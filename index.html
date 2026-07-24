@@ -1,0 +1,1617 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WoW 团本考勤管理系统</title>
+<link rel="stylesheet" href="css/main.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+
+<!-- 认证遮罩层 -->
+<div class="auth-overlay" id="authOverlay" style="display:none">
+  <div class="auth-container">
+    <div class="auth-logo">⚔</div>
+    <h1 class="auth-title">WoW 团本考勤系统</h1>
+    <p class="auth-subtitle">团队云端协作平台</p>
+
+    <!-- 登录表单 -->
+    <div class="auth-form" id="authLoginForm">
+      <div class="auth-field">
+        <label>邮箱</label>
+        <input type="email" id="authEmail" placeholder="your@email.com" class="auth-input">
+      </div>
+      <div class="auth-field">
+        <label>密码</label>
+        <input type="password" id="authPassword" placeholder="至少6位" class="auth-input">
+      </div>
+      <button class="btn btn-primary auth-btn" onclick="handleLogin()">登录</button>
+      <div class="auth-switch">
+        还没有账号？<a href="javascript:void(0)" onclick="showRegisterForm()">立即注册</a>
+      </div>
+      <div class="auth-divider"><span>或者</span></div>
+      <button class="btn auth-btn" onclick="handleLocalMode()">本地模式（不登录）</button>
+    </div>
+
+    <!-- 注册表单 -->
+    <div class="auth-form" id="authRegisterForm" style="display:none">
+      <div class="auth-field">
+        <label>显示名称</label>
+        <input type="text" id="regDisplayName" placeholder="你的角色名" class="auth-input">
+      </div>
+      <div class="auth-field">
+        <label>邮箱</label>
+        <input type="email" id="regEmail" placeholder="your@email.com" class="auth-input">
+      </div>
+      <div class="auth-field">
+        <label>密码</label>
+        <input type="password" id="regPassword" placeholder="至少6位" class="auth-input">
+      </div>
+      <button class="btn btn-primary auth-btn" onclick="handleRegister()">注册</button>
+      <button class="btn auth-btn" style="background:transparent;border:1px solid var(--border-color);color:var(--text-secondary);margin-top:8px" onclick="showLoginForm()">返回登录</button>
+    </div>
+
+    <!-- 创建/加入公会 -->
+    <div class="auth-form" id="authGuildForm" style="display:none">
+      <p class="auth-guild-hint">你还没有加入任何公会，请创建或加入一个</p>
+      <div class="auth-field">
+        <label>创建新公会</label>
+        <input type="text" id="newGuildName" placeholder="输入公会名称" class="auth-input">
+      </div>
+      <div class="auth-field">
+        <label>服务器区域</label>
+        <select id="serverRegion" class="auth-input" onchange="updateServerList()">
+          <option value="">选择区域</option>
+          <option value="一区">一区</option>
+          <option value="三区">三区</option>
+          <option value="五区">五区</option>
+          <option value="十区">十区</option>
+          <option value="推荐服务器">推荐服务器</option>
+        </select>
+      </div>
+      <div class="auth-field">
+        <label>服务器名称</label>
+        <div class="autocomplete-container">
+          <input type="text" id="serverNameInput" placeholder="输入服务器名称自动搜索区域" class="auth-input autocomplete-input" oninput="filterServerList()" onfocus="showServerDropdown()" onblur="hideServerDropdown()">
+          <div class="autocomplete-dropdown" id="serverDropdown"></div>
+        </div>
+      </div>
+      <button class="btn btn-primary auth-btn" onclick="handleCreateGuild()">创建公会</button>
+      <div class="auth-divider"><span>或者</span></div>
+      <div class="auth-field">
+        <label>邀请码</label>
+        <input type="text" id="joinInviteCode" placeholder="输入8位邀请码" class="auth-input" maxlength="8" style="text-transform:uppercase">
+      </div>
+      <button class="btn auth-btn" onclick="handleJoinGuild()">加入公会</button>
+      <div class="auth-divider"><span>或者</span></div>
+      <button class="btn auth-btn" style="background:transparent;border:1px solid var(--border-color);color:var(--text-secondary)" onclick="showAuthView('login')">返回登录</button>
+    </div>
+
+    <div class="auth-error" id="authError"></div>
+  </div>
+</div>
+
+<div class="app-container">
+  <!-- 侧边栏 -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <div class="sidebar-logo">⚔</div>
+      <div>
+        <div class="sidebar-title">WoW团本工具箱</div>
+        <div class="sidebar-subtitle" id="guildName">本地模式</div>
+      </div>
+    </div>
+    <!-- 公会信息栏 -->
+    <div class="guild-bar" id="guildBar" style="display:none">
+      <div class="guild-bar-info">
+        <span class="guild-bar-name" id="guildBarName"></span>
+        <span class="guild-bar-role" id="guildRole"></span>
+      </div>
+      <div class="guild-bar-actions">
+        <button class="user-center-btn" onclick="openUserCenter()" title="用户中心">
+          👤
+          <span class="notif-dot"></span>
+        </button>
+        <button class="guild-bar-btn" onclick="openGuildSettings()" title="公会设置">⚙</button>
+      </div>
+    </div>
+    <nav class="nav-menu">
+      <div class="nav-item active" data-page="dashboard" onclick="switchPage('dashboard')">
+        <span class="nav-icon">📊</span><span>仪表盘</span>
+      </div>
+      <div class="nav-item" data-page="members" onclick="switchPage('members')">
+        <span class="nav-icon">👥</span><span>成员管理</span>
+      </div>
+      <div class="nav-item" data-page="attendance" onclick="switchPage('attendance')">
+        <span class="nav-icon">📅</span><span>考勤记录</span>
+      </div>
+      <div class="nav-item" data-page="loot" onclick="switchPage('loot')">
+        <span class="nav-icon">⚔️</span><span>装备分配</span>
+      </div>
+      <div class="nav-item" data-page="wishlist" onclick="switchPage('wishlist')">
+        <span class="nav-icon">🎯</span><span>心愿单</span>
+      </div>
+      <div class="nav-item" data-page="reports" onclick="switchPage('reports')">
+        <span class="nav-icon">📈</span><span>统计报表</span>
+      </div>
+      <div class="nav-item" data-page="data" onclick="switchPage('data')">
+        <span class="nav-icon">💾</span><span>数据管理</span>
+      </div>
+      <div class="nav-item" data-page="changelog" onclick="switchPage('changelog')">
+        <span class="nav-icon">📝</span><span>更新日志</span>
+      </div>
+      <div class="nav-item" onclick="openUserCenter()">
+        <span class="nav-icon">👤</span><span>用户中心</span>
+      </div>
+    </nav>
+    <div class="sidebar-footer">
+      <div id="sidebarUser"></div>
+      <div style="margin-top:4px">v3.1.0 · 用户中心版</div>
+    </div>
+  </aside>
+
+  <!-- 主内容区 -->
+  <main class="main-content" id="mainContent">
+    <!-- 顶部栏 -->
+    <header class="topbar">
+      <div class="topbar-left">
+        <div class="menu-toggle" onclick="toggleSidebar()">☰</div>
+        <div class="page-title" id="pageTitle">仪表盘</div>
+      </div>
+      <div class="topbar-right">
+        <span id="userInfo" style="font-size:12px;color:var(--text-muted);margin-right:8px"></span>
+        <button class="feishu-btn" id="guildSwitchBtn" onclick="openGuildSwitcher()" style="display:none">
+          <span>🏰 切换公会</span>
+        </button>
+        <span style="font-size:12px;color:var(--text-muted)" id="todayStr"></span>
+      </div>
+    </header>
+
+    <!-- 内容区域 -->
+    <div class="content-area">
+      <!-- 仪表盘 -->
+      <div class="page active" id="page-dashboard">
+        <div class="stats-grid" id="statsGrid"></div>
+        <div class="dashboard-grid">
+          <div class="card">
+            <div class="card-header">
+              <div>
+                <div class="card-title">最近活动</div>
+                <div class="card-subtitle">最近 5 次团本考勤</div>
+              </div>
+            </div>
+            <div class="recent-list" id="recentList"></div>
+          </div>
+          <div class="card">
+            <div class="card-header">
+              <div>
+                <div class="card-title">出勤率排行</div>
+                <div class="card-subtitle">Top 5</div>
+              </div>
+            </div>
+            <div class="rank-list" id="rankListTop5"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 成员管理 -->
+      <div class="page" id="page-members">
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <div class="card-title">团队成员</div>
+              <div class="card-subtitle">管理所有团队成员信息</div>
+            </div>
+          </div>
+          <div class="toolbar">
+            <div class="toolbar-left">
+              <input type="text" class="search-input" placeholder="搜索角色名、职业..." id="memberSearch" oninput="renderMembers()">
+              <select class="form-select" style="width:140px;font-size:13px" id="classFilter" onchange="renderMembers()">
+                <option value="">全部职业</option>
+                <option value="战士">战士</option>
+                <option value="法师">法师</option>
+                <option value="牧师">牧师</option>
+                <option value="盗贼">盗贼</option>
+                <option value="猎人">猎人</option>
+                <option value="圣骑士">圣骑士</option>
+                <option value="萨满">萨满</option>
+                <option value="德鲁伊">德鲁伊</option>
+                <option value="术士">术士</option>
+                <option value="武僧">武僧</option>
+                <option value="恶魔猎手">恶魔猎手</option>
+                <option value="死亡骑士">死亡骑士</option>
+                <option value="唤魔师">唤魔师</option>
+              </select>
+              <div class="role-filter-group" id="roleFilter">
+                <span class="role-filter-label">职责：</span>
+                <label class="role-filter-item">
+                  <input type="checkbox" value="坦克" onchange="renderMembers()">
+                  <span class="role-filter-tag tank">坦克</span>
+                </label>
+                <label class="role-filter-item">
+                  <input type="checkbox" value="输出" onchange="renderMembers()">
+                  <span class="role-filter-tag dps">输出</span>
+                </label>
+                <label class="role-filter-item">
+                  <input type="checkbox" value="治疗" onchange="renderMembers()">
+                  <span class="role-filter-tag heal">治疗</span>
+                </label>
+              </div>
+            </div>
+            <div class="toolbar-right">
+              <button class="btn" onclick="showImportMembersModal()">📋 批量导入</button>
+              <button class="btn btn-primary" onclick="showMemberModal()">+ 添加成员</button>
+            </div>
+          </div>
+          <div class="table-container">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th style="width:50px">#</th>
+                  <th>角色名</th>
+                  <th>职业</th>
+                  <th>专精</th>
+                  <th>状态</th>
+                  <th>加入日期</th>
+                  <th>出勤率</th>
+                  <th style="width:100px">操作</th>
+                </tr>
+              </thead>
+              <tbody id="membersTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- 考勤记录 -->
+      <div class="page" id="page-attendance">
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <div class="card-title">考勤记录</div>
+              <div class="card-subtitle">查看和管理所有团本活动考勤</div>
+            </div>
+          </div>
+          <div class="attendance-header">
+            <div class="view-tabs">
+              <div class="view-tab active" onclick="switchAttendanceView('calendar')">日历视图</div>
+              <div class="view-tab" onclick="switchAttendanceView('list')">列表视图</div>
+            </div>
+            <div style="display:flex;gap:8px">
+              <button class="btn" onclick="showWCLImportModal()">🔗 WCL 导入</button>
+              <button class="btn btn-primary" onclick="showActivityModal()">+ 创建活动</button>
+            </div>
+          </div>
+
+          <!-- 日历视图 -->
+          <div id="calendarView">
+            <div class="calendar">
+              <div class="calendar-header">
+                <div class="calendar-nav">
+                  <button class="icon-btn" onclick="changeMonth(-1)">◀</button>
+                  <div class="calendar-month" id="calendarMonth"></div>
+                  <button class="icon-btn" onclick="changeMonth(1)">▶</button>
+                </div>
+                <button class="btn btn-sm" onclick="goToToday()">今天</button>
+              </div>
+              <div class="calendar-weekdays">
+                <div class="calendar-weekday">日</div>
+                <div class="calendar-weekday">一</div>
+                <div class="calendar-weekday">二</div>
+                <div class="calendar-weekday">三</div>
+                <div class="calendar-weekday">四</div>
+                <div class="calendar-weekday">五</div>
+                <div class="calendar-weekday">六</div>
+              </div>
+              <div class="calendar-days" id="calendarDays"></div>
+            </div>
+          </div>
+
+          <!-- 列表视图 -->
+          <div id="listView" style="display:none">
+            <div class="activity-list" id="activityList"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 统计报表 -->
+
+      <!-- 装备分配 -->
+      <div class="page" id="page-loot">
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <div class="card-title">装备分配</div>
+              <div class="card-subtitle">管理团本装备掉落与分配记录</div>
+            </div>
+          </div>
+          <div class="toolbar">
+            <div class="toolbar-left">
+              <input type="text" class="search-input" placeholder="搜索装备名称..." id="lootSearch" oninput="lootRender()">
+              <select class="loot-filter-select" id="lootRaidFilter" onchange="lootRender()">
+                <option value="">全部团本</option>
+                <option value="虚影尖塔">虚影尖塔</option>
+                <option value="梦境裂隙">梦境裂隙</option>
+                <option value="进军奎尔丹纳斯">进军奎尔丹纳斯</option>
+              </select>
+              <select class="loot-filter-select" id="lootDifficultyFilter" onchange="lootRender()">
+                <option value="">全部难度</option>
+                <option value="普通">普通</option>
+                <option value="英雄">英雄</option>
+                <option value="史诗">史诗</option>
+              </select>
+              <select class="loot-filter-select" id="lootCategoryFilter" onchange="lootRender()">
+                <option value="">全部大类</option>
+                <option value="武器">武器</option>
+                <option value="防具">防具</option>
+                <option value="首饰">首饰</option>
+                <option value="饰品">饰品</option>
+              </select>
+              <select class="loot-filter-select" id="lootStatusFilter" onchange="lootRender()">
+                <option value="">全部状态</option>
+                <option value="待分配">待分配</option>
+                <option value="已分配">已分配</option>
+                <option value="分解">分解</option>
+                <option value="销毁">销毁</option>
+              </select>
+              <select class="loot-filter-select" id="lootPriorityFilter" onchange="lootRender()">
+                <option value="">全部优先级</option>
+                <option value="P0">P0</option>
+                <option value="P1">P1</option>
+                <option value="P2">P2</option>
+                <option value="P3">P3</option>
+              </select>
+            </div>
+            <div class="toolbar-right">
+              <button class="btn" onclick="lootShowFeishuSync()">☁️ 飞书备份</button>
+              <button class="btn btn-primary" onclick="lootShowModal()">+ 添加装备</button>
+            </div>
+          </div>
+          <div class="table-container">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>装备名称</th>
+                  <th>所属团本</th>
+                  <th>掉落难度</th>
+                  <th>掉落BOSS</th>
+                  <th>装备部位</th>
+                  <th>主属性</th>
+                  <th>副属性</th>
+                  <th>分配给谁</th>
+                  <th>分配状态</th>
+                  <th>分配方式</th>
+                  <th>Roll</th>
+                  <th>活动日期</th>
+                  <th style="width:90px">操作</th>
+                </tr>
+              </thead>
+              <tbody id="lootTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- 心愿单 -->
+      <div class="page" id="page-wishlist">
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <div class="card-title">心愿单</div>
+              <div class="card-subtitle">管理团员的装备需求与获取进度</div>
+            </div>
+          </div>
+          <div class="toolbar">
+            <div class="toolbar-left">
+              <input type="text" class="search-input" placeholder="搜索装备名称..." id="wishlistSearch" oninput="wishlistRender()">
+              <select class="loot-filter-select" id="wishlistMemberFilter" onchange="wishlistRender()">
+                <option value="">全部成员</option>
+              </select>
+              <select class="loot-filter-select" id="wishlistPriorityFilter" onchange="wishlistRender()">
+                <option value="">全部优先级</option>
+                <option value="P0">P0</option>
+                <option value="P1">P1</option>
+                <option value="P2">P2</option>
+              </select>
+              <select class="loot-filter-select" id="wishlistCategoryFilter" onchange="wishlistRender()">
+                <option value="">全部大类</option>
+                <option value="武器">武器</option>
+                <option value="防具">防具</option>
+                <option value="首饰">首饰</option>
+                <option value="饰品">饰品</option>
+              </select>
+              <select class="loot-filter-select" id="wishlistStatusFilter" onchange="wishlistRender()">
+                <option value="">全部状态</option>
+                <option value="pending">未获取</option>
+                <option value="obtained">已获取</option>
+              </select>
+              <select class="loot-filter-select" id="wishlistSpecFilter" onchange="wishlistRender()">
+                <option value="">全部专精</option>
+                <option value="main">主专精</option>
+                <option value="off">副专精</option>
+              </select>
+            </div>
+            <div class="toolbar-right">
+              <button class="btn" onclick="wishlistShowFeishuSync()">☁️ 飞书备份</button>
+              <button class="btn btn-primary" onclick="wishlistShowModal()">+ 添加心愿</button>
+            </div>
+          </div>
+          <!-- 批量操作工具栏 -->
+          <div id="wishlistBatchToolbar" style="display:none;align-items:center;gap:12px;padding:8px 12px;margin-bottom:8px;background:var(--bg-tertiary);border:1px solid var(--border-color);border-radius:6px;font-size:13px">
+            <span id="wishlistBatchCount" style="color:var(--gold);font-weight:600">已选择 0 条</span>
+            <button class="btn btn-danger btn-sm" onclick="wishlistBatchDelete()">批量删除</button>
+            <button class="btn btn-sm" onclick="wishlistClearSelection()">取消选择</button>
+          </div>
+          <div class="table-container">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th style="width:36px"><input type="checkbox" id="wishlistSelectAll" onchange="wishlistToggleSelectAll(this.checked)" title="全选"></th>
+                  <th>装备名称</th>
+                  <th>所属团本</th>
+                  <th>掉落BOSS</th>
+                  <th>装备部位</th>
+                  <th>需求成员</th>
+                  <th>优先级</th>
+                  <th>专精</th>
+                  <th>状态</th>
+                  <th style="width:120px">操作</th>
+                </tr>
+              </thead>
+              <tbody id="wishlistTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="page" id="page-reports">
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <div class="card-title">统计报表</div>
+              <div class="card-subtitle">团队出勤数据分析</div>
+            </div>
+          </div>
+          <div class="filter-bar">
+            <span style="font-size:13px;color:var(--text-secondary)">时间范围：</span>
+            <button class="filter-btn active" data-range="7" onclick="setReportRange(7)">近7天</button>
+            <button class="filter-btn" data-range="30" onclick="setReportRange(30)">近30天</button>
+            <button class="filter-btn" data-range="90" onclick="setReportRange(90)">近90天</button>
+            <button class="filter-btn" data-range="0" onclick="setReportRange(0)">全部</button>
+          </div>
+          <div class="charts-grid">
+            <div class="chart-container">
+              <div style="font-size:14px;font-weight:600;color:var(--gold);margin-bottom:12px">出勤率 Top10</div>
+              <canvas id="barChart"></canvas>
+            </div>
+            <div class="chart-container">
+              <div style="font-size:14px;font-weight:600;color:var(--gold);margin-bottom:12px">出勤趋势（最近10次）</div>
+              <canvas id="lineChart"></canvas>
+            </div>
+          </div>
+
+          <div style="display:grid;grid-template-columns:2fr 1fr;gap:20px">
+            <div class="card" style="margin-bottom:0">
+              <div class="card-header">
+                <div class="card-title">出勤率排名</div>
+              </div>
+              <div class="table-container">
+                <table class="data-table stats-rank-table">
+                  <thead>
+                    <tr><th style="width:50px">排名</th><th>角色名</th><th>职业</th><th>出席</th><th>替补</th><th>缺席</th><th>迟到</th><th>请假</th><th>出勤率</th></tr>
+                  </thead>
+                  <tbody id="rankTableBody"></tbody>
+                </table>
+              </div>
+            </div>
+            <div class="card" style="margin-bottom:0">
+              <div class="card-header">
+                <div class="card-title">缺席榜 Top5</div>
+              </div>
+              <div class="rank-list" id="absentRankList"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 数据管理 -->
+      <div class="page" id="page-data">
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <div class="card-title">数据管理</div>
+              <div class="card-subtitle">数据导入导出与备份</div>
+            </div>
+          </div>
+          <div class="data-stats-grid" id="dataStatsGrid"></div>
+
+          <div class="data-actions">
+            <div class="data-action-card" style="background:rgba(63,185,80,0.08); border-color:rgba(63,185,80,0.2)">
+              <h4 style="color:var(--success)">☁ 云端同步状态</h4>
+              <p>当前数据已自动同步到云端，所有公会成员共享同一份数据，无需手动备份。</p>
+              <div style="display:flex; align-items:center; gap:8px; color:var(--success); font-size:12px; margin-top:8px">
+                <span>✅</span>
+                <span id="cloudSyncStatus">数据已云端同步</span>
+              </div>
+            </div>
+            <div class="data-action-card feishu-sync-card">
+              <h4>📘 飞书多维表格同步</h4>
+              <p>将考勤数据与飞书多维表格双向同步，支持成员、活动、考勤记录的云端备份与共享。</p>
+              <div class="feishu-sync-actions">
+                <button class="btn btn-primary btn-sm" onclick="openFeishuConfig()">⚙ 配置</button>
+                <button class="btn btn-sm" onclick="pullFromFeishu()">⬇ 拉取数据</button>
+                <button class="btn btn-sm" onclick="pushToFeishu()">⬆ 推送数据</button>
+              </div>
+            </div>
+            <div class="data-action-card" style="opacity:0.7">
+              <h4 style="color:var(--text-muted)">💾 本地 JSON 备份/迁移</h4>
+              <p style="color:var(--text-muted)">仅作为数据备份或跨环境迁移使用，不参与日常 CRUD 实时数据流。</p>
+              <div style="display:flex; gap:10px">
+                <button class="btn btn-sm" onclick="exportData()" id="btnExportLocal" disabled>导出 JSON</button>
+                <button class="btn btn-sm" onclick="document.getElementById('importFile').click()" id="btnImportLocal" disabled>导入 JSON</button>
+                <input type="file" id="importFile" accept=".json" style="display:none" onchange="handleImportFile(event)">
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 更新日志 -->
+      <div class="page" id="page-changelog">
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <div class="card-title">📝 更新日志</div>
+              <div class="card-subtitle">记录每一次功能迭代与优化</div>
+            </div>
+            <div class="filter-bar">
+              <button class="filter-btn active" data-type="all" onclick="changelogFilter('all')">全部</button>
+              <button class="filter-btn" data-type="feature" onclick="changelogFilter('feature')">✨ 新增功能</button>
+              <button class="filter-btn" data-type="fix" onclick="changelogFilter('fix')">🐛 修复BUG</button>
+              <button class="filter-btn" data-type="improve" onclick="changelogFilter('improve')">⚡ 功能优化</button>
+              <button class="filter-btn" data-type="refactor" onclick="changelogFilter('refactor')">🔧 模块调整</button>
+            </div>
+          </div>
+          <div class="changelog-timeline" id="changelogTimeline"></div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- ===== 弹窗：添加/编辑成员 ===== -->
+<div class="modal-overlay" id="memberModal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="memberModalTitle">添加成员</div>
+      <div class="modal-close" onclick="closeModal('memberModal')">×</div>
+    </div>
+    <div class="modal-body">
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">角色名 *</label>
+          <input type="text" class="form-input" id="memberName" placeholder="请输入角色名">
+        </div>
+        <div class="form-group">
+          <label class="form-label">职业 *</label>
+          <select class="form-select" id="memberClass" onchange="onMemberClassChange()">
+            <option value="">请选择职业</option>
+            <option value="战士">战士</option>
+            <option value="法师">法师</option>
+            <option value="牧师">牧师</option>
+            <option value="盗贼">盗贼</option>
+            <option value="猎人">猎人</option>
+            <option value="圣骑士">圣骑士</option>
+            <option value="萨满">萨满</option>
+            <option value="德鲁伊">德鲁伊</option>
+            <option value="术士">术士</option>
+            <option value="武僧">武僧</option>
+            <option value="恶魔猎手">恶魔猎手</option>
+            <option value="死亡骑士">死亡骑士</option>
+            <option value="唤魔师">唤魔师</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">职责<span style="color:var(--text-muted);font-weight:400">（非必填）</span></label>
+        <div class="role-tags" id="memberRoleTags">
+          <span class="role-tag" data-role="坦克" onclick="toggleMemberRole('坦克')">🛡 坦克</span>
+          <span class="role-tag" data-role="治疗" onclick="toggleMemberRole('治疗')">💚 治疗</span>
+          <span class="role-tag" data-role="输出" onclick="toggleMemberRole('输出')">⚔ 输出</span>
+        </div>
+      </div>
+      <div class="form-group" id="specFieldGroup">
+        <label class="form-label" id="specFieldLabel">专精</label>
+        <div id="specFieldsContainer">
+          <select class="form-select" id="memberMainSpec">
+            <option value="">请先选择职业</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">状态</label>
+          <select class="form-select" id="memberStatus">
+            <option value="正式">正式</option>
+            <option value="替补">替补</option>
+            <option value="试用">试用</option>
+            <option value="离队">离队</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">加入日期</label>
+        <input type="date" class="form-input" id="memberJoinDate">
+      </div>
+      <div class="form-group">
+        <label class="form-label">备注</label>
+        <textarea class="form-textarea" id="memberNotes" placeholder="可选"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('memberModal')">取消</button>
+      <button id="memberSaveBtn" class="btn btn-primary" onclick="saveMember()">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 弹窗：批量导入成员 ===== -->
+<div class="modal-overlay" id="importMembersModal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">批量导入成员</div>
+      <div class="modal-close" onclick="closeModal('importMembersModal')">×</div>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:13px;color:var(--text-muted);margin-bottom:12px">
+        支持 JSON 数组格式，每行一个成员，或粘贴完整的 JSON。<br>
+        格式示例：<code style="color:var(--gold)">[{"name":"角色名","class":"职业","main_spec":"主专精","role":["输出"]}]</code>
+      </p>
+      <textarea class="form-textarea" id="importMembersText" style="height:200px" placeholder='[
+  {"name": "角色1", "class": "战士", "main_spec": "武器", "role": ["输出"]},
+  {"name": "角色2", "class": "圣骑士", "main_spec": "惩戒", "off_spec": "神圣", "role": ["输出", "治疗"]}
+]'></textarea>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('importMembersModal')">取消</button>
+      <button class="btn btn-primary" onclick="importMembers()">导入</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 弹窗：创建/编辑活动 ===== -->
+<div class="modal-overlay" id="activityModal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="activityModalTitle">创建活动</div>
+      <div class="modal-close" onclick="closeModal('activityModal')">×</div>
+    </div>
+    <div class="modal-body">
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">日期 *</label>
+          <input type="date" class="form-input" id="activityDate">
+        </div>
+        <div class="form-group">
+          <label class="form-label">团本名称 *</label>
+          <input type="text" class="form-input" id="activityRaidName" placeholder="如：尼鲁巴尔王宫">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">开始时间</label>
+          <input type="time" class="form-input" id="activityStartTime" value="20:00">
+        </div>
+        <div class="form-group">
+          <label class="form-label">结束时间</label>
+          <input type="time" class="form-input" id="activityEndTime" value="23:00">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">备注</label>
+        <textarea class="form-textarea" id="activityNotes" style="height:60px" placeholder="可选"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('activityModal')">取消</button>
+      <button id="activitySaveBtn" class="btn btn-primary" onclick="saveActivity()">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 弹窗：考勤详情 ===== -->
+<div class="modal-overlay" id="attendanceDetailModal">
+  <div class="modal" style="max-width:680px">
+    <div class="modal-header">
+      <div>
+        <div class="modal-title" id="attendanceDetailTitle">考勤详情</div>
+        <div class="card-subtitle" id="attendanceDetailSubtitle" style="font-size:12px"></div>
+      </div>
+      <div class="modal-close" onclick="closeModal('attendanceDetailModal')">×</div>
+    </div>
+    <div class="modal-body">
+      <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+        <button class="btn btn-sm" onclick="setAllAttendance('出席')">全部出席</button>
+        <button class="btn btn-sm" onclick="setAllAttendance('缺席')">全部缺席</button>
+        <button class="btn btn-sm" onclick="setAllAttendance('替补')">全部替补</button>
+        <button class="btn btn-sm" onclick="setAllAttendance('请假')">全部请假</button>
+      </div>
+      <div class="attendance-members" id="attendanceMembersList"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-danger btn-sm" onclick="deleteCurrentActivity()" style="margin-right:auto">删除活动</button>
+      <button class="btn" onclick="closeModal('attendanceDetailModal')">关闭</button>
+      <button id="attendanceSaveBtn" class="btn btn-primary" onclick="saveAttendance()">保存考勤</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 弹窗：WCL 导入 ===== -->
+<div class="modal-overlay" id="wclImportModal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">WCL 导入</div>
+      <div class="modal-close" onclick="closeModal('wclImportModal')">×</div>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:13px;color:var(--text-muted);margin-bottom:12px">
+        粘贴 WCL (Warcraft Logs) 报告链接，自动提取参与玩家并匹配团队成员。
+      </p>
+      <div class="form-group">
+        <label class="form-label">WCL 链接</label>
+        <input type="text" class="form-input" id="wclUrl" placeholder="https://www.warcraftlogs.com/reports/...">
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">活动日期</label>
+          <input type="date" class="form-input" id="wclDate">
+        </div>
+        <div class="form-group">
+          <label class="form-label">团本名称</label>
+          <input type="text" class="form-input" id="wclRaidName" placeholder="尼鲁巴尔王宫">
+        </div>
+      </div>
+      <div style="padding:12px;background:var(--bg-primary);border-radius:6px;font-size:12px;color:var(--text-muted);border:1px solid var(--border-color)">
+        <strong style="color:var(--warning)">说明：</strong>由于浏览器安全限制，无法直接跨域请求 WCL API。
+        请在下方直接粘贴玩家名单（每行一个角色名），或使用角色名列表快速导入：
+      </div>
+      <div class="form-group" style="margin-top:12px">
+        <label class="form-label">玩家名单（每行一个角色名）</label>
+        <textarea class="form-textarea" id="wclPlayerList" style="height:120px" placeholder="角色名1
+角色名2
+角色名3"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('wclImportModal')">取消</button>
+      <button class="btn btn-primary" onclick="importFromWCL()">导入</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 弹窗：飞书同步配置 ===== -->
+<div class="modal-overlay" id="feishuConfigModal">
+  <div class="modal" style="max-width:600px">
+    <div class="modal-header">
+      <div>
+        <div class="modal-title">📘 飞书多维表格同步配置</div>
+        <div class="card-subtitle" style="font-size:12px">
+          <span class="feishu-status-badge" id="feishuStatusBadge">
+            <span class="sync-status-indicator" id="feishuStatusDot"></span>
+            <span id="feishuStatusText">未连接</span>
+          </span>
+        </div>
+      </div>
+      <div class="modal-close" onclick="closeModal('feishuConfigModal')">×</div>
+    </div>
+    <div class="modal-body">
+      <!-- 应用配置 -->
+      <div class="feishu-config-section">
+        <div class="feishu-config-title">🔑 应用凭证</div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">App ID</label>
+            <input type="text" class="form-input" id="feishuAppId" placeholder="cli_xxxxxxxxxx">
+          </div>
+          <div class="form-group">
+            <label class="form-label">App Secret</label>
+            <input type="password" class="form-input" id="feishuAppSecret" placeholder="xxxxxxxxxxxxxxxxxxxx">
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Base Token（多维表格唯一标识）</label>
+          <input type="text" class="form-input" id="feishuBaseToken" placeholder="bascnxxxxxxxxxxxxxxxx">
+        </div>
+      </div>
+
+      <!-- 表格配置 -->
+      <div class="feishu-config-section">
+        <div class="feishu-config-title">📋 数据表配置</div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">成员表 Table ID</label>
+            <input type="text" class="form-input" id="feishuMemberTableId" placeholder="tblxxxxxxxxxxxx">
+          </div>
+          <div class="form-group">
+            <label class="form-label">活动表 Table ID</label>
+            <input type="text" class="form-input" id="feishuActivityTableId" placeholder="tblxxxxxxxxxxxx">
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">考勤记录表 Table ID</label>
+          <input type="text" class="form-input" id="feishuRecordTableId" placeholder="tblxxxxxxxxxxxx">
+        </div>
+      </div>
+
+      <!-- 同步模式 -->
+      <div class="feishu-config-section">
+        <div class="feishu-config-title">🔄 同步设置</div>
+        <div class="form-group">
+          <label class="form-label">同步模式</label>
+          <div class="sync-mode-toggle">
+            <div class="sync-mode-option active" data-mode="incremental" onclick="setSyncMode('incremental')">增量同步</div>
+            <div class="sync-mode-option" data-mode="full" onclick="setSyncMode('full')">全量同步</div>
+          </div>
+          <p style="font-size:11px;color:var(--text-muted);margin-top:8px;line-height:1.5">
+            <strong style="color:var(--text-secondary)">增量同步：</strong>仅同步本地有变更或飞书新增的数据<br>
+            <strong style="color:var(--text-secondary)">全量同步：</strong>清空目标端数据后重新同步所有记录
+          </p>
+        </div>
+      </div>
+
+      <!-- 操作按钮 -->
+      <div style="display:flex;gap:8px;justify-content:flex-end">
+        <button class="btn" onclick="testFeishuConnection()">🔌 测试连接</button>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('feishuConfigModal')">取消</button>
+      <button class="btn btn-primary" onclick="saveFeishuConfig()">保存配置</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 弹窗：同步进度 ===== -->
+<div class="modal-overlay sync-progress-modal" id="syncProgressModal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="syncProgressTitle">同步中...</div>
+      <div class="modal-close" onclick="closeSyncProgress()">×</div>
+    </div>
+    <div class="modal-body">
+      <div id="syncProgressList">
+        <!-- 进度项动态生成 -->
+      </div>
+      <div id="syncResultSummary" style="display:none" class="sync-result-summary">
+        <div class="sync-result-item success">
+          <div class="sync-result-item-value" id="syncResultSuccess">0</div>
+          <div class="sync-result-item-label">成功</div>
+        </div>
+        <div class="sync-result-item error">
+          <div class="sync-result-item-value" id="syncResultFailed">0</div>
+          <div class="sync-result-item-label">失败</div>
+        </div>
+        <div class="sync-result-item">
+          <div class="sync-result-item-value" id="syncResultSkipped">0</div>
+          <div class="sync-result-item-label">跳过</div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer" id="syncProgressFooter" style="display:none">
+      <button class="btn btn-primary" onclick="closeSyncProgress()">完成</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- ===== 弹窗：添加/编辑装备 ===== -->
+<div class="modal-overlay" id="lootModal">
+  <div class="modal" style="max-width: 600px;">
+    <div class="modal-header">
+      <div class="modal-title" id="lootModalTitle">添加装备</div>
+      <div class="modal-close" onclick="closeModal('lootModal')">×</div>
+    </div>
+    <div class="modal-body">
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">装备名称 *</label>
+          <input type="text" class="form-input" id="lootName" placeholder="请输入装备名称" oninput="lootUpdateWishlistMatches()">
+          <button type="button" class="btn btn-sm" style="margin-top:6px;width:100%;" onclick="openItemDbPicker('loot')">📦 从装备库选择</button>
+        </div>
+        <div class="form-group">
+          <label class="form-label">所属团本</label>
+          <select class="form-select" id="lootRaid" onchange="lootOnRaidChange()">
+          </select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">掉落难度</label>
+          <select class="form-select" id="lootDifficulty">
+            <option value="普通">普通</option>
+            <option value="英雄">英雄</option>
+            <option value="史诗">史诗</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">掉落BOSS</label>
+          <select class="form-select" id="lootBoss">
+          </select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">装备大类</label>
+          <select class="form-select" id="lootCategory" onchange="lootOnCategoryChange()">
+            <option value="武器">武器</option>
+            <option value="防具">防具</option>
+            <option value="首饰">首饰</option>
+            <option value="饰品">饰品</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">装备部位</label>
+          <select class="form-select" id="lootSlot">
+          </select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">主属性</label>
+          <select class="form-select" id="lootPrimaryStat">
+            <option value="力量">力量</option>
+            <option value="敏捷">敏捷</option>
+            <option value="智力">智力</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">副属性</label>
+        <div class="secondary-stat-tags" id="lootSecondaryStats">
+          <span class="secondary-stat-tag" data-stat="暴击" onclick="lootToggleSecondaryStat('暴击')">暴击</span>
+          <span class="secondary-stat-tag" data-stat="急速" onclick="lootToggleSecondaryStat('急速')">急速</span>
+          <span class="secondary-stat-tag" data-stat="精通" onclick="lootToggleSecondaryStat('精通')">精通</span>
+          <span class="secondary-stat-tag" data-stat="全能" onclick="lootToggleSecondaryStat('全能')">全能</span>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">特殊效果</label>
+        <textarea class="form-textarea" id="lootSpecialEffect" placeholder="请输入装备的特殊效果描述" rows="2"></textarea>
+        <div class="special-effect-hint">填写装备的特殊效果描述，如风剑的特效</div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">分配给谁</label>
+          <select class="form-select" id="lootAssignedTo" onchange="lootUpdateMemberInfo()">
+            <option value="">请选择成员</option>
+          </select>
+          <div id="lootMemberInfo" class="loot-member-info" style="display:none;">
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">分配状态</label>
+          <select class="form-select" id="lootStatus">
+            <option value="待分配">待分配</option>
+            <option value="已分配">已分配</option>
+            <option value="分解">分解</option>
+            <option value="销毁">销毁</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">分配方式 *</label>
+          <select class="form-select" id="lootDistributionMethod" onchange="lootOnDistributionMethodChange()">
+            <option value="roll">Roll</option>
+            <option value="cl">CL</option>
+            <option value="master_loot">队长分配</option>
+            <option value="custom" selected>其他</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">赛季</label>
+          <input type="text" class="form-input" id="lootSeason" placeholder="例如：地心之战 S1">
+        </div>
+      </div>
+      <div class="form-row" id="lootPlayerActionRow" style="display:none;">
+        <div class="form-group">
+          <label class="form-label">玩家行为</label>
+          <select class="form-select" id="lootPlayerAction">
+            <option value="none" selected>无</option>
+            <option value="need">需求</option>
+            <option value="greed">贪婪</option>
+            <option value="pass">放弃</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Roll 值</label>
+          <input type="number" class="form-input" id="lootRollValue" min="1" max="100" placeholder="1-100">
+        </div>
+      </div>
+      <div class="form-group" id="lootRuleNoteRow" style="display:none;">
+        <label class="form-label">规则说明</label>
+        <textarea class="form-textarea" id="lootRuleNote" placeholder="记录 Roll 规则、公会制度或特殊情况说明" rows="2"></textarea>
+      </div>
+      <div class="form-group" id="lootDecisionNoteRow" style="display:none;">
+        <label class="form-label">决策说明</label>
+        <textarea class="form-textarea" id="lootDecisionNote" placeholder="记录 CL 分配原因、队长分配理由" rows="2"></textarea>
+      </div>
+      <div class="form-group">
+        <label class="form-checkbox" style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+          <input type="checkbox" id="lootIsWishlist" style="width:auto;">
+          <span>心愿单装备</span>
+        </label>
+      </div>
+      <div class="form-group" id="lootWishlistMatches" style="display:none">
+        <label class="form-label">💡 有需求的成员</label>
+        <div id="lootWishlistMatchList" style="display:flex;gap:8px;flex-wrap:wrap;padding:10px;background:var(--bg-primary);border-radius:6px;border:1px solid var(--border-color);min-height:40px;">
+        </div>
+        <div class="special-effect-hint">点击成员名可自动填充「分配给谁」字段</div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">优先级</label>
+          <select class="form-select" id="lootPriority">
+            <option value="P0">P0 - 最高</option>
+            <option value="P1">P1 - 高</option>
+            <option value="P2" selected>P2 - 中</option>
+            <option value="P3">P3 - 低</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">活动日期</label>
+          <input type="date" class="form-input" id="lootDate">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">备注</label>
+        <textarea class="form-textarea" id="lootNote" placeholder="可选备注信息" rows="2"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('lootModal')">取消</button>
+      <button class="btn btn-primary" id="lootSaveBtn" onclick="lootSave()">确认</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 弹窗：飞书同步 ===== -->
+<div class="modal-overlay" id="lootFeishuSyncModal">
+  <div class="modal" style="max-width: 520px;">
+    <div class="modal-header">
+      <div class="modal-title">☁️ 飞书备份与迁移</div>
+      <div class="modal-close" onclick="closeModal('lootFeishuSyncModal')">×</div>
+    </div>
+    <div class="modal-body">
+      <div style="padding: 12px; background: rgba(240, 192, 96, 0.08); border-radius: 8px; margin-bottom: 16px; border: 1px solid rgba(240, 192, 96, 0.2);">
+        <div style="font-size: 13px; color: var(--gold); font-weight: 600; margin-bottom: 6px;">ℹ️ 备份说明</div>
+        <div style="font-size: 12px; color: var(--text-secondary); line-height: 1.8;">
+          此入口仅用于装备数据的离线备份与迁移，不参与实时数据流。<br>
+          日常 CRUD 请直接在本页面操作，数据会自动同步到 Supabase 云端。
+        </div>
+      </div>
+
+      <div style="margin-bottom: 20px;">
+        <div style="font-size: 14px; font-weight: 600; color: var(--text-primary); margin-bottom: 12px;">📤 本地上传到飞书</div>
+        <div style="font-size: 12px; color: var(--text-secondary); line-height: 1.8; margin-bottom: 10px;">
+          1. 点击下方按钮导出装备数据 JSON 文件<br>
+          2. 将文件发送给「蝮蛇」，说"同步装备分配到飞书"<br>
+          3. 蝮蛇会自动写入飞书多维表格
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="lootExportJSON()">📁 导出装备数据 JSON</button>
+      </div>
+
+      <div style="margin-bottom: 10px;">
+        <div style="font-size: 14px; font-weight: 600; color: var(--text-primary); margin-bottom: 12px;">📥 飞书下载到本地</div>
+        <div style="font-size: 12px; color: var(--text-secondary); line-height: 1.8; margin-bottom: 10px;">
+          1. 跟「蝮蛇」说"从飞书导出装备分配数据"<br>
+          2. 蝮蛇会从飞书拉取数据并生成 JSON 文件<br>
+          3. 将文件拖到下方区域或点击导入
+        </div>
+        <div class="loot-import-area" id="lootImportArea" onclick="document.getElementById('lootImportFile').click()">
+          <div style="font-size: 24px; margin-bottom: 8px;">📂</div>
+          <div style="font-size: 13px; color: var(--text-secondary);">点击或拖拽 JSON 文件到此处导入</div>
+        </div>
+        <input type="file" id="lootImportFile" accept=".json" style="display: none;" onchange="lootImportJSON(event)">
+      </div>
+
+      <div style="font-size: 11px; color: var(--text-muted); margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border-color);">
+        飞书多维表格链接：<a href="https://my.feishu.cn/base/UDtYbjHPqaBLsHsaBNacyF2Onig" target="_blank" style="color: var(--blue-highlight);">WoW团本考勤</a>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('lootFeishuSyncModal')">关闭</button>
+    </div>
+  </div>
+</div>
+
+<!-- 提示消息容器 -->
+<div class="toast-container" id="toastContainer"></div>
+
+<!-- ===== 弹窗：添加/编辑心愿 ===== -->
+<div class="modal-overlay" id="wishlistModal">
+  <div class="modal" style="max-width: 2000px;">
+    <div class="modal-header">
+      <div class="modal-title" id="wishlistModalTitle">添加心愿</div>
+      <div class="modal-close" onclick="closeModal('wishlistModal')">×</div>
+    </div>
+    <div class="modal-body">
+      <!-- 第一行：装备名称 -->
+      <div class="form-row">
+        <div class="form-group" style="flex:1">
+          <label class="form-label">装备名称 *</label>
+          <input type="text" class="form-input" id="wishlistItemName" placeholder="请输入装备名称">
+          <button type="button" class="btn btn-sm" style="margin-top:6px;width:100%;" onclick="openItemDbPicker('wishlist')">📦 从装备库选择</button>
+        </div>
+      </div>
+      <!-- 第二行：成员多选 -->
+      <div class="form-row" style="grid-template-columns: 1fr;">
+        <div class="form-group" id="wishlistMemberGroup">
+          <label class="form-label">成员 *</label>
+          <!-- 添加模式：多选成员 -->
+          <div id="wishlistMemberMulti" style="display:none">
+            <div class="wishlist-member-search">
+              <input type="text" id="wishlistMemberSearch" placeholder="🔍 搜索成员名称..." oninput="wishlistFilterMembers()">
+            </div>
+            <div class="wishlist-member-checkboxes" id="wishlistMemberCheckboxes">
+              <!-- JS动态填充 -->
+            </div>
+            <div class="wishlist-member-toolbar">
+              <span class="quick-action" onclick="wishlistSelectAllMembers(true)">全选</span>
+              <span class="divider">|</span>
+              <span class="quick-action" onclick="wishlistSelectAllMembers(false)">清空</span>
+              <span class="count" id="wishlistMemberCount">已选 0 人</span>
+            </div>
+          </div>
+          <!-- 编辑模式：单选成员 -->
+          <select class="form-select" id="wishlistMember">
+            <option value="">请选择成员</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">所属团本</label>
+          <select class="form-select" id="wishlistRaid" onchange="wishlistOnRaidChange()">
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">掉落BOSS</label>
+          <select class="form-select" id="wishlistBoss">
+            <option value="">请选择BOSS</option>
+          </select>
+          <input type="text" class="form-input" id="wishlistBossText" placeholder="请输入BOSS名称" style="display:none;margin-top:6px">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">装备大类</label>
+          <select class="form-select" id="wishlistCategory" onchange="wishlistOnCategoryChange()">
+            <option value="武器">武器</option>
+            <option value="防具">防具</option>
+            <option value="首饰">首饰</option>
+            <option value="饰品">饰品</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">装备部位</label>
+          <select class="form-select" id="wishlistSlot">
+          </select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">优先级</label>
+          <select class="form-select" id="wishlistPriority">
+            <option value="P0">P0 - 必须有</option>
+            <option value="P1">P1 - 大提升</option>
+            <option value="P2" selected>P2 - 小提升</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">需求专精</label>
+          <select class="form-select" id="wishlistSpec">
+            <option value="main">主专精</option>
+            <option value="off">副专精</option>
+            <option value="both">双修都要</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">
+            <input type="checkbox" id="wishlistObtained" onchange="wishlistToggleObtainedDate()"> 是否已获取
+          </label>
+        </div>
+        <div class="form-group" id="wishlistObtainedDateGroup" style="display:none">
+          <label class="form-label">获取日期</label>
+          <input type="date" class="form-input" id="wishlistObtainedDate">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">备注</label>
+        <textarea class="form-textarea" id="wishlistNote" placeholder="可选备注信息" rows="2"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('wishlistModal')">取消</button>
+      <button class="btn btn-primary" id="wishlistSaveBtn" onclick="wishlistSave()">确认</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 弹窗：心愿单飞书同步 ===== -->
+<div class="modal-overlay" id="wishlistFeishuSyncModal">
+  <div class="modal" style="max-width: 520px;">
+    <div class="modal-header">
+      <div class="modal-title">🎯 心愿单飞书备份</div>
+      <div class="modal-close" onclick="closeModal('wishlistFeishuSyncModal')">×</div>
+    </div>
+    <div class="modal-body">
+      <div style="padding: 12px; background: rgba(240, 192, 96, 0.08); border-radius: 8px; margin-bottom: 16px; border: 1px solid rgba(240, 192, 96, 0.2);">
+        <div style="font-size: 13px; color: var(--gold); font-weight: 600; margin-bottom: 6px;">ℹ️ 备份说明</div>
+        <div style="font-size: 12px; color: var(--text-secondary); line-height: 1.8;">
+          此入口仅用于心愿单数据的离线备份与迁移，不参与实时数据流。<br>
+          日常 CRUD 请直接在本页面操作，数据会自动同步到 Supabase 云端。
+        </div>
+      </div>
+
+      <div style="margin-bottom: 20px;">
+        <div style="font-size: 14px; font-weight: 600; color: var(--text-primary); margin-bottom: 12px;">📤 本地上传到飞书</div>
+        <div style="font-size: 12px; color: var(--text-secondary); line-height: 1.8; margin-bottom: 10px;">
+          1. 点击下方按钮导心愿单数据 JSON 文件<br>
+          2. 将文件发送给「蝮蛇」，说"同步心愿单到飞书"<br>
+          3. 蝮蛇会自动写入飞书多维表格
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="wishlistExportJSON()">📁 导出心愿单 JSON</button>
+      </div>
+
+      <div style="margin-bottom: 10px;">
+        <div style="font-size: 14px; font-weight: 600; color: var(--text-primary); margin-bottom: 12px;">📥 飞书下载到本地</div>
+        <div style="font-size: 12px; color: var(--text-secondary); line-height: 1.8; margin-bottom: 10px;">
+          1. 跟「蝮蛇」说"从飞书导出心愿单数据"<br>
+          2. 蝮蛇会从飞书拉取数据并生成 JSON 文件<br>
+          3. 将文件拖到下方区域或点击导入
+        </div>
+        <div class="loot-import-area" id="wishlistImportArea" onclick="document.getElementById('wishlistImportFile').click()">
+          <div style="font-size: 24px; margin-bottom: 8px;">📂</div>
+          <div style="font-size: 13px; color: var(--text-secondary);">点击或拖拽 JSON 文件到此处导入</div>
+        </div>
+        <input type="file" id="wishlistImportFile" accept=".json" style="display: none;" onchange="wishlistImportJSON(event)">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('wishlistFeishuSyncModal')">关闭</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="itemDbModal">
+  <div class="modal item-db-modal">
+    <div class="modal-header">
+      <div class="modal-title">装备库选择</div>
+      <div class="modal-close" onclick="closeModal('itemDbModal')">×</div>
+    </div>
+    <div class="modal-body">
+      <div class="item-db-container">
+        <!-- 左侧筛选 -->
+        <div class="item-db-filters">
+          <input type="text" class="item-db-search" id="itemDbSearch" placeholder="搜索装备名称..." oninput="renderItemDbList()">
+          
+          <div class="item-db-filter-group">
+            <div class="item-db-filter-label">所属团本</div>
+            <select class="item-db-filter-select" id="itemDbRaidFilter" onchange="updateItemDbBossFilter(); renderItemDbList();">
+              <option value="">全部团本</option>
+              <option value="voidspire">虚影尖塔</option>
+              <option value="dreamrift">梦境裂隙</option>
+              <option value="queldanas">进军奎尔丹纳斯</option>
+              <option value="mire">孢陨幽境</option>
+            </select>
+          </div>
+          
+          <div class="item-db-filter-group">
+            <div class="item-db-filter-label">首领掉落</div>
+            <select class="item-db-filter-select" id="itemDbBossFilter" onchange="renderItemDbList()" disabled>
+              <option value="">全部首领</option>
+            </select>
+          </div>
+          
+          <div class="item-db-filter-group">
+            <div class="item-db-filter-label">装备部位</div>
+            <select class="item-db-filter-select" id="itemDbSlotFilter" onchange="renderItemDbList()">
+              <option value="">全部部位</option>
+              <option value="饰品">饰品</option>
+              <option value="武器">武器</option>
+              <option value="副手">副手</option>
+              <option value="戒指">戒指</option>
+              <option value="头部">头部</option>
+              <option value="项链">项链</option>
+              <option value="背部">披风</option>
+              <option value="胸部">胸部</option>
+              <option value="手部">手部</option>
+              <option value="腰部">腰部</option>
+              <option value="腿部">腿部</option>
+              <option value="脚部">脚部</option>
+            </select>
+          </div>
+          
+          <div class="item-db-filter-group">
+            <div class="item-db-filter-label">护甲类型</div>
+            <select class="item-db-filter-select" id="itemDbArmorFilter" onchange="renderItemDbList()">
+              <option value="">全部类型</option>
+              <option value="布甲">布甲</option>
+              <option value="皮甲">皮甲</option>
+              <option value="锁甲">锁甲</option>
+              <option value="板甲">板甲</option>
+              <option value="饰品">饰品</option>
+              <option value="武器">武器</option>
+              <option value="戒指">戒指</option>
+              <option value="项链">项链</option>
+              <option value="副手">副手</option>
+            </select>
+          </div>
+          
+          <div class="item-db-filter-group">
+            <div class="item-db-filter-label">副属性</div>
+            <select class="item-db-filter-select" id="itemDbStatFilter" onchange="renderItemDbList()">
+              <option value="">全部属性</option>
+              <option value="爆击">爆击</option>
+              <option value="急速">急速</option>
+              <option value="精通">精通</option>
+              <option value="全能">全能</option>
+            </select>
+          </div>
+        </div>
+        
+        <!-- 右侧装备列表 -->
+        <div class="item-db-list">
+          <div class="item-db-count" id="itemDbCount">共 0 件装备</div>
+          <div id="itemDbList"></div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('itemDbModal')">取消</button>
+      <button class="btn btn-primary" onclick="confirmItemDbSelection()" id="itemDbConfirmBtn" disabled>确认选择</button>
+    </div>
+  </div>
+</div>
+
+<!-- 公会设置弹窗 -->
+<div class="modal-overlay" id="guildSettingsModal">
+  <div class="modal" style="max-width:560px">
+    <div class="modal-header">
+      <div class="modal-title">公会设置</div>
+      <button class="modal-close" onclick="closeModal('guildSettingsModal')">&times;</button>
+    </div>
+    <div class="modal-body">
+      <!-- 公会信息 -->
+      <div class="card" style="margin-bottom:16px">
+        <div class="card-header">
+          <div class="card-title">公会信息</div>
+        </div>
+        <div class="card-body">
+          <div style="display:flex;gap:12px;align-items:center;margin-bottom:12px">
+            <div>
+              <div style="font-size:16px;font-weight:600;color:var(--text-primary)" id="settingsGuildName"></div>
+              <div style="font-size:12px;color:var(--text-muted);margin-top:4px">公会ID: <span id="settingsGuildId" style="color:var(--blue-highlight);font-family:monospace;font-size:11px"></span></div>
+              <div style="font-size:12px;color:var(--text-muted);margin-top:4px">服务器: <span id="settingsServer" style="color:var(--text-secondary)"></span></div>
+              <div style="font-size:12px;color:var(--text-muted);margin-top:4px">邀请码: <span id="settingsInviteCode" style="color:var(--gold);font-family:monospace;letter-spacing:1px;cursor:pointer" onclick="copyInviteCode()"></span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 成员管理 -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">成员管理</div>
+          <button class="btn btn-sm" onclick="loadGuildMembers()">刷新</button>
+        </div>
+        <div class="card-body" id="guildMembersList">
+          <div style="text-align:center;color:var(--text-muted);padding:20px">加载中...</div>
+        </div>
+      </div>
+
+      <!-- 危险操作 -->
+      <div class="card" style="margin-top:16px" id="dangerZone" style="display:none">
+        <div class="card-header">
+          <div class="card-title" style="color:var(--danger)">退出公会</div>
+        </div>
+        <div class="card-body">
+          <button class="btn" style="border-color:var(--danger);color:var(--danger)" onclick="handleLeaveGuild()">退出此公会</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 公会切换弹窗 -->
+<div class="modal-overlay" id="guildSwitcherModal">
+  <div class="modal" style="max-width:400px">
+    <div class="modal-header">
+      <div class="modal-title">切换公会</div>
+      <button class="modal-close" onclick="closeModal('guildSwitcherModal')">&times;</button>
+    </div>
+    <div class="modal-body" id="guildSwitcherList">
+    </div>
+  </div>
+</div>
+
+<!-- 移动端底部导航栏 -->
+  <nav class="bottom-nav">
+    <div class="nav-item active" data-page="dashboard" onclick="switchPage('dashboard')">
+      <span class="nav-icon">📊</span><span>仪表盘</span>
+    </div>
+    <div class="nav-item" data-page="members" onclick="switchPage('members')">
+      <span class="nav-icon">👥</span><span>成员</span>
+    </div>
+    <div class="nav-item" data-page="wishlist" onclick="switchPage('wishlist')">
+      <span class="nav-icon">🎯</span><span>心愿</span>
+    </div>
+    <div class="nav-item" data-page="loot" onclick="switchPage('loot')">
+      <span class="nav-icon">⚔️</span><span>装备</span>
+    </div>
+    <div class="nav-item" data-page="data" onclick="switchPage('data')">
+      <span class="nav-icon">⚙️</span><span>设置</span>
+    </div>
+  </nav>
+
+  <!-- 用户中心模态框 -->
+  <div class="modal-overlay" id="userCenterModal">
+    <div class="modal-content user-center-modal">
+      <div class="modal-header">
+        <h2>👤 用户中心</h2>
+        <button class="modal-close" onclick="closeModal('userCenterModal')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <!-- 标签页导航 -->
+        <div class="uc-tabs">
+          <button class="uc-tab active" data-tab="profile" onclick="switchUserTab('profile')">📝 个人资料</button>
+          <button class="uc-tab" data-tab="characters" onclick="switchUserTab('characters')">⚔️ 我的角色</button>
+          <button class="uc-tab" data-tab="notifications" onclick="switchUserTab('notifications')">
+            🔔 通知 <span class="uc-badge" id="notifBadge" style="display:none">0</span>
+          </button>
+        </div>
+
+        <!-- 个人资料标签页 -->
+        <div class="uc-tab-content" id="tab-profile">
+          <div class="uc-section">
+            <h3>基本信息</h3>
+            <div class="uc-form-group">
+              <label>邮箱</label>
+              <input type="email" id="ucEmail" disabled class="uc-input-disabled">
+            </div>
+            <div class="uc-form-group">
+              <label>显示名称</label>
+              <input type="text" id="ucDisplayName" class="uc-input" placeholder="输入显示名称">
+            </div>
+            <button class="uc-btn uc-btn-primary" onclick="saveUserProfile()">保存资料</button>
+          </div>
+        </div>
+
+        <!-- 角色管理标签页 -->
+        <div class="uc-tab-content" id="tab-characters" style="display:none">
+          <div class="uc-section">
+            <div class="uc-header-row">
+              <h3>魔兽世界角色</h3>
+              <button class="uc-btn uc-btn-primary" onclick="openAddCharacterModal()">+ 添加角色</button>
+            </div>
+            <div id="characterList" class="uc-character-list">
+              <p class="uc-empty">暂无角色，点击上方按钮添加</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- 通知标签页 -->
+        <div class="uc-tab-content" id="tab-notifications" style="display:none">
+          <div class="uc-section">
+            <div class="uc-header-row">
+              <h3>通知消息</h3>
+              <button class="uc-btn uc-btn-secondary" onclick="markAllNotificationsRead()">全部已读</button>
+            </div>
+            <div id="notificationList" class="uc-notification-list">
+              <p class="uc-empty">暂无通知</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 添加角色模态框 -->
+  <div class="modal-overlay" id="addCharacterModal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>️ 添加魔兽世界角色</h2>
+        <button class="modal-close" onclick="closeModal('addCharacterModal')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="uc-form-group">
+          <label>英雄榜链接 <span class="uc-hint">(支持国服/亚服/欧美服)</span></label>
+          <input type="url" id="charArmoryUrl" class="uc-input" placeholder="https://worldofwarcraft.blizzard.cn/character-profile/服务器/角色名" oninput="parseArmoryUrlInput()">
+        </div>
+        <div class="uc-form-row">
+          <div class="uc-form-group">
+            <label>角色名称</label>
+            <input type="text" id="charName" class="uc-input" placeholder="自动解析或手动输入">
+          </div>
+          <div class="uc-form-group">
+            <label>服务器</label>
+            <input type="text" id="charServer" class="uc-input" placeholder="自动解析或手动输入">
+          </div>
+        </div>
+        <div class="uc-form-row">
+          <div class="uc-form-group">
+            <label>区域</label>
+            <select id="charRegion" class="uc-select">
+              <option value="CN">国服</option>
+              <option value="Asia">亚服</option>
+              <option value="US-EU">欧美服</option>
+            </select>
+          </div>
+          <div class="uc-form-group">
+            <label>阵营</label>
+            <select id="charFaction" class="uc-select">
+              <option value="">未知</option>
+              <option value="Alliance">联盟</option>
+              <option value="Horde">部落</option>
+            </select>
+          </div>
+        </div>
+        <div class="uc-form-row">
+          <div class="uc-form-group">
+            <label>职业</label>
+            <select id="charClass" class="uc-select">
+              <option value="">请选择</option>
+              <option value="战士">战士</option>
+              <option value="圣骑士">圣骑士</option>
+              <option value="猎人">猎人</option>
+              <option value="盗贼">盗贼</option>
+              <option value="牧师">牧师</option>
+              <option value="死亡骑士">死亡骑士</option>
+              <option value="萨满">萨满</option>
+              <option value="法师">法师</option>
+              <option value="术士">术士</option>
+              <option value="武僧">武僧</option>
+              <option value="德鲁伊">德鲁伊</option>
+              <option value="恶魔猎手">恶魔猎手</option>
+              <option value="唤魔师">唤魔师</option>
+            </select>
+          </div>
+          <div class="uc-form-group">
+            <label>专精</label>
+            <input type="text" id="charSpec" class="uc-input" placeholder="如：武器、狂怒">
+          </div>
+        </div>
+        <div class="uc-form-row">
+          <div class="uc-form-group">
+            <label>等级</label>
+            <input type="number" id="charLevel" class="uc-input" placeholder="80" min="1" max="80">
+          </div>
+          <div class="uc-form-group">
+            <label>装等</label>
+            <input type="number" id="charItemLevel" class="uc-input" placeholder="600" min="0">
+          </div>
+        </div>
+        <div class="uc-form-group">
+          <label>种族</label>
+          <input type="text" id="charRace" class="uc-input" placeholder="如：人类、兽人">
+        </div>
+        <div class="uc-form-group">
+          <label>所属公会</label>
+          <input type="text" id="charGuild" class="uc-input" placeholder="角色所在公会名称">
+        </div>
+        <div class="uc-actions">
+          <button class="uc-btn uc-btn-secondary" onclick="closeModal('addCharacterModal')">取消</button>
+          <button class="uc-btn uc-btn-primary" onclick="saveCharacter()">保存角色</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+<script src="js/cloud.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>

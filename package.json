@@ -1,0 +1,16 @@
+{
+  "name": "wow-guild-platform",
+  "version": "2.1.2",
+  "description": "WoW 团本考勤管理系统 - 支持云端协作和本地模式",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "keywords": ["wow", "raid", "attendance", "guild", "supabase"],
+  "author": "WoW Guild Platform Team",
+  "license": "MIT"
+}
