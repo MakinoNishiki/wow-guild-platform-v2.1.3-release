@@ -796,27 +796,21 @@ function toggleManualServer() {}
 
 // 创建公会
 async function handleCreateGuild() {
-  const name = document.getElementById('newGuildName').value.trim();
+  const nameEl = document.getElementById('newGuildName');
+  const name = nameEl ? nameEl.value.trim() : '';
   if (!name) { showAuthError('请输入公会名称'); return; }
 
-  const isManual = document.getElementById('manualServerToggle').checked;
-  let serverName = '';
-  let serverRegion = '';
-
-  if (isManual) {
-    serverName = document.getElementById('serverNameManual').value.trim();
-    serverRegion = document.getElementById('serverRegion').value;
-  } else {
-    serverName = document.getElementById('serverName').value;
-    serverRegion = document.getElementById('serverRegion').value;
-  }
+  const serverInput = document.getElementById('serverNameInput');
+  const regionSelect = document.getElementById('serverRegion');
+  const serverName = serverInput ? serverInput.value.trim() : '';
+  const serverRegion = regionSelect ? regionSelect.value : '';
 
   try {
     showAuthError('创建中...');
     await window.CloudSync.createGuild(name, serverName, serverRegion);
     showAppView();
   } catch (e) {
-    showAuthError(e.message || '创建失败');
+    showAuthError('创建失败：' + (e.message || '未知错误'));
   }
 }
 

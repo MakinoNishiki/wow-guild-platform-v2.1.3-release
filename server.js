@@ -5,8 +5,32 @@ const fs = require("fs");
 const path = require("path");
 const { execSync } = require("child_process");
 
-const PORT = parseInt(process.env.DEPLOY_RUN_PORT || "5000", 10);
 const ROOT = __dirname;
+
+// 读取项目根目录 .env 文件（手写解析，零依赖）。
+// 已存在的系统环境变量优先，.env 只补缺。
+function loadDotEnv() {
+  try {
+    const content = fs.readFileSync(path.join(ROOT, ".env"), "utf8");
+    for (const line of content.split(/\r?\n/)) {
+      const m = line.match(/^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)\s*$/);
+      if (!m) continue; // 注释和空行自然不匹配
+      let value = m[2];
+      if (
+        (value.startsWith("'") && value.endsWith("'")) ||
+        (value.startsWith('"') && value.endsWith('"'))
+      ) {
+        value = value.slice(1, -1);
+      }
+      if (!process.env[m[1]]) process.env[m[1]] = value;
+    }
+  } catch {
+    // .env 不存在或不可读时静默跳过，由其他来源（系统环境变量 / Coze 平台）提供配置
+  }
+}
+loadDotEnv();
+
+const PORT = parseInt(process.env.DEPLOY_RUN_PORT || "5000", 10);
 
 const MIME = {
   ".html": "text/html; charset=utf-8",
@@ -69,25 +93,25 @@ except Exception as e:
 function getSupabaseConfig() {
   loadEnv();
   return {
-    url: process.env.COZE_SUPABASE_URL || "",
-    anonKey: process.env.COZE_SUPABASE_ANON_KEY || "",
+    url: process.env.COZE_SUPABASE_URL || process.env.SUPABASE_URL || "",
+    anonKey: process.env.COZE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || "",
   };
 }
 
 function getServiceRoleKey() {
   loadEnv();
-  return process.env.COZE_SUPABASE_SERVICE_ROLE_KEY || "";
+  return process.env.COZE_SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || "";
 }
 
 function getSupabaseUrl() {
   loadEnv();
-  return process.env.COZE_SUPABASE_URL || "";
+  return process.env.COZE_SUPABASE_URL || process.env.SUPABASE_URL || "";
 }
 
 // Verify JWT token with Supabase Auth
 function verifyToken(accessToken, callback) {
   const supabaseUrl = getSupabaseUrl();
-  const anonKey = process.env.COZE_SUPABASE_ANON_KEY || "";
+  const anonKey = process.env.COZE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || "";
   
   if (!accessToken) {
     callback(null);

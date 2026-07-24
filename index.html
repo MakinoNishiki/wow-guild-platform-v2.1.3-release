@@ -61,7 +61,7 @@
       </div>
       <div class="auth-field">
         <label>服务器区域</label>
-        <select id="serverRegion" class="auth-input" onchange="updateServerList()">
+        <select id="serverRegion" class="auth-input">
           <option value="">选择区域</option>
           <option value="一区">一区</option>
           <option value="三区">三区</option>
@@ -85,7 +85,7 @@
       </div>
       <button class="btn auth-btn" onclick="handleJoinGuild()">加入公会</button>
       <div class="auth-divider"><span>或者</span></div>
-      <button class="btn auth-btn" style="background:transparent;border:1px solid var(--border-color);color:var(--text-secondary)" onclick="showAuthView('login')">返回登录</button>
+      <button class="btn auth-btn" style="background:transparent;border:1px solid var(--border-color);color:var(--text-secondary)" onclick="showLoginForm()">返回登录</button>
     </div>
 
     <div class="auth-error" id="authError"></div>
