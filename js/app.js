@@ -110,13 +110,9 @@ function loadData() {
           return migrated;
         });
       }
-    } else {
-      // 初始化示例数据
-      initSampleData();
     }
   } catch (e) {
     console.error('加载数据失败', e);
-    initSampleData();
   }
 }
 
@@ -498,7 +494,7 @@ async function syncAllToCloud() {
   if (!window.CloudSync || !window.CloudSync.isCloudMode()) return;
   try {
     // V2.1 修复：不再直接重新加载云端数据覆盖本地，避免刚保存的本地数据被旧云端数据覆盖
-    // 单个编辑操作已通过 syncToCloud 实时同步到云端
+    // 单个编辑操作已通过 cloudCrud 实时同步到云端
     // 如需拉取其他会话的最新数据，请刷新页面或切换公会
     console.log('全量同步跳过，避免覆盖本地未同步完成的数据');
   } catch (e) {
@@ -506,31 +502,11 @@ async function syncAllToCloud() {
   }
 }
 
-// 同步单个操作到云端（fire-and-forget，失败仅提示不抛错，避免未处理 Promise 拒绝）
-async function syncToCloud(dataType, operation, item, extra) {
-  if (!window.CloudSync || !window.CloudSync.isCloudMode()) return false;
-  try {
-    await window.CloudSync.saveCloudData(dataType, operation, item, extra);
-    return true;
-  } catch (e) {
-    console.error('云端同步失败', e);
-    showToast('云端同步失败，数据已保存到本地缓存', 'warning');
-    return false;
-  }
-}
-
 // V2.1 数据架构稳定修复：统一 CRUD 严格数据流
-// Supabase 是唯一主数据源；localStorage 仅作缓存；JSON/飞书仅作备份/迁移。
+// Supabase 是唯一主数据源；localStorage 仅作缓存；JSON 仅作备份/迁移。
 // 流程：写入 DB -> 重新读取 DB -> 更新 appData -> 渲染
 async function cloudCrud(dataType, operation, payload, options = {}) {
   const { renderFn, onSuccess, onError, reloadTypes } = options;
-
-  // 本地模式：直接保存到 localStorage 并渲染
-  if (!window.CloudSync || !window.CloudSync.isCloudMode()) {
-    saveData();
-    if (typeof renderFn === 'function') renderFn();
-    return { success: true, local: true };
-  }
 
   try {
     // 1. 写入主数据源（Supabase）
@@ -543,7 +519,7 @@ async function cloudCrud(dataType, operation, payload, options = {}) {
       await window.CloudSync.reloadData(t);
     }
 
-    // 3. 缓存到 localStorage（仅作为缓存/本地模式兜底）
+    // 3. 缓存到 localStorage（仅作为缓存）
     saveData();
 
     // 4. 渲染当前模块
@@ -561,60 +537,6 @@ async function cloudCrud(dataType, operation, payload, options = {}) {
 // V2.1 数据持久化稳定性（兼容旧调用，已委托给 cloudCrud）
 async function syncToCloudAndReload(dataType, operation, item, extra, renderFn) {
   return cloudCrud(dataType, operation, item, { renderFn });
-}
-
-function initSampleData() {
-  const today = new Date();
-  const members = [
-    { id: genId(), name: '战神阿瑞斯', class: '战士', main_spec: '武器', off_spec: '防护', role: ['输出', '坦克'], join_date: '2026-01-15', status: '正式', notes: '' },
-    { id: genId(), name: '烈焰法师', class: '法师', main_spec: '火焰', off_spec: '', role: ['输出'], join_date: '2026-01-16', status: '正式', notes: '' },
-    { id: genId(), name: '圣光牧师', class: '牧师', main_spec: '戒律', off_spec: '神圣', role: ['治疗'], join_date: '2026-01-18', status: '正式', notes: '' },
-    { id: genId(), name: '暗影盗贼', class: '盗贼', main_spec: '狂徒', off_spec: '', role: ['输出'], join_date: '2026-01-20', status: '正式', notes: '' },
-    { id: genId(), name: '兽王猎人', class: '猎人', main_spec: '野兽控制', off_spec: '', role: ['输出'], join_date: '2026-01-22', status: '正式', notes: '' },
-    { id: genId(), name: '白银之手', class: '圣骑士', main_spec: '惩戒', off_spec: '神圣', role: ['输出', '治疗'], join_date: '2026-01-25', status: '正式', notes: '' },
-    { id: genId(), name: '元素萨满', class: '萨满', main_spec: '元素', off_spec: '恢复', role: ['输出', '治疗'], join_date: '2026-02-01', status: '正式', notes: '' },
-    { id: genId(), name: '野性德鲁伊', class: '德鲁伊', main_spec: '野性', off_spec: '守护', role: ['输出', '坦克'], join_date: '2026-02-05', status: '替补', notes: '' },
-    { id: genId(), name: '恶魔术士', class: '术士', main_spec: '恶魔学识', off_spec: '', role: ['输出'], join_date: '2026-02-10', status: '正式', notes: '' },
-    { id: genId(), name: '酒仙武僧', class: '武僧', main_spec: '酒仙', off_spec: '踏风', role: ['坦克', '输出'], join_date: '2026-02-15', status: '试用', notes: '' },
-    { id: genId(), name: '浩劫DH', class: '恶魔猎手', main_spec: '浩劫', off_spec: '复仇', role: ['输出', '坦克'], join_date: '2026-02-20', status: '正式', notes: '' },
-    { id: genId(), name: '冰霜DK', class: '死亡骑士', main_spec: '冰霜', off_spec: '鲜血', role: ['输出', '坦克'], join_date: '2026-02-25', status: '正式', notes: '' },
-    { id: genId(), name: '湮灭唤魔师', class: '唤魔师', main_spec: '湮灭', off_spec: '恩护', role: ['输出', '治疗'], join_date: '2026-03-01', status: '替补', notes: '' },
-  ];
-
-  // 生成最近10次活动
-  const activities = [];
-  const raidNames = ['尼鲁巴尔王宫', '阿梅达希尔', '翡翠梦境'];
-  
-  for (let i = 0; i < 10; i++) {
-    const date = new Date(today);
-    date.setDate(date.getDate() - (i * 3) - 1);
-    const dateStr = formatDate(date);
-    
-    const attendees = members.slice(0, 10 + Math.floor(Math.random() * 3)).map(m => {
-      const rand = Math.random();
-      let status = '出席';
-      if (rand > 0.85) status = '缺席';
-      else if (rand > 0.75) status = '迟到';
-      else if (rand > 0.65) status = '替补';
-      else if (rand > 0.6) status = '请假';
-      return { member_id: m.id, status: status, notes: '' };
-    });
-    
-    activities.push({
-      id: genId(),
-      date: dateStr,
-      raid_name: raidNames[i % raidNames.length],
-      start_time: '20:00',
-      end_time: '23:00',
-      attendees: attendees,
-      notes: ''
-    });
-  }
-
-  const loots = [];
-  const wishlist = [];
-  appData = { members, activities, loots, wishlist };
-  saveData();
 }
 
 function genId() {
@@ -721,15 +643,6 @@ async function handleRegister() {
   } catch (e) {
     showAuthError(mapAuthError(e) || '注册失败');
   }
-}
-
-// 本地模式（不登录）
-function handleLocalMode() {
-  document.getElementById('authOverlay').style.display = 'none';
-  document.querySelector('.app-container').style.display = '';
-  // 加载本地数据
-  loadData();
-  renderDashboard();
 }
 
 // 服务器搜索（全区域）
@@ -1044,8 +957,16 @@ function showAppView() {
 
   // 更新 UI
   updateCloudUI();
+  updatePermissionUI();
   loadData();
   renderCurrentPage();
+}
+
+// BUG-012：viewer 权限门。viewer 登录后隐藏/禁用全部写入口（界面收口，
+// 真正防线在 server.js 代理鉴权）。切换公会/登录/登出后都需调用。
+function updatePermissionUI() {
+  const isViewer = !!(window.CloudSync && window.CloudSync.isCloudMode() && !window.CloudSync.canEdit());
+  document.body.classList.toggle('viewer-mode', isViewer);
 }
 
 // 更新云端模式 UI
@@ -1086,24 +1007,11 @@ function updateCloudUI() {
         guildBarName.textContent = displayName;
       }
     }
-    // 云端模式下禁用本地备份按钮
-    const btnExportLocal = document.getElementById('btnExportLocal');
-    const btnImportLocal = document.getElementById('btnImportLocal');
-    if (btnExportLocal) { btnExportLocal.disabled = true; btnExportLocal.style.opacity = '0.5'; }
-    if (btnImportLocal) { btnImportLocal.disabled = true; btnImportLocal.style.opacity = '0.5'; }
     const cloudSyncStatus = document.getElementById('cloudSyncStatus');
     if (cloudSyncStatus) cloudSyncStatus.textContent = '数据已云端同步';
   } else {
     if (guildBar) guildBar.style.display = 'none';
     if (guildSwitchBtn) guildSwitchBtn.style.display = 'none';
-    if (guildName) guildName.textContent = '本地模式';
-    // 本地模式下启用本地备份按钮
-    const btnExportLocal = document.getElementById('btnExportLocal');
-    const btnImportLocal = document.getElementById('btnImportLocal');
-    if (btnExportLocal) { btnExportLocal.disabled = false; btnExportLocal.style.opacity = '1'; }
-    if (btnImportLocal) { btnImportLocal.disabled = false; btnImportLocal.style.opacity = '1'; }
-    const cloudSyncStatus = document.getElementById('cloudSyncStatus');
-    if (cloudSyncStatus) cloudSyncStatus.textContent = '当前为本地模式，建议登录使用云端同步';
   }
 }
 
@@ -1636,24 +1544,7 @@ async function saveMember() {
     notes: document.getElementById('memberNotes').value.trim()
   };
 
-  // V2.1 数据架构稳定修复：云端模式下严格遵循 Save DB -> Load DB -> Update State -> Render
-  // 本地模式保持原有行为
-  if (!window.CloudSync || !window.CloudSync.isCloudMode()) {
-    if (editingMemberId) {
-      const index = appData.members.findIndex(m => m.id === editingMemberId);
-      if (index !== -1) appData.members[index] = { ...appData.members[index], ...memberData };
-    } else {
-      appData.members.push({ id: genId(), ...memberData });
-    }
-    saveData();
-    closeModal('memberModal');
-    renderMembers();
-    showToast(editingMemberId ? '成员已更新' : '成员已添加', 'success');
-    memberSaving = false;
-    if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = saveBtn.dataset.originalText || '保存'; }
-    return;
-  }
-
+  // V2.1 数据架构稳定修复：严格遵循 Save DB -> Load DB -> Update State -> Render
   try {
     const payload = { ...memberData, id: editingMemberId || undefined };
     const operation = editingMemberId ? 'update' : 'add';
@@ -1674,16 +1565,7 @@ async function deleteMember(id) {
   const member = appData.members.find(m => m.id === id);
   if (!member) return;
 
-  // 本地模式：直接修改本地状态
-  if (!window.CloudSync || !window.CloudSync.isCloudMode()) {
-    appData.members = appData.members.filter(m => m.id !== id);
-    saveData();
-    renderMembers();
-    showToast('成员已删除', 'success');
-    return;
-  }
-
-  // 云端模式：严格 DB-first
+  // 严格 DB-first
   try {
     await cloudCrud('members', 'delete', { id: member.id }, { renderFn: renderMembers });
     showToast('成员已删除', 'success');
@@ -1742,17 +1624,7 @@ async function importMembers() {
       }
     });
 
-    // 本地模式：直接写入本地状态
-    if (!window.CloudSync || !window.CloudSync.isCloudMode()) {
-      pendingMembers.forEach(m => appData.members.push({ id: genId(), ...m }));
-      saveData();
-      closeModal('importMembersModal');
-      renderMembers();
-      showToast(`成功导入 ${pendingMembers.length} 个成员`, 'success');
-      return;
-    }
-
-    // 云端模式：严格 DB-first，批量写入后统一 reload
+    // 规范 1.2.2 批处理例外：批量导入循环 saveCloudData 写入，完成后统一 reload 一次
     try {
       for (const member of pendingMembers) {
         await window.CloudSync.saveCloudData('members', 'add', member);
@@ -1858,6 +1730,11 @@ function openDayActivities(dateStr) {
 }
 
 function createActivityOnDate(dateStr) {
+  // BUG-012：viewer 无创建权限（CSS 无法覆盖日历格子的动态 onclick，此处 JS 守卫）
+  if (window.CloudSync && window.CloudSync.isCloudMode() && !window.CloudSync.canEdit()) {
+    showToast('当前为只读权限，无法创建活动', 'warning');
+    return;
+  }
   editingActivityId = null;
   document.getElementById('activityModalTitle').textContent = '创建活动';
   document.getElementById('activityDate').value = dateStr;
@@ -1947,30 +1824,7 @@ async function saveActivity() {
     notes: document.getElementById('activityNotes').value.trim()
   };
   
-  if (!window.CloudSync || !window.CloudSync.isCloudMode()) {
-    // 本地模式
-    if (editingActivityId) {
-      const index = appData.activities.findIndex(a => a.id === editingActivityId);
-      if (index !== -1) {
-        appData.activities[index] = { ...appData.activities[index], ...activityData };
-        showToast('活动已更新', 'success');
-      }
-    } else {
-      const attendees = appData.members.filter(m => m.status !== '离队').map(m => ({
-        member_id: m.id, status: '缺席', notes: ''
-      }));
-      appData.activities.push({ id: genId(), ...activityData, attendees });
-      showToast('活动已创建', 'success');
-    }
-    saveData();
-    closeModal('activityModal');
-    renderAttendance();
-    activitySaving = false;
-    if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = saveBtn.dataset.originalText || '保存'; }
-    return;
-  }
-  
-  // 云端模式：严格 DB-first
+  // 严格 DB-first
   try {
     if (editingActivityId) {
       const activity = appData.activities.find(a => a.id === editingActivityId);
@@ -2094,19 +1948,7 @@ async function saveAttendance() {
     });
   });
   
-  if (!window.CloudSync || !window.CloudSync.isCloudMode()) {
-    // 本地模式
-    activity.attendees = attendees;
-    saveData();
-    closeModal('attendanceDetailModal');
-    renderAttendance();
-    showToast('考勤已保存', 'success');
-    attendanceSaving = false;
-    if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = saveBtn.dataset.originalText || '保存考勤'; }
-    return;
-  }
-  
-  // 云端模式：严格 DB-first
+  // 严格 DB-first
   try {
     const payload = { ...activity, attendees, id: activity.id };
     await cloudCrud('activities', 'update', payload, { renderFn: renderAttendance });
@@ -2124,16 +1966,7 @@ async function deleteCurrentActivity() {
   if (!confirm('确定要删除这个活动吗？此操作不可撤销。')) return;
   const activity = appData.activities.find(a => a.id === currentActivityId);
   
-  if (!window.CloudSync || !window.CloudSync.isCloudMode()) {
-    appData.activities = appData.activities.filter(a => a.id !== currentActivityId);
-    saveData();
-    closeModal('attendanceDetailModal');
-    renderAttendance();
-    showToast('活动已删除', 'success');
-    return;
-  }
-  
-  // 云端模式：严格 DB-first
+  // 严格 DB-first
   try {
     if (activity) {
       await cloudCrud('activities', 'delete', { id: activity.id }, { renderFn: renderAttendance });
@@ -2191,16 +2024,7 @@ async function importFromWCL() {
     notes: '从WCL导入'
   };
   
-  if (!isCloudMode()) {
-    appData.activities.push(newActivity);
-    saveData();
-    closeModal('wclImportModal');
-    renderAttendance();
-    showToast(`成功导入，匹配到 ${matchedIds.size} 名团员`, 'success');
-    return;
-  }
-  
-  // 云端模式：写入DB → reload → render
+  // 写入DB → reload → render
   try {
     await cloudCrud('activities', 'add', newActivity, { renderFn: renderAttendance });
     closeModal('wclImportModal');
@@ -2527,7 +2351,7 @@ function handleImportFile(event) {
   if (!file) return;
   
   const reader = new FileReader();
-  reader.onload = function(e) {
+  reader.onload = async function(e) {
     try {
       const data = JSON.parse(e.target.result);
       
@@ -2538,45 +2362,85 @@ function handleImportFile(event) {
       
       const mode = confirm('点击"确定"合并数据，点击"取消"覆盖现有数据。\n\n合并：保留现有数据，添加新数据\n覆盖：删除所有现有数据，替换为导入的数据');
       
-      if (mode) {
-        // 合并
+      // 规范 1.2.2 批处理例外：JSON 导入属于备份/迁移的批量写入，
+      // 循环 saveCloudData 写入，全部完成后统一 reload 一次再渲染（与 importMembers 同款写法）
+      try {
+        if (!mode) {
+          // 覆盖：先清空云端现有数据（按依赖顺序：心愿单/装备/活动/成员）
+          for (const w of (appData.wishlist || [])) {
+            await window.CloudSync.saveCloudData('wishlists', 'delete', { id: w.id });
+          }
+          for (const l of (appData.loots || [])) {
+            await window.CloudSync.saveCloudData('loots', 'delete', { id: l.id });
+          }
+          for (const a of appData.activities) {
+            await window.CloudSync.saveCloudData('activities', 'delete', { id: a.id });
+          }
+          for (const m of appData.members) {
+            await window.CloudSync.saveCloudData('members', 'delete', { id: m.id });
+          }
+        }
+
+        // 成员：数据库会生成新 id，建立 旧id -> 新id 映射，供考勤/心愿单关联修复
+        const memberIdMap = {};
         if (data.members && Array.isArray(data.members)) {
-          data.members.forEach(m => {
-            if (!appData.members.find(existing => existing.name === m.name)) {
-              appData.members.push({ id: genId(), ...m });
+          for (const m of data.members) {
+            if (mode) {
+              // 合并模式按名字去重，已存在的成员沿用其现有 id
+              const existing = appData.members.find(ex => ex.name === m.name);
+              if (existing) {
+                if (m.id) memberIdMap[m.id] = existing.id;
+                continue;
+              }
             }
-          });
+            const oldId = m.id;
+            const row = { ...m };
+            delete row.id;
+            await window.CloudSync.saveCloudData('members', 'add', row);
+            if (oldId && row.id) memberIdMap[oldId] = row.id;
+          }
         }
         if (data.activities && Array.isArray(data.activities)) {
-          data.activities.forEach(a => {
-            appData.activities.push({ id: genId(), ...a });
-          });
+          for (const a of data.activities) {
+            const row = { ...a };
+            delete row.id;
+            if (Array.isArray(row.attendees)) {
+              row.attendees = row.attendees.map(att => ({
+                ...att,
+                member_id: memberIdMap[att.member_id] || att.member_id
+              }));
+            }
+            await window.CloudSync.saveCloudData('activities', 'add', row);
+          }
         }
         if (data.loots && Array.isArray(data.loots)) {
-          data.loots.forEach(l => {
-            appData.loots.push({ id: genId(), ...l });
-          });
+          for (const l of data.loots) {
+            const row = { ...l };
+            delete row.id;
+            await window.CloudSync.saveCloudData('loots', 'add', row);
+          }
         }
         if (data.wishlist && Array.isArray(data.wishlist)) {
-          if (!appData.wishlist) appData.wishlist = [];
-          data.wishlist.forEach(w => {
-            appData.wishlist.push({ id: genId(), ...w });
-          });
+          for (const w of data.wishlist) {
+            const row = { ...w, id: genId() };
+            if (row.memberId && memberIdMap[row.memberId]) row.memberId = memberIdMap[row.memberId];
+            if (row.member_id && memberIdMap[row.member_id]) row.member_id = memberIdMap[row.member_id];
+            await window.CloudSync.saveCloudData('wishlists', 'add', row);
+          }
         }
-        showToast('数据已合并导入', 'success');
-      } else {
-        // 覆盖
-        appData = {
-          members: data.members || [],
-          activities: data.activities || [],
-          loots: data.loots || [],
-          wishlist: data.wishlist || []
-        };
-        showToast('数据已覆盖导入', 'success');
+
+        // 统一 reload + 缓存 + 渲染
+        await window.CloudSync.reloadData('members');
+        await window.CloudSync.reloadData('activities');
+        await window.CloudSync.reloadData('loots');
+        await window.CloudSync.reloadData('wishlists');
+        saveData();
+        renderDataPage();
+        showToast(mode ? '数据已合并导入' : '数据已覆盖导入', 'success');
+      } catch (cloudErr) {
+        console.error('JSON 导入失败:', cloudErr);
+        showToast('导入失败：云端同步出错', 'error');
       }
-      
-      saveData();
-      renderDataPage();
     } catch (err) {
       showToast('文件解析失败', 'error');
     }
@@ -2585,857 +2449,37 @@ function handleImportFile(event) {
   event.target.value = '';
 }
 
-function confirmClearAll() {
+async function confirmClearAll() {
   if (!confirm('⚠️ 警告：此操作将删除所有成员、考勤、装备和心愿单数据，且无法恢复！\n\n确定要清空所有数据吗？')) return;
   if (!confirm('再次确认：真的要清空所有数据吗？')) return;
   
-  appData = { members: [], activities: [], loots: [], wishlist: [] };
-  saveData();
-  renderDataPage();
-  showToast('所有数据已清空', 'warning');
-}
-
-// ==================== 飞书多维表格同步 ====================
-const FEISHU_CONFIG_KEY = 'wow_feishu_sync_config';
-const FEISHU_RECORD_MAP_KEY = 'wow_feishu_record_map';
-const FEISHU_API_BASE = 'https://open.feishu.cn/open-apis';
-
-let feishuConfig = {
-  app_id: '',
-  app_secret: '',
-  base_token: '',
-  member_table_id: '',
-  activity_table_id: '',
-  record_table_id: '',
-  sync_mode: 'incremental'
-};
-
-let feishuToken = null;
-let feishuTokenExpire = 0;
-let syncInProgress = false;
-
-// 记录ID映射表（本地ID -> 飞书record_id）
-let recordIdMap = {
-  members: {},
-  activities: {},
-  records: {}
-};
-
-// 加载飞书配置
-function loadFeishuConfig() {
+  // 规范 1.2.2 批处理例外：清空属于批量删除，循环 saveCloudData 删除后统一 reload 一次
   try {
-    const saved = localStorage.getItem(FEISHU_CONFIG_KEY);
-    if (saved) {
-      feishuConfig = { ...feishuConfig, ...JSON.parse(saved) };
+    for (const w of (appData.wishlist || [])) {
+      await window.CloudSync.saveCloudData('wishlists', 'delete', { id: w.id });
     }
-    const mapSaved = localStorage.getItem(FEISHU_RECORD_MAP_KEY);
-    if (mapSaved) {
-      recordIdMap = { ...recordIdMap, ...JSON.parse(mapSaved) };
+    for (const l of (appData.loots || [])) {
+      await window.CloudSync.saveCloudData('loots', 'delete', { id: l.id });
     }
-  } catch (e) {
-    console.error('加载飞书配置失败', e);
-  }
-  updateFeishuStatusUI();
-}
-
-// 保存飞书配置
-function saveFeishuConfig() {
-  feishuConfig.app_id = document.getElementById('feishuAppId').value.trim();
-  feishuConfig.app_secret = document.getElementById('feishuAppSecret').value.trim();
-  feishuConfig.base_token = document.getElementById('feishuBaseToken').value.trim();
-  feishuConfig.member_table_id = document.getElementById('feishuMemberTableId').value.trim();
-  feishuConfig.activity_table_id = document.getElementById('feishuActivityTableId').value.trim();
-  feishuConfig.record_table_id = document.getElementById('feishuRecordTableId').value.trim();
-  
-  localStorage.setItem(FEISHU_CONFIG_KEY, JSON.stringify(feishuConfig));
-  showToast('飞书配置已保存', 'success');
-  updateFeishuStatusUI();
-  closeModal('feishuConfigModal');
-}
-
-// 保存记录ID映射
-function saveRecordIdMap() {
-  localStorage.setItem(FEISHU_RECORD_MAP_KEY, JSON.stringify(recordIdMap));
-}
-
-// 更新飞书连接状态UI
-function updateFeishuStatusUI() {
-  const isConfigured = feishuConfig.app_id && feishuConfig.app_secret && feishuConfig.base_token;
-  const indicator = document.getElementById('feishuTopIndicator');
-  const topBtn = document.getElementById('feishuTopBtn');
-  const statusDot = document.getElementById('feishuStatusDot');
-  const statusText = document.getElementById('feishuStatusText');
-  const statusBadge = document.getElementById('feishuStatusBadge');
-  
-  if (indicator) {
-    indicator.className = 'sync-status-indicator' + (isConfigured ? ' active' : '');
-  }
-  if (topBtn) {
-    topBtn.classList.toggle('connected', isConfigured);
-  }
-  if (statusDot) {
-    statusDot.className = 'sync-status-indicator' + (isConfigured ? ' active' : '');
-  }
-  if (statusText) {
-    statusText.textContent = isConfigured ? '已配置' : '未连接';
-  }
-  if (statusBadge) {
-    statusBadge.className = 'feishu-status-badge ' + (isConfigured ? 'connected' : 'disconnected');
-  }
-}
-
-// 打开飞书配置面板
-function openFeishuConfig() {
-  document.getElementById('feishuAppId').value = feishuConfig.app_id;
-  document.getElementById('feishuAppSecret').value = feishuConfig.app_secret;
-  document.getElementById('feishuBaseToken').value = feishuConfig.base_token;
-  document.getElementById('feishuMemberTableId').value = feishuConfig.member_table_id;
-  document.getElementById('feishuActivityTableId').value = feishuConfig.activity_table_id;
-  document.getElementById('feishuRecordTableId').value = feishuConfig.record_table_id;
-  setSyncMode(feishuConfig.sync_mode);
-  openModal('feishuConfigModal');
-}
-
-// 设置同步模式
-function setSyncMode(mode) {
-  feishuConfig.sync_mode = mode;
-  document.querySelectorAll('.sync-mode-option').forEach(opt => {
-    opt.classList.toggle('active', opt.dataset.mode === mode);
-  });
-}
-
-// 获取 tenant_access_token
-async function getFeishuToken() {
-  const now = Date.now();
-  if (feishuToken && feishuTokenExpire > now + 60000) {
-    return feishuToken;
-  }
-  
-  try {
-    const response = await fetch(`${FEISHU_API_BASE}/auth/v3/tenant_access_token/internal`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        app_id: feishuConfig.app_id,
-        app_secret: feishuConfig.app_secret
-      })
-    });
-    
-    const data = await response.json();
-    if (data.code !== 0) {
-      throw new Error(data.msg || '获取token失败');
+    for (const a of appData.activities) {
+      await window.CloudSync.saveCloudData('activities', 'delete', { id: a.id });
     }
-    
-    feishuToken = data.tenant_access_token;
-    feishuTokenExpire = now + (data.expire || 7200) * 1000;
-    return feishuToken;
-  } catch (e) {
-    console.error('获取飞书token失败', e);
-    throw e;
-  }
-}
-
-// 测试连接
-async function testFeishuConnection() {
-  // 先保存当前输入的配置
-  feishuConfig.app_id = document.getElementById('feishuAppId').value.trim();
-  feishuConfig.app_secret = document.getElementById('feishuAppSecret').value.trim();
-  feishuConfig.base_token = document.getElementById('feishuBaseToken').value.trim();
-  feishuConfig.member_table_id = document.getElementById('feishuMemberTableId').value.trim();
-  feishuConfig.activity_table_id = document.getElementById('feishuActivityTableId').value.trim();
-  feishuConfig.record_table_id = document.getElementById('feishuRecordTableId').value.trim();
-  
-  if (!feishuConfig.app_id || !feishuConfig.app_secret) {
-    showToast('请填写 App ID 和 App Secret', 'error');
-    return;
-  }
-  
-  showToast('正在测试连接...', 'info');
-  
-  try {
-    await getFeishuToken();
-    
-    // 尝试列出成员表验证base_token和table_id
-    if (feishuConfig.base_token && feishuConfig.member_table_id) {
-      await listFeishuRecords(feishuConfig.member_table_id, 1);
+    for (const m of appData.members) {
+      await window.CloudSync.saveCloudData('members', 'delete', { id: m.id });
     }
-    
-    showToast('连接测试成功！', 'success');
-    updateFeishuStatusUI();
-  } catch (e) {
-    showToast('连接失败：' + (e.message || '未知错误'), 'error');
-  }
-}
-
-// 列出飞书表格记录
-async function listFeishuRecords(tableId, pageSize = 100, pageToken = '') {
-  const token = await getFeishuToken();
-  let url = `${FEISHU_API_BASE}/bitable/v1/apps/${feishuConfig.base_token}/tables/${tableId}/records?page_size=${pageSize}`;
-  if (pageToken) {
-    url += `&page_token=${pageToken}`;
-  }
-  
-  const response = await fetch(url, {
-    method: 'GET',
-    headers: {
-      'Authorization': `Bearer ${token}`,
-      'Content-Type': 'application/json'
-    }
-  });
-  
-  const data = await response.json();
-  if (data.code !== 0) {
-    throw new Error(data.msg || '获取记录失败');
-  }
-  
-  return {
-    items: data.data.items || [],
-    has_more: data.data.has_more,
-    page_token: data.data.page_token
-  };
-}
-
-// 获取所有记录（分页）
-async function getAllFeishuRecords(tableId) {
-  const allItems = [];
-  let pageToken = '';
-  
-  do {
-    const result = await listFeishuRecords(tableId, 100, pageToken);
-    allItems.push(...result.items);
-    pageToken = result.page_token;
-  } while (pageToken);
-  
-  return allItems;
-}
-
-// 创建飞书记录
-async function createFeishuRecord(tableId, fields) {
-  const token = await getFeishuToken();
-  const response = await fetch(`${FEISHU_API_BASE}/bitable/v1/apps/${feishuConfig.base_token}/tables/${tableId}/records`, {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${token}`,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({ fields })
-  });
-  
-  const data = await response.json();
-  if (data.code !== 0) {
-    throw new Error(data.msg || '创建记录失败');
-  }
-  
-  return data.data.record;
-}
-
-// 更新飞书记录
-async function updateFeishuRecord(tableId, recordId, fields) {
-  const token = await getFeishuToken();
-  const response = await fetch(`${FEISHU_API_BASE}/bitable/v1/apps/${feishuConfig.base_token}/tables/${tableId}/records/${recordId}`, {
-    method: 'PUT',
-    headers: {
-      'Authorization': `Bearer ${token}`,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({ fields })
-  });
-  
-  const data = await response.json();
-  if (data.code !== 0) {
-    throw new Error(data.msg || '更新记录失败');
-  }
-  
-  return data.data.record;
-}
-
-// 删除飞书记录
-async function deleteFeishuRecord(tableId, recordId) {
-  const token = await getFeishuToken();
-  const response = await fetch(`${FEISHU_API_BASE}/bitable/v1/apps/${feishuConfig.base_token}/tables/${tableId}/records/${recordId}`, {
-    method: 'DELETE',
-    headers: {
-      'Authorization': `Bearer ${token}`,
-      'Content-Type': 'application/json'
-    }
-  });
-  
-  const data = await response.json();
-  if (data.code !== 0) {
-    throw new Error(data.msg || '删除记录失败');
-  }
-  
-  return true;
-}
-
-// 批量创建/更新（飞书API不支持批量创建，这里逐个处理）
-async function batchUpsertRecords(tableId, records, idField, localIdKey) {
-  const results = { success: 0, failed: 0, skipped: 0 };
-  
-  for (let i = 0; i < records.length; i++) {
-    const rec = records[i];
-    try {
-      const localId = rec[localIdKey];
-      const existingRecordId = recordIdMap[idField][localId];
-      
-      if (existingRecordId && feishuConfig.sync_mode === 'incremental') {
-        // 增量模式下更新已有记录
-        await updateFeishuRecord(tableId, existingRecordId, rec.fields);
-        results.success++;
-      } else if (existingRecordId && feishuConfig.sync_mode === 'full') {
-        // 全量模式下先删除再创建
-        try { await deleteFeishuRecord(tableId, existingRecordId); } catch(e) {}
-        const newRec = await createFeishuRecord(tableId, rec.fields);
-        recordIdMap[idField][localId] = newRec.record_id;
-        results.success++;
-      } else {
-        // 新记录
-        const newRec = await createFeishuRecord(tableId, rec.fields);
-        recordIdMap[idField][localId] = newRec.record_id;
-        results.success++;
-      }
-    } catch (e) {
-      console.error(`同步记录失败: ${rec[localIdKey]}`, e);
-      results.failed++;
-    }
-    
-    // 更新进度
-    updateSyncProgressItem(idField, i + 1, records.length);
-  }
-  
-  return results;
-}
-
-// 同步进度管理
-let syncProgressData = {};
-
-function initSyncProgress(title, items) {
-  syncProgressData = {};
-  document.getElementById('syncProgressTitle').textContent = title;
-  document.getElementById('syncResultSummary').style.display = 'none';
-  document.getElementById('syncProgressFooter').style.display = 'none';
-  
-  const listHtml = items.map(item => {
-    syncProgressData[item.key] = { current: 0, total: item.total, status: 'pending' };
-    return `
-      <div class="sync-progress-item" data-key="${item.key}">
-        <div class="sync-progress-icon" id="sync-icon-${item.key}">⏳</div>
-        <div class="sync-progress-info">
-          <div class="sync-progress-label">${item.label}</div>
-          <div class="sync-progress-bar">
-            <div class="sync-progress-fill" id="sync-bar-${item.key}" style="width:0%"></div>
-          </div>
-        </div>
-        <div class="sync-progress-count" id="sync-count-${item.key}">0 / ${item.total}</div>
-      </div>
-    `;
-  }).join('');
-  
-  document.getElementById('syncProgressList').innerHTML = listHtml;
-  openModal('syncProgressModal');
-}
-
-function updateSyncProgressItem(key, current, total) {
-  const bar = document.getElementById(`sync-bar-${key}`);
-  const count = document.getElementById(`sync-count-${key}`);
-  const icon = document.getElementById(`sync-icon-${key}`);
-  
-  if (bar) bar.style.width = `${Math.round((current / total) * 100)}%`;
-  if (count) count.textContent = `${current} / ${total}`;
-  if (icon && syncProgressData[key].status === 'pending') {
-    icon.textContent = '🔄';
-    syncProgressData[key].status = 'running';
-  }
-}
-
-function markSyncItemComplete(key, success, failed, skipped) {
-  const icon = document.getElementById(`sync-icon-${key}`);
-  const count = document.getElementById(`sync-count-${key}`);
-  
-  if (icon) {
-    icon.textContent = failed > 0 ? '⚠️' : '✅';
-  }
-  if (count) {
-    count.innerHTML = `<span style="color:var(--success)">${success}成</span> / <span style="color:var(--danger)">${failed}败</span>`;
-  }
-  syncProgressData[key].status = 'complete';
-}
-
-function showSyncResult(success, failed, skipped) {
-  document.getElementById('syncResultSuccess').textContent = success;
-  document.getElementById('syncResultFailed').textContent = failed;
-  document.getElementById('syncResultSkipped').textContent = skipped;
-  document.getElementById('syncResultSummary').style.display = 'grid';
-  document.getElementById('syncProgressFooter').style.display = 'flex';
-}
-
-function closeSyncProgress() {
-  closeModal('syncProgressModal');
-  syncInProgress = false;
-}
-
-// ==================== 拉取数据（飞书 -> 本地） ====================
-async function pullFromFeishu() {
-  if (syncInProgress) {
-    showToast('同步正在进行中...', 'warning');
-    return;
-  }
-  
-  if (!feishuConfig.app_id || !feishuConfig.app_secret || !feishuConfig.base_token) {
-    showToast('请先配置飞书应用信息', 'error');
-    openFeishuConfig();
-    return;
-  }
-  
-  if (!feishuConfig.member_table_id || !feishuConfig.activity_table_id || !feishuConfig.record_table_id) {
-    showToast('请先配置所有数据表ID', 'error');
-    openFeishuConfig();
-    return;
-  }
-  
-  syncInProgress = true;
-  initSyncProgress('从飞书拉取数据', [
-    { key: 'members', label: '同步成员数据', total: 0 },
-    { key: 'activities', label: '同步活动数据', total: 0 },
-    { key: 'records', label: '同步考勤记录', total: 0 }
-  ]);
-  
-  let totalSuccess = 0, totalFailed = 0, totalSkipped = 0;
-  
-  try {
-    // 1. 拉取成员
-    const feishuMembers = await getAllFeishuRecords(feishuConfig.member_table_id);
-    document.getElementById('sync-count-members').textContent = `0 / ${feishuMembers.length}`;
-    document.getElementById('sync-icon-members').textContent = '🔄';
-    
-    const memberResults = processMembersFromFeishu(feishuMembers);
-    markSyncItemComplete('members', memberResults.success, memberResults.failed, memberResults.skipped);
-    totalSuccess += memberResults.success;
-    totalFailed += memberResults.failed;
-    totalSkipped += memberResults.skipped;
-    
-    // 2. 拉取活动
-    const feishuActivities = await getAllFeishuRecords(feishuConfig.activity_table_id);
-    document.getElementById('sync-count-activities').textContent = `0 / ${feishuActivities.length}`;
-    document.getElementById('sync-icon-activities').textContent = '🔄';
-    
-    const activityResults = processActivitiesFromFeishu(feishuActivities);
-    markSyncItemComplete('activities', activityResults.success, activityResults.failed, activityResults.skipped);
-    totalSuccess += activityResults.success;
-    totalFailed += activityResults.failed;
-    totalSkipped += activityResults.skipped;
-    
-    // 3. 拉取考勤记录
-    const feishuRecords = await getAllFeishuRecords(feishuConfig.record_table_id);
-    document.getElementById('sync-count-records').textContent = `0 / ${feishuRecords.length}`;
-    document.getElementById('sync-icon-records').textContent = '🔄';
-    
-    const recordResults = processRecordsFromFeishu(feishuRecords);
-    markSyncItemComplete('records', recordResults.success, recordResults.failed, recordResults.skipped);
-    totalSuccess += recordResults.success;
-    totalFailed += recordResults.failed;
-    totalSkipped += recordResults.skipped;
-    
+    await window.CloudSync.reloadData('members');
+    await window.CloudSync.reloadData('activities');
+    await window.CloudSync.reloadData('loots');
+    await window.CloudSync.reloadData('wishlists');
     saveData();
-    saveRecordIdMap();
-    
-    showSyncResult(totalSuccess, totalFailed, totalSkipped);
-    showToast('数据拉取完成', 'success');
-    
-    // 刷新各页面
-    renderDashboard();
-    renderMembers();
-    renderAttendance();
     renderDataPage();
-    
+    showToast('所有数据已清空', 'warning');
   } catch (e) {
-    console.error('拉取数据失败', e);
-    showToast('拉取失败：' + (e.message || '未知错误'), 'error');
-    showSyncResult(totalSuccess, totalFailed, totalSkipped);
+    console.error('清空数据失败:', e);
+    showToast('清空失败：云端同步出错', 'error');
   }
-  
-  syncInProgress = false;
 }
 
-// 处理从飞书拉取的成员数据
-function processMembersFromFeishu(items) {
-  const results = { success: 0, failed: 0, skipped: 0 };
-  
-  // 建立名称到本地ID的映射
-  const localNameMap = {};
-  appData.members.forEach(m => { localNameMap[m.name] = m; });
-  
-  items.forEach(item => {
-    try {
-      const fields = item.fields;
-      const name = fields['角色名'] || '';
-      
-      if (!name) {
-        results.skipped++;
-        return;
-      }
-      
-      // 查找本地是否存在
-      const existing = localNameMap[name];
-      const feishuSpec = fields['专精'] || '';
-      const memberData = {
-        name: name,
-        class: fields['职业'] || '',
-        main_spec: feishuSpec,
-        off_spec: '',
-        role: [],
-        spec: feishuSpec, // 向后兼容
-        status: fields['状态'] || '正式',
-        join_date: fields['加入日期'] ? formatDate(new Date(fields['加入日期'])) : '',
-        notes: fields['备注'] || ''
-      };
-      
-      if (existing) {
-        // 增量模式：已存在则跳过或更新
-        const existingMainSpec = existing.main_spec || existing.spec || '';
-        if (feishuConfig.sync_mode === 'full' || 
-            existing.class !== memberData.class || 
-            existingMainSpec !== feishuSpec ||
-            existing.status !== memberData.status) {
-          Object.assign(existing, memberData);
-          results.success++;
-        } else {
-          results.skipped++;
-        }
-        recordIdMap.members[existing.id] = item.record_id;
-      } else {
-        // 新成员
-        const newMember = { id: genId(), ...memberData };
-        appData.members.push(newMember);
-        recordIdMap.members[newMember.id] = item.record_id;
-        results.success++;
-      }
-    } catch (e) {
-      console.error('处理成员记录失败', e, item);
-      results.failed++;
-    }
-  });
-  
-  return results;
-}
-
-// 处理从飞书拉取的活动数据
-function processActivitiesFromFeishu(items) {
-  const results = { success: 0, failed: 0, skipped: 0 };
-  
-  // 建立日期+名称到本地活动的映射
-  const localActivityMap = {};
-  appData.activities.forEach(a => {
-    const key = `${a.date}_${a.raid_name}`;
-    localActivityMap[key] = a;
-  });
-  
-  items.forEach(item => {
-    try {
-      const fields = item.fields;
-      const activityName = fields['活动名称'] || '';
-      const activityDate = fields['活动日期'];
-      
-      if (!activityName || !activityDate) {
-        results.skipped++;
-        return;
-      }
-      
-      const dateStr = formatDate(new Date(activityDate));
-      const key = `${dateStr}_${activityName}`;
-      const existing = localActivityMap[key];
-      
-      const activityData = {
-        date: dateStr,
-        raid_name: activityName,
-        start_time: fields['开始时间'] ? formatTime(new Date(fields['开始时间'])) : '',
-        end_time: fields['结束时间'] ? formatTime(new Date(fields['结束时间'])) : '',
-        status: fields['状态'] || '',
-        notes: fields['备注'] || ''
-      };
-      
-      if (existing) {
-        if (feishuConfig.sync_mode === 'full' || 
-            existing.start_time !== activityData.start_time ||
-            existing.end_time !== activityData.end_time) {
-          Object.assign(existing, activityData);
-          results.success++;
-        } else {
-          results.skipped++;
-        }
-        recordIdMap.activities[existing.id] = item.record_id;
-      } else {
-        const newActivity = {
-          id: genId(),
-          ...activityData,
-          attendees: []
-        };
-        appData.activities.push(newActivity);
-        recordIdMap.activities[newActivity.id] = item.record_id;
-        results.success++;
-      }
-    } catch (e) {
-      console.error('处理活动记录失败', e, item);
-      results.failed++;
-    }
-  });
-  
-  return results;
-}
-
-// 处理从飞书拉取的考勤记录数据
-function processRecordsFromFeishu(items) {
-  const results = { success: 0, failed: 0, skipped: 0 };
-  
-  // 反向映射：飞书record_id -> 本地ID
-  const feishuMemberMap = {};
-  Object.entries(recordIdMap.members).forEach(([localId, feishuId]) => {
-    feishuMemberMap[feishuId] = localId;
-  });
-  
-  const feishuActivityMap = {};
-  Object.entries(recordIdMap.activities).forEach(([localId, feishuId]) => {
-    feishuActivityMap[feishuId] = localId;
-  });
-  
-  items.forEach(item => {
-    try {
-      const fields = item.fields;
-      
-      // 获取成员链接
-      const memberLinks = fields['成员'] || [];
-      const activityLinks = fields['活动'] || [];
-      
-      if (!memberLinks.length || !activityLinks.length) {
-        results.skipped++;
-        return;
-      }
-      
-      const feishuMemberId = memberLinks[0].record_id;
-      const feishuActivityId = activityLinks[0].record_id;
-      
-      const localMemberId = feishuMemberMap[feishuMemberId];
-      const localActivityId = feishuActivityMap[feishuActivityId];
-      
-      if (!localMemberId || !localActivityId) {
-        results.skipped++;
-        return;
-      }
-      
-      // 查找活动
-      const activity = appData.activities.find(a => a.id === localActivityId);
-      if (!activity) {
-        results.skipped++;
-        return;
-      }
-      
-      const attendData = {
-        member_id: localMemberId,
-        status: fields['出勤状态'] || '缺席',
-        notes: fields['备注'] || ''
-      };
-      
-      // 查找现有记录
-      const existingAttend = activity.attendees.find(a => a.member_id === localMemberId);
-      
-      if (existingAttend) {
-        if (feishuConfig.sync_mode === 'full' || existingAttend.status !== attendData.status) {
-          Object.assign(existingAttend, attendData);
-          results.success++;
-        } else {
-          results.skipped++;
-        }
-      } else {
-        activity.attendees.push(attendData);
-        results.success++;
-      }
-      
-      recordIdMap.records[`${localActivityId}_${localMemberId}`] = item.record_id;
-    } catch (e) {
-      console.error('处理考勤记录失败', e, item);
-      results.failed++;
-    }
-  });
-  
-  return results;
-}
-
-// ==================== 推送数据（本地 -> 飞书） ====================
-async function pushToFeishu() {
-  if (syncInProgress) {
-    showToast('同步正在进行中...', 'warning');
-    return;
-  }
-  
-  if (!feishuConfig.app_id || !feishuConfig.app_secret || !feishuConfig.base_token) {
-    showToast('请先配置飞书应用信息', 'error');
-    openFeishuConfig();
-    return;
-  }
-  
-  if (!feishuConfig.member_table_id || !feishuConfig.activity_table_id || !feishuConfig.record_table_id) {
-    showToast('请先配置所有数据表ID', 'error');
-    openFeishuConfig();
-    return;
-  }
-  
-  if (!confirm(`确定要将本地数据推送到飞书吗？\n\n同步模式：${feishuConfig.sync_mode === 'full' ? '全量同步' : '增量同步'}`)) {
-    return;
-  }
-  
-  syncInProgress = true;
-  
-  // 计算考勤记录总数
-  let recordCount = 0;
-  appData.activities.forEach(a => {
-    recordCount += a.attendees.length;
-  });
-  
-  initSyncProgress('推送数据到飞书', [
-    { key: 'members', label: '同步成员数据', total: appData.members.length },
-    { key: 'activities', label: '同步活动数据', total: appData.activities.length },
-    { key: 'records', label: '同步考勤记录', total: recordCount }
-  ]);
-  
-  let totalSuccess = 0, totalFailed = 0, totalSkipped = 0;
-  
-  try {
-    // 1. 推送成员
-    const memberRecords = appData.members.map(m => ({
-      localId: m.id,
-      fields: memberToFeishuFields(m)
-    }));
-    
-    const memberResults = await batchUpsertRecords(
-      feishuConfig.member_table_id, memberRecords, 'members', 'localId'
-    );
-    markSyncItemComplete('members', memberResults.success, memberResults.failed, memberResults.skipped);
-    totalSuccess += memberResults.success;
-    totalFailed += memberResults.failed;
-    totalSkipped += memberResults.skipped;
-    
-    // 2. 推送活动
-    const activityRecords = appData.activities.map(a => ({
-      localId: a.id,
-      fields: activityToFeishuFields(a)
-    }));
-    
-    const activityResults = await batchUpsertRecords(
-      feishuConfig.activity_table_id, activityRecords, 'activities', 'localId'
-    );
-    markSyncItemComplete('activities', activityResults.success, activityResults.failed, activityResults.skipped);
-    totalSuccess += activityResults.success;
-    totalFailed += activityResults.failed;
-    totalSkipped += activityResults.skipped;
-    
-    // 3. 推送考勤记录
-    const recordItems = [];
-    appData.activities.forEach(activity => {
-      activity.attendees.forEach(att => {
-        recordItems.push({
-          localId: `${activity.id}_${att.member_id}`,
-          activityId: activity.id,
-          memberId: att.member_id,
-          fields: recordToFeishuFields(activity.id, att)
-        });
-      });
-    });
-    
-    const recordResults = await batchUpsertRecords(
-      feishuConfig.record_table_id, recordItems, 'records', 'localId'
-    );
-    markSyncItemComplete('records', recordResults.success, recordResults.failed, recordResults.skipped);
-    totalSuccess += recordResults.success;
-    totalFailed += recordResults.failed;
-    totalSkipped += recordResults.skipped;
-    
-    saveRecordIdMap();
-    
-    showSyncResult(totalSuccess, totalFailed, totalSkipped);
-    showToast('数据推送完成', 'success');
-    
-  } catch (e) {
-    console.error('推送数据失败', e);
-    showToast('推送失败：' + (e.message || '未知错误'), 'error');
-    showSyncResult(totalSuccess, totalFailed, totalSkipped);
-  }
-  
-  syncInProgress = false;
-}
-
-// 本地成员 -> 飞书字段
-function memberToFeishuFields(member) {
-  const mainSpec = member.main_spec || member.spec || '';
-  const fields = {
-    '角色名': member.name,
-    '职业': member.class,
-    '专精': mainSpec,
-    '状态': member.status || '正式',
-    '备注': member.notes || ''
-  };
-  
-  if (member.join_date) {
-    // 转为毫秒时间戳
-    fields['加入日期'] = new Date(member.join_date + 'T00:00:00').getTime();
-  }
-  
-  return fields;
-}
-
-// 本地活动 -> 飞书字段
-function activityToFeishuFields(activity) {
-  const dateTime = new Date(activity.date + 'T00:00:00').getTime();
-  const fields = {
-    '活动名称': activity.raid_name,
-    '活动日期': dateTime,
-    '活动类型': '团本',
-    '备注': activity.notes || ''
-  };
-  
-  if (activity.start_time) {
-    const [h, m] = activity.start_time.split(':');
-    const startDate = new Date(activity.date);
-    startDate.setHours(parseInt(h), parseInt(m), 0);
-    fields['开始时间'] = startDate.getTime();
-  }
-  
-  if (activity.end_time) {
-    const [h, m] = activity.end_time.split(':');
-    const endDate = new Date(activity.date);
-    endDate.setHours(parseInt(h), parseInt(m), 0);
-    fields['结束时间'] = endDate.getTime();
-  }
-  
-  return fields;
-}
-
-// 本地考勤记录 -> 飞书字段
-function recordToFeishuFields(activityId, attendee) {
-  const memberRecordId = recordIdMap.members[attendee.member_id];
-  const activityRecordId = recordIdMap.activities[activityId];
-  
-  const fields = {
-    '出勤状态': attendee.status || '缺席',
-    '备注': attendee.notes || ''
-  };
-  
-  if (memberRecordId) {
-    fields['成员'] = [{ record_id: memberRecordId }];
-  }
-  
-  if (activityRecordId) {
-    fields['活动'] = [{ record_id: activityRecordId }];
-  }
-  
-  return fields;
-}
-
-// 格式化时间
-function formatTime(d) {
-  const h = String(d.getHours()).padStart(2, '0');
-  const m = String(d.getMinutes()).padStart(2, '0');
-  return `${h}:${m}`;
-}
 
 
 
@@ -3946,34 +2990,7 @@ async function lootSave() {
   const isEdit = !!lootEditingId;
   const oldLoot = isEdit ? (appData.loots || []).find(l => l.id === lootEditingId) : null;
 
-  // 本地模式：保持原有乐观更新逻辑
-  if (!window.CloudSync || !window.CloudSync.isCloudMode()) {
-    if (isEdit) {
-      const targetLoot = (appData.loots || []).find(l => l.id === lootEditingId);
-      if (targetLoot) {
-        if (targetLoot.status === '已分配' && targetLoot.assignedTo && lootData.status !== '已分配') {
-          const unmarkedCount = lootUnmarkWishlistObtained(targetLoot.name, targetLoot.assignedTo);
-          if (unmarkedCount > 0) showToast(`已取消 ${unmarkedCount} 条心愿单的已获取标记`, 'info');
-        }
-        Object.assign(targetLoot, lootData, { updatedAt: Date.now() });
-      }
-    } else {
-      appData.loots.push({ id: genId(), ...lootData, createdAt: Date.now(), updatedAt: Date.now() });
-    }
-    if (lootData.status === '已分配' && lootData.assignedTo) {
-      const markedCount = lootMarkWishlistObtained(lootData.name, lootData.assignedTo, lootData.date, lootData.difficulty, lootData.raid, lootData.boss);
-      if (markedCount > 0) showToast(`已自动标记 ${markedCount} 条心愿单为已获取`, 'success');
-    }
-    saveData();
-    lootRender();
-    closeModal('lootModal');
-    showToast(isEdit ? '装备已更新' : '装备已添加', isEdit ? 'success' : 'success');
-    lootSaving = false;
-    if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = saveBtn.dataset.originalText || '确认'; }
-    return;
-  }
-
-  // 云端模式：严格 DB-first（Save DB -> Load DB -> Update State -> Render）
+  // 严格 DB-first（Save DB -> Load DB -> Update State -> Render）
   try {
     const payload = { ...lootData, id: lootEditingId || undefined };
     await cloudCrud('loots', isEdit ? 'update' : 'add', payload, { renderFn: lootRender });
@@ -4066,20 +3083,7 @@ async function lootDelete(lootId) {
   const loot = appData.loots ? appData.loots.find(l => l.id === lootId) : null;
   if (!loot) return;
 
-  // 本地模式：直接修改本地状态
-  if (!window.CloudSync || !window.CloudSync.isCloudMode()) {
-    if (loot.status === '已分配' && loot.assignedTo) {
-      const unmarkedCount = lootUnmarkWishlistObtained(loot.name, loot.assignedTo);
-      if (unmarkedCount > 0) showToast(`已同步取消 ${unmarkedCount} 条心愿单的已获取标记`, 'info');
-    }
-    appData.loots = appData.loots.filter(l => l.id !== lootId);
-    saveData();
-    lootRender();
-    showToast('装备已删除', 'success');
-    return;
-  }
-
-  // 云端模式：严格 DB-first
+  // 严格 DB-first
   try {
     await cloudCrud('loots', 'delete', { id: loot.id }, { renderFn: lootRender });
 
@@ -4094,169 +3098,6 @@ async function lootDelete(lootId) {
   }
 }
 
-// 飞书同步弹窗
-function lootShowFeishuSync() {
-  openModal('lootFeishuSyncModal');
-}
-
-// 导出装备数据JSON
-function lootExportJSON() {
-  const lootData = appData.loots || [];
-  const exportData = {
-    type: 'wow_raid_loot',
-    version: '1.0',
-    exportTime: new Date().toISOString(),
-    count: lootData.length,
-    loots: lootData
-  };
-  
-  const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  const dateStr = new Date().toISOString().split('T')[0];
-  a.download = `装备分配数据_${dateStr}.json`;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
-  
-  showToast(`已导出 ${lootData.length} 条装备记录`, 'success');
-}
-
-// 导入装备数据JSON
-function lootImportJSON(event) {
-  const file = event.target.files[0];
-  if (!file) return;
-  
-  const reader = new FileReader();
-  reader.onload = function(e) {
-    try {
-      const data = JSON.parse(e.target.result);
-      let loots = [];
-      
-      // 支持多种格式：直接数组 / 带loots字段的对象 / 全量数据
-      if (Array.isArray(data)) {
-        loots = data;
-      } else if (data.loots && Array.isArray(data.loots)) {
-        loots = data.loots;
-      } else if (data.type === 'wow_raid_loot' && data.loots) {
-        loots = data.loots;
-      } else {
-        throw new Error('文件格式不正确');
-      }
-      
-      if (loots.length === 0) {
-        showToast('文件中没有装备数据', 'error');
-        return;
-      }
-      
-      const importCount = loots.length;
-      const mode = confirm(`检测到 ${importCount} 条装备记录。\n\n点击「确定」= 合并导入（保留现有数据）\n点击「取消」= 覆盖导入（替换现有数据）`);
-      
-      // 云端模式：导入后同步到DB并reload
-      if (isCloudMode()) {
-        const lootsToImport = mode ? loots.filter(l => !(appData.loots || []).some(x => x.id === l.id)) : loots;
-        (async () => {
-          try {
-            for (const l of lootsToImport) {
-              await window.CloudSync.saveCloudData('loots', 'add', l);
-            }
-            await window.CloudSync.reloadData('loots');
-            saveData();
-            lootRender();
-            closeModal('lootFeishuSyncModal');
-            showToast(`导入 ${lootsToImport.length} 条装备记录`, 'success');
-          } catch (e) {
-            console.error('装备导入同步失败:', e);
-            showToast('导入失败：云端同步出错', 'error');
-          }
-        })();
-        return;
-      }
-
-      if (mode) {
-        // 合并模式（本地）
-        const existingIds = new Set((appData.loots || []).map(l => l.id));
-        const newLoots = loots.filter(l => !existingIds.has(l.id));
-        appData.loots = [...(appData.loots || []), ...newLoots];
-        showToast(`合并导入 ${newLoots.length} 条新记录`, 'success');
-      } else {
-        // 覆盖模式（本地）
-        appData.loots = loots;
-        showToast(`覆盖导入 ${loots.length} 条记录`, 'success');
-      }
-
-      saveData();
-      lootRender();
-      closeModal('lootFeishuSyncModal');
-    } catch (err) {
-      showToast('导入失败：' + err.message, 'error');
-    }
-  };
-  reader.readAsText(file);
-  event.target.value = '';
-}
-
-// 拖拽导入支持
-document.addEventListener('DOMContentLoaded', function() {
-  setTimeout(() => {
-    const importArea = document.getElementById('lootImportArea');
-    if (!importArea) return;
-    
-    importArea.addEventListener('dragover', function(e) {
-      e.preventDefault();
-      importArea.classList.add('dragover');
-    });
-    
-    importArea.addEventListener('dragleave', function(e) {
-      e.preventDefault();
-      importArea.classList.remove('dragover');
-    });
-    
-    importArea.addEventListener('drop', function(e) {
-      e.preventDefault();
-      importArea.classList.remove('dragover');
-      const file = e.dataTransfer.files[0];
-      if (file && file.name.endsWith('.json')) {
-        const input = document.getElementById('lootImportFile');
-        const dt = new DataTransfer();
-        dt.items.add(file);
-        input.files = dt.files;
-        lootImportJSON({ target: input });
-      } else {
-        showToast('请拖入 JSON 文件', 'error');
-      }
-    });
-
-    // 心愿单导入区域拖拽支持
-    const wishImportArea = document.getElementById('wishlistImportArea');
-    if (wishImportArea) {
-      wishImportArea.addEventListener('dragover', function(e) {
-        e.preventDefault();
-        wishImportArea.classList.add('dragover');
-      });
-      wishImportArea.addEventListener('dragleave', function(e) {
-        e.preventDefault();
-        wishImportArea.classList.remove('dragover');
-      });
-      wishImportArea.addEventListener('drop', function(e) {
-        e.preventDefault();
-        wishImportArea.classList.remove('dragover');
-        const file = e.dataTransfer.files[0];
-        if (file && file.name.endsWith('.json')) {
-          const input = document.getElementById('wishlistImportFile');
-          const dt = new DataTransfer();
-          dt.items.add(file);
-          input.files = dt.files;
-          wishlistImportJSON({ target: input });
-        } else {
-          showToast('请拖入 JSON 文件', 'error');
-        }
-      });
-    }
-  }, 100);
-});
 
 
 // ==================== 心愿单模块 ====================
@@ -4513,7 +3354,6 @@ async function wishlistBatchDelete() {
   }
   if (!confirm(`确定要删除选中的 ${ids.length} 条心愿记录吗？此操作不可恢复。`)) return;
 
-  const isCloudMode = window.CloudSync && window.CloudSync.isCloudMode();
   let successCount = 0;
   let failCount = 0;
 
@@ -4521,11 +3361,7 @@ async function wishlistBatchDelete() {
     const wish = (appData.wishlist || []).find(w => w.id === wishId);
     if (!wish) continue;
     try {
-      if (isCloudMode) {
-        await cloudCrud('wishlists', 'delete', { id: wishId }, { renderFn: () => {} });
-      } else {
-        appData.wishlist = appData.wishlist.filter(w => w.id !== wishId);
-      }
+      await cloudCrud('wishlists', 'delete', { id: wishId }, { renderFn: () => {} });
       successCount++;
     } catch (e) {
       console.error('批量删除失败:', wishId, e);
@@ -4533,9 +3369,7 @@ async function wishlistBatchDelete() {
     }
   }
 
-  if (isCloudMode) {
-    await window.CloudSync.reloadData('wishlists');
-  }
+  await window.CloudSync.reloadData('wishlists');
   saveData();
   wishlistSelectedIds.clear();
   wishlistRender();
@@ -4832,52 +3666,7 @@ async function wishlistSave() {
     return '';
   }
 
-  // 本地模式：直接操作本地状态
-  if (!window.CloudSync || !window.CloudSync.isCloudMode()) {
-    if (isEdit) {
-      const memberId = document.getElementById('wishlistMember').value;
-      const member = appData.members.find(m => m.id === memberId);
-      const targetWish = (appData.wishlist || []).find(w => w.id === wishlistEditingId);
-      if (targetWish) {
-        Object.assign(targetWish, {
-          memberId, memberName: member ? member.name : '', itemName, raid, boss, category, slot,
-          priority, spec, specName: calcSpecName(member, spec), obtained, obtainedDate, note,
-          updatedAt: Date.now()
-        });
-      }
-      showToast('心愿已更新', 'success');
-    } else {
-      const checkedBoxes = document.querySelectorAll('#wishlistMemberCheckboxes input[type="checkbox"]:checked');
-      const selectedMemberIds = Array.from(checkedBoxes).map(cb => cb.value);
-      if (selectedMemberIds.length === 0) {
-        showToast('请至少选择一个成员', 'error');
-        return;
-      }
-      if (!appData.wishlist) appData.wishlist = [];
-      selectedMemberIds.forEach(memberId => {
-        const member = appData.members.find(m => m.id === memberId);
-        if (!member) return;
-        const exists = (appData.wishlist || []).some(w =>
-          !w.obtained && w.memberId === memberId && w.itemName.toLowerCase() === itemName.toLowerCase()
-        );
-        if (exists) return;
-        appData.wishlist.push({
-          id: genId(), memberId, memberName: member.name, itemName, raid, boss, category, slot,
-          priority, spec, specName: calcSpecName(member, spec), obtained, obtainedDate, note,
-          createdAt: Date.now(), updatedAt: Date.now()
-        });
-      });
-      showToast('心愿已添加', 'success');
-    }
-    saveData();
-    wishlistRender();
-    closeModal('wishlistModal');
-    wishlistSaving = false;
-    if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = saveBtn.dataset.originalText || '确定'; }
-    return;
-  }
-
-  // 云端模式：严格 DB-first
+  // 严格 DB-first
   try {
     if (isEdit) {
       const memberId = document.getElementById('wishlistMember').value;
@@ -4956,16 +3745,7 @@ async function wishlistDelete(wishId) {
   const wish = appData.wishlist ? appData.wishlist.find(w => w.id === wishId) : null;
   if (!wish) return;
 
-  // 本地模式：直接修改本地状态
-  if (!window.CloudSync || !window.CloudSync.isCloudMode()) {
-    appData.wishlist = appData.wishlist.filter(w => w.id !== wishId);
-    saveData();
-    wishlistRender();
-    showToast('心愿已删除', 'success');
-    return;
-  }
-
-  // 云端模式：严格 DB-first
+  // 严格 DB-first
   try {
     await cloudCrud('wishlists', 'delete', { id: wish.id }, { renderFn: wishlistRender });
     showToast('心愿已删除', 'success');
@@ -4982,18 +3762,7 @@ async function wishlistToggleObtained(wishId) {
   const newObtained = !wish.obtained;
   const newObtainedDate = newObtained ? formatDate(new Date()) : '';
 
-  // 本地模式：直接修改本地状态
-  if (!window.CloudSync || !window.CloudSync.isCloudMode()) {
-    wish.obtained = newObtained;
-    wish.obtainedDate = newObtainedDate;
-    wish.updatedAt = Date.now();
-    saveData();
-    wishlistRender();
-    showToast(newObtained ? '已标记为已获取 🎉' : '已标记为未获取', newObtained ? 'success' : 'info');
-    return;
-  }
-
-  // 云端模式：严格 DB-first
+  // 严格 DB-first
   try {
     await cloudCrud('wishlists', 'update', {
       ...wish,
@@ -5007,109 +3776,6 @@ async function wishlistToggleObtained(wishId) {
   }
 }
 
-// 飞书同步弹窗
-function wishlistShowFeishuSync() {
-  openModal('wishlistFeishuSyncModal');
-}
-
-// 导出心愿单JSON
-function wishlistExportJSON() {
-  const wishData = appData.wishlist || [];
-  const exportData = {
-    type: 'wow_raid_wishlist',
-    version: '1.0',
-    exportTime: new Date().toISOString(),
-    count: wishData.length,
-    wishlist: wishData
-  };
-
-  const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  const dateStr = new Date().toISOString().split('T')[0];
-  a.download = `心愿单数据_${dateStr}.json`;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
-
-  showToast(`已导出 ${wishData.length} 条心愿记录`, 'success');
-}
-
-// 导入心愿单JSON
-function wishlistImportJSON(event) {
-  const file = event.target.files[0];
-  if (!file) return;
-
-  const reader = new FileReader();
-  reader.onload = function(e) {
-    try {
-      const data = JSON.parse(e.target.result);
-      let wishlist = [];
-
-      // 支持多种格式
-      if (Array.isArray(data)) {
-        wishlist = data;
-      } else if (data.wishlist && Array.isArray(data.wishlist)) {
-        wishlist = data.wishlist;
-      } else if (data.type === 'wow_raid_wishlist' && data.wishlist) {
-        wishlist = data.wishlist;
-      } else {
-        throw new Error('文件格式不正确');
-      }
-
-      if (wishlist.length === 0) {
-        showToast('文件中没有心愿单数据', 'error');
-        return;
-      }
-
-      const importCount = wishlist.length;
-      const mode = confirm(`检测到 ${importCount} 条心愿记录。\n\n点击「确定」= 合并导入（保留现有数据）\n点击「取消」= 覆盖导入（替换现有数据）`);
-
-      // 云端模式：导入后同步到DB并reload
-      if (isCloudMode()) {
-        const wishesToImport = mode ? wishlist.filter(w => !(appData.wishlist || []).some(x => x.id === w.id)) : wishlist;
-        (async () => {
-          try {
-            for (const w of wishesToImport) {
-              await window.CloudSync.saveCloudData('wishlists', 'add', w);
-            }
-            await window.CloudSync.reloadData('wishlists');
-            saveData();
-            wishlistRender();
-            closeModal('wishlistFeishuSyncModal');
-            showToast(`导入 ${wishesToImport.length} 条心愿记录`, 'success');
-          } catch (e) {
-            console.error('心愿单导入同步失败:', e);
-            showToast('导入失败：云端同步出错', 'error');
-          }
-        })();
-        return;
-      }
-
-      if (mode) {
-        // 合并模式（本地）
-        const existingIds = new Set((appData.wishlist || []).map(w => w.id));
-        const newWishes = wishlist.filter(w => !existingIds.has(w.id));
-        appData.wishlist = [...(appData.wishlist || []), ...newWishes];
-        showToast(`合并导入 ${newWishes.length} 条新记录`, 'success');
-      } else {
-        // 覆盖模式（本地）
-        appData.wishlist = wishlist;
-        showToast(`覆盖导入 ${wishlist.length} 条记录`, 'success');
-      }
-
-      saveData();
-      wishlistRender();
-      closeModal('wishlistFeishuSyncModal');
-    } catch (err) {
-      showToast('导入失败：' + err.message, 'error');
-    }
-  };
-  reader.readAsText(file);
-  event.target.value = '';
-}
 
 // 装备分配弹窗中更新心愿单匹配
 function lootUpdateWishlistMatches() {
@@ -5167,58 +3833,6 @@ function lootFillAssignedTo(name) {
     lootUpdateMemberInfo();
   }
   lootUpdateWishlistMatches();
-}
-
-// 装备分配保存时联动心愿单
-function lootMarkWishlistObtained(itemName, assignedTo, dateStr, difficulty, raid, boss) {
-  if (!itemName || !assignedTo) return 0;
-
-  let count = 0;
-  // 构建获取详情备注
-  const dateDisplay = dateStr || formatDate(new Date());
-  let obtainInfo = `${dateDisplay}，`;
-  if (difficulty) obtainInfo += `${difficulty}难度 `;
-  if (raid) obtainInfo += `${raid} `;
-  if (boss) obtainInfo += `${boss} `;
-  obtainInfo += '获得该装备';
-
-  (appData.wishlist || []).forEach(w => {
-    if (!w.obtained &&
-        w.itemName.toLowerCase() === itemName.toLowerCase() &&
-        w.memberName === assignedTo) {
-      w.obtained = true;
-      w.obtainedDate = dateStr || formatDate(new Date());
-      // 追加获取详情到备注
-      if (w.note) {
-        w.note = w.note + '\n' + obtainInfo;
-      } else {
-        w.note = obtainInfo;
-      }
-      w.updatedAt = Date.now();
-      count++;
-    }
-  });
-
-  return count;
-}
-
-// 反向联动：取消心愿单已获取标记
-function lootUnmarkWishlistObtained(itemName, assignedTo) {
-  if (!itemName || !assignedTo) return 0;
-
-  let count = 0;
-  (appData.wishlist || []).forEach(w => {
-    if (w.obtained &&
-        w.itemName.toLowerCase() === itemName.toLowerCase() &&
-        w.memberName === assignedTo) {
-      w.obtained = false;
-      w.obtainedDate = '';
-      w.updatedAt = Date.now();
-      count++;
-    }
-  });
-
-  return count;
 }
 
 
@@ -5814,9 +4428,10 @@ async function init() {
   }
 
   // 尝试初始化云端
+  let cloudReady = false;
   if (window.CloudSync) {
     try {
-      await window.CloudSync.init();
+      cloudReady = !!(await window.CloudSync.init());
       window.CloudSync.setupAuthListener();
 
       // 检查是否已有登录态
@@ -5842,11 +4457,11 @@ async function init() {
         }
       }
     } catch (e) {
-      console.warn('云端初始化失败，使用本地模式', e);
+      console.warn('云端初始化失败', e);
     }
   }
 
-  // 未登录或云端不可用 - 显示认证界面
+  // 未登录或云端不可用 - 停留在登录/注册界面（Supabase 是唯一数据源）
   const authOverlay = document.getElementById('authOverlay');
   const appContainer = document.querySelector('.app-container');
   
@@ -5855,9 +4470,9 @@ async function init() {
     if (appContainer) appContainer.style.display = 'none';
   }
 
-  // 如果云端不可用，自动进入本地模式
-  if (!window.CloudSync || !window.CloudSync.init) {
-    handleLocalMode();
+  // 云端不可用时停留在登录页并给出明确提示
+  if (!cloudReady) {
+    showAuthError('云端服务不可用，请检查网络后刷新重试');
   }
 }
 

@@ -209,6 +209,228 @@ function readBody(req) {
   });
 }
 
+// ==================== SEC-001 代理层公会级鉴权 ====================
+// 所有经 /api/db/rest/v1/* 的写操作以 service_role 执行（绕过 RLS），
+// 因此必须在代理层完成 "用户 → 公会成员身份 → 角色" 三级校验。
+// 规则映射见 tasks/任务书05 与 docs/开发规范.md 2.2。
+
+// Promise 版 JWT 验证
+function verifyTokenAsync(accessToken) {
+  return new Promise((resolve) => verifyToken(accessToken, resolve));
+}
+
+// service_role REST 查询（仅鉴权模块内部使用）
+function supabaseRestGet(restPath) {
+  return new Promise((resolve) => {
+    proxyToSupabase("GET", restPath, {}, null, (result) => {
+      let body = null;
+      try { body = JSON.parse(result.body); } catch { body = null; }
+      resolve({ status: result.statusCode, body });
+    });
+  });
+}
+
+// 查询用户在指定公会的角色（owner/editor/viewer），非成员返回 null
+async function getGuildRole(guildId, userId) {
+  const { body } = await supabaseRestGet(
+    `/rest/v1/guild_members?guild_id=eq.${guildId}&user_id=eq.${userId}&select=role&limit=1`
+  );
+  return Array.isArray(body) && body[0] ? body[0].role : null;
+}
+
+// 解析 query string 中的 eq. 过滤条件 → { 列名: [值, ...] }
+function parseEqFilters(queryString) {
+  const filters = {};
+  const qs = (queryString || "").replace(/^\?/, "");
+  for (const pair of qs.split("&")) {
+    if (!pair) continue;
+    const eqIdx = pair.indexOf("=");
+    if (eqIdx < 0) continue;
+    const key = decodeURIComponent(pair.slice(0, eqIdx));
+    const value = decodeURIComponent(pair.slice(eqIdx + 1));
+    if (value.startsWith("eq.")) {
+      if (!filters[key]) filters[key] = [];
+      filters[key].push(value.slice(3));
+    }
+  }
+  return filters;
+}
+
+// 把请求体规范化为行数组（POST 支持单对象或数组批量）
+function parseBodyRows(rawBody) {
+  if (!rawBody) return [];
+  try {
+    const parsed = JSON.parse(rawBody);
+    return Array.isArray(parsed) ? parsed : [parsed];
+  } catch {
+    return [];
+  }
+}
+
+// 解析本次写操作涉及的 guild_id 集合
+// table: 目标表；filters: query 中的 eq 过滤；rows: 请求体行
+async function resolveGuildIds(table, filters, rows) {
+  const guildIds = new Set();
+  const add = (v) => { if (v) guildIds.add(v); };
+
+  // 1. 请求体 / query 直接携带 guild_id
+  rows.forEach((r) => add(r && r.guild_id));
+  (filters.guild_id || []).forEach(add);
+
+  // 2. activity_attendance：从 activity_id 联查 activities
+  if (table === "activity_attendance") {
+    const activityIds = new Set();
+    rows.forEach((r) => r && r.activity_id && activityIds.add(r.activity_id));
+    (filters.activity_id || []).forEach((v) => activityIds.add(v));
+    for (const actId of activityIds) {
+      const { body } = await supabaseRestGet(`/rest/v1/activities?id=eq.${actId}&select=guild_id&limit=1`);
+      if (Array.isArray(body) && body[0]) add(body[0].guild_id);
+    }
+  }
+
+  // 3. wishlists 按 member_id 过滤：联查 raid_members
+  if (table === "wishlists" && filters.member_id) {
+    for (const memberId of filters.member_id) {
+      const { body } = await supabaseRestGet(`/rest/v1/raid_members?id=eq.${memberId}&select=guild_id&limit=1`);
+      if (Array.isArray(body) && body[0]) add(body[0].guild_id);
+    }
+  }
+
+  // 4. 仅按 id 过滤（PATCH/DELETE）：查行取 guild_id
+  if (filters.id && ["raid_members", "activities", "loot_records", "wishlists"].includes(table)) {
+    for (const rowId of filters.id) {
+      const { body } = await supabaseRestGet(`/rest/v1/${table}?id=eq.${rowId}&select=guild_id&limit=1`);
+      if (Array.isArray(body) && body[0]) add(body[0].guild_id);
+    }
+  }
+
+  return guildIds;
+}
+
+// 按 id 查询单行（用于归属判断）
+async function fetchRowById(table, id, select) {
+  const { body } = await supabaseRestGet(`/rest/v1/${table}?id=eq.${id}&select=${select}&limit=1`);
+  return Array.isArray(body) && body[0] ? body[0] : null;
+}
+
+// 鉴权主函数：返回 { ok, status, message }
+async function authorizeProxyRequest(user, table, method, queryString, rawBody) {
+  const uid = user.id;
+  const deny = (message) => ({ ok: false, status: 403, message });
+  const filters = parseEqFilters(queryString);
+  const rows = parseBodyRows(rawBody);
+
+  // ---- GET：仅放行 guilds（邀请码/按 id 查找公会的唯一代理读场景），且必须带精确过滤，防止全表遍历 ----
+  if (method === "GET") {
+    if (table === "guilds" && (filters.invite_code || filters.id)) return { ok: true };
+    if (table === "guilds") return deny("查询公会必须提供邀请码或公会 ID");
+    return deny("该表不允许通过代理读取");
+  }
+
+  // ---- guilds ----
+  if (table === "guilds") {
+    if (method === "POST") return { ok: true }; // 任何登录用户可创建公会
+    // PATCH/DELETE：仅 owner
+    const ids = filters.id || [];
+    for (const guildId of ids) {
+      const role = await getGuildRole(guildId, uid);
+      if (role !== "owner") return deny("仅公会会长可以修改或删除公会");
+    }
+    return { ok: true };
+  }
+
+  // ---- guild_members ----
+  if (table === "guild_members") {
+    if (method === "POST") {
+      for (const row of rows) {
+        if (!row || row.user_id !== uid) return deny("只能将自己的账号加入公会");
+        if (row.role === "owner") {
+          // 防自我提权：owner 行仅允许建在本人拥有的公会
+          const guild = await fetchRowById("guilds", row.guild_id, "owner_id");
+          if (!guild || guild.owner_id !== uid) return deny("无权在该公会设置会长角色");
+        } else if (row.role !== "viewer" && row.role !== "editor") {
+          return deny("非法的成员角色");
+        } else if (row.role === "editor") {
+          return deny("加入公会时不能以编辑身份加入");
+        }
+      }
+      return { ok: true };
+    }
+    // PATCH/DELETE：解析目标行
+    const ids = filters.id || [];
+    for (const rowId of ids) {
+      const row = await fetchRowById("guild_members", rowId, "guild_id,user_id");
+      if (!row) continue; // 目标不存在，no-op 放行
+      if (method === "PATCH") {
+        const role = await getGuildRole(row.guild_id, uid);
+        if (role !== "owner") return deny("仅公会会长可以变更成员角色");
+      } else if (method === "DELETE") {
+        if (row.user_id === uid) continue; // 退出自己的公会，允许
+        const role = await getGuildRole(row.guild_id, uid);
+        if (role !== "owner") return deny("仅公会会长可以移除成员");
+      }
+    }
+    return { ok: true };
+  }
+
+  // ---- notifications ----
+  if (table === "notifications") {
+    if (method === "POST") {
+      // 入/退会通知等：调用者必须是目标公会成员
+      for (const row of rows) {
+        if (!row || !row.guild_id) return deny("通知缺少目标公会");
+        const role = await getGuildRole(row.guild_id, uid);
+        if (!role) return deny("无权向该公会成员发送通知");
+      }
+      return { ok: true };
+    }
+    // PATCH/DELETE：仅限本人通知
+    if (filters.user_id && filters.user_id.some((v) => v !== uid)) return deny("只能操作本人的通知");
+    for (const rowId of filters.id || []) {
+      const row = await fetchRowById("notifications", rowId, "user_id");
+      if (row && row.user_id !== uid) return deny("只能操作本人的通知");
+    }
+    if (method === "PATCH") {
+      for (const row of rows) {
+        if (row && row.user_id && row.user_id !== uid) return deny("只能操作本人的通知");
+      }
+    }
+    return { ok: true };
+  }
+
+  // ---- user_profiles / user_characters：仅限本人 ----
+  if (table === "user_profiles" || table === "user_characters") {
+    if (filters.user_id && filters.user_id.some((v) => v !== uid)) return deny("只能操作本人的数据");
+    for (const row of rows) {
+      if (row && row.user_id && row.user_id !== uid) return deny("只能操作本人的数据");
+    }
+    for (const rowId of filters.id || []) {
+      const row = await fetchRowById(table, rowId, "user_id");
+      if (row && row.user_id !== uid) return deny("只能操作本人的数据");
+    }
+    return { ok: true };
+  }
+
+  // ---- 公会业务表：raid_members / activities / activity_attendance / loot_records / wishlists ----
+  if (["raid_members", "activities", "activity_attendance", "loot_records", "wishlists"].includes(table)) {
+    const guildIds = await resolveGuildIds(table, filters, rows);
+    if (guildIds.size === 0) {
+      // 无法定位目标公会（如删除不存在的行）：放行，操作必然 no-op
+      return { ok: true };
+    }
+    for (const guildId of guildIds) {
+      const role = await getGuildRole(guildId, uid);
+      if (role !== "owner" && role !== "editor") {
+        return deny("无权修改该公会数据（需要编辑或以上权限）");
+      }
+    }
+    return { ok: true };
+  }
+
+  // ---- 未知表：一律拒绝 ----
+  return deny("不允许代理访问该表");
+}
+
 function serveFile(res, filePath) {
   const ext = path.extname(filePath).toLowerCase();
   const contentType = MIME[ext] || "application/octet-stream";
@@ -250,67 +472,87 @@ const server = http.createServer(async (req, res) => {
   }
 
   // API: DB Proxy - /api/db/rest/v1/:table
-  // Proxies read/write operations (GET/POST/PATCH/DELETE) to Supabase using service_role key
+  // 代理读写操作到 Supabase（service_role），转发前必须过 SEC-001 公会级鉴权
   if (urlPath.startsWith("/api/db/rest/v1/") && (req.method === "GET" || req.method === "POST" || req.method === "PATCH" || req.method === "DELETE")) {
     const authHeader = req.headers["authorization"] || "";
     const token = authHeader.replace("Bearer ", "");
 
     if (!token) {
       res.writeHead(401, { "Content-Type": "application/json", ...corsHeaders });
-      res.end(JSON.stringify({ error: "Unauthorized" }));
+      res.end(JSON.stringify({ message: "未登录或登录已过期，请重新登录" }));
       return;
     }
 
-    // Verify the user's token
-    verifyToken(token, (user) => {
+    (async () => {
+      const user = await verifyTokenAsync(token);
       if (!user) {
         res.writeHead(401, { "Content-Type": "application/json", ...corsHeaders });
-        res.end(JSON.stringify({ error: "Invalid token" }));
+        res.end(JSON.stringify({ message: "登录状态无效，请重新登录" }));
         return;
       }
 
-      // Extract the Supabase REST path
-      const restPath = urlPath.replace("/api/db", "");
+      const table = urlPath.replace("/api/db/rest/v1/", "").split("/")[0];
       const queryString = req.url.includes("?") ? req.url.substring(req.url.indexOf("?")) : "";
-      const supabasePath = `/rest/v1${restPath.replace("/rest/v1", "")}${queryString}`;
+      const body = await readBody(req);
 
-      readBody(req).then((body) => {
-        proxyToSupabase(req.method, supabasePath, req.headers, body, (result) => {
-          const responseHeaders = { ...corsHeaders, "Content-Type": "application/json" };
-          
-          // Forward content-range header if present
-          if (result.headers["content-range"]) {
-            responseHeaders["Content-Range"] = result.headers["content-range"];
-          }
+      // SEC-001：公会级鉴权，失败返回 401/403 + 中文提示
+      try {
+        const authz = await authorizeProxyRequest(user, table, req.method, queryString, body);
+        if (!authz.ok) {
+          res.writeHead(authz.status, { "Content-Type": "application/json", ...corsHeaders });
+          res.end(JSON.stringify({ message: authz.message }));
+          return;
+        }
+      } catch (e) {
+        res.writeHead(500, { "Content-Type": "application/json", ...corsHeaders });
+        res.end(JSON.stringify({ message: "权限校验失败，请稍后重试" }));
+        return;
+      }
 
-          res.writeHead(result.statusCode, responseHeaders);
-          res.end(result.body);
-        });
+      const supabasePath = `/rest/v1/${table}${queryString}`;
+      proxyToSupabase(req.method, supabasePath, req.headers, body, (result) => {
+        const responseHeaders = { ...corsHeaders, "Content-Type": "application/json" };
+
+        // Forward content-range header if present
+        if (result.headers["content-range"]) {
+          responseHeaders["Content-Range"] = result.headers["content-range"];
+        }
+
+        res.writeHead(result.statusCode, responseHeaders);
+        res.end(result.body);
       });
-    });
+    })();
     return;
   }
 
   // API: RPC Proxy - /api/db/rpc/v1/:function_name
+  // SEC-001：service_role 执行数据库函数风险高，仅放行白名单函数
+  const RPC_ALLOWLIST = ["get_unread_notification_count"];
   if (urlPath.startsWith("/api/db/rpc/v1/") && req.method === "POST") {
     const authHeader = req.headers["authorization"] || "";
     const token = authHeader.replace("Bearer ", "");
 
     if (!token) {
       res.writeHead(401, { "Content-Type": "application/json", ...corsHeaders });
-      res.end(JSON.stringify({ error: "Unauthorized" }));
+      res.end(JSON.stringify({ message: "未登录或登录已过期，请重新登录" }));
+      return;
+    }
+
+    const fnName = urlPath.replace("/api/db/rpc/v1/", "").split("/")[0];
+    if (!RPC_ALLOWLIST.includes(fnName)) {
+      res.writeHead(403, { "Content-Type": "application/json", ...corsHeaders });
+      res.end(JSON.stringify({ message: "不允许调用该函数" }));
       return;
     }
 
     verifyToken(token, (user) => {
       if (!user) {
         res.writeHead(401, { "Content-Type": "application/json", ...corsHeaders });
-        res.end(JSON.stringify({ error: "Invalid token" }));
+        res.end(JSON.stringify({ message: "登录状态无效，请重新登录" }));
         return;
       }
 
-      const restPath = urlPath.replace("/api/db", "");
-      const supabasePath = restPath;
+      const supabasePath = `/rest/v1/rpc/${fnName}`;
 
       readBody(req).then((body) => {
         proxyToSupabase("POST", supabasePath, req.headers, body, (result) => {

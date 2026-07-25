@@ -34,12 +34,12 @@
       const config = await resp.json();
 
       if (!config.url || !config.anonKey) {
-        console.warn('Supabase 未配置，使用本地模式');
+        console.warn('Supabase 未配置，云端不可用');
         return null;
       }
 
       if (typeof window.supabase === 'undefined') {
-        console.warn('Supabase SDK 未加载，使用本地模式');
+        console.warn('Supabase SDK 未加载，云端不可用');
         return null;
       }
 
@@ -55,7 +55,7 @@
       configLoaded = true;
       return supabaseClient;
     } catch (e) {
-      console.warn('Supabase 初始化失败，使用本地模式', e);
+      console.warn('Supabase 初始化失败，云端不可用', e);
       return null;
     }
   }
@@ -270,6 +270,8 @@
   // ---- 用户登出后 ----
   function onUserSignedOut() {
     isCloudMode = false;
+    // BUG-012：登出时清除 viewer 权限门状态
+    if (typeof document !== 'undefined') document.body.classList.remove('viewer-mode');
     showAuthView();
   }
 
@@ -1207,6 +1209,11 @@
     }
     if (userInfoEl && currentUser) {
       userInfoEl.textContent = currentUser.email;
+    }
+
+    // BUG-012：切换公会后角色可能变化，刷新 viewer 权限门
+    if (typeof window.updatePermissionUI === 'function') {
+      window.updatePermissionUI();
     }
   }
 

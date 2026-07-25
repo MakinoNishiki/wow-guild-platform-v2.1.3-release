@@ -1494,8 +1494,8 @@ body {
 .empty-icon { font-size: 48px; margin-bottom: 12px; opacity: 0.5; }
 .empty-text { font-size: 14px; margin-bottom: 16px; }
 
-/* ========== 飞书同步 ========== */
-.feishu-btn {
+/* ========== 公会切换按钮 ========== */
+.guild-switch-btn {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -1509,194 +1509,10 @@ body {
   transition: all 0.2s;
 }
 
-.feishu-btn:hover {
+.guild-switch-btn:hover {
   background: rgba(88, 166, 255, 0.15);
   border-color: var(--info);
   color: var(--info);
-}
-
-.feishu-btn.connected {
-  border-color: rgba(63, 185, 80, 0.4);
-  color: var(--success);
-}
-
-.feishu-config-section {
-  margin-bottom: 20px;
-  padding-bottom: 16px;
-  border-bottom: 1px solid var(--border-color);
-}
-
-.feishu-config-section:last-child {
-  border-bottom: none;
-  margin-bottom: 0;
-  padding-bottom: 0;
-}
-
-.feishu-config-title {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--gold);
-  margin-bottom: 12px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.feishu-status-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 2px 8px;
-  border-radius: 10px;
-  font-size: 11px;
-  font-weight: 500;
-}
-
-.feishu-status-badge.connected {
-  background: rgba(63, 185, 80, 0.15);
-  color: var(--success);
-}
-
-.feishu-status-badge.disconnected {
-  background: rgba(139, 148, 158, 0.15);
-  color: var(--text-muted);
-}
-
-.sync-status-indicator {
-  display: inline-block;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--text-muted);
-}
-
-.sync-status-indicator.active {
-  background: var(--success);
-  box-shadow: 0 0 6px var(--success);
-  animation: pulse 1.5s infinite;
-}
-
-.sync-status-indicator.error {
-  background: var(--danger);
-}
-
-@keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
-}
-
-/* 同步进度弹窗 */
-.sync-progress-modal .modal { max-width: 500px; }
-
-.sync-progress-item {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 10px 0;
-  border-bottom: 1px solid var(--border-color);
-}
-
-.sync-progress-item:last-child { border-bottom: none; }
-
-.sync-progress-icon {
-  width: 24px;
-  height: 24px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 14px;
-}
-
-.sync-progress-info { flex: 1; }
-
-.sync-progress-label {
-  font-size: 13px;
-  color: var(--text-primary);
-  margin-bottom: 4px;
-}
-
-.sync-progress-bar {
-  height: 4px;
-  background: var(--bg-tertiary);
-  border-radius: 2px;
-  overflow: hidden;
-}
-
-.sync-progress-fill {
-  height: 100%;
-  background: linear-gradient(90deg, var(--gold-dark), var(--gold));
-  border-radius: 2px;
-  transition: width 0.3s ease;
-}
-
-.sync-progress-count {
-  font-size: 12px;
-  color: var(--text-muted);
-  text-align: right;
-  min-width: 80px;
-}
-
-.sync-result-summary {
-  background: var(--bg-tertiary);
-  border-radius: 6px;
-  padding: 12px 16px;
-  margin-top: 16px;
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 12px;
-  text-align: center;
-}
-
-.sync-result-item-value {
-  font-size: 20px;
-  font-weight: 700;
-  color: var(--gold);
-}
-
-.sync-result-item-label {
-  font-size: 11px;
-  color: var(--text-muted);
-  margin-top: 2px;
-}
-
-.sync-result-item.success .sync-result-item-value { color: var(--success); }
-.sync-result-item.error .sync-result-item-value { color: var(--danger); }
-
-.sync-mode-toggle {
-  display: flex;
-  background: var(--bg-tertiary);
-  border-radius: 6px;
-  padding: 3px;
-  margin-bottom: 16px;
-}
-
-.sync-mode-option {
-  flex: 1;
-  padding: 6px 12px;
-  text-align: center;
-  font-size: 12px;
-  cursor: pointer;
-  border-radius: 4px;
-  color: var(--text-secondary);
-  transition: all 0.2s;
-}
-
-.sync-mode-option.active {
-  background: var(--gold);
-  color: var(--bg-primary);
-  font-weight: 600;
-}
-
-.feishu-sync-card {
-  border: 1px solid rgba(88, 166, 255, 0.3) !important;
-}
-
-.feishu-sync-card h4 { color: var(--info) !important; }
-
-.feishu-sync-actions {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
 }
 
 /* ========== 响应式 ========== */
@@ -1880,26 +1696,6 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.loot-import-area {
-  border: 2px dashed var(--border-color);
-  border-radius: 8px;
-  padding: 24px;
-  text-align: center;
-  cursor: pointer;
-  transition: all 0.2s;
-  background: var(--bg-primary);
-}
-
-.loot-import-area:hover {
-  border-color: var(--gold);
-  background: rgba(240, 192, 96, 0.05);
-}
-
-.loot-import-area.dragover {
-  border-color: var(--gold);
-  background: rgba(240, 192, 96, 0.1);
 }
 
 .special-effect-hint {
@@ -2212,7 +2008,7 @@ body {
     display: none;
   }
 
-  .feishu-btn {
+  .guild-switch-btn {
     padding: 6px 10px;
     font-size: 12px;
     min-height: 36px;
@@ -3455,4 +3251,20 @@ body {
 @media (max-width: 768px) {
   .auth-container { max-width: 100%; }
   .guild-bar { padding: 6px 12px; }
+}
+
+/* ==================== BUG-012 viewer 权限门 ====================
+   viewer（无编辑权限）登录后隐藏/禁用所有写入口。
+   真正的防线在 server.js 代理鉴权（SEC-001），此处仅界面收口。 */
+body.viewer-mode .edit-only,
+body.viewer-mode .action-btns,
+body.viewer-mode .wishlist-row-checkbox {
+  display: none !important;
+}
+
+/* 考勤详情：viewer 可查看，但不可修改 */
+body.viewer-mode .attend-checkbox,
+body.viewer-mode .attend-status-select {
+  pointer-events: none;
+  opacity: 0.6;
 }

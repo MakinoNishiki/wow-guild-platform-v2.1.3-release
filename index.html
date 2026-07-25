@@ -30,8 +30,6 @@
       <div class="auth-switch">
         还没有账号？<a href="javascript:void(0)" onclick="showRegisterForm()">立即注册</a>
       </div>
-      <div class="auth-divider"><span>或者</span></div>
-      <button class="btn auth-btn" onclick="handleLocalMode()">本地模式（不登录）</button>
     </div>
 
     <!-- 注册表单 -->
@@ -99,7 +97,7 @@
       <div class="sidebar-logo">⚔</div>
       <div>
         <div class="sidebar-title">WoW团本工具箱</div>
-        <div class="sidebar-subtitle" id="guildName">本地模式</div>
+        <div class="sidebar-subtitle" id="guildName">未加入公会</div>
       </div>
     </div>
     <!-- 公会信息栏 -->
@@ -113,7 +111,7 @@
           👤
           <span class="notif-dot"></span>
         </button>
-        <button class="guild-bar-btn" onclick="openGuildSettings()" title="公会设置">⚙</button>
+        <button class="guild-bar-btn edit-only" onclick="openGuildSettings()" title="公会设置">⚙</button>
       </div>
     </div>
     <nav class="nav-menu">
@@ -161,7 +159,7 @@
       </div>
       <div class="topbar-right">
         <span id="userInfo" style="font-size:12px;color:var(--text-muted);margin-right:8px"></span>
-        <button class="feishu-btn" id="guildSwitchBtn" onclick="openGuildSwitcher()" style="display:none">
+        <button class="guild-switch-btn" id="guildSwitchBtn" onclick="openGuildSwitcher()" style="display:none">
           <span>🏰 切换公会</span>
         </button>
         <span style="font-size:12px;color:var(--text-muted)" id="todayStr"></span>
@@ -240,8 +238,8 @@
               </div>
             </div>
             <div class="toolbar-right">
-              <button class="btn" onclick="showImportMembersModal()">📋 批量导入</button>
-              <button class="btn btn-primary" onclick="showMemberModal()">+ 添加成员</button>
+              <button class="btn edit-only" onclick="showImportMembersModal()">📋 批量导入</button>
+              <button class="btn btn-primary edit-only" onclick="showMemberModal()">+ 添加成员</button>
             </div>
           </div>
           <div class="table-container">
@@ -279,8 +277,8 @@
               <div class="view-tab" onclick="switchAttendanceView('list')">列表视图</div>
             </div>
             <div style="display:flex;gap:8px">
-              <button class="btn" onclick="showWCLImportModal()">🔗 WCL 导入</button>
-              <button class="btn btn-primary" onclick="showActivityModal()">+ 创建活动</button>
+              <button class="btn edit-only" onclick="showWCLImportModal()">🔗 WCL 导入</button>
+              <button class="btn btn-primary edit-only" onclick="showActivityModal()">+ 创建活动</button>
             </div>
           </div>
 
@@ -364,8 +362,7 @@
               </select>
             </div>
             <div class="toolbar-right">
-              <button class="btn" onclick="lootShowFeishuSync()">☁️ 飞书备份</button>
-              <button class="btn btn-primary" onclick="lootShowModal()">+ 添加装备</button>
+              <button class="btn btn-primary edit-only" onclick="lootShowModal()">+ 添加装备</button>
             </div>
           </div>
           <div class="table-container">
@@ -433,12 +430,11 @@
               </select>
             </div>
             <div class="toolbar-right">
-              <button class="btn" onclick="wishlistShowFeishuSync()">☁️ 飞书备份</button>
-              <button class="btn btn-primary" onclick="wishlistShowModal()">+ 添加心愿</button>
+              <button class="btn btn-primary edit-only" onclick="wishlistShowModal()">+ 添加心愿</button>
             </div>
           </div>
           <!-- 批量操作工具栏 -->
-          <div id="wishlistBatchToolbar" style="display:none;align-items:center;gap:12px;padding:8px 12px;margin-bottom:8px;background:var(--bg-tertiary);border:1px solid var(--border-color);border-radius:6px;font-size:13px">
+          <div id="wishlistBatchToolbar" class="edit-only" style="display:none;align-items:center;gap:12px;padding:8px 12px;margin-bottom:8px;background:var(--bg-tertiary);border:1px solid var(--border-color);border-radius:6px;font-size:13px">
             <span id="wishlistBatchCount" style="color:var(--gold);font-weight:600">已选择 0 条</span>
             <button class="btn btn-danger btn-sm" onclick="wishlistBatchDelete()">批量删除</button>
             <button class="btn btn-sm" onclick="wishlistClearSelection()">取消选择</button>
@@ -535,21 +531,12 @@
                 <span id="cloudSyncStatus">数据已云端同步</span>
               </div>
             </div>
-            <div class="data-action-card feishu-sync-card">
-              <h4>📘 飞书多维表格同步</h4>
-              <p>将考勤数据与飞书多维表格双向同步，支持成员、活动、考勤记录的云端备份与共享。</p>
-              <div class="feishu-sync-actions">
-                <button class="btn btn-primary btn-sm" onclick="openFeishuConfig()">⚙ 配置</button>
-                <button class="btn btn-sm" onclick="pullFromFeishu()">⬇ 拉取数据</button>
-                <button class="btn btn-sm" onclick="pushToFeishu()">⬆ 推送数据</button>
-              </div>
-            </div>
             <div class="data-action-card" style="opacity:0.7">
               <h4 style="color:var(--text-muted)">💾 本地 JSON 备份/迁移</h4>
               <p style="color:var(--text-muted)">仅作为数据备份或跨环境迁移使用，不参与日常 CRUD 实时数据流。</p>
               <div style="display:flex; gap:10px">
-                <button class="btn btn-sm" onclick="exportData()" id="btnExportLocal" disabled>导出 JSON</button>
-                <button class="btn btn-sm" onclick="document.getElementById('importFile').click()" id="btnImportLocal" disabled>导入 JSON</button>
+                <button class="btn btn-sm" onclick="exportData()" id="btnExportLocal">导出 JSON</button>
+                <button class="btn btn-sm edit-only" onclick="document.getElementById('importFile').click()" id="btnImportLocal">导入 JSON</button>
                 <input type="file" id="importFile" accept=".json" style="display:none" onchange="handleImportFile(event)">
               </div>
             </div>
@@ -731,7 +718,7 @@
       <div class="modal-close" onclick="closeModal('attendanceDetailModal')">×</div>
     </div>
     <div class="modal-body">
-      <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+      <div class="edit-only" style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
         <button class="btn btn-sm" onclick="setAllAttendance('出席')">全部出席</button>
         <button class="btn btn-sm" onclick="setAllAttendance('缺席')">全部缺席</button>
         <button class="btn btn-sm" onclick="setAllAttendance('替补')">全部替补</button>
@@ -740,9 +727,9 @@
       <div class="attendance-members" id="attendanceMembersList"></div>
     </div>
     <div class="modal-footer">
-      <button class="btn btn-danger btn-sm" onclick="deleteCurrentActivity()" style="margin-right:auto">删除活动</button>
+      <button class="btn btn-danger btn-sm edit-only" onclick="deleteCurrentActivity()" style="margin-right:auto">删除活动</button>
       <button class="btn" onclick="closeModal('attendanceDetailModal')">关闭</button>
-      <button id="attendanceSaveBtn" class="btn btn-primary" onclick="saveAttendance()">保存考勤</button>
+      <button id="attendanceSaveBtn" class="btn btn-primary edit-only" onclick="saveAttendance()">保存考勤</button>
     </div>
   </div>
 </div>
@@ -786,120 +773,6 @@
     <div class="modal-footer">
       <button class="btn" onclick="closeModal('wclImportModal')">取消</button>
       <button class="btn btn-primary" onclick="importFromWCL()">导入</button>
-    </div>
-  </div>
-</div>
-
-<!-- ===== 弹窗：飞书同步配置 ===== -->
-<div class="modal-overlay" id="feishuConfigModal">
-  <div class="modal" style="max-width:600px">
-    <div class="modal-header">
-      <div>
-        <div class="modal-title">📘 飞书多维表格同步配置</div>
-        <div class="card-subtitle" style="font-size:12px">
-          <span class="feishu-status-badge" id="feishuStatusBadge">
-            <span class="sync-status-indicator" id="feishuStatusDot"></span>
-            <span id="feishuStatusText">未连接</span>
-          </span>
-        </div>
-      </div>
-      <div class="modal-close" onclick="closeModal('feishuConfigModal')">×</div>
-    </div>
-    <div class="modal-body">
-      <!-- 应用配置 -->
-      <div class="feishu-config-section">
-        <div class="feishu-config-title">🔑 应用凭证</div>
-        <div class="form-row">
-          <div class="form-group">
-            <label class="form-label">App ID</label>
-            <input type="text" class="form-input" id="feishuAppId" placeholder="cli_xxxxxxxxxx">
-          </div>
-          <div class="form-group">
-            <label class="form-label">App Secret</label>
-            <input type="password" class="form-input" id="feishuAppSecret" placeholder="xxxxxxxxxxxxxxxxxxxx">
-          </div>
-        </div>
-        <div class="form-group">
-          <label class="form-label">Base Token（多维表格唯一标识）</label>
-          <input type="text" class="form-input" id="feishuBaseToken" placeholder="bascnxxxxxxxxxxxxxxxx">
-        </div>
-      </div>
-
-      <!-- 表格配置 -->
-      <div class="feishu-config-section">
-        <div class="feishu-config-title">📋 数据表配置</div>
-        <div class="form-row">
-          <div class="form-group">
-            <label class="form-label">成员表 Table ID</label>
-            <input type="text" class="form-input" id="feishuMemberTableId" placeholder="tblxxxxxxxxxxxx">
-          </div>
-          <div class="form-group">
-            <label class="form-label">活动表 Table ID</label>
-            <input type="text" class="form-input" id="feishuActivityTableId" placeholder="tblxxxxxxxxxxxx">
-          </div>
-        </div>
-        <div class="form-group">
-          <label class="form-label">考勤记录表 Table ID</label>
-          <input type="text" class="form-input" id="feishuRecordTableId" placeholder="tblxxxxxxxxxxxx">
-        </div>
-      </div>
-
-      <!-- 同步模式 -->
-      <div class="feishu-config-section">
-        <div class="feishu-config-title">🔄 同步设置</div>
-        <div class="form-group">
-          <label class="form-label">同步模式</label>
-          <div class="sync-mode-toggle">
-            <div class="sync-mode-option active" data-mode="incremental" onclick="setSyncMode('incremental')">增量同步</div>
-            <div class="sync-mode-option" data-mode="full" onclick="setSyncMode('full')">全量同步</div>
-          </div>
-          <p style="font-size:11px;color:var(--text-muted);margin-top:8px;line-height:1.5">
-            <strong style="color:var(--text-secondary)">增量同步：</strong>仅同步本地有变更或飞书新增的数据<br>
-            <strong style="color:var(--text-secondary)">全量同步：</strong>清空目标端数据后重新同步所有记录
-          </p>
-        </div>
-      </div>
-
-      <!-- 操作按钮 -->
-      <div style="display:flex;gap:8px;justify-content:flex-end">
-        <button class="btn" onclick="testFeishuConnection()">🔌 测试连接</button>
-      </div>
-    </div>
-    <div class="modal-footer">
-      <button class="btn" onclick="closeModal('feishuConfigModal')">取消</button>
-      <button class="btn btn-primary" onclick="saveFeishuConfig()">保存配置</button>
-    </div>
-  </div>
-</div>
-
-<!-- ===== 弹窗：同步进度 ===== -->
-<div class="modal-overlay sync-progress-modal" id="syncProgressModal">
-  <div class="modal">
-    <div class="modal-header">
-      <div class="modal-title" id="syncProgressTitle">同步中...</div>
-      <div class="modal-close" onclick="closeSyncProgress()">×</div>
-    </div>
-    <div class="modal-body">
-      <div id="syncProgressList">
-        <!-- 进度项动态生成 -->
-      </div>
-      <div id="syncResultSummary" style="display:none" class="sync-result-summary">
-        <div class="sync-result-item success">
-          <div class="sync-result-item-value" id="syncResultSuccess">0</div>
-          <div class="sync-result-item-label">成功</div>
-        </div>
-        <div class="sync-result-item error">
-          <div class="sync-result-item-value" id="syncResultFailed">0</div>
-          <div class="sync-result-item-label">失败</div>
-        </div>
-        <div class="sync-result-item">
-          <div class="sync-result-item-value" id="syncResultSkipped">0</div>
-          <div class="sync-result-item-label">跳过</div>
-        </div>
-      </div>
-    </div>
-    <div class="modal-footer" id="syncProgressFooter" style="display:none">
-      <button class="btn btn-primary" onclick="closeSyncProgress()">完成</button>
     </div>
   </div>
 </div>
@@ -1076,56 +949,6 @@
   </div>
 </div>
 
-<!-- ===== 弹窗：飞书同步 ===== -->
-<div class="modal-overlay" id="lootFeishuSyncModal">
-  <div class="modal" style="max-width: 520px;">
-    <div class="modal-header">
-      <div class="modal-title">☁️ 飞书备份与迁移</div>
-      <div class="modal-close" onclick="closeModal('lootFeishuSyncModal')">×</div>
-    </div>
-    <div class="modal-body">
-      <div style="padding: 12px; background: rgba(240, 192, 96, 0.08); border-radius: 8px; margin-bottom: 16px; border: 1px solid rgba(240, 192, 96, 0.2);">
-        <div style="font-size: 13px; color: var(--gold); font-weight: 600; margin-bottom: 6px;">ℹ️ 备份说明</div>
-        <div style="font-size: 12px; color: var(--text-secondary); line-height: 1.8;">
-          此入口仅用于装备数据的离线备份与迁移，不参与实时数据流。<br>
-          日常 CRUD 请直接在本页面操作，数据会自动同步到 Supabase 云端。
-        </div>
-      </div>
-
-      <div style="margin-bottom: 20px;">
-        <div style="font-size: 14px; font-weight: 600; color: var(--text-primary); margin-bottom: 12px;">📤 本地上传到飞书</div>
-        <div style="font-size: 12px; color: var(--text-secondary); line-height: 1.8; margin-bottom: 10px;">
-          1. 点击下方按钮导出装备数据 JSON 文件<br>
-          2. 将文件发送给「蝮蛇」，说"同步装备分配到飞书"<br>
-          3. 蝮蛇会自动写入飞书多维表格
-        </div>
-        <button class="btn btn-primary btn-sm" onclick="lootExportJSON()">📁 导出装备数据 JSON</button>
-      </div>
-
-      <div style="margin-bottom: 10px;">
-        <div style="font-size: 14px; font-weight: 600; color: var(--text-primary); margin-bottom: 12px;">📥 飞书下载到本地</div>
-        <div style="font-size: 12px; color: var(--text-secondary); line-height: 1.8; margin-bottom: 10px;">
-          1. 跟「蝮蛇」说"从飞书导出装备分配数据"<br>
-          2. 蝮蛇会从飞书拉取数据并生成 JSON 文件<br>
-          3. 将文件拖到下方区域或点击导入
-        </div>
-        <div class="loot-import-area" id="lootImportArea" onclick="document.getElementById('lootImportFile').click()">
-          <div style="font-size: 24px; margin-bottom: 8px;">📂</div>
-          <div style="font-size: 13px; color: var(--text-secondary);">点击或拖拽 JSON 文件到此处导入</div>
-        </div>
-        <input type="file" id="lootImportFile" accept=".json" style="display: none;" onchange="lootImportJSON(event)">
-      </div>
-
-      <div style="font-size: 11px; color: var(--text-muted); margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border-color);">
-        飞书多维表格链接：<a href="https://my.feishu.cn/base/UDtYbjHPqaBLsHsaBNacyF2Onig" target="_blank" style="color: var(--blue-highlight);">WoW团本考勤</a>
-      </div>
-    </div>
-    <div class="modal-footer">
-      <button class="btn" onclick="closeModal('lootFeishuSyncModal')">关闭</button>
-    </div>
-  </div>
-</div>
-
 <!-- 提示消息容器 -->
 <div class="toast-container" id="toastContainer"></div>
 
@@ -1237,52 +1060,6 @@
     <div class="modal-footer">
       <button class="btn" onclick="closeModal('wishlistModal')">取消</button>
       <button class="btn btn-primary" id="wishlistSaveBtn" onclick="wishlistSave()">确认</button>
-    </div>
-  </div>
-</div>
-
-<!-- ===== 弹窗：心愿单飞书同步 ===== -->
-<div class="modal-overlay" id="wishlistFeishuSyncModal">
-  <div class="modal" style="max-width: 520px;">
-    <div class="modal-header">
-      <div class="modal-title">🎯 心愿单飞书备份</div>
-      <div class="modal-close" onclick="closeModal('wishlistFeishuSyncModal')">×</div>
-    </div>
-    <div class="modal-body">
-      <div style="padding: 12px; background: rgba(240, 192, 96, 0.08); border-radius: 8px; margin-bottom: 16px; border: 1px solid rgba(240, 192, 96, 0.2);">
-        <div style="font-size: 13px; color: var(--gold); font-weight: 600; margin-bottom: 6px;">ℹ️ 备份说明</div>
-        <div style="font-size: 12px; color: var(--text-secondary); line-height: 1.8;">
-          此入口仅用于心愿单数据的离线备份与迁移，不参与实时数据流。<br>
-          日常 CRUD 请直接在本页面操作，数据会自动同步到 Supabase 云端。
-        </div>
-      </div>
-
-      <div style="margin-bottom: 20px;">
-        <div style="font-size: 14px; font-weight: 600; color: var(--text-primary); margin-bottom: 12px;">📤 本地上传到飞书</div>
-        <div style="font-size: 12px; color: var(--text-secondary); line-height: 1.8; margin-bottom: 10px;">
-          1. 点击下方按钮导心愿单数据 JSON 文件<br>
-          2. 将文件发送给「蝮蛇」，说"同步心愿单到飞书"<br>
-          3. 蝮蛇会自动写入飞书多维表格
-        </div>
-        <button class="btn btn-primary btn-sm" onclick="wishlistExportJSON()">📁 导出心愿单 JSON</button>
-      </div>
-
-      <div style="margin-bottom: 10px;">
-        <div style="font-size: 14px; font-weight: 600; color: var(--text-primary); margin-bottom: 12px;">📥 飞书下载到本地</div>
-        <div style="font-size: 12px; color: var(--text-secondary); line-height: 1.8; margin-bottom: 10px;">
-          1. 跟「蝮蛇」说"从飞书导出心愿单数据"<br>
-          2. 蝮蛇会从飞书拉取数据并生成 JSON 文件<br>
-          3. 将文件拖到下方区域或点击导入
-        </div>
-        <div class="loot-import-area" id="wishlistImportArea" onclick="document.getElementById('wishlistImportFile').click()">
-          <div style="font-size: 24px; margin-bottom: 8px;">📂</div>
-          <div style="font-size: 13px; color: var(--text-secondary);">点击或拖拽 JSON 文件到此处导入</div>
-        </div>
-        <input type="file" id="wishlistImportFile" accept=".json" style="display: none;" onchange="wishlistImportJSON(event)">
-      </div>
-    </div>
-    <div class="modal-footer">
-      <button class="btn" onclick="closeModal('wishlistFeishuSyncModal')">关闭</button>
     </div>
   </div>
 </div>
