@@ -111,7 +111,7 @@
           👤
           <span class="notif-dot"></span>
         </button>
-        <button class="guild-bar-btn edit-only" onclick="openGuildSettings()" title="公会设置">⚙</button>
+        <button class="guild-bar-btn" onclick="openGuildSettings()" title="公会设置">⚙</button>
       </div>
     </div>
     <nav class="nav-menu">
@@ -145,7 +145,7 @@
     </nav>
     <div class="sidebar-footer">
       <div id="sidebarUser"></div>
-      <div style="margin-top:4px">v3.1.0 · 用户中心版</div>
+      <div style="margin-top:4px" id="appVersion">v3.2.0</div>
     </div>
   </aside>
 
@@ -250,6 +250,7 @@
                   <th>角色名</th>
                   <th>职业</th>
                   <th>专精</th>
+                  <th>职责</th>
                   <th>状态</th>
                   <th>加入日期</th>
                   <th>出勤率</th>
@@ -273,8 +274,8 @@
           </div>
           <div class="attendance-header">
             <div class="view-tabs">
-              <div class="view-tab active" onclick="switchAttendanceView('calendar')">日历视图</div>
-              <div class="view-tab" onclick="switchAttendanceView('list')">列表视图</div>
+              <div class="view-tab" onclick="switchAttendanceView('calendar')">日历视图</div>
+              <div class="view-tab active" onclick="switchAttendanceView('list')">列表视图</div>
             </div>
             <div style="display:flex;gap:8px">
               <button class="btn edit-only" onclick="showWCLImportModal()">🔗 WCL 导入</button>
@@ -282,8 +283,8 @@
             </div>
           </div>
 
-          <!-- 日历视图 -->
-          <div id="calendarView">
+          <!-- 日历视图（REQ-011：默认列表视图，日历为用户自选） -->
+          <div id="calendarView" style="display:none">
             <div class="calendar">
               <div class="calendar-header">
                 <div class="calendar-nav">
@@ -307,7 +308,7 @@
           </div>
 
           <!-- 列表视图 -->
-          <div id="listView" style="display:none">
+          <div id="listView">
             <div class="activity-list" id="activityList"></div>
           </div>
         </div>
@@ -370,6 +371,7 @@
               <thead>
                 <tr>
                   <th>装备名称</th>
+                  <th>心愿</th>
                   <th>所属团本</th>
                   <th>掉落难度</th>
                   <th>掉落BOSS</th>
@@ -603,9 +605,9 @@
       <div class="form-group">
         <label class="form-label">职责<span style="color:var(--text-muted);font-weight:400">（非必填）</span></label>
         <div class="role-tags" id="memberRoleTags">
-          <span class="role-tag" data-role="坦克" onclick="toggleMemberRole('坦克')">🛡 坦克</span>
-          <span class="role-tag" data-role="治疗" onclick="toggleMemberRole('治疗')">💚 治疗</span>
-          <span class="role-tag" data-role="输出" onclick="toggleMemberRole('输出')">⚔ 输出</span>
+          <span class="role-tag" data-role="坦克" onclick="toggleMemberRole('坦克')">🛡︎ 坦克</span>
+          <span class="role-tag" data-role="治疗" onclick="toggleMemberRole('治疗')">✚ 治疗</span>
+          <span class="role-tag" data-role="输出" onclick="toggleMemberRole('输出')">⚔︎ 输出</span>
         </div>
       </div>
       <div class="form-group" id="specFieldGroup">
@@ -688,16 +690,23 @@
       <div class="form-row">
         <div class="form-group">
           <label class="form-label">开始时间</label>
-          <input type="time" class="form-input" id="activityStartTime" value="20:00">
+          <input type="time" class="form-input" id="activityStartTime" value="20:00" oninput="updateActivityDuration()">
         </div>
         <div class="form-group">
           <label class="form-label">结束时间</label>
-          <input type="time" class="form-input" id="activityEndTime" value="23:00">
+          <input type="time" class="form-input" id="activityEndTime" value="23:00" oninput="updateActivityDuration()">
         </div>
       </div>
+      <!-- REQ-012：活动时长实时显示 -->
+      <div id="activityDuration" style="font-size:12px;color:var(--text-muted);margin:-8px 0 12px 2px"></div>
       <div class="form-group">
         <label class="form-label">备注</label>
         <textarea class="form-textarea" id="activityNotes" style="height:60px" placeholder="可选"></textarea>
+      </div>
+      <!-- REQ-014：WCL 日志链接（一个活动一条；保存时自动解析报告编号） -->
+      <div class="form-group">
+        <label class="form-label">WCL 日志链接<span style="color:var(--text-muted);font-weight:400">（可选）</span></label>
+        <input type="text" class="form-input" id="activityWclUrl" placeholder="https://www.warcraftlogs.com/reports/...">
       </div>
     </div>
     <div class="modal-footer">
@@ -728,6 +737,8 @@
     </div>
     <div class="modal-footer">
       <button class="btn btn-danger btn-sm edit-only" onclick="deleteCurrentActivity()" style="margin-right:auto">删除活动</button>
+      <!-- REQ-014：已挂 WCL 链接的活动显示复盘入口（全体成员可见），新标签页打开 -->
+      <a id="attendanceWclBtn" class="btn btn-sm" href="#" target="_blank" rel="noopener noreferrer" style="display:none">📊 WCL 复盘</a>
       <button class="btn" onclick="closeModal('attendanceDetailModal')">关闭</button>
       <button id="attendanceSaveBtn" class="btn btn-primary edit-only" onclick="saveAttendance()">保存考勤</button>
     </div>
@@ -899,7 +910,13 @@
         </div>
         <div class="form-group">
           <label class="form-label">Roll 值</label>
-          <input type="number" class="form-input" id="lootRollValue" min="1" max="100" placeholder="1-100">
+          <!-- REQ-022：自定义步进按钮，1↓→100 / 100↑→1 循环，范围锁定 1-100 -->
+          <div style="display:flex;gap:4px;align-items:center">
+            <input type="number" class="form-input roll-value-input" id="lootRollValue" min="1" max="100" placeholder="1-100"
+                   onchange="rollClamp()" onkeydown="rollKeyStep(event)">
+            <button type="button" class="btn btn-sm" onclick="rollStep(1)" title="加 1（100 时回到 1）">↑</button>
+            <button type="button" class="btn btn-sm" onclick="rollStep(-1)" title="减 1（1 时回到 100）">↓</button>
+          </div>
         </div>
       </div>
       <div class="form-group" id="lootRuleNoteRow" style="display:none;">

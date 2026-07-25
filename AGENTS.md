@@ -38,9 +38,9 @@ WoW 团本考勤管理系统，暗色史诗奇幻风格（WoW 主题），基于
 2. **公会系统** - 创建公会、邀请码加入、公会切换
 3. **权限管理** - 三级权限（owner/editor/viewer）、成员角色变更、公会设置
 4. **仪表盘**（page:dashboard） - 出勤率统计、排行、活动概览
-5. **成员管理**（page:members） - 13个职业、专精/职责联动、出勤详情
-6. **考勤记录**（page:attendance） - 日历视图/列表视图、活动CRUD、BOSS选择
-7. **装备分配**（page:loot） - 103件装备库、多维筛选、分配记录
+5. **成员管理**（page:members） - 13个职业、专精/职责联动、职责列（按专精推导）、出勤详情
+6. **考勤记录**（page:attendance） - 默认列表视图/日历视图（记住选择）、活动CRUD、BOSS选择、WCL 日志链接（REQ-014）
+7. **装备分配**（page:loot） - 103件装备库、多维筛选、心愿独立列、Roll 点循环输入（1-100）、分配记录
 8. **心愿单**（page:wishlist） - 按成员管理、竞争概览
 9. **统计报表**（page:reports） - 出勤率图表、角色分布
 10. **数据管理**（page:data） - 设置、JSON导入导出、重置
@@ -83,6 +83,7 @@ WoW 团本考勤管理系统，暗色史诗奇幻风格（WoW 主题），基于
 - 自动分配端口：通过 `DEPLOY_RUN_PORT` 环境变量
 
 ## 注意事项
+- 版本号单一常量：`APP_VERSION`（js/app.js 顶部），发布时只改这一处，侧边栏自动显示
 - 数据只存 Supabase；localStorage 仅缓存，JSON 导入导出仅作备份/迁移
 - 出勤率全站唯一算法源 `getAttendanceStats()`（app.js）：出勤率 = 出勤 ÷ 应到；出勤 = 出席+迟到+替补；应到 = 该成员已标记记录数；请假计入应到不计入出勤
 - viewer 前端权限门：`updatePermissionUI()` 给 body 加 `viewer-mode` 类隐藏/禁用编辑入口（`.edit-only` 等），服务端代理鉴权为最终防线

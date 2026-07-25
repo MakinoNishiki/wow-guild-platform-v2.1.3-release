@@ -508,6 +508,8 @@
         raid_name: a.raid,
         start_time: a.start_time || '',
         end_time: a.end_time || '',
+        wcl_url: a.wcl_url || '',
+        wcl_report_code: a.wcl_report_code || '',
         attendees: att.map(at => ({
           member_id: at.member_id,
           status: mapStatusFromDb(at.status),
@@ -735,6 +737,8 @@
       notes: a.notes || '',
       start_time: a.start_time || '',
       end_time: a.end_time || '',
+      wcl_url: a.wcl_url || '',
+      wcl_report_code: a.wcl_report_code || '',
       attendees: attendanceMap[a.id] || []
     }));
 
@@ -832,6 +836,8 @@
           notes: item.notes || '',
           start_time: item.start_time || '',
           end_time: item.end_time || '',
+          wcl_url: item.wcl_url || '',
+          wcl_report_code: item.wcl_report_code || '',
           created_by: currentUser ? currentUser.id : null,
         };
 
@@ -1212,6 +1218,8 @@
     if (guildRoleEl && currentMembership) {
       const roleLabels = { owner: '会长', editor: '编辑', viewer: '浏览' };
       guildRoleEl.textContent = roleLabels[currentMembership.role] || currentMembership.role;
+      // BUG-018：按角色着色，一眼可见自己身份
+      guildRoleEl.className = `guild-bar-role role-${currentMembership.role}`;
     }
     if (userInfoEl && currentUser) {
       userInfoEl.textContent = currentUser.email;

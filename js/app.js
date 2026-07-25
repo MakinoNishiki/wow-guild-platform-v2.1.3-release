@@ -1,6 +1,9 @@
 // ==================== 数据管理 ====================
 const STORAGE_KEY = 'wow_raid_attendance_data';
 
+// DEC-004：版本号单一事实源（发布时只改这一处），侧边栏左下角显示
+const APP_VERSION = 'v3.2.0';
+
 let appData = {
   members: [],
   activities: [],
@@ -16,7 +19,8 @@ let editingActivityId = null;
 let currentActivityId = null;
 let reportRange = 7;
 let calendarDate = new Date();
-let attendanceView = 'calendar';
+// REQ-011：考勤默认列表视图，日历为用户自选；记住用户上次选择
+let attendanceView = localStorage.getItem('wow_raid_attendance_view') || 'list';
 
 // 职业映射
 const classMap = {
@@ -49,6 +53,24 @@ const roleTypeMap = {
   '治疗': 'healer',
   '输出': 'dps'
 };
+
+// REQ-009：专精 → 职责推导表（未列出的专精一律视为输出）
+const specRoleMap = {
+  '防护': '坦克', '鲜血': '坦克', '复仇': '坦克', '酒仙': '坦克', '守护': '坦克',
+  '神圣': '治疗', '戒律': '治疗', '恢复': '治疗', '织雾': '治疗', '恩护': '治疗'
+};
+
+// REQ-009：按主专精+副专精推导成员全部职责（主专精优先，去重，保持首次出现顺序）
+function deriveMemberRoles(m) {
+  const specs = [m.main_spec || m.spec || ''].concat(m.off_specs || (m.off_spec ? [m.off_spec] : []));
+  const roles = [];
+  specs.forEach(s => {
+    if (!s) return;
+    const role = specRoleMap[s] || '输出';
+    if (!roles.includes(role)) roles.push(role);
+  });
+  return roles;
+}
 
 // 团本-BOSS映射
 const raidBossMap = {
@@ -1005,7 +1027,11 @@ function updateCloudUI() {
     if (membership) {
       const roleLabels = { owner: '会长', editor: '编辑', viewer: '浏览' };
       const guildRole = document.getElementById('guildRole');
-      if (guildRole) guildRole.textContent = roleLabels[membership.role] || membership.role;
+      if (guildRole) {
+        guildRole.textContent = roleLabels[membership.role] || membership.role;
+        // BUG-018：按角色着色，一眼可见自己身份
+        guildRole.className = `guild-bar-role role-${membership.role}`;
+      }
     }
     if (guild) {
       const guildBarName = document.getElementById('guildBarName');
@@ -1084,6 +1110,10 @@ function switchPage(pageName) {
   document.getElementById('pageTitle').textContent = pageTitles[pageName];
   
   // 渲染对应页面
+  if (pageName === 'attendance') {
+    // REQ-011：进入考勤页时按上次选择同步视图（默认列表）
+    syncAttendanceViewUI();
+  }
   if (pageName === 'loot') {
     lootRender();
   }
@@ -1288,7 +1318,7 @@ function renderMembers() {
   const tbody = document.getElementById('membersTableBody');
   
   if (!filtered.length) {
-    tbody.innerHTML = `<tr><td colspan="8"><div class="empty-state"><div class="empty-icon">👥</div><div class="empty-text">暂无成员数据</div><button class="btn btn-primary" onclick="showMemberModal()">+ 添加第一个成员</button></div></td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="9"><div class="empty-state"><div class="empty-icon">👥</div><div class="empty-text">暂无成员数据</div><button class="btn btn-primary" onclick="showMemberModal()">+ 添加第一个成员</button></div></td></tr>`;
     return;
   }
   
@@ -1298,13 +1328,12 @@ function renderMembers() {
     const mainSpec = m.main_spec || '';
     const offSpecs = m.off_specs || (m.off_spec ? [m.off_spec] : []);
     const offSpecText = offSpecs.join('、');
-    const roles = m.role || [];
     
-    // 职责标签HTML
-    const roleTagsHtml = roles.length > 0 ? roles.map(r => {
-      const type = roleTypeMap[r] || 'dps';
-      return `<span class="member-role-tag ${type}">${r}</span>`;
-    }).join('') : '';
+    // REQ-009：职责列 = 按主/副专精推导的全部职责，tag 尺寸与职业 tag 一致（.badge）
+    const derivedRoles = deriveMemberRoles(m);
+    const roleTagsHtml = derivedRoles.length > 0
+      ? derivedRoles.map(r => `<span class="badge badge-role-${roleTypeMap[r] || 'dps'}">${r}</span>`).join(' ')
+      : '<span style="color:var(--text-muted)">—</span>';
     
     // 专精显示
     const specHtml = mainSpec 
@@ -1317,9 +1346,9 @@ function renderMembers() {
         <td class="class-${cls}" style="font-weight:500">${m.name}</td>
         <td>
           <span class="badge class-bg-${cls}" style="color:var(--${cls === 'priest' ? 'text-primary' : cls})">${m.class}</span>
-          ${roleTagsHtml ? `<span class="member-role-tags">${roleTagsHtml}</span>` : ''}
         </td>
         <td style="color:var(--text-secondary)">${specHtml}</td>
+        <td>${roleTagsHtml}</td>
         <td><span class="badge ${m.status === '正式' || m.status?.trim() === 'active' ? 'badge-present' : m.status === '替补' ? 'badge-sub' : m.status === '试用' ? 'badge-late' : 'badge-inactive'}">${(function(){ const s = (m.status || '').trim(); if (s === 'inactive') return '离队'; if (s === 'active') return '正式'; return m.status || '-'; })()}</span></td>
         <td style="color:var(--text-secondary)">${m.join_date || '-'}</td>
         <td><span style="color:${rate >= 80 ? 'var(--success)' : rate >= 60 ? 'var(--warning)' : 'var(--danger)'};font-weight:600">${rate}%</span></td>
@@ -1654,11 +1683,18 @@ function renderAttendance() {
 
 function switchAttendanceView(view) {
   attendanceView = view;
+  // REQ-011：记住用户上次选择
+  localStorage.setItem('wow_raid_attendance_view', view);
+  syncAttendanceViewUI();
+}
+
+// REQ-011：按 attendanceView 同步 tab 高亮与视图容器显隐（页面初始化/切页时也要调）
+function syncAttendanceViewUI() {
   document.querySelectorAll('.view-tab').forEach((tab, i) => {
-    tab.classList.toggle('active', (view === 'calendar' && i === 0) || (view === 'list' && i === 1));
+    tab.classList.toggle('active', (attendanceView === 'calendar' && i === 0) || (attendanceView === 'list' && i === 1));
   });
-  document.getElementById('calendarView').style.display = view === 'calendar' ? 'block' : 'none';
-  document.getElementById('listView').style.display = view === 'list' ? 'block' : 'none';
+  document.getElementById('calendarView').style.display = attendanceView === 'calendar' ? 'block' : 'none';
+  document.getElementById('listView').style.display = attendanceView === 'list' ? 'block' : 'none';
   renderAttendance();
 }
 
@@ -1742,6 +1778,8 @@ function createActivityOnDate(dateStr) {
   document.getElementById('activityStartTime').value = '20:00';
   document.getElementById('activityEndTime').value = '23:00';
   document.getElementById('activityNotes').value = '';
+  document.getElementById('activityWclUrl').value = '';
+  updateActivityDuration();
   openModal('activityModal');
 }
 
@@ -1769,6 +1807,7 @@ function renderActivityList() {
             <span>📅 ${a.date}</span>
             <span>⏰ ${a.start_time || '--:--'} - ${a.end_time || '--:--'}</span>
             <span>👥 ${a.attendees.length} 人登记</span>
+            ${a.wcl_url ? `<a class="btn btn-sm" href="${a.wcl_url}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()" style="padding:2px 10px;font-size:12px">📊 WCL 复盘</a>` : ''}
           </div>
         </div>
         <div class="activity-stats">
@@ -1798,11 +1837,50 @@ function showActivityModal(activity = null) {
   document.getElementById('activityStartTime').value = activity ? activity.start_time : '20:00';
   document.getElementById('activityEndTime').value = activity ? activity.end_time : '23:00';
   document.getElementById('activityNotes').value = activity ? activity.notes || '' : '';
+  // REQ-014：回填 WCL 链接
+  document.getElementById('activityWclUrl').value = activity ? (activity.wcl_url || '') : '';
+  updateActivityDuration();
   openModal('activityModal');
+}
+
+// REQ-012：活动时长实时显示（结束早于开始按跨天计算并提示）
+function updateActivityDuration() {
+  const el = document.getElementById('activityDuration');
+  if (!el) return;
+  const start = document.getElementById('activityStartTime').value;
+  const end = document.getElementById('activityEndTime').value;
+  if (!start || !end) { el.textContent = ''; return; }
+  const [sh, sm] = start.split(':').map(Number);
+  const [eh, em] = end.split(':').map(Number);
+  let diff = (eh * 60 + em) - (sh * 60 + sm);
+  let crossDay = false;
+  if (diff < 0) { diff += 24 * 60; crossDay = true; }
+  if (diff === 0) { el.textContent = '⚠️ 起止时间相同，请确认'; el.style.color = 'var(--warning)'; return; }
+  const h = Math.floor(diff / 60);
+  const m = diff % 60;
+  el.textContent = `⏱ 时长：${h > 0 ? h + ' 小时 ' : ''}${m > 0 ? m + ' 分钟' : ''}${crossDay ? '（跨天，结束时间为次日）' : ''}`.trim();
+  el.style.color = crossDay ? 'var(--warning)' : 'var(--text-muted)';
 }
 
 // 防重复提交标志
 let activitySaving = false;
+
+// REQ-014：校验 WCL 链接并解析报告编号
+// 返回 { url, code }；空输入返回 { url:'', code:'' }；非 warcraftlogs.com 域名返回 null
+function parseWclUrl(input) {
+  const url = (input || '').trim();
+  if (!url) return { url: '', code: '' };
+  let parsed;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return null;
+  }
+  const host = parsed.hostname.toLowerCase();
+  if (host !== 'warcraftlogs.com' && !host.endsWith('.warcraftlogs.com')) return null;
+  const m = parsed.pathname.match(/\/reports\/([A-Za-z0-9]+)/);
+  return { url, code: m ? m[1] : '' };
+}
 
 async function saveActivity() {
   if (activitySaving) return;
@@ -1815,17 +1893,31 @@ async function saveActivity() {
   
   if (!date) { showToast('请选择日期', 'error'); activitySaving = false; if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = saveBtn.dataset.originalText || '保存'; } return; }
   if (!raidName) { showToast('请输入团本名称', 'error'); activitySaving = false; if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = saveBtn.dataset.originalText || '保存'; } return; }
+
+  // REQ-014：WCL 链接校验（域名必须是 warcraftlogs.com），并解析报告编号
+  const wclParsed = parseWclUrl(document.getElementById('activityWclUrl').value);
+  if (wclParsed === null) {
+    showToast('WCL 链接格式不正确，请输入 warcraftlogs.com 的链接', 'error');
+    activitySaving = false;
+    if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = saveBtn.dataset.originalText || '保存'; }
+    return;
+  }
   
   const activityData = {
     date,
     raid_name: raidName,
     start_time: document.getElementById('activityStartTime').value,
     end_time: document.getElementById('activityEndTime').value,
-    notes: document.getElementById('activityNotes').value.trim()
+    notes: document.getElementById('activityNotes').value.trim(),
+    wcl_url: wclParsed.url,
+    wcl_report_code: wclParsed.code
   };
   
   // 严格 DB-first
   try {
+    // BUG-019：保存后把日历切到活动所在月份，保证新活动即时可见
+    // （否则在“翻到其他月份后用创建按钮”的入口下，活动落在当月之外，看似未刷新）
+    calendarDate = new Date(date + 'T00:00:00');
     if (editingActivityId) {
       const activity = appData.activities.find(a => a.id === editingActivityId);
       if (!activity) return;
@@ -1857,6 +1949,17 @@ function openAttendanceDetail(activityId) {
   document.getElementById('attendanceDetailTitle').textContent = activity.raid_name;
   document.getElementById('attendanceDetailSubtitle').textContent = 
     `📅 ${activity.date} | ⏰ ${activity.start_time || '--:--'} - ${activity.end_time || '--:--'}`;
+  
+  // REQ-014：已挂 WCL 链接的活动显示"WCL 复盘"（全体成员可见），否则隐藏
+  const wclBtn = document.getElementById('attendanceWclBtn');
+  if (wclBtn) {
+    if (activity.wcl_url) {
+      wclBtn.href = activity.wcl_url;
+      wclBtn.style.display = '';
+    } else {
+      wclBtn.style.display = 'none';
+    }
+  }
   
   renderAttendanceMembers(activity);
   openModal('attendanceDetailModal');
@@ -2611,6 +2714,36 @@ function lootToggleSecondaryStat(stat) {
   });
 }
 
+// REQ-022：Roll 值循环步进（1↓→100，100↑→1），空值时 ↑=1、↓=100
+function rollStep(delta) {
+  const input = document.getElementById('lootRollValue');
+  if (!input) return;
+  let v = parseInt(input.value, 10);
+  if (isNaN(v)) {
+    input.value = delta > 0 ? 1 : 100;
+    return;
+  }
+  v += delta;
+  if (v > 100) v = 1;
+  if (v < 1) v = 100;
+  input.value = v;
+}
+
+// REQ-022：键盘上下箭头同样走循环逻辑
+function rollKeyStep(event) {
+  if (event.key === 'ArrowUp') { event.preventDefault(); rollStep(1); }
+  else if (event.key === 'ArrowDown') { event.preventDefault(); rollStep(-1); }
+}
+
+// REQ-022：手动输入时锁定范围 1-100（空值允许，表示未 Roll）
+function rollClamp() {
+  const input = document.getElementById('lootRollValue');
+  if (!input || input.value === '') return;
+  let v = parseInt(input.value, 10);
+  if (isNaN(v)) { input.value = ''; return; }
+  input.value = Math.min(100, Math.max(1, v));
+}
+
 // 渲染装备列表
 function lootRender() {
   const tbody = document.getElementById('lootTableBody');
@@ -2657,7 +2790,7 @@ function lootRender() {
   if (loots.length === 0) {
     tbody.innerHTML = `
       <tr>
-        <td colspan="13">
+        <td colspan="14">
           <div class="empty-state">
             <div class="empty-icon">⚔️</div>
             <div class="empty-text">暂无装备记录，点击「添加装备」开始记录</div>
@@ -2690,11 +2823,13 @@ function lootRender() {
     const rollText = loot.distribution_method === 'roll' 
       ? `${loot.player_action === 'need' ? '需求' : loot.player_action === 'greed' ? '贪婪' : loot.player_action === 'pass' ? '放弃' : ''} ${loot.roll_value || ''}`.trim() || '-'
       : '-';
-    const wishlistBadge = loot.is_wishlist ? '<span class="badge" style="background:#f0c060;color:#0d1117;margin-left:4px">心愿</span>' : '';
+    // REQ-008："心愿"独立成列，非心愿装备显示 —
+    const wishlistBadge = loot.is_wishlist ? '<span class="badge" style="background:#f0c060;color:#0d1117">心愿</span>' : '<span style="color:var(--text-muted)">—</span>';
     
     return `
       <tr>
-        <td><span class="loot-name">${loot.name}</span>${wishlistBadge}</td>
+        <td><span class="loot-name">${loot.name}</span></td>
+        <td>${wishlistBadge}</td>
         <td><span class="wishlist-raid-tag">${loot.raid || '-'}</span></td>
         <td>${loot.difficulty || ''}</td>
         <td>${loot.boss || ''}</td>
@@ -3877,6 +4012,36 @@ function lootFillAssignedTo(name) {
 // ==================== 更新日志 ====================
 const changelogData = [
   {
+    id: 'v3.2.0',
+    version: 'v3.2.0',
+    date: '2026-07-26',
+    type: 'feature',
+    typeLabel: '重大更新',
+    title: '安全鉴权、权限体系与体验优化',
+    summary: '服务端公会级写入鉴权上线，浏览权限只读模式，装备心愿单双向联动，全站出勤率口径统一；下线飞书同步与本地模式。',
+    details: [
+      '—— 新增功能 ——',
+      '服务端公会级写入鉴权（会长/编辑/浏览三级权限，26 项自动化验证）',
+      '浏览权限只读模式；会长可提升成员为编辑',
+      '非会长成员退出公会（二次确认+通知管理者）',
+      '装备分配 ↔ 心愿单双向联动（自动创建/标记已获取）',
+      '同服务器角色名唯一性拦截',
+      '活动可挂载 WCL 战斗日志链接，成员一键直达复盘',
+      '—— 修复bug ——',
+      '修复注册/创建公会/加入公会无反应（准入链路三处失效）',
+      '修复 Top5 出勤率统计口径错误（全站统一算法源）',
+      '修复退出公会报错、认证提示英文、昵称保存不生效',
+      '修复活动时间不显示、角色重复保存',
+      '—— 功能优化 ——',
+      '删除活动响应提速（写链路减半）',
+      '旧活动时间统一回填 20:00–23:00',
+      '成员表新增职责列，考勤默认列表视图，活动时长实时显示',
+      '—— 模块调整 ——',
+      '下线飞书同步模块、下线本地模式',
+      '版本标识简化为纯版本号'
+    ]
+  },
+  {
     id: 'v3.0.0',
     version: 'v3.0.0',
     date: '2026-07-22',
@@ -4455,6 +4620,10 @@ function changelogToggle(id) {
 
 // ==================== 初始化 ====================
 async function init() {
+  // DEC-004：侧边栏版本号来自单一常量 APP_VERSION
+  const verEl = document.getElementById('appVersion');
+  if (verEl) verEl.textContent = APP_VERSION;
+
   // 设置今日日期显示
   const now = new Date();
   const weekdays = ['日', '一', '二', '三', '四', '五', '六'];
