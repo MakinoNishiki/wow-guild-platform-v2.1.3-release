@@ -311,7 +311,7 @@
 
     const { data: memberData, error: memberError } = await supabaseClient
       .from('guild_members')
-      .select('role')
+      .select('id, role')
       .eq('guild_id', guildId)
       .eq('user_id', currentUser.id)
       .maybeSingle();
@@ -410,6 +410,43 @@
     return guildData;
   }
 
+  // ---- 通过公会 ID 加入公会（用户中心接受邀请，BUG-010） ----
+  async function joinGuildById(guildId) {
+    const client = await initSupabase();
+    if (!client || !currentUser) throw new Error('请先登录');
+    if (!guildId) throw new Error('公会不存在或邀请已失效');
+
+    // 通过代理查询，绕过 RLS（非成员不可读公会行）
+    const guild = await dbQuery('guilds', `id=eq.${guildId}`, 'GET');
+    if (!guild || guild.length === 0) throw new Error('公会不存在或已解散');
+    const guildData = guild[0];
+
+    // 检查是否已是成员
+    const { data: existing } = await supabaseClient
+      .from('guild_members')
+      .select('id')
+      .eq('guild_id', guildData.id)
+      .eq('user_id', currentUser.id)
+      .maybeSingle();
+
+    if (existing) throw new Error('你已经是该公会成员');
+
+    // 加入公会 (INSERT - 走代理)
+    const displayName = currentUser.user_metadata?.display_name || currentUser.email.split('@')[0];
+    await dbInsert('guild_members', {
+      guild_id: guildData.id,
+      user_id: currentUser.id,
+      role: 'viewer',
+      display_name: displayName,
+    });
+
+    await createJoinNotification(guildData.id, currentUser.id, displayName);
+
+    await loadUserGuilds();
+    await selectGuild(guildData.id);
+    return guildData;
+  }
+
   // ---- 加载云端数据到 appData (SELECT - 直接走 Supabase) ----
   async function loadCloudData() {
     if (!supabaseClient || !currentGuild) return;
@@ -460,8 +497,8 @@
         id: a.id,
         date: a.activity_date,
         raid_name: a.raid,
-        start_time: '20:00',
-        end_time: '23:00',
+        start_time: a.start_time || '',
+        end_time: a.end_time || '',
         attendees: att.map(at => ({
           member_id: at.member_id,
           status: mapStatusFromDb(at.status),
@@ -687,6 +724,8 @@
       raid_name: a.raid || '',
       boss: a.boss || '',
       notes: a.notes || '',
+      start_time: a.start_time || '',
+      end_time: a.end_time || '',
       attendees: attendanceMap[a.id] || []
     }));
 
@@ -782,6 +821,8 @@
           raid: item.raid_name || '',
           boss: item.boss || '',
           notes: item.notes || '',
+          start_time: item.start_time || '',
+          end_time: item.end_time || '',
           created_by: currentUser ? currentUser.id : null,
         };
 
@@ -1246,11 +1287,26 @@
   async function saveUserCharacter(characterData) {
     if (!isCloudMode || !currentUser) return null;
     try {
+      // BUG-011 修复：upsert 不带 id 时主键永远新生成，会产生重复行。
+      // 未指定 id 时先按 (user_id, server_name, character_name) 查已有行，复用其 id 做真正的更新。
+      let rowId = characterData.id;
+      if (!rowId) {
+        const { data: existing, error: queryError } = await supabaseClient
+          .from('user_characters')
+          .select('id')
+          .eq('user_id', currentUser.id)
+          .eq('server_name', characterData.server_name || '')
+          .eq('character_name', characterData.character_name || '')
+          .maybeSingle();
+        if (queryError) throw queryError;
+        if (existing) rowId = existing.id;
+      }
       const { data, error } = await supabaseClient
         .from('user_characters')
         .upsert({
           user_id: currentUser.id,
           ...characterData,
+          id: rowId || undefined,
           updated_at: new Date().toISOString()
         })
         .select()
@@ -1391,6 +1447,7 @@
     getCurrentUser: getCurrentUser,
     createGuild: createGuild,
     joinGuild: joinGuild,
+    joinGuildById: joinGuildById,
     selectGuild: selectGuild,
     loadUserGuilds: loadUserGuilds,
     loadCloudData: loadCloudData,

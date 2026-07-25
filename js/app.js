@@ -332,7 +332,22 @@ async function saveCharacter() {
     alert('请填写角色名称和服务器');
     return;
   }
-  
+
+  // REQ-002②：同一服务器内角色名唯一，不同服务器允许重名
+  try {
+    const existingChars = await window.CloudSync.getUserCharacters();
+    const dup = (existingChars || []).some(c =>
+      c.server_name === characterData.server_name && c.character_name === characterData.character_name
+    );
+    if (dup) {
+      alert(`服务器「${characterData.server_name}」已存在同名角色「${characterData.character_name}」`);
+      return;
+    }
+  } catch (e) {
+    console.error('角色查重失败:', e);
+    // 查重失败不阻断保存，由数据库唯一索引兜底
+  }
+
   try {
     await window.CloudSync.saveUserCharacter(characterData);
     closeModal('addCharacterModal');
@@ -621,6 +636,21 @@ function showAuthError(msg) {
   if (el) el.textContent = msg;
 }
 
+// BUG-009：Supabase Auth 英文错误 → 中文提示映射
+function mapAuthError(e) {
+  const msg = (e && (e.message || e.error_description || e.msg)) || '';
+  const lower = msg.toLowerCase();
+  if (lower.includes('invalid login credentials')) return '邮箱或密码错误';
+  if (lower.includes('user already registered')) return '该邮箱已注册，请直接登录';
+  if (lower.includes('email not confirmed')) return '邮箱尚未验证，请先完成邮箱验证';
+  if (lower.includes('password') && (lower.includes('at least') || lower.includes('too short') || lower.includes('weak'))) return '密码不符合要求（至少 6 位）';
+  if (lower.includes('unable to validate email') || lower.includes('invalid email') || lower.includes('email address') && lower.includes('invalid')) return '邮箱格式不正确';
+  if (lower.includes('signups not allowed') || lower.includes('signup') && lower.includes('disabled')) return '当前未开放注册，请联系管理员';
+  if (lower.includes('for security purposes') || lower.includes('rate limit') || lower.includes('too many requests')) return '操作过于频繁，请稍后再试';
+  if (lower.includes('failed to fetch') || lower.includes('network') || lower.includes('load failed')) return '网络连接失败，请检查网络后重试';
+  return msg || '操作失败，请重试';
+}
+
 // 显示登录表单
 function showLoginForm() {
   document.getElementById('authLoginForm').style.display = '';
@@ -671,7 +701,7 @@ async function handleLogin() {
       showAppView();
     }
   } catch (e) {
-    showAuthError(e.message || '登录失败');
+    showAuthError(mapAuthError(e) || '登录失败');
   }
 }
 
@@ -689,7 +719,7 @@ async function handleRegister() {
     // 注册后一定没有公会，显示创建/加入公会表单
     showGuildForm();
   } catch (e) {
-    showAuthError(e.message || '注册失败');
+    showAuthError(mapAuthError(e) || '注册失败');
   }
 }
 
@@ -1583,6 +1613,10 @@ async function saveMember() {
 
   if (!name) { showToast('请输入角色名', 'error'); memberSaving = false; if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = saveBtn.dataset.originalText || '保存'; } return; }
   if (!cls) { showToast('请选择职业', 'error'); memberSaving = false; if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = saveBtn.dataset.originalText || '保存'; } return; }
+
+  // REQ-002①：公会绑定单服务器，公会内角色名唯一（即服务器内唯一），编辑时排除自身
+  const nameDuplicate = appData.members.some(m => m.name === name && m.id !== editingMemberId);
+  if (nameDuplicate) { showToast(`公会内已存在同名角色「${name}」`, 'error'); memberSaving = false; if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = saveBtn.dataset.originalText || '保存'; } return; }
 
   const mainSpec = document.getElementById('memberMainSpec') ? document.getElementById('memberMainSpec').value : '';
   // 副专精从全局变量取（多选数组）
