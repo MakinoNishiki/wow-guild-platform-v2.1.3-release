@@ -443,7 +443,7 @@
             <table class="data-table">
               <thead>
                 <tr>
-                  <th style="width:36px"><input type="checkbox" id="wishlistSelectAll" onchange="wishlistToggleSelectAll(this.checked)" title="全选"></th>
+                  <th style="width:36px"><input type="checkbox" id="wishlistSelectAll" class="edit-only" onchange="wishlistToggleSelectAll(this.checked)" title="全选"></th>
                   <th>装备名称</th>
                   <th>所属团本</th>
                   <th>掉落BOSS</th>
@@ -1191,8 +1191,8 @@
         </div>
       </div>
 
-      <!-- 危险操作 -->
-      <div class="card" style="margin-top:16px" id="dangerZone" style="display:none">
+      <!-- 危险操作（BUG-015：仅非 owner 可见；owner 退出=解散/转让，另案） -->
+      <div class="card" id="dangerZone" style="margin-top:16px;display:none">
         <div class="card-header">
           <div class="card-title" style="color:var(--danger)">退出公会</div>
         </div>

@@ -786,10 +786,10 @@ async function openGuildSettings() {
   if (guild.server_name) serverInfo.push(guild.server_name);
   document.getElementById('settingsServer').textContent = serverInfo.length > 0 ? serverInfo.join(' - ') : '未设置';
 
-  // 非 owner 隐藏危险操作
+  // BUG-015：危险区（退出公会）仅非 owner 可见；owner 退出=解散/转让，属另一需求
   const dangerZone = document.getElementById('dangerZone');
   if (dangerZone) {
-    dangerZone.style.display = window.CloudSync.isOwner() ? '' : 'none';
+    dangerZone.style.display = window.CloudSync.isOwner() ? 'none' : '';
   }
 
   openModal('guildSettingsModal');
@@ -873,20 +873,30 @@ function copyInviteCode() {
   });
 }
 
-// 退出公会
+// 退出公会（BUG-015：非 owner 入口；退出后不登出，清除公会上下文并回公会入口页）
 async function handleLeaveGuild() {
-  if (!confirm('确定要退出此公会吗？')) return;
+  const membership = window.CloudSync.getCurrentMembership();
+  if (!membership) return;
+  // owner 退出 = 解散/转让，属另一需求，此处双保险拦截（按钮本就不对 owner 显示）
+  if (window.CloudSync.isOwner()) { showToast('会长不能直接退出公会', 'warning'); return; }
+  if (!confirm('确定要退出此公会吗？退出后需要重新获得邀请码才能加入。')) return;
+  if (!confirm('再次确认：真的要退出吗？')) return;
   try {
-    const membership = window.CloudSync.getCurrentMembership();
-    if (membership) {
-      await window.CloudSync.removeGuildMember(membership.id);
-    }
-    await window.CloudSync.signOut();
-    showAuthError('');
-    // 重新检查公会列表
-    const guilds = window.CloudSync.getUserGuilds();
-    if (guilds.length === 0) {
+    await window.CloudSync.leaveGuild(membership.id);
+    // 清除本地会话中的公会上下文
+    window.CloudSync.clearCurrentGuild();
+    closeModal('guildSettingsModal');
+    // 重新加载公会列表：仍有其他公会则切到第一个，否则回"创建/加入公会"页
+    const guilds = await window.CloudSync.loadUserGuilds();
+    if (guilds.length > 0) {
+      await window.CloudSync.selectGuild(guilds[0].id);
+      showToast('已退出公会', 'success');
+    } else {
+      // 回"创建/加入公会"页（保持在登录态）
+      const appContainer = document.querySelector('.app-container');
+      if (appContainer) appContainer.style.display = 'none';
       showGuildForm();
+      showToast('已退出公会', 'success');
     }
   } catch (e) {
     showToast('退出失败: ' + e.message, 'error');
@@ -1186,25 +1196,43 @@ function renderDashboard() {
   }).join('') : `<div class="empty-state"><div class="empty-icon">📭</div><div class="empty-text">暂无活动记录</div></div>`;
   document.getElementById('recentList').innerHTML = recentHtml;
   
-  // Top5 排行
-  renderRankList('rankListTop5', 5);
+  // Top5 排行（BUG-014：用全量活动，与成员列表/报表同算法）
+  renderRankList('rankListTop5', 5, appData.activities);
+}
+
+// BUG-014：全站出勤率唯一算法源（成员列表 / Top5 / 统计报表 / 仪表盘平均必须同源）。
+// 统一口径：出勤率 = 出勤次数 ÷ 应到次数
+//   出勤 = 出席 + 迟到 + 替补（替补按出勤计）
+//   应到 = 该成员有考勤记录（任意状态）的活动数；无记录的活动不计入应到
+//   请假 / 缺席：计入应到，不计入出勤
+function getAttendanceStats(memberId, activities) {
+  let present = 0, absent = 0, late = 0, sub = 0, leave = 0, total = 0;
+  (activities || []).forEach(act => {
+    const attendee = (act.attendees || []).find(a => a.member_id === memberId);
+    if (!attendee) return; // 未标记：不计入应到
+    total++;
+    switch (attendee.status) {
+      case '出席': present++; break;
+      case '缺席': absent++; break;
+      case '迟到': late++; present++; break; // 迟到算出勤
+      case '替补': sub++; present++; break;  // 替补按出勤计
+      case '请假': leave++; break;           // 请假计入应到，不计入出勤
+    }
+  });
+  const rate = total > 0 ? Math.round((present / total) * 100) : 0;
+  return { present, absent, late, sub, leave, total, rate };
 }
 
 function calculateAvgAttendanceRate(activities) {
-  if (!activities.length) return 0;
-  const activeMembers = appData.members.filter(m => m.status !== '离队').length;
-  if (!activeMembers) return 0;
-  
-  let totalRate = 0;
-  activities.forEach(a => {
-    const present = a.attendees.filter(att => att.status === '出席' || att.status === '替补' || att.status === '迟到').length;
-    totalRate += (present / activeMembers) * 100;
-  });
-  return Math.round(totalRate / activities.length);
+  // BUG-014：与成员级口径同源 = 全成员（非离队）出勤率的平均
+  const members = appData.members.filter(m => m.status !== '离队');
+  if (!members.length || !activities.length) return 0;
+  const sum = members.reduce((acc, m) => acc + getAttendanceStats(m.id, activities).rate, 0);
+  return Math.round(sum / members.length);
 }
 
-function renderRankList(containerId, limit) {
-  const rankings = getAttendanceRankings();
+function renderRankList(containerId, limit, activities) {
+  const rankings = getAttendanceRankings(activities);
   const top = rankings.slice(0, limit);
   
   const html = top.length ? top.map((item, i) => `
@@ -1218,32 +1246,14 @@ function renderRankList(containerId, limit) {
   document.getElementById(containerId).innerHTML = html;
 }
 
-function getAttendanceRankings() {
+// BUG-014：活动集由调用方显式传入（仪表盘 Top5 传全量；统计报表传用户自选范围），
+// 不再隐式依赖报表页的 reportRange，算法统一走 getAttendanceStats。
+function getAttendanceRankings(activities) {
   const members = appData.members.filter(m => m.status !== '离队');
-  const activities = getFilteredActivities();
-  
+
   return members.map(member => {
-    let present = 0, absent = 0, late = 0, sub = 0, leave = 0;
-    let total = activities.length;
-    
-    activities.forEach(act => {
-      const attendee = act.attendees.find(a => a.member_id === member.id);
-      if (attendee) {
-        switch(attendee.status) {
-          case '出席': present++; break;
-          case '缺席': absent++; break;
-          case '迟到': late++; present++; break; // 迟到算出勤
-          case '替补': sub++; break;
-          case '请假': leave++; break;
-        }
-      } else {
-        absent++;
-      }
-    });
-    
-    const rate = total > 0 ? Math.round(((present + sub) / total) * 100) : 0;
-    
-    return { member, present, absent, late, sub, leave, total, rate };
+    const stats = getAttendanceStats(member.id, activities);
+    return { member, ...stats };
   }).sort((a, b) => b.rate - a.rate || b.present - a.present);
 }
 
@@ -1325,18 +1335,8 @@ function renderMembers() {
 }
 
 function getMemberAttendanceRate(memberId) {
-  const activities = appData.activities;
-  if (!activities.length) return 0;
-  
-  let present = 0;
-  activities.forEach(act => {
-    const att = act.attendees.find(a => a.member_id === memberId);
-    if (att && (att.status === '出席' || att.status === '替补' || att.status === '迟到')) {
-      present++;
-    }
-  });
-  
-  return Math.round((present / activities.length) * 100);
+  // BUG-014：与 Top5/统计报表/仪表盘同源同算法（全量活动）
+  return getAttendanceStats(memberId, appData.activities).rate;
 }
 
 function showMemberModal(member = null) {
@@ -2044,7 +2044,8 @@ function setReportRange(days) {
 }
 
 function renderReports() {
-  const rankings = getAttendanceRankings();
+  // BUG-014：报表页尊重用户自选时间范围，算法与仪表盘/成员列表同源
+  const rankings = getAttendanceRankings(getFilteredActivities());
   
   // 排名表格
   const tbody = document.getElementById('rankTableBody');
@@ -3062,6 +3063,42 @@ async function syncWishlistLinkages(newLoot, oldLoot) {
       if (toMark.length > 0) {
         hasChanges = true;
         showToast(`已自动标记 ${toMark.length} 条心愿单为已获取`, 'success');
+      }
+
+      // REQ-007：勾选"心愿单装备"且该成员心愿单中无此装备记录 → 自动创建并直接标记已获取
+      // （优先级取默认值 P2，来源备注"装备分配联动"；规范 1.2.2：写入后统一 reload）
+      if (newLoot.is_wishlist) {
+        const existsAny = (appData.wishlist || []).some(w =>
+          w.itemName.toLowerCase() === newLoot.name.toLowerCase() &&
+          w.memberName === newLoot.assignedTo
+        );
+        if (!existsAny) {
+          const member = appData.members.find(m => m.name === newLoot.assignedTo);
+          if (member) {
+            await cloudCrud('wishlists', 'add', {
+              id: genId(),
+              memberId: member.id,
+              memberName: member.name,
+              itemName: newLoot.name,
+              raid: newLoot.raid || '',
+              boss: newLoot.boss || '',
+              category: newLoot.category || '',
+              slot: newLoot.slot || '',
+              priority: 'P2',
+              spec: 'main',
+              specName: member.main_spec || member.spec || '',
+              obtained: true,
+              obtainedDate: newLoot.date || formatDate(new Date()),
+              note: '装备分配联动',
+              createdAt: Date.now(),
+              updatedAt: Date.now()
+            }, { renderFn: () => {} });
+            hasChanges = true;
+            showToast('已自动创建心愿单记录并标记已获取', 'success');
+          } else {
+            console.warn('REQ-007 联动跳过：未找到成员', newLoot.assignedTo);
+          }
+        }
       }
     }
 

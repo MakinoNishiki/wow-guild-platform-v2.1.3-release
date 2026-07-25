@@ -239,6 +239,13 @@
     onUserSignedOut();
   }
 
+  // ---- 清除当前公会上下文（BUG-015：退出公会后调用，不登出） ----
+  function clearCurrentGuild() {
+    currentGuild = null;
+    currentMembership = null;
+    localStorage.removeItem('wow_raid_last_guild');
+  }
+
   // ---- 获取当前用户 ----
   async function getCurrentUser() {
     const client = await initSupabase();
@@ -869,10 +876,9 @@
         break;
       }
       case 'delete': {
-        // 先删除出勤记录
-        if (item.id) {
-          await dbDelete('activity_attendance', { activity_id: item.id });
-        }
+        // BUG-016：activity_attendance.activity_id 外键为 ON DELETE CASCADE（sql/01_tables.sql:78，
+        // 真实库已用 scripts/verify-activity-cascade.js 实证），删活动即级联删考勤，
+        // 不再单独发一次考勤删除代理请求（省掉一次完整的 JWT 验证 + 联查鉴权 + 转发链路）。
         await dbDelete('activities', { id: item.id });
         break;
       }
@@ -1463,6 +1469,7 @@
     getGuildMembers: getGuildMembers,
     updateMemberRole: updateMemberRole,
     removeGuildMember: removeGuildMember,
+    clearCurrentGuild: clearCurrentGuild,
     deleteGuild: deleteGuildCloud,
     leaveGuild: leaveGuildCloud,
     resetGuildData: resetGuildDataCloud,

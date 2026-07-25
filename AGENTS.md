@@ -84,7 +84,10 @@ WoW 团本考勤管理系统，暗色史诗奇幻风格（WoW 主题），基于
 
 ## 注意事项
 - 数据只存 Supabase；localStorage 仅缓存，JSON 导入导出仅作备份/迁移
+- 出勤率全站唯一算法源 `getAttendanceStats()`（app.js）：出勤率 = 出勤 ÷ 应到；出勤 = 出席+迟到+替补；应到 = 该成员已标记记录数；请假计入应到不计入出勤
 - viewer 前端权限门：`updatePermissionUI()` 给 body 加 `viewer-mode` 类隐藏/禁用编辑入口（`.edit-only` 等），服务端代理鉴权为最终防线
+- 装备分配 ↔ 心愿单联动由 `syncWishlistLinkages()` 处理（标记/取消已获取、REQ-007 自动创建心愿记录）
+- 删除活动依赖 DB 外键级联删考勤（ON DELETE CASCADE），不要再加显式考勤删除调用
 - 职业色遵循 WoW 官方配色
 - 响应式断点：768px（移动端底部Tab导航）
 - 代码为IIFE模式，所有函数全局暴露，通过 `switchPage()` 路由
