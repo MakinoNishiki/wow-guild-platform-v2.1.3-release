@@ -11,11 +11,14 @@ WoW 团本考勤管理系统，暗色史诗奇幻风格（WoW 主题），支持
 - **数据库**: Supabase PostgreSQL（云端）+ localStorage（本地）
 - **认证**: Supabase Auth（邮箱密码）
 - **UI**: 纯 CSS（无框架），WoW 暗色主题
-- **部署**: 静态文件服务器 + Node.js API 代理
+- **部署**: GitHub Actions + 受限 SSH 部署入口 + PM2 + Caddy
 
 ## 目录结构
 
 ```
+├── .github/
+│   └── workflows/
+│       └── deploy.yml              # master 分支生产自动部署
 ├── index.html                  # 入口页面（认证界面 + 公会管理 + 主应用 DOM）
 ├── css/
 │   └── main.css                # 全局样式（WoW 暗色主题 + 认证界面样式）
@@ -40,8 +43,22 @@ WoW 团本考勤管理系统，暗色史诗奇幻风格（WoW 主题），支持
 │   ├── 01_tables.sql           # 数据库表结构
 │   └── 02_rls.sql              # RLS 权限策略
 └── docs/
+    ├── DEPLOYMENT.md           # 自动部署边界、密钥与数据流
     └── ENVIRONMENT.md          # 环境变量配置说明
 ```
+
+## 部署架构
+
+```text
+GitHub master
+  → GitHub Actions
+  → 受限 SSH 强制命令
+  → /usr/local/sbin/deploy-wow
+  → PM2: wow-guild
+  → Caddy: ddctl.com
+```
+
+Actions 密钥只能触发固定部署入口，不能获得交互式 Shell；生产密钥仅存放于 GitHub Secrets 与服务器。
 
 ## 核心架构
 
