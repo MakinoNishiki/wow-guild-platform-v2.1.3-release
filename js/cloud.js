@@ -586,6 +586,7 @@
   async function reloadData(dataType) {
     if (!supabaseClient || !currentGuild) return;
     const guildId = currentGuild.id;
+    const perfT0 = performance.now(); // 任务书 #10：分表计时
 
     try {
       switch (dataType) {
@@ -606,6 +607,7 @@
           console.warn('未知 reload 数据类型:', dataType);
       }
       saveLocalCache();
+      console.debug(`[perf] reloadData ${dataType} ${Math.round(performance.now() - perfT0)}ms`);
     } catch (e) {
       console.error('reloadData 失败:', dataType, e);
       throw e;

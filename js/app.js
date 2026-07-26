@@ -589,10 +589,12 @@ async function syncAllToCloud() {
 // 流程：写入 DB -> 重新读取 DB -> 更新 appData -> 渲染
 async function cloudCrud(dataType, operation, payload, options = {}) {
   const { renderFn, onSuccess, onError, reloadTypes } = options;
+  const perfT0 = performance.now(); // 任务书 #10：写路径前端计时
 
   try {
     // 1. 写入主数据源（Supabase）
     await window.CloudSync.saveCloudData(dataType, operation, payload);
+    const perfWrite = performance.now();
 
     // 2. 重新读取数据库最新状态并更新 appData
     await window.CloudSync.reloadData(dataType);
@@ -603,10 +605,13 @@ async function cloudCrud(dataType, operation, payload, options = {}) {
 
     // 3. 缓存到 localStorage（仅作为缓存）
     saveData();
+    const perfReload = performance.now();
 
     // 4. 渲染当前模块
     if (typeof renderFn === 'function') renderFn();
     if (typeof onSuccess === 'function') onSuccess();
+    const perfEnd = performance.now();
+    console.debug(`[perf] cloudCrud ${dataType}/${operation} write=${Math.round(perfWrite - perfT0)}ms reload=${Math.round(perfReload - perfWrite)}ms render=${Math.round(perfEnd - perfReload)}ms total=${Math.round(perfEnd - perfT0)}ms`);
     return { success: true };
   } catch (e) {
     console.error(`cloudCrud 失败 [${dataType}/${operation}]:`, e);
@@ -1847,7 +1852,7 @@ function importRemoveRow(i) {
   renderImportPreview();
 }
 
-// 规范 1.2.2 批处理例外：批量导入循环写入，完成后统一 reload 一次
+// 规范 1.2.2 批处理例外：智能导入循环写入，完成后统一 reload 一次
 async function importConfirmRoster() {
   const picked = importPreviewRows.filter(r => r.include && r.name.trim() && r.cls);
   if (!picked.length) { showToast('没有可导入的成员（需勾选且名字、职业齐全）', 'error'); return; }
@@ -1874,7 +1879,7 @@ async function importConfirmRoster() {
     renderMembers();
     showToast(`成功导入 ${picked.length} 个成员（专精待补充）`, 'success');
   } catch (e) {
-    console.error('成员批量导入失败:', e);
+    console.error('成员智能导入失败:', e);
     showToast('导入失败：云端同步出错', 'error');
   } finally {
     btn.disabled = false;
@@ -2274,10 +2279,16 @@ async function saveAttendance() {
   closeModal('attendanceDetailModal');
 }
 
+let activityDeleting = false;
+
 async function deleteCurrentActivity() {
+  if (activityDeleting) return; // 任务书 #10：防重复点击
   if (!confirm('确定要删除这个活动吗？此操作不可撤销。')) return;
   const activity = appData.activities.find(a => a.id === currentActivityId);
-  
+  activityDeleting = true;
+  const delBtn = document.getElementById('activityDeleteBtn');
+  if (delBtn) { delBtn.dataset.originalText = delBtn.textContent; delBtn.disabled = true; delBtn.textContent = '删除中...'; }
+
   // 严格 DB-first
   try {
     if (activity) {
@@ -2286,6 +2297,9 @@ async function deleteCurrentActivity() {
     showToast('活动已删除', 'success');
   } catch (e) {
     console.error('活动删除失败:', e);
+  } finally {
+    activityDeleting = false;
+    if (delBtn) { delBtn.disabled = false; delBtn.textContent = delBtn.dataset.originalText || '删除活动'; }
   }
   closeModal('attendanceDetailModal');
 }

@@ -219,6 +219,48 @@ function verifyTokenAsync(accessToken) {
   return new Promise((resolve) => verifyToken(accessToken, resolve));
 }
 
+// ==================== 任务书 #10 性能缓存 ====================
+// 诊断结论：每次 HTTPS 往返 Supabase ≈700ms，写路径串行 3-5 次往返，
+// JWT 验证与角色联查合计占一半以上且是重复查询，故加缓存；行归属联查不缓存。
+//
+// 缓存失效策略（安全优先于速度）：
+// 1. JWT 缓存：按 token 缓存 60 秒。风险：用户登出/删号后最长 60 秒内旧 token
+//    仍被认作"有效用户"，但公会级角色校验仍逐次生效，且 token 自身会过期，可接受。
+// 2. 角色缓存：按 user+guild 缓存 120 秒。任何经本代理的 guild_members / guilds
+//    写操作成功后立即清空全部角色缓存（见转发回调），因此权限变更经本代理即时生效；
+//    直接改库的最晚 120 秒（TTL 上限）生效。
+// 3. 行归属联查（resolveGuildIds / fetchRowById）不缓存——归属判断必须实时。
+const JWT_CACHE_TTL = 60 * 1000;
+const ROLE_CACHE_TTL = 120 * 1000;
+const jwtCache = new Map(); // token → { user, exp }
+const roleCache = new Map(); // `${userId}:${guildId}` → { role, exp }
+
+function cacheSet(map, key, value) {
+  if (map.size > 5000) { // 防内存膨胀：超限顺带清理过期项
+    const now = Date.now();
+    for (const [k, v] of map) { if (v.exp <= now) map.delete(k); }
+  }
+  map.set(key, value);
+}
+
+function verifyTokenCached(accessToken) {
+  const hit = jwtCache.get(accessToken);
+  if (hit && hit.exp > Date.now()) return Promise.resolve(hit.user);
+  return verifyTokenAsync(accessToken).then((user) => {
+    if (user) cacheSet(jwtCache, accessToken, { user, exp: Date.now() + JWT_CACHE_TTL });
+    return user;
+  });
+}
+
+async function getGuildRoleCached(guildId, userId) {
+  const key = `${userId}:${guildId}`;
+  const hit = roleCache.get(key);
+  if (hit && hit.exp > Date.now()) return hit.role;
+  const role = await getGuildRole(guildId, userId);
+  cacheSet(roleCache, key, { role, exp: Date.now() + ROLE_CACHE_TTL });
+  return role;
+}
+
 // service_role REST 查询（仅鉴权模块内部使用）
 function supabaseRestGet(restPath) {
   return new Promise((resolve) => {
@@ -333,7 +375,7 @@ async function authorizeProxyRequest(user, table, method, queryString, rawBody) 
     // PATCH/DELETE：仅 owner
     const ids = filters.id || [];
     for (const guildId of ids) {
-      const role = await getGuildRole(guildId, uid);
+      const role = await getGuildRoleCached(guildId, uid);
       if (role !== "owner") return deny("仅公会会长可以修改或删除公会");
     }
     return { ok: true };
@@ -362,11 +404,11 @@ async function authorizeProxyRequest(user, table, method, queryString, rawBody) 
       const row = await fetchRowById("guild_members", rowId, "guild_id,user_id");
       if (!row) continue; // 目标不存在，no-op 放行
       if (method === "PATCH") {
-        const role = await getGuildRole(row.guild_id, uid);
+        const role = await getGuildRoleCached(row.guild_id, uid);
         if (role !== "owner") return deny("仅公会会长可以变更成员角色");
       } else if (method === "DELETE") {
         if (row.user_id === uid) continue; // 退出自己的公会，允许
-        const role = await getGuildRole(row.guild_id, uid);
+        const role = await getGuildRoleCached(row.guild_id, uid);
         if (role !== "owner") return deny("仅公会会长可以移除成员");
       }
     }
@@ -379,7 +421,7 @@ async function authorizeProxyRequest(user, table, method, queryString, rawBody) 
       // 入/退会通知等：调用者必须是目标公会成员
       for (const row of rows) {
         if (!row || !row.guild_id) return deny("通知缺少目标公会");
-        const role = await getGuildRole(row.guild_id, uid);
+        const role = await getGuildRoleCached(row.guild_id, uid);
         if (!role) return deny("无权向该公会成员发送通知");
       }
       return { ok: true };
@@ -419,7 +461,7 @@ async function authorizeProxyRequest(user, table, method, queryString, rawBody) 
       return { ok: true };
     }
     for (const guildId of guildIds) {
-      const role = await getGuildRole(guildId, uid);
+      const role = await getGuildRoleCached(guildId, uid);
       if (role !== "owner" && role !== "editor") {
         return deny("无权修改该公会数据（需要编辑或以上权限）");
       }
@@ -484,7 +526,9 @@ const server = http.createServer(async (req, res) => {
     }
 
     (async () => {
-      const user = await verifyTokenAsync(token);
+      const perfT0 = Date.now();
+      const user = await verifyTokenCached(token);
+      const perfJwt = Date.now();
       if (!user) {
         res.writeHead(401, { "Content-Type": "application/json", ...corsHeaders });
         res.end(JSON.stringify({ message: "登录状态无效，请重新登录" }));
@@ -508,9 +552,17 @@ const server = http.createServer(async (req, res) => {
         res.end(JSON.stringify({ message: "权限校验失败，请稍后重试" }));
         return;
       }
+      const perfAuthz = Date.now();
 
       const supabasePath = `/rest/v1/${table}${queryString}`;
       proxyToSupabase(req.method, supabasePath, req.headers, body, (result) => {
+        const perfEnd = Date.now();
+        // 任务书 #10：写路径分阶段计时日志（JWT 验证 / 鉴权联查 / 转发写入）
+        console.log(`[perf] ${req.method} ${table} jwt=${perfJwt - perfT0}ms authz=${perfAuthz - perfJwt}ms write=${perfEnd - perfAuthz}ms total=${perfEnd - perfT0}ms`);
+        // 任务书 #10 缓存失效：公会/成员写成功 → 权限可能已变更，清空角色缓存（安全优先，缓存重建代价低）
+        if (result.statusCode < 300 && (table === "guild_members" || table === "guilds")) {
+          roleCache.clear();
+        }
         const responseHeaders = { ...corsHeaders, "Content-Type": "application/json" };
 
         // Forward content-range header if present

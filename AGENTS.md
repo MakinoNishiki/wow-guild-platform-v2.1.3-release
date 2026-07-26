@@ -67,6 +67,7 @@ WoW 团本考勤管理系统，暗色史诗奇幻风格（WoW 主题），基于
 - **读操作**：直接通过 Supabase REST API（anon key + JWT），RLS SELECT 策略正常工作
 - **写操作**：统一走 `cloudCrud()` 入口（Save DB → Load DB → Update State → Render），底层经 server.js 代理（`/api/db/rest/v1/*`）
   - 代理先验证用户 JWT（调用 `/auth/v1/user`），再做公会级鉴权（owner/editor 可写业务表，viewer 只读；个人表限本人），最后用 service_role key 写入
+  - 性能缓存（任务书 #10）：JWT 按 token 缓存 60s、公会角色按 user+guild 缓存 120s；guild_members/guilds 写成功即清空角色缓存（即时生效）；行归属联查不缓存
   - 代理鉴权逻辑集中在 server.js `authorizeProxyRequest()`；回归脚本 `scripts/verify-authz.js`
   - RPC 代理仅放行白名单函数（当前仅 `get_unread_notification_count`）
 - 批量导入/清空属规范 1.2.2 批处理例外：循环 saveCloudData 后统一 reload 一次

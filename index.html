@@ -238,7 +238,7 @@
               </div>
             </div>
             <div class="toolbar-right">
-              <button class="btn edit-only" onclick="showImportMembersModal()">📋 批量导入</button>
+              <button class="btn edit-only" onclick="showImportMembersModal()">📋 智能导入</button>
               <button class="btn btn-primary edit-only" onclick="showMemberModal()">+ 添加成员</button>
             </div>
           </div>
@@ -645,7 +645,7 @@
   </div>
 </div>
 
-<!-- ===== 弹窗：批量导入成员 ===== -->
+<!-- ===== 弹窗：智能导入成员 ===== -->
 <div class="modal-overlay" id="importMembersModal">
   <div class="modal" style="max-width:640px">
     <div class="modal-header">
@@ -777,7 +777,7 @@
       <div class="attendance-members" id="attendanceMembersList"></div>
     </div>
     <div class="modal-footer">
-      <button class="btn btn-danger btn-sm edit-only" onclick="deleteCurrentActivity()" style="margin-right:auto">删除活动</button>
+      <button class="btn btn-danger btn-sm edit-only" id="activityDeleteBtn" onclick="deleteCurrentActivity()" style="margin-right:auto">删除活动</button>
       <!-- REQ-014：已挂 WCL 链接的活动显示复盘入口（全体成员可见），新标签页打开 -->
       <a id="attendanceWclBtn" class="btn btn-sm" href="#" target="_blank" rel="noopener noreferrer" style="display:none">📊 WCL 复盘</a>
       <button class="btn" onclick="closeModal('attendanceDetailModal')">关闭</button>
