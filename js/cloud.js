@@ -334,6 +334,14 @@
     updateGuildUI();
   }
 
+  // ---- REQ-025：更新公会资料（简介/分配制度/规则说明），服务端代理仅放行 owner ----
+  async function updateGuildProfile(fields) {
+    if (!currentGuild) throw new Error('未选择公会');
+    await dbUpdate('guilds', fields, { id: currentGuild.id });
+    Object.assign(currentGuild, fields);
+    updateGuildUI();
+  }
+
   // ---- 获取服务器列表 ----
   function getWowServers() {
     return WOW_SERVERS;
@@ -1470,6 +1478,7 @@
     joinGuild: joinGuild,
     joinGuildById: joinGuildById,
     selectGuild: selectGuild,
+    updateGuildProfile: updateGuildProfile,
     loadUserGuilds: loadUserGuilds,
     loadCloudData: loadCloudData,
     saveCloudData: saveCloudData,

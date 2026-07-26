@@ -36,9 +36,9 @@ WoW 团本考勤管理系统，暗色史诗奇幻风格（WoW 主题），基于
 ## 功能模块
 1. **用户认证** - 邮箱注册/登录、会话管理（未登录仅见注册/登录页）
 2. **公会系统** - 创建公会、邀请码加入、公会切换
-3. **权限管理** - 三级权限（owner/editor/viewer）、成员角色变更、公会设置
+3. **权限管理** - 三级权限（owner/editor/viewer）、成员角色变更、公会设置、公会资料（REQ-025：简介/分配制度/规则说明，仅 owner 可编辑）
 4. **仪表盘**（page:dashboard） - 出勤率统计、排行、活动概览
-5. **成员管理**（page:members） - 13个职业、专精/职责联动、职责列（按专精推导）、出勤详情
+5. **成员管理**（page:members） - 13个职业、专精/职责联动、职责列（按专精推导）、出勤详情、智能导入（REQ-023：多格式解析+预览确认，专精占位"待补充"）
 6. **考勤记录**（page:attendance） - 默认列表视图/日历视图（记住选择）、活动CRUD、BOSS选择、WCL 日志链接（REQ-014）
 7. **装备分配**（page:loot） - 103件装备库、多维筛选、心愿独立列、Roll 点循环输入（1-100）、分配记录
 8. **心愿单**（page:wishlist） - 按成员管理、竞争概览
@@ -48,7 +48,7 @@ WoW 团本考勤管理系统，暗色史诗奇幻风格（WoW 主题），基于
 
 ## 云端架构
 ### 数据库表（Supabase PostgreSQL）
-- `guilds` - 公会（name, owner_id, invite_code）
+- `guilds` - 公会（name, owner_id, invite_code, description, loot_rule_type, loot_rule_text）
 - `guild_members` - 公会成员权限（user_id, guild_id, role: owner/editor/viewer）
 - `raid_members` - WoW 角色成员（guild_id, name, class, spec, role）
 - `activities` - 考勤活动（guild_id, name, activity_date, raid, boss）

@@ -30,6 +30,57 @@ const classMap = {
   '唤魔师': 'evoker'
 };
 
+// REQ-023：英文类名（游戏宏输出）→ 中文职业映射
+const wowClassEnToCn = {
+  'WARRIOR': '战士', 'PALADIN': '圣骑士', 'HUNTER': '猎人', 'ROGUE': '盗贼',
+  'PRIEST': '牧师', 'DEATHKNIGHT': '死亡骑士', 'SHAMAN': '萨满', 'MAGE': '法师',
+  'WARLOCK': '术士', 'MONK': '武僧', 'DRUID': '德鲁伊', 'DEMONHUNTER': '恶魔猎手',
+  'EVOKER': '唤魔师'
+};
+
+// REQ-023：解析单行名单为 {name, cls}，无法识别返回 null。
+// 支持：宏输出（名字-服务器,英文类名）、名字,职业、名字-职业、名字 职业、纯名字（cls 为空）
+function parseMemberRosterLine(line) {
+  const raw = (line || '').trim();
+  if (!raw) return null;
+  const isCnClass = s => Object.prototype.hasOwnProperty.call(classMap, s);
+  const isEnClass = s => Object.prototype.hasOwnProperty.call(wowClassEnToCn, (s || '').toUpperCase());
+
+  // ① 逗号格式：末段是职业（英文类名或中文职业）
+  if (raw.indexOf(',') !== -1 || raw.indexOf('，') !== -1) {
+    const parts = raw.split(/[,，]/).map(p => p.trim()).filter(Boolean);
+    if (parts.length < 2) return null;
+    const last = parts[parts.length - 1];
+    let name = parts.slice(0, -1).join(',');
+    if (isEnClass(last)) {
+      // 宏格式：名字带 -服务器 后缀，去掉
+      if (name.indexOf('-') !== -1) name = name.split('-')[0].trim();
+      return name ? { name, cls: wowClassEnToCn[last.toUpperCase()] } : null;
+    }
+    if (isCnClass(last)) return name ? { name, cls: last } : null;
+    return null;
+  }
+
+  // ② 无逗号含 '-' 且末段是中文职业：名字-职业
+  if (raw.indexOf('-') !== -1) {
+    const idx = raw.lastIndexOf('-');
+    const tail = raw.slice(idx + 1).trim();
+    if (isCnClass(tail)) {
+      const name = raw.slice(0, idx).trim();
+      return name ? { name, cls: tail } : null;
+    }
+    // ③ '-' 后非职业（如 名字-服务器）：整行按纯名字保留，预览页人工修正
+    return { name: raw, cls: '' };
+  }
+
+  // ④ 空白分隔（含全角空格）：尾段是中文职业 → 名字 职业
+  const m = raw.match(/^(.+?)[\s　]+([^\s　]+)$/);
+  if (m && isCnClass(m[2])) return { name: m[1].trim(), cls: m[2] };
+
+  // ⑤ 纯名字
+  return { name: raw, cls: '' };
+}
+
 // 职业-专精映射
 const classSpecMap = {
   '战士': ['防护', '武器', '狂怒'],
@@ -65,7 +116,7 @@ function deriveMemberRoles(m) {
   const specs = [m.main_spec || m.spec || ''].concat(m.off_specs || (m.off_spec ? [m.off_spec] : []));
   const roles = [];
   specs.forEach(s => {
-    if (!s) return;
+    if (!s || s === '待补充') return; // REQ-023：导入占位专精不参与职责推导
     const role = specRoleMap[s] || '输出';
     if (!roles.includes(role)) roles.push(role);
   });
@@ -814,8 +865,50 @@ async function openGuildSettings() {
     dangerZone.style.display = window.CloudSync.isOwner() ? 'none' : '';
   }
 
+  // REQ-025：公会资料（仅 owner 可编辑）
+  const profileOwner = window.CloudSync.isOwner();
+  const descEl = document.getElementById('guildProfileDesc');
+  const typeEl = document.getElementById('guildProfileLootRuleType');
+  const textEl = document.getElementById('guildProfileLootRuleText');
+  descEl.value = guild.description || '';
+  typeEl.value = guild.loot_rule_type || '';
+  textEl.value = guild.loot_rule_text || '';
+  [descEl, typeEl, textEl].forEach(el => { el.disabled = !profileOwner; });
+  document.getElementById('guildProfileSaveBtn').style.display = profileOwner ? '' : 'none';
+  document.getElementById('guildProfileOwnerHint').style.display = profileOwner ? 'none' : '';
+  toggleGuildProfileCustomHint();
+
   openModal('guildSettingsModal');
   await loadGuildMembers();
+}
+
+// REQ-025：自定义制度时提示规则说明必填
+function toggleGuildProfileCustomHint() {
+  const typeEl = document.getElementById('guildProfileLootRuleType');
+  const hint = document.getElementById('guildProfileCustomHint');
+  if (typeEl && hint) hint.style.display = typeEl.value === 'custom' ? '' : 'none';
+}
+
+// REQ-025：保存公会资料（服务端代理二次校验仅 owner 可写）
+async function saveGuildProfile() {
+  if (!window.CloudSync.isOwner()) { showToast('仅会长可编辑公会资料', 'error'); return; }
+  const description = document.getElementById('guildProfileDesc').value.trim();
+  const lootRuleType = document.getElementById('guildProfileLootRuleType').value;
+  const lootRuleText = document.getElementById('guildProfileLootRuleText').value.trim();
+  if (lootRuleType === 'custom' && !lootRuleText) {
+    showToast('选择自定义制度时，请填写分配规则说明', 'error');
+    return;
+  }
+  try {
+    await window.CloudSync.updateGuildProfile({
+      description: description || null,
+      loot_rule_type: lootRuleType || null,
+      loot_rule_text: lootRuleText || null
+    });
+    showToast('公会资料已保存', 'success');
+  } catch (e) {
+    showToast('保存失败: ' + e.message, 'error');
+  }
 }
 
 // 加载公会成员列表
@@ -1603,72 +1696,117 @@ async function deleteMember(id) {
   }
 }
 
+// REQ-023：智能导入预览行 {name, cls, include, status: 'ok'|'dup'|'bad'}
+let importPreviewRows = [];
+
 function showImportMembersModal() {
   document.getElementById('importMembersText').value = '';
+  importPreviewRows = [];
+  document.getElementById('importPasteStep').style.display = '';
+  document.getElementById('importPreviewStep').style.display = 'none';
+  document.getElementById('importParseBtn').style.display = '';
+  document.getElementById('importConfirmBtn').style.display = 'none';
+  document.getElementById('importBackBtn').style.display = 'none';
   openModal('importMembersModal');
 }
 
-async function importMembers() {
-  const text = document.getElementById('importMembersText').value.trim();
-  if (!text) { showToast('请输入成员数据', 'error'); return; }
+function copyImportMacro() {
+  const text = document.getElementById('importMacroText').textContent;
+  navigator.clipboard.writeText(text)
+    .then(() => showToast('宏已复制，到游戏聊天框粘贴回车即可导出名单', 'success'))
+    .catch(() => showToast('复制失败，请手动选中复制', 'error'));
+}
 
+function importParseRoster() {
+  const text = document.getElementById('importMembersText').value;
+  const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+  if (!lines.length) { showToast('请先粘贴名单', 'error'); return; }
+  importPreviewRows = lines.map(line => {
+    const parsed = parseMemberRosterLine(line);
+    if (!parsed) return { name: line, cls: '', include: false, status: 'bad' };
+    const dup = appData.members.some(m => m.name === parsed.name);
+    const status = !parsed.cls ? 'bad' : (dup ? 'dup' : 'ok');
+    return { name: parsed.name, cls: parsed.cls, include: status === 'ok', status };
+  });
+  document.getElementById('importPasteStep').style.display = 'none';
+  document.getElementById('importPreviewStep').style.display = '';
+  document.getElementById('importParseBtn').style.display = 'none';
+  document.getElementById('importConfirmBtn').style.display = '';
+  document.getElementById('importBackBtn').style.display = '';
+  renderImportPreview();
+}
+
+function importBackToPaste() {
+  document.getElementById('importPasteStep').style.display = '';
+  document.getElementById('importPreviewStep').style.display = 'none';
+  document.getElementById('importParseBtn').style.display = '';
+  document.getElementById('importConfirmBtn').style.display = 'none';
+  document.getElementById('importBackBtn').style.display = 'none';
+}
+
+function renderImportPreview() {
+  const classOptions = sel => '<option value="">（选职业）</option>' +
+    Object.keys(classMap).map(c => `<option value="${c}" ${sel === c ? 'selected' : ''}>${c}</option>`).join('');
+  const statusText = { ok: '新成员', dup: '已存在', bad: '需修正' };
+  document.getElementById('importPreviewBody').innerHTML = importPreviewRows.map((r, i) => {
+    const color = r.status === 'bad' ? 'var(--danger)' : (r.status === 'dup' ? 'var(--warning)' : '');
+    const nameCell = r.status === 'bad'
+      ? `<input class="form-input" style="height:28px;padding:2px 6px" value="${r.name.replace(/"/g, '&quot;')}" oninput="importUpdateRow(${i},'name',this.value)">`
+      : r.name;
+    return `<tr${color ? ` style="color:${color}"` : ''}>
+      <td><input type="checkbox" ${r.include ? 'checked' : ''} onchange="importUpdateRow(${i},'include',this.checked)"></td>
+      <td>${nameCell}</td>
+      <td><select class="form-select" style="height:28px;padding:2px 6px" onchange="importUpdateRow(${i},'cls',this.value)">${classOptions(r.cls)}</select></td>
+      <td>待补充</td>
+      <td>${statusText[r.status]}</td>
+      <td><button type="button" class="btn btn-sm btn-danger" onclick="importRemoveRow(${i})">剔除</button></td>
+    </tr>`;
+  }).join('');
+}
+
+function importUpdateRow(i, field, value) {
+  const r = importPreviewRows[i];
+  if (!r) return;
+  r[field] = value;
+  // 不整表重绘（避免输入框失焦），状态在确认导入时最终校验
+}
+
+function importRemoveRow(i) {
+  importPreviewRows.splice(i, 1);
+  renderImportPreview();
+}
+
+// 规范 1.2.2 批处理例外：批量导入循环写入，完成后统一 reload 一次
+async function importConfirmRoster() {
+  const picked = importPreviewRows.filter(r => r.include && r.name.trim() && r.cls);
+  if (!picked.length) { showToast('没有可导入的成员（需勾选且名字、职业齐全）', 'error'); return; }
+  const btn = document.getElementById('importConfirmBtn');
+  btn.disabled = true;
   try {
-    let members;
-    // 尝试解析 JSON
-    if (text.startsWith('[')) {
-      members = JSON.parse(text);
-    } else {
-      // 每行一个成员，用空格或Tab分隔 名字 职业 专精
-      members = text.split('\n').filter(l => l.trim()).map(line => {
-        const parts = line.trim().split(/[\s\t]+/);
-        return { name: parts[0] || '', class: parts[1] || '', spec: parts[2] || '' };
+    for (const r of picked) {
+      await window.CloudSync.saveCloudData('members', 'add', {
+        name: r.name.trim(),
+        class: r.cls,
+        main_spec: '待补充',
+        spec: '待补充', // 向后兼容
+        off_spec: '',
+        off_specs: [],
+        role: [],
+        status: '正式',
+        join_date: formatDate(new Date()),
+        notes: ''
       });
     }
-
-    if (!Array.isArray(members)) throw new Error('格式错误');
-
-    const pendingMembers = [];
-    members.forEach(m => {
-      if (m.name && m.class) {
-        const mainSpec = m.main_spec || m.spec || '';
-        // 副专精：优先数组，其次字符串转数组
-        let offSpecs = [];
-        if (m.off_specs && Array.isArray(m.off_specs)) {
-          offSpecs = m.off_specs;
-        } else if (m.off_spec) {
-          offSpecs = Array.isArray(m.off_spec) ? m.off_spec : [m.off_spec];
-        }
-        pendingMembers.push({
-          name: m.name,
-          class: m.class,
-          main_spec: mainSpec,
-          off_spec: offSpecs.length > 0 ? offSpecs[0] : '',
-          off_specs: offSpecs,
-          role: m.role || [],
-          spec: mainSpec, // 向后兼容
-          status: m.status || '正式',
-          join_date: m.join_date || formatDate(new Date()),
-          notes: m.notes || ''
-        });
-      }
-    });
-
-    // 规范 1.2.2 批处理例外：批量导入循环 saveCloudData 写入，完成后统一 reload 一次
-    try {
-      for (const member of pendingMembers) {
-        await window.CloudSync.saveCloudData('members', 'add', member);
-      }
-      await window.CloudSync.reloadData('members');
-      saveData();
-      closeModal('importMembersModal');
-      renderMembers();
-      showToast(`成功导入 ${pendingMembers.length} 个成员`, 'success');
-    } catch (e) {
-      console.error('成员批量导入失败:', e);
-      showToast('导入失败：云端同步出错', 'error');
-    }
+    await window.CloudSync.reloadData('members');
+    saveData();
+    closeModal('importMembersModal');
+    renderMembers();
+    showToast(`成功导入 ${picked.length} 个成员（专精待补充）`, 'success');
   } catch (e) {
-    showToast('导入失败：格式不正确', 'error');
+    console.error('成员批量导入失败:', e);
+    showToast('导入失败：云端同步出错', 'error');
+  } finally {
+    btn.disabled = false;
   }
 }
 
@@ -3058,7 +3196,9 @@ function lootShowModal(lootId = null) {
     document.getElementById('lootSeason').value = '';
     document.getElementById('lootPlayerAction').value = 'none';
     document.getElementById('lootRollValue').value = '';
-    document.getElementById('lootRuleNote').value = '';
+    // REQ-025：新建装备时自动带入公会分配规则说明（仅预填，不回写公会设置）
+    const guildProfile = window.CloudSync.getCurrentGuild() || {};
+    document.getElementById('lootRuleNote').value = guildProfile.loot_rule_text || '';
     document.getElementById('lootDecisionNote').value = '';
     document.getElementById('lootIsWishlist').checked = false;
   }
