@@ -655,14 +655,22 @@
     <div class="modal-body">
       <!-- 第一步：粘贴名单 -->
       <div id="importPasteStep">
-        <details style="margin-bottom:12px;font-size:13px">
+        <details style="margin-bottom:12px;font-size:13px" open>
           <summary style="cursor:pointer;color:var(--info)">📖 游戏内一键导出教程（点击展开）</summary>
           <div style="margin-top:8px;padding:10px;background:var(--bg-tertiary);border-radius:6px;color:var(--text-secondary)">
-            在游戏聊天框输入以下宏并回车，会把全团名单（名字-服务器,职业）输出到聊天框，复制后粘贴到下方文本框：
-            <div style="display:flex;gap:8px;align-items:flex-start;margin-top:8px">
-              <code id="importMacroText" style="flex:1;font-size:11px;word-break:break-all;color:var(--gold)">/run for i=1,GetNumGuildMembers() do local n,_,_,_,_,_,_,_,_,_,c=GetGuildRosterInfo(i) if n then print(n..","..c) end end</code>
-              <button type="button" class="btn btn-sm" onclick="copyImportMacro()">复制</button>
+            <div style="margin-bottom:6px"><strong style="color:var(--text-primary)">团队宏（推荐）</strong>：先组好团队/小队再执行，只导出当前实际打团的人：</div>
+            <div style="display:flex;gap:8px;align-items:flex-start">
+              <code id="importMacroTeam" style="flex:1;font-size:11px;word-break:break-all;color:var(--gold)">/run for i=1,GetNumGroupMembers() do local n,_,_,_,_,c=GetRaidRosterInfo(i) if n then print(n..","..c) end end</code>
+              <button type="button" class="btn btn-sm" onclick="copyImportMacro('importMacroTeam')">复制</button>
             </div>
+            <details style="margin-top:10px">
+              <summary style="cursor:pointer">公会宏（兜底：导出整个公会花名册，适合整会导入）</summary>
+              <div style="display:flex;gap:8px;align-items:flex-start;margin-top:6px">
+                <code id="importMacroGuild" style="flex:1;font-size:11px;word-break:break-all;color:var(--gold)">/run for i=1,GetNumGuildMembers() do local n,_,_,_,_,_,_,_,_,_,c=GetGuildRosterInfo(i) if n then print(n..","..c) end end</code>
+                <button type="button" class="btn btn-sm" onclick="copyImportMacro('importMacroGuild')">复制</button>
+              </div>
+            </details>
+            <div style="margin-top:8px;font-size:12px;color:var(--text-muted)">提示：魔兽原生聊天框不支持复制，需安装聊天增强插件（如自带复制功能的插件）后才能复制名单。</div>
           </div>
         </details>
         <p style="font-size:13px;color:var(--text-muted);margin-bottom:8px">

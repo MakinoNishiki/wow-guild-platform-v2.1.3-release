@@ -43,12 +43,15 @@ const wowClassEnToCn = {
 function parseMemberRosterLine(line) {
   const raw = (line || '').trim();
   if (!raw) return null;
+  // 任务书 #9：剥离聊天复制带来的时间戳前缀（[12:34] / [12:34:56] / 12:34 / 12:34:56，前后可带空格）
+  const text = raw.replace(/^\[?\d{1,2}:\d{2}(?::\d{2})?\]?\s*/, '').trim();
+  if (!text) return null;
   const isCnClass = s => Object.prototype.hasOwnProperty.call(classMap, s);
   const isEnClass = s => Object.prototype.hasOwnProperty.call(wowClassEnToCn, (s || '').toUpperCase());
 
   // ① 逗号格式：末段是职业（英文类名或中文职业）
-  if (raw.indexOf(',') !== -1 || raw.indexOf('，') !== -1) {
-    const parts = raw.split(/[,，]/).map(p => p.trim()).filter(Boolean);
+  if (text.indexOf(',') !== -1 || text.indexOf('，') !== -1) {
+    const parts = text.split(/[,，]/).map(p => p.trim()).filter(Boolean);
     if (parts.length < 2) return null;
     const last = parts[parts.length - 1];
     let name = parts.slice(0, -1).join(',');
@@ -62,23 +65,29 @@ function parseMemberRosterLine(line) {
   }
 
   // ② 无逗号含 '-' 且末段是中文职业：名字-职业
-  if (raw.indexOf('-') !== -1) {
-    const idx = raw.lastIndexOf('-');
-    const tail = raw.slice(idx + 1).trim();
+  if (text.indexOf('-') !== -1) {
+    const idx = text.lastIndexOf('-');
+    const tail = text.slice(idx + 1).trim();
     if (isCnClass(tail)) {
-      const name = raw.slice(0, idx).trim();
+      const name = text.slice(0, idx).trim();
       return name ? { name, cls: tail } : null;
     }
     // ③ '-' 后非职业（如 名字-服务器）：整行按纯名字保留，预览页人工修正
-    return { name: raw, cls: '' };
+    return { name: text, cls: '' };
   }
 
   // ④ 空白分隔（含全角空格）：尾段是中文职业 → 名字 职业
-  const m = raw.match(/^(.+?)[\s　]+([^\s　]+)$/);
+  const m = text.match(/^(.+?)[\s　]+([^\s　]+)$/);
   if (m && isCnClass(m[2])) return { name: m[1].trim(), cls: m[2] };
 
   // ⑤ 纯名字
-  return { name: raw, cls: '' };
+  return { name: text, cls: '' };
+}
+
+// 任务书 #9：查重同时匹配"名字"与"名字-服务器"两种形态（existingNames 为库中已存成员名数组）
+function isDupMemberName(pastedName, existingNames) {
+  return existingNames.some(n => n === pastedName ||
+    n.startsWith(pastedName + '-') || pastedName.startsWith(n + '-'));
 }
 
 // 职业-专精映射
@@ -1243,21 +1252,82 @@ function toggleSidebar() {
 }
 
 // ==================== 弹窗控制 ====================
+// 弹窗防误关（任务书 #9，开发规范第四章第 6 条）：
+// 含未保存编辑内容的弹窗，点击遮罩/按 ESC 时不直接关闭，二次确认后才放弃；
+// 无编辑内容或未登记的弹窗维持现状。新弹窗必须在 modalDirtyChecks 登记判定函数。
+const modalFormSnapshots = {};
+
+// 打开时快照表单值（input/select/textarea，按元素 id 记录）
+function snapshotModalForm(modalId) {
+  const modal = document.getElementById(modalId);
+  if (!modal) return;
+  const snap = {};
+  modal.querySelectorAll('input, select, textarea').forEach(el => {
+    if (el.id) snap[el.id] = el.type === 'checkbox' ? el.checked : el.value;
+  });
+  modalFormSnapshots[modalId] = snap;
+}
+
+// 当前表单值与快照比对，任一字段不同即视为有未保存编辑
+function isModalFormDirty(modalId) {
+  const snap = modalFormSnapshots[modalId];
+  const modal = document.getElementById(modalId);
+  if (!snap || !modal) return false;
+  let dirty = false;
+  modal.querySelectorAll('input, select, textarea').forEach(el => {
+    if (!el.id || !(el.id in snap)) return;
+    const cur = el.type === 'checkbox' ? el.checked : el.value;
+    if (cur !== snap[el.id]) dirty = true;
+  });
+  return dirty;
+}
+
+// 各弹窗"有未保存内容"判定；未登记的弹窗遮罩点击/ESC 直接关闭（维持现状）
+const modalDirtyChecks = {
+  importMembersModal: () => isModalFormDirty('importMembersModal') || importPreviewRows.length > 0,
+  memberModal: () => isModalFormDirty('memberModal'),
+  activityModal: () => isModalFormDirty('activityModal'),
+  lootModal: () => isModalFormDirty('lootModal'),
+  // 公会设置：成员角色变更即时保存不算未保存内容，只跟踪公会资料三字段
+  guildSettingsModal: () => {
+    const g = (window.CloudSync && window.CloudSync.getCurrentGuild()) || {};
+    return document.getElementById('guildProfileDesc').value !== (g.description || '') ||
+      document.getElementById('guildProfileLootRuleType').value !== (g.loot_rule_type || '') ||
+      document.getElementById('guildProfileLootRuleText').value !== (g.loot_rule_text || '');
+  }
+};
+
+// 遮罩点击/ESC 的统一关闭入口：有未保存内容时二次确认
+function requestCloseModal(id) {
+  const check = modalDirtyChecks[id];
+  if (check && check() && !confirm('内容未保存，确定放弃吗？')) return;
+  closeModal(id);
+}
+
 function openModal(id) {
   document.getElementById(id).classList.add('show');
+  snapshotModalForm(id);
 }
 
 function closeModal(id) {
   document.getElementById(id).classList.remove('show');
 }
 
-// 点击遮罩关闭弹窗
+// 点击遮罩关闭弹窗（防误关：走 requestCloseModal 二次确认）
 document.querySelectorAll('.modal-overlay').forEach(overlay => {
   overlay.addEventListener('click', (e) => {
     if (e.target === overlay) {
-      overlay.classList.remove('show');
+      requestCloseModal(overlay.id);
     }
   });
+});
+
+// ESC 关闭最上层弹窗（同样走二次确认）
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Escape') return;
+  const open = document.querySelectorAll('.modal-overlay.show');
+  if (!open.length) return;
+  requestCloseModal(open[open.length - 1].id);
 });
 
 // ==================== 仪表盘 ====================
@@ -1710,8 +1780,8 @@ function showImportMembersModal() {
   openModal('importMembersModal');
 }
 
-function copyImportMacro() {
-  const text = document.getElementById('importMacroText').textContent;
+function copyImportMacro(elementId) {
+  const text = document.getElementById(elementId).textContent;
   navigator.clipboard.writeText(text)
     .then(() => showToast('宏已复制，到游戏聊天框粘贴回车即可导出名单', 'success'))
     .catch(() => showToast('复制失败，请手动选中复制', 'error'));
@@ -1721,10 +1791,11 @@ function importParseRoster() {
   const text = document.getElementById('importMembersText').value;
   const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
   if (!lines.length) { showToast('请先粘贴名单', 'error'); return; }
+  const existingNames = appData.members.map(m => m.name);
   importPreviewRows = lines.map(line => {
     const parsed = parseMemberRosterLine(line);
     if (!parsed) return { name: line, cls: '', include: false, status: 'bad' };
-    const dup = appData.members.some(m => m.name === parsed.name);
+    const dup = isDupMemberName(parsed.name, existingNames);
     const status = !parsed.cls ? 'bad' : (dup ? 'dup' : 'ok');
     return { name: parsed.name, cls: parsed.cls, include: status === 'ok', status };
   });
