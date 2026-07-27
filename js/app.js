@@ -2234,9 +2234,24 @@ async function importConfirmRoster() {
     const restoredMsg = toRestore.length ? `，恢复 ${toRestore.length} 个已离队成员` : '';
     showToast(`成功导入 ${toAdd.length} 个成员（专精待补充）${restoredMsg}`, 'success');
     // BUG-026（任务书 #12 补丁）：从 WCL 同步预览跳转过来的"添加为成员"，
-    // 导入成功后回标该行为「已添加」并回到同步预览弹窗，不阻塞后续考勤写入
+    // 导入成功后回到同步预览弹窗，不阻塞后续考勤写入
+    // BUG-032（任务书 #12 补丁2）：reload 后用新名单对 _pendingAdd 行重跑对照匹配，
+    // 命中则移入①自动出席/②部分参战分区（随「确认写入考勤」一并写入），不再滞留③区
     if (typeof wclSyncRows !== 'undefined' && wclSyncRows.some(r => r._pendingAdd)) {
-      wclSyncRows.forEach(r => { if (r._pendingAdd) { r._pendingAdd = false; r.added = true; } });
+      const activeMembers = appData.members.filter(m => m.status !== '离队');
+      wclSyncRows.forEach(r => {
+        if (!r._pendingAdd) return;
+        r._pendingAdd = false;
+        const member = activeMembers.find(m => m.name === r.name);
+        if (member) {
+          r.memberId = member.id;
+          r.zone = r.bossFights >= (wclSyncMeta ? wclSyncMeta.bossFightTotal : 0) ? 'full' : 'partial';
+          r.status = '出席';
+          r.added = false;
+        } else {
+          r.added = true; // 兜底：reload 后仍未匹配到（异常），维持补丁1 的「已添加」灰显
+        }
+      });
       if (wclSyncMeta) {
         renderWclSyncPreview();
         openModal('wclSyncModal');
@@ -2898,8 +2913,9 @@ async function toggleActivityCancelled() {
     const payload = { ...activity, status: cancelling ? 'cancelled' : 'normal', id: activity.id };
     await cloudCrud('activities', 'update', payload, { renderFn: renderAttendance });
     showToast(cancelling ? '活动已取消，其考勤不再计入出勤率' : '活动已恢复正常', 'success');
-    // 刷新弹窗内状态（横幅 / 按钮文案 / 控件禁用）
-    openAttendanceDetail(currentActivityId);
+    // REQ-047（任务书 #12 补丁2）：成功后自动关闭弹窗，列表灰显/徽标即为可视反馈；
+    // 失败时 cloudCrud 已弹错误 toast，弹窗保持打开便于重试
+    closeModal('attendanceDetailModal');
   } catch (e) {
     console.error('活动状态变更失败:', e);
   } finally {
@@ -3184,7 +3200,8 @@ function wclSyncIgnoreRow(i) {
 // ③ 区"添加为成员"：预填进智能导入预览页（复用 REQ-032 预览/查重/入库全链路）
 // BUG-026（任务书 #12 补丁）：先关同步弹窗再开导入弹窗——两个 .modal-overlay 同 z-index
 // 按 DOM 序后者在上，wclSyncModal 在 importMembersModal 之后，不关闭会把导入弹窗完全压住，
-// 表现为"点击无任何反应"。导入成功后由 importConfirmRoster 回标 r.added 并重开同步预览。
+// 表现为"点击无任何反应"。导入成功后由 importConfirmRoster 对 _pendingAdd 行重跑对照匹配
+// （BUG-032：命中新成员即移入①/②分区），并重开同步预览。
 function wclSyncAddAsMember(i) {
   const r = wclSyncRows[i];
   if (!r || r.added || r._pendingAdd) return; // 防重复点击
