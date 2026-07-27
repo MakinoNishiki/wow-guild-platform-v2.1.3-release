@@ -773,6 +773,24 @@
   </div>
 </div>
 
+<!-- ===== 弹窗：同名已离队成员聚合确认（REQ-048） ===== -->
+<div class="modal-overlay" id="importRestoreModal">
+  <div class="modal" style="max-width:520px">
+    <div class="modal-header">
+      <div class="modal-title">同名已离队成员</div>
+      <div class="modal-close" onclick="importRestoreCancel()">×</div>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:13px;color:var(--text-muted);margin-bottom:10px" id="importRestoreHint"></p>
+      <div id="importRestoreList" style="max-height:320px;overflow-y:auto"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="importRestoreCancel()">返回</button>
+      <button class="btn btn-primary" id="importRestoreConfirmBtn" onclick="importRestoreConfirm()">确认恢复并导入</button>
+    </div>
+  </div>
+</div>
+
 <!-- ===== 弹窗：创建/编辑活动 ===== -->
 <div class="modal-overlay" id="activityModal">
   <div class="modal">

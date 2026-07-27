@@ -2,7 +2,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const src = fs.readFileSync(path.join(__dirname, '..', 'js', 'app.js'), 'utf8');
+const src = fs.readFileSync(path.join(__dirname, '..', 'js', 'app.js'), 'utf8').replace(/\r\n/g, '\n');
 
 const start = src.indexOf('const classMap = {');
 const fnStart = src.indexOf('function parseMemberRosterLine');

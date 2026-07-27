@@ -1278,8 +1278,8 @@ function renderCurrentPage() {
     case 'dashboard': renderDashboard(); break;
     case 'members': renderMembers(); break;
     case 'attendance': renderAttendance(); break;
-    case 'loot': renderLoot(); break;
-    case 'wishlist': renderWishlist(); break;
+    case 'loot': lootRender(); break; // BUG-034：修正未定义函数名（原 renderLoot 不存在，ReferenceError）
+    case 'wishlist': wishlistRender(); break; // 同上（原 renderWishlist）
     case 'reports': renderReports(); break;
     case 'data': renderDataPage(); break;
   }
@@ -1413,6 +1413,8 @@ function isModalFormDirty(modalId) {
 // 各弹窗"有未保存内容"判定；未登记的弹窗遮罩点击/ESC 直接关闭（维持现状）
 const modalDirtyChecks = {
   importMembersModal: () => isModalFormDirty('importMembersModal') || importPreviewRows.length > 0,
+  // REQ-048：聚合确认弹窗——改动过勾选（与默认全选快照不一致）才算未保存内容
+  importRestoreModal: () => isModalFormDirty('importRestoreModal'),
   // REQ-033：同步预览弹窗内改过状态/忽略过角色即视为有未确认数据
   wclSyncModal: () => wclSyncDirty || isModalFormDirty('wclSyncModal'),
   memberModal: () => isModalFormDirty('memberModal'),
@@ -1435,12 +1437,34 @@ function requestCloseModal(id) {
 }
 
 function openModal(id) {
-  document.getElementById(id).classList.add('show');
+  const el = document.getElementById(id);
+  el.classList.add('show');
+  // BUG-033：压栈并置顶（重复打开同弹窗先出栈再压栈，保持唯一）
+  const si = modalStack.indexOf(id);
+  if (si !== -1) modalStack.splice(si, 1);
+  modalStack.push(id);
+  modalApplyStacking();
   snapshotModalForm(id);
 }
 
 function closeModal(id) {
-  document.getElementById(id).classList.remove('show');
+  const el = document.getElementById(id);
+  el.classList.remove('show');
+  el.style.zIndex = '';
+  const si = modalStack.indexOf(id);
+  if (si !== -1) modalStack.splice(si, 1);
+}
+
+// BUG-033（任务书 #12 补丁3）：弹窗栈统一管理——任何 openModal 都把弹窗置顶，
+// z-index 按打开顺序递增（基数 1000 同 CSS，步进 2；上限远低于 toast 的 2000）。
+// 全站弹窗一律走 openModal/closeModal，禁止个别弹窗写死 z-index。
+const modalStack = [];
+
+function modalApplyStacking() {
+  modalStack.forEach((id, idx) => {
+    const el = document.getElementById(id);
+    if (el) el.style.zIndex = String(1000 + (idx + 1) * 2);
+  });
 }
 
 // 点击遮罩关闭弹窗（防误关：走 requestCloseModal 二次确认）
@@ -1452,12 +1476,11 @@ document.querySelectorAll('.modal-overlay').forEach(overlay => {
   });
 });
 
-// ESC 关闭最上层弹窗（同样走二次确认）
+// ESC 关闭最上层弹窗（BUG-033：以弹窗栈栈顶为准，同样走二次确认）
 document.addEventListener('keydown', (e) => {
   if (e.key !== 'Escape') return;
-  const open = document.querySelectorAll('.modal-overlay.show');
-  if (!open.length) return;
-  requestCloseModal(open[open.length - 1].id);
+  if (!modalStack.length) return;
+  requestCloseModal(modalStack[modalStack.length - 1]);
 });
 
 // ==================== 仪表盘 ====================
@@ -1610,7 +1633,10 @@ function renderMembers() {
     const mainSpec = m.main_spec || '';
     const offSpecs = m.off_specs || (m.off_spec ? [m.off_spec] : []);
     const offSpecText = offSpecs.join('、');
-    const matchSearch = !search || m.name.toLowerCase().includes(search) || m.class.includes(search) || mainSpec.toLowerCase().includes(search) || offSpecText.toLowerCase().includes(search);
+    // BUG-034：坏数据（如 name 为空）不能拖垮整表渲染——整表 innerHTML 一次性赋值，
+    // 任何一行抛错都会让表格停留在上一次渲染（表现为"出勤率列全是旧值"）
+    const mname = m.name || '';
+    const matchSearch = !search || mname.toLowerCase().includes(search) || (m.class || '').includes(search) || mainSpec.toLowerCase().includes(search) || offSpecText.toLowerCase().includes(search);
     const matchClass = !classFilter || m.class === classFilter;
     // 职责匹配：成员的role数组必须包含所有勾选的职责（AND逻辑）；未勾选任何职责则不过滤
     const memberRoles = m.role || [];
@@ -1630,6 +1656,8 @@ function renderMembers() {
   }
   
   tbody.innerHTML = filtered.map((m, i) => {
+    // BUG-034：行级防御——单行异常降级为提示行，不拖垮整表（否则整表停在旧渲染，出勤率列全是旧值）
+    try {
     const cls = classMap[m.class] || '';
     const rate = getMemberAttendanceRate(m.id);
     const mainSpec = m.main_spec || '';
@@ -1670,6 +1698,10 @@ function renderMembers() {
         </td>
       </tr>
     `;
+    } catch (err) {
+      console.error('成员行渲染失败（已降级为提示行）:', m && m.id, err);
+      return `<tr><td colspan="10" style="color:var(--danger)">该行数据异常，渲染失败（${(m && (m.name || m.id)) || '未知成员'}），请检查数据</td></tr>`;
+    }
   }).join('');
 
   // REQ-042：剔除已不存在的选中项，同步全选框与批量工具条
@@ -2139,7 +2171,8 @@ function importBackToPaste() {
 function renderImportPreview() {
   const classOptions = sel => '<option value="">（选职业）</option>' +
     Object.keys(classMap).map(c => `<option value="${c}" ${sel === c ? 'selected' : ''}>${c}</option>`).join('');
-  const statusText = { ok: '新成员', dup: '已存在', bad: '需修正' };
+  // REQ-048：departed-skip = 同名已离队未恢复（聚合确认中未勾选，跳过导入）
+  const statusText = { ok: '新成员', dup: '已存在', bad: '需修正', 'departed-skip': '已离队同名，未恢复' };
   // REQ-032：WCL 来源时在预览步顶部注明报告标题
   const srcEl = document.getElementById('importPreviewSource');
   if (importSource === 'wcl' && importWclTitle) {
@@ -2149,7 +2182,7 @@ function renderImportPreview() {
     srcEl.style.display = 'none';
   }
   document.getElementById('importPreviewBody').innerHTML = importPreviewRows.map((r, i) => {
-    const color = r.status === 'bad' ? 'var(--danger)' : (r.status === 'dup' ? 'var(--warning)' : '');
+    const color = r.status === 'bad' ? 'var(--danger)' : (r.status === 'dup' || r.status === 'departed-skip' ? 'var(--warning)' : '');
     const nameCell = r.status === 'bad'
       ? `<input class="form-input" style="height:28px;padding:2px 6px" value="${r.name.replace(/"/g, '&quot;')}" oninput="importUpdateRow(${i},'name',this.value)">`
       : r.name;
@@ -2179,32 +2212,78 @@ function importRemoveRow(i) {
 
 // 规范 1.2.2 批处理例外：智能导入循环写入，完成后统一 reload 一次
 let importConfirming = false; // BUG-024：防重复点击
+let importRestorePending = null; // REQ-048：聚合确认上下文 { picked, collisions }
+
 async function importConfirmRoster() {
   if (importConfirming) return;
   const picked = importPreviewRows.filter(r => r.include && r.name.trim() && r.cls);
   if (!picked.length) { showToast('没有可导入的成员（需勾选且名字、职业齐全）', 'error'); return; }
+
+  // REQ-048（任务书 #12 补丁3）：撞已离队同名成员的行聚合确认——一次弹窗列全、默认全选恢复，
+  // 替代原逐个浏览器 confirm。未勾选的跳过不导入，预览页标"已离队同名，未恢复"。
+  // （恢复优先于新建：DB (guild_id,name) 唯一索引下不恢复则无法新建）
+  const collisions = [];
+  for (const r of picked) {
+    const departed = importSource === 'wcl'
+      ? findDepartedByNameWithServer(r.name.trim(), r.server || '')
+      : findDepartedByName(r.name.trim());
+    if (departed) collisions.push({ row: r, departed });
+  }
+  if (collisions.length) {
+    importRestorePending = { picked, collisions };
+    showImportRestoreModal(collisions);
+    return;
+  }
+  await importExecute(picked, [], []);
+}
+
+// REQ-048：聚合确认弹窗
+function showImportRestoreModal(collisions) {
+  document.getElementById('importRestoreHint').textContent =
+    `以下 ${collisions.length} 名成员同名已离队，勾选将恢复为正式成员（不新建）；未勾选的跳过导入。`;
+  document.getElementById('importRestoreList').innerHTML = collisions.map((c, i) => `
+    <label style="display:flex;align-items:center;gap:8px;padding:8px 4px;border-bottom:1px solid var(--border-color, #333);cursor:pointer">
+      <input type="checkbox" id="importRestoreCb${i}" checked>
+      <span style="font-weight:500">${c.row.name}</span>
+      <span style="color:var(--text-muted);font-size:12px">${c.row.cls}${c.row.server ? ' · ' + c.row.server : ''}</span>
+      <span style="margin-left:auto;font-size:12px;color:var(--warning)">已离队</span>
+    </label>`).join('');
+  openModal('importRestoreModal');
+}
+
+// REQ-048：返回导入预览，不做任何写入
+function importRestoreCancel() {
+  importRestorePending = null;
+  closeModal('importRestoreModal');
+}
+
+// REQ-048：聚合确认——勾选的恢复、未勾选的跳过（预览页标出）、其余正常新建
+async function importRestoreConfirm() {
+  const pending = importRestorePending;
+  if (!pending) return;
+  const checkedIdx = [];
+  pending.collisions.forEach((c, i) => {
+    if (document.getElementById(`importRestoreCb${i}`).checked) checkedIdx.push(i);
+  });
+  const toRestore = checkedIdx.map(i => pending.collisions[i]);
+  const skipped = pending.collisions.filter((c, i) => !checkedIdx.includes(i)).map(c => c.row);
+  const collidingRows = new Set(pending.collisions.map(c => c.row));
+  const toAdd = pending.picked.filter(r => !collidingRows.has(r));
+  importRestorePending = null;
+  closeModal('importRestoreModal');
+  await importExecute(toAdd, toRestore, skipped);
+}
+
+// REQ-048：导入执行体（原 importConfirmRoster 写路径）。
+// skipped：同名离队未恢复的行——不导入，预览页标"已离队同名，未恢复"并停留预览页
+async function importExecute(toAdd, toRestore, skipped) {
   const btn = document.getElementById('importConfirmBtn');
   importConfirming = true;
   btn.disabled = true;
   btn.dataset.originalText = btn.textContent;
   btn.textContent = '导入中...';
   try {
-    // REQ-002（软删除）：撞已离队同名成员的行 → 不新建，逐一确认后恢复（恢复优先于新建；
-    // DB (guild_id,name) 唯一索引下放弃恢复也无法新建，故放弃即跳过该行）
-    const toAdd = [];
-    const toRestore = [];
-    for (const r of picked) {
-      const departed = importSource === 'wcl'
-        ? findDepartedByNameWithServer(r.name.trim(), r.server || '')
-        : findDepartedByName(r.name.trim());
-      if (departed) {
-        if (confirm(`存在同名已离队成员「${departed.name}」，是否恢复？\n确认后不新建成员，该成员将恢复为「正式」并更新职业。`)) {
-          toRestore.push({ departed, cls: r.cls });
-        }
-        continue;
-      }
-      toAdd.push(r);
-    }
+    skipped.forEach(r => { r.status = 'departed-skip'; r.include = false; });
     for (const r of toAdd) {
       await window.CloudSync.saveCloudData('members', 'add', {
         name: r.name.trim(),
@@ -2222,22 +2301,31 @@ async function importConfirmRoster() {
     for (const t of toRestore) {
       await window.CloudSync.saveCloudData('members', 'update', {
         ...t.departed,
-        class: t.cls || t.departed.class, // 顺带更新本次输入的职业，其余字段保留原值
+        class: t.row.cls || t.departed.class, // 顺带更新本次输入的职业，其余字段保留原值
         status: '正式',
         id: t.departed.id
       });
     }
-    await window.CloudSync.reloadData('members');
-    saveData();
-    closeModal('importMembersModal');
-    renderMembers();
-    const restoredMsg = toRestore.length ? `，恢复 ${toRestore.length} 个已离队成员` : '';
-    showToast(`成功导入 ${toAdd.length} 个成员（专精待补充）${restoredMsg}`, 'success');
+    if (toAdd.length || toRestore.length) {
+      await window.CloudSync.reloadData('members');
+      saveData();
+      renderMembers();
+    }
+    if (skipped.length) {
+      // 有跳过行：停留预览页标出，由用户剔除或重新勾选后再导入
+      renderImportPreview();
+      showToast(`导入 ${toAdd.length} 个、恢复 ${toRestore.length} 个，跳过 ${skipped.length} 个（同名离队未恢复）`, 'warning');
+    } else {
+      closeModal('importMembersModal');
+      const restoredMsg = toRestore.length ? `，恢复 ${toRestore.length} 个已离队成员` : '';
+      showToast(`成功导入 ${toAdd.length} 个成员（专精待补充）${restoredMsg}`, 'success');
+    }
     // BUG-026（任务书 #12 补丁）：从 WCL 同步预览跳转过来的"添加为成员"，
     // 导入成功后回到同步预览弹窗，不阻塞后续考勤写入
     // BUG-032（任务书 #12 补丁2）：reload 后用新名单对 _pendingAdd 行重跑对照匹配，
     // 命中则移入①自动出席/②部分参战分区（随「确认写入考勤」一并写入），不再滞留③区
-    if (typeof wclSyncRows !== 'undefined' && wclSyncRows.some(r => r._pendingAdd)) {
+    if ((toAdd.length || toRestore.length) &&
+        typeof wclSyncRows !== 'undefined' && wclSyncRows.some(r => r._pendingAdd)) {
       const activeMembers = appData.members.filter(m => m.status !== '离队');
       wclSyncRows.forEach(r => {
         if (!r._pendingAdd) return;
