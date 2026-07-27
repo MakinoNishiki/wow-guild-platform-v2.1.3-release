@@ -1289,6 +1289,49 @@ body {
   transform: translateX(4px);
 }
 
+/* REQ-020：已取消活动灰显 */
+.activity-item.activity-cancelled {
+  opacity: 0.55;
+}
+.activity-item.activity-cancelled:hover {
+  transform: none;
+}
+.activity-item.activity-cancelled .activity-info h4 {
+  color: var(--text-muted);
+}
+
+/* REQ-028：时间冲突活动黄色左边条 + ⚠ */
+.activity-item.activity-conflict {
+  border-left: 3px solid var(--warning);
+}
+.conflict-icon {
+  color: var(--warning);
+}
+
+/* REQ-028：活动弹窗内冲突警告条（黄色，仅提示不阻断） */
+.activity-conflict-warning {
+  background: rgba(210, 153, 34, 0.12);
+  border: 1px solid var(--warning);
+  border-radius: 8px;
+  color: var(--warning);
+  font-size: 12px;
+  line-height: 1.6;
+  padding: 8px 12px;
+  margin-bottom: 12px;
+}
+
+/* REQ-020：考勤详情弹窗「活动已取消」横幅 */
+.attendance-cancelled-banner {
+  background: rgba(139, 148, 158, 0.15);
+  border: 1px solid var(--text-muted);
+  border-radius: 8px;
+  color: var(--text-secondary);
+  font-size: 13px;
+  padding: 10px 12px;
+  margin-bottom: 12px;
+  text-align: center;
+}
+
 .activity-info h4 {
   font-size: 15px;
   color: var(--text-primary);
@@ -3343,4 +3386,170 @@ body.viewer-mode .attend-checkbox,
 body.viewer-mode .attend-status-select {
   pointer-events: none;
   opacity: 0.6;
+}
+
+/* ==================== 任务书 #12 第二批：筛选条 / 批量条 / 提示条 ==================== */
+
+/* REQ-018：考勤筛选条（实时筛选 + 出勤率小计） */
+.att-filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 10px 12px;
+  margin-bottom: 12px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  font-size: 13px;
+}
+.att-filter-bar .form-select,
+.att-filter-bar .form-input {
+  height: 30px;
+  padding: 2px 8px;
+  font-size: 12px;
+  width: auto;
+}
+.att-filter-statuses {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.att-filter-statuses label,
+.att-filter-toggle {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 12px;
+}
+.att-filter-subtotal {
+  margin-left: auto;
+  color: var(--gold);
+  font-weight: 600;
+  font-size: 12px;
+}
+
+/* 批量操作工具条（REQ-017-B 活动 / REQ-042 成员共用，参照心愿单批量条） */
+.batch-toolbar {
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  margin-bottom: 8px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  font-size: 13px;
+}
+.batch-toolbar-count {
+  color: var(--gold);
+  font-weight: 600;
+}
+
+/* REQ-017-B：活动卡片复选框 */
+.activity-select-checkbox {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+  accent-color: var(--gold);
+  margin-right: 12px;
+  flex-shrink: 0;
+}
+
+/* REQ-017-A：考勤详情勾选列 + 批量标记条 */
+.attend-pick-checkbox {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  accent-color: var(--info);
+  flex-shrink: 0;
+}
+.att-pick-bar {
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 8px 12px;
+  margin-bottom: 12px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  font-size: 13px;
+}
+
+/* REQ-037：WCL 已导入提示条（复用 .attendance-cancelled-banner 结构，换 info 配色） */
+.attendance-wcl-banner {
+  background: rgba(88, 166, 255, 0.12);
+  border: 1px solid var(--info);
+  border-radius: 8px;
+  color: var(--info);
+  font-size: 13px;
+  padding: 10px 12px;
+  margin-bottom: 12px;
+  text-align: center;
+}
+
+/* REQ-042：已离队成员名（装备分配历史记录） */
+.member-departed {
+  color: var(--text-muted);
+  opacity: 0.75;
+}
+
+/* REQ-042：成员复选框列 */
+.member-row-checkbox {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  accent-color: var(--gold);
+}
+
+/* 批量删除二次确认弹窗（REQ-017-B / REQ-042 共用） */
+.batch-delete-list {
+  max-height: 240px;
+  overflow-y: auto;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  padding: 8px 12px;
+  margin-bottom: 12px;
+  font-size: 13px;
+}
+.batch-delete-item {
+  padding: 4px 0;
+  border-bottom: 1px solid var(--border-color);
+}
+.batch-delete-item:last-child { border-bottom: none; }
+.batch-delete-warning {
+  color: var(--danger);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* viewer 权限门补充：批量勾选入口一并隐藏 */
+body.viewer-mode .member-row-checkbox,
+body.viewer-mode .activity-select-checkbox,
+body.viewer-mode .attend-pick-checkbox,
+body.viewer-mode #memberSelectAll {
+  display: none !important;
+}
+
+/* REQ-042（软删除）：已离队成员行灰显（成员列表 / 考勤详情历史行共用） */
+.member-row-departed {
+  opacity: 0.55;
+}
+
+/* BUG-030（任务书 #12 补丁）：数据模块加载失败横幅 */
+.load-failure-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  margin-bottom: 12px;
+  background: rgba(220, 50, 47, 0.12);
+  border: 1px solid var(--danger);
+  border-radius: 6px;
+  color: var(--danger);
+  font-size: 13px;
+}
+.load-failure-banner span {
+  flex: 1;
 }

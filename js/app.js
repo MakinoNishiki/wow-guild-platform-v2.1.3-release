@@ -20,7 +20,18 @@ let currentActivityId = null;
 let reportRange = 7;
 let calendarDate = new Date();
 // REQ-011：考勤默认列表视图，日历为用户自选；记住用户上次选择
-let attendanceView = localStorage.getItem('wow_raid_attendance_view') || 'list';
+// BUG-023：视图偏好按「账号+公会」记忆。根因：旧 key 'wow_raid_attendance_view' 无用户/公会维度，
+// 同浏览器所有账号、所有公会共用一份，切换后互相覆盖。
+// 本文件顶部执行时还没有用户/公会上下文，故用时惰性计算 key；切公会后渲染链路自然读到新 key，无需额外钩子。
+// 旧 key 不迁移，自然废弃。
+function getAttendanceViewStorageKey() {
+  const user = window.CloudSync && window.CloudSync.getCachedUser && window.CloudSync.getCachedUser();
+  const guild = window.CloudSync && window.CloudSync.getCurrentGuild && window.CloudSync.getCurrentGuild();
+  return `attendanceView:${(user && user.id) || 'anonymous'}:${(guild && guild.id) || 'noguild'}`;
+}
+function getAttendanceView() {
+  return localStorage.getItem(getAttendanceViewStorageKey()) === 'calendar' ? 'calendar' : 'list';
+}
 
 // 职业映射
 const classMap = {
@@ -100,6 +111,21 @@ function isDupMemberNameWithServer(name, server, existingNames) {
   });
 }
 
+// REQ-002（软删除）：与 isDupMemberName 同口径，返回匹配的「已离队」成员（无则 null）。
+// 撞活跃成员判重；撞离队成员不判重、走恢复链路（恢复优先于新建）。
+function findDepartedByName(name) {
+  return appData.members.find(m => m.status === '离队' &&
+    (m.name === name || m.name.startsWith(name + '-') || name.startsWith(m.name + '-'))) || null;
+}
+
+// REQ-002（软删除）：与 isDupMemberNameWithServer 同口径的已离队成员查找（WCL 来源用）
+function findDepartedByNameWithServer(name, server) {
+  return appData.members.find(m => m.status === '离队' && (
+    m.name === name ||
+    (m.name.startsWith(name + '-') && (!server || m.name === name + '-' + server))
+  )) || null;
+}
+
 // 职业-专精映射
 const classSpecMap = {
   '战士': ['防护', '武器', '狂怒'],
@@ -149,6 +175,82 @@ const raidBossMap = {
   '进军奎尔丹纳斯': ['贝洛朗（奥的子嗣）', '至暗之夜降临'],
   '孢陨幽境': ['腐沼']
 };
+
+// REQ-029：团本名称候选清单（activityRaidName 的 datalist 建议，仍可手输兜底）。
+// 主数据层 V2.2 上线后切换为数据库驱动（REQ-003/004）
+const RAID_NAME_OPTIONS = ['尼鲁巴尔王宫', ...Object.keys(raidBossMap)];
+
+// REQ-029：「最近使用」团本，按公会记忆最近 3 个
+function getRecentRaidNamesKey() {
+  const guild = window.CloudSync && window.CloudSync.getCurrentGuild && window.CloudSync.getCurrentGuild();
+  return `recentRaidNames:${(guild && guild.id) || 'local'}`;
+}
+function getRecentRaidNames() {
+  try { return JSON.parse(localStorage.getItem(getRecentRaidNamesKey())) || []; } catch { return []; }
+}
+// 保存活动成功后调用：置顶去重，最多保留 3 个
+function rememberRecentRaidName(name) {
+  if (!name) return;
+  const list = [name, ...getRecentRaidNames().filter(n => n !== name)].slice(0, 3);
+  localStorage.setItem(getRecentRaidNamesKey(), JSON.stringify(list));
+}
+// datalist 渲染：最近使用置顶，其余候选随后（去重）
+function renderRaidNameDatalist() {
+  const dl = document.getElementById('raidNameOptions');
+  if (!dl) return;
+  const recent = getRecentRaidNames();
+  const rest = RAID_NAME_OPTIONS.filter(n => !recent.includes(n));
+  dl.innerHTML = [...recent, ...rest].map(n => `<option value="${n}"></option>`).join('');
+}
+
+// REQ-028：活动时间段归一化为 [start, end) 分钟区间；结束 <= 开始视为跨天（+24h），与 REQ-012 时长口径一致。
+// 缺起止时间返回 null（不参与冲突判定）。
+function activityTimeRangeMinutes(a) {
+  if (!a.start_time || !a.end_time) return null;
+  const [sh, sm] = a.start_time.split(':').map(Number);
+  const [eh, em] = a.end_time.split(':').map(Number);
+  if ([sh, sm, eh, em].some(isNaN)) return null;
+  const s = sh * 60 + sm;
+  let e = eh * 60 + em;
+  if (e <= s) e += 24 * 60; // 跨天：结束时间为次日
+  return [s, e];
+}
+
+// REQ-028：时间冲突检测。规则：同日 + 同团队标签（双方都空视为同组）+ 时间段交叉。
+// 交叉判定：半开区间 s1 < e2 && s2 < e1（首尾相接不算冲突）；跨天已按 +24h 归一。
+// 已取消的活动不占用时间，不参与冲突判定；编辑时由 excludeId 排除自身。
+function findActivityConflicts(candidate, excludeId) {
+  if (!candidate || !candidate.date) return [];
+  const range = activityTimeRangeMinutes(candidate);
+  if (!range) return [];
+  const tag = (candidate.team_tag || '').trim();
+  return appData.activities.filter(a => {
+    if (a.id === excludeId) return false;
+    if (a.status === 'cancelled') return false;
+    if (a.date !== candidate.date) return false;
+    if ((a.team_tag || '').trim() !== tag) return false;
+    const r = activityTimeRangeMinutes(a);
+    if (!r) return false;
+    return range[0] < r[1] && r[0] < range[1];
+  });
+}
+
+// REQ-028：活动弹窗内冲突警告条（黄色，仅提示不阻断保存）
+function updateActivityConflictWarning() {
+  const el = document.getElementById('activityConflictWarning');
+  if (!el) return;
+  const conflicts = findActivityConflicts({
+    date: document.getElementById('activityDate').value,
+    team_tag: document.getElementById('activityTeamTag').value,
+    start_time: document.getElementById('activityStartTime').value,
+    end_time: document.getElementById('activityEndTime').value
+  }, editingActivityId);
+  if (!conflicts.length) { el.style.display = 'none'; el.innerHTML = ''; return; }
+  el.innerHTML = conflicts.map(c =>
+    `⚠ 与活动《${c.raid_name || '未命名活动'}》（${c.start_time || '--:--'}-${c.end_time || '--:--'}）时间冲突`
+  ).join('<br>');
+  el.style.display = '';
+}
 
 // 当前弹窗中选中的职责
 let modalSelectedRoles = [];
@@ -1199,6 +1301,17 @@ function showToast(message, type = 'info') {
   }, 2500);
 }
 
+// BUG-030（任务书 #12 补丁）：数据模块加载失败的页面可见提示（cloud.js loadCloudData 调用）
+window.showLoadFailureBanner = function (failedTables) {
+  const banner = document.getElementById('loadFailureBanner');
+  const text = document.getElementById('loadFailureText');
+  if (!banner || !text) return;
+  const names = { members: '成员', activities: '考勤活动', loots: '装备', wishlists: '心愿单' };
+  const label = (failedTables || []).map(t => names[t] || t).join('、');
+  text.textContent = `⚠ 部分数据加载失败（${label}），显示的可能不是最新数据。`;
+  banner.style.display = 'flex';
+};
+
 // ==================== 页面切换 ====================
 const pageTitles = {
   dashboard: '仪表盘',
@@ -1415,9 +1528,12 @@ function renderDashboard() {
 //   出勤 = 出席 + 迟到 + 替补（替补按出勤计）
 //   应到 = 该成员有考勤记录（任意状态）的活动数；无记录的活动不计入应到
 //   请假 / 缺席：计入应到，不计入出勤
+// REQ-020：已取消活动（status === 'cancelled'）的考勤不计入应到与出勤；
+// 只过滤统计不过滤数据，DB 记录保留，活动恢复正常即重新计入。
 function getAttendanceStats(memberId, activities) {
   let present = 0, absent = 0, late = 0, sub = 0, leave = 0, total = 0;
   (activities || []).forEach(act => {
+    if (act.status === 'cancelled') return; // REQ-020：已取消活动不参与统计
     const attendee = (act.attendees || []).find(a => a.member_id === memberId);
     if (!attendee) return; // 未标记：不计入应到
     total++;
@@ -1475,6 +1591,13 @@ function getFilteredActivities() {
 }
 
 // ==================== 成员管理 ====================
+// REQ-042（软删除）：成员列表默认隐藏已离队成员（开关状态存模块变量，不持久化）
+let showDepartedMembers = false;
+function memberToggleShowDeparted(checked) {
+  showDepartedMembers = checked;
+  renderMembers();
+}
+
 function renderMembers() {
   const search = document.getElementById('memberSearch').value.toLowerCase();
   const classFilter = document.getElementById('classFilter').value;
@@ -1494,11 +1617,15 @@ function renderMembers() {
     const matchRole = roleFilter.length === 0 || roleFilter.every(r => memberRoles.includes(r));
     return matchSearch && matchClass && matchRole;
   });
+
+  // REQ-042（软删除）：默认隐藏已离队成员，「显示已离队」开关开启时灰显展示
+  if (!showDepartedMembers) filtered = filtered.filter(m => m.status !== '离队');
   
   const tbody = document.getElementById('membersTableBody');
   
   if (!filtered.length) {
-    tbody.innerHTML = `<tr><td colspan="9"><div class="empty-state"><div class="empty-icon">👥</div><div class="empty-text">暂无成员数据</div><button class="btn btn-primary" onclick="showMemberModal()">+ 添加第一个成员</button></div></td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="10"><div class="empty-state"><div class="empty-icon">👥</div><div class="empty-text">暂无成员数据</div><button class="btn btn-primary" onclick="showMemberModal()">+ 添加第一个成员</button></div></td></tr>`;
+    memberUpdateBatchToolbar();
     return;
   }
   
@@ -1521,7 +1648,8 @@ function renderMembers() {
       : '-';
     
     return `
-      <tr>
+      <tr${m.status === '离队' ? ' class="member-row-departed"' : ''}>
+        <td><input type="checkbox" class="member-row-checkbox" value="${m.id}" ${memberSelectedIds.has(m.id) ? 'checked' : ''} onchange="memberToggleSelect('${m.id}', this.checked)"></td>
         <td>${i + 1}</td>
         <td class="class-${cls}" style="font-weight:500">${m.name}</td>
         <td>
@@ -1535,12 +1663,90 @@ function renderMembers() {
         <td>
           <div class="action-btns">
             <button class="icon-btn" onclick="editMember('${m.id}')" title="编辑">✏️</button>
-            <button class="icon-btn danger" onclick="deleteMember('${m.id}')" title="删除">🗑</button>
+            ${m.status === '离队'
+              ? `<button class="icon-btn" onclick="restoreMember('${m.id}', this)" title="恢复">♻️</button>`
+              : `<button class="icon-btn danger" onclick="deleteMember('${m.id}')" title="删除">🗑</button>`}
           </div>
         </td>
       </tr>
     `;
   }).join('');
+
+  // REQ-042：剔除已不存在的选中项，同步全选框与批量工具条
+  memberSelectedIds.forEach(id => { if (!appData.members.some(m => m.id === id)) memberSelectedIds.delete(id); });
+  const selectAllEl = document.getElementById('memberSelectAll');
+  if (selectAllEl) {
+    const visibleIds = filtered.map(m => m.id);
+    selectAllEl.checked = visibleIds.length > 0 && visibleIds.every(id => memberSelectedIds.has(id));
+  }
+  memberUpdateBatchToolbar();
+}
+
+// ==================== REQ-042：成员批量删除 ====================
+let memberSelectedIds = new Set();
+
+function memberToggleSelect(id, checked) {
+  if (checked) memberSelectedIds.add(id);
+  else memberSelectedIds.delete(id);
+  memberUpdateBatchToolbar();
+}
+
+function memberToggleSelectAll(checked) {
+  document.querySelectorAll('.member-row-checkbox').forEach(cb => {
+    cb.checked = checked;
+    if (checked) memberSelectedIds.add(cb.value);
+    else memberSelectedIds.delete(cb.value);
+  });
+  memberUpdateBatchToolbar();
+}
+
+function memberClearSelection() {
+  memberSelectedIds.clear();
+  memberUpdateBatchToolbar();
+  renderMembers();
+}
+
+function memberUpdateBatchToolbar() {
+  const toolbar = document.getElementById('memberBatchToolbar');
+  const countEl = document.getElementById('memberBatchCount');
+  if (!toolbar) return;
+  toolbar.style.display = memberSelectedIds.size > 0 ? 'flex' : 'none';
+  if (countEl) countEl.textContent = `已选择 ${memberSelectedIds.size} 人`;
+  const btn = document.getElementById('memberBatchDeleteBtn');
+  if (btn) btn.textContent = `批量删除（${memberSelectedIds.size}）`;
+}
+
+function memberBatchDelete() {
+  const members = appData.members.filter(m => memberSelectedIds.has(m.id));
+  if (!members.length) { showToast('未选择任何成员', 'warning'); return; }
+  // REQ-042（软删除）：与单个 deleteMember 同语义——status 置「离队」，不再真删行
+  openBatchDeleteModal({
+    title: `批量删除成员（${members.length}）`,
+    lines: members.map(m => `${m.name}（${m.class}）`),
+    warning: '成员将标记为「离队」（编辑成员可恢复），其历史考勤/装备记录将保留并标记为已离队',
+    onConfirm: async () => {
+      // 规范 1.2.2 批处理例外：并发写库，完成后统一 reload 一次 + 单次 render
+      // BUG-029（任务书 #12 补丁）：同活动批量删除，串行改并发 + reload 失败报错误
+      try {
+        const results = await Promise.allSettled(
+          members.map(m => window.CloudSync.saveCloudData('members', 'update', { ...m, status: '离队', id: m.id }))
+        );
+        const ok = results.filter(r => r.status === 'fulfilled').length;
+        const fail = results.length - ok;
+        results.forEach((r, i) => { if (r.status === 'rejected') console.error('批量删除成员失败:', members[i].id, r.reason); });
+        await window.CloudSync.reloadData('members');
+        saveData();
+        memberSelectedIds.clear();
+        closeModal('batchDeleteModal');
+        renderMembers();
+        if (fail) showToast(`删除完成：成功 ${ok} 人，失败 ${fail} 人`, 'warning');
+        else showToast(`已将 ${ok} 个成员标记为离队`, 'success');
+      } catch (e) {
+        console.error('批量删除成员后刷新失败:', e);
+        showToast('操作可能已提交，但刷新数据失败：' + (e.message || '请手动刷新页面'), 'error');
+      }
+    }
+  });
 }
 
 function getMemberAttendanceRate(memberId) {
@@ -1731,9 +1937,10 @@ async function saveMember() {
   if (!name) { showToast('请输入角色名', 'error'); memberSaving = false; if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = saveBtn.dataset.originalText || '保存'; } return; }
   if (!cls) { showToast('请选择职业', 'error'); memberSaving = false; if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = saveBtn.dataset.originalText || '保存'; } return; }
 
-  // REQ-002①：公会绑定单服务器，公会内角色名唯一（即服务器内唯一），编辑时排除自身
-  const nameDuplicate = appData.members.some(m => m.name === name && m.id !== editingMemberId);
-  if (nameDuplicate) { showToast(`公会内已存在同名角色「${name}」`, 'error'); memberSaving = false; if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = saveBtn.dataset.originalText || '保存'; } return; }
+  // REQ-002①：公会绑定单服务器，公会内角色名唯一（即服务器内唯一），编辑时排除自身。
+  // 软删除后查重只针对活跃成员；撞「离队」成员走下方恢复链路（DB 有 (guild_id,name) 唯一索引，无法新建同名行）
+  const nameClash = appData.members.find(m => m.name === name && m.id !== editingMemberId);
+  if (nameClash && nameClash.status !== '离队') { showToast(`公会内已存在同名角色「${name}」`, 'error'); memberSaving = false; if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = saveBtn.dataset.originalText || '保存'; } return; }
 
   const mainSpec = document.getElementById('memberMainSpec') ? document.getElementById('memberMainSpec').value : '';
   // 副专精从全局变量取（多选数组）
@@ -1753,6 +1960,35 @@ async function saveMember() {
     notes: document.getElementById('memberNotes').value.trim()
   };
 
+  // REQ-002（软删除）：新增时撞同名已离队成员 → 不判重、不新建，确认后恢复优先于新建
+  // （恢复 = status 改回「正式」，顺带更新本次输入的职业/专精/职责等字段，加入日期保留原值）
+  if (!editingMemberId && nameClash && nameClash.status === '离队') {
+    if (!confirm(`存在同名已离队成员「${name}」，是否恢复？\n确认后不新建成员，该成员将恢复为「正式」并更新为本次输入的职业/专精等信息。`)) {
+      memberSaving = false;
+      if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = saveBtn.dataset.originalText || '保存'; }
+      return;
+    }
+    try {
+      const payload = { ...nameClash, ...memberData, id: nameClash.id, status: '正式', join_date: nameClash.join_date || memberData.join_date };
+      await cloudCrud('members', 'update', payload, { renderFn: renderMembers });
+      closeModal('memberModal');
+      showToast('已恢复同名离队成员', 'success');
+    } catch (e) {
+      // 弹窗保持打开，便于用户重试
+    } finally {
+      memberSaving = false;
+      if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = saveBtn.dataset.originalText || '保存'; }
+    }
+    return;
+  }
+  // 编辑改名撞上已离队同名成员：唯一索引同样会拦，提前给出明确提示
+  if (editingMemberId && nameClash && nameClash.status === '离队') {
+    showToast(`已存在同名已离队成员「${name}」，请先恢复该成员或改用其他名字`, 'error');
+    memberSaving = false;
+    if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = saveBtn.dataset.originalText || '保存'; }
+    return;
+  }
+
   // V2.1 数据架构稳定修复：严格遵循 Save DB -> Load DB -> Update State -> Render
   try {
     const payload = { ...memberData, id: editingMemberId || undefined };
@@ -1768,18 +2004,34 @@ async function saveMember() {
   }
 }
 
+// REQ-042（软删除）：删除 = status 置「离队」，不再 DELETE 行
+// （activity_attendance.member_id 外键 ON DELETE CASCADE，真删会连带清空历史考勤）
 async function deleteMember(id) {
-  if (!confirm('确定要删除这个成员吗？相关考勤记录不会被删除。')) return;
+  if (!confirm('确定要删除这个成员吗？其状态将标记为「离队」，历史考勤/装备记录将保留并标记为已离队。')) return;
 
   const member = appData.members.find(m => m.id === id);
   if (!member) return;
 
   // 严格 DB-first
   try {
-    await cloudCrud('members', 'delete', { id: member.id }, { renderFn: renderMembers });
-    showToast('成员已删除', 'success');
+    await cloudCrud('members', 'update', { ...member, status: '离队', id: member.id }, { renderFn: renderMembers });
+    showToast('成员已标记为离队（编辑成员可改回正式）', 'success');
   } catch (e) {
     // 错误已在 cloudCrud 中提示
+  }
+}
+
+// BUG-031（任务书 #12 补丁）：离队成员操作列「恢复」按钮（复用 REQ-042 恢复链路：status 改回正式）
+async function restoreMember(id, btn) {
+  const member = appData.members.find(m => m.id === id);
+  if (!member) return;
+  if (btn) { btn.disabled = true; }
+  try {
+    await cloudCrud('members', 'update', { ...member, status: '正式', id: member.id }, { renderFn: renderMembers });
+    showToast(`已恢复 ${member.name} 为正式成员`, 'success');
+  } catch (e) {
+    // 错误已在 cloudCrud 中提示
+    if (btn) { btn.disabled = false; }
   }
 }
 
@@ -1837,7 +2089,8 @@ async function importParseWcl() {
     const players = data.players || [];
     if (!players.length) { showToast('该报告中未找到玩家名单', 'error'); return; }
     importWclTitle = data.title || '';
-    const existingNames = appData.members.map(m => m.name);
+    // REQ-002（软删除）：dup 判定只针对活跃成员；撞已离队成员不判重，确认导入时走恢复链路
+    const existingNames = appData.members.filter(m => m.status !== '离队').map(m => m.name);
     importPreviewRows = players.map(p => {
       const cls = wowClassEnToCn[(p.subType || '').toUpperCase()] || '';
       // 未识别职业按现有 bad 状态处理（预览页可人工修正）
@@ -1866,7 +2119,8 @@ function importParseRoster() {
   const text = document.getElementById('importMembersText').value;
   const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
   if (!lines.length) { showToast('请先粘贴名单', 'error'); return; }
-  const existingNames = appData.members.map(m => m.name);
+  // REQ-002（软删除）：dup 判定只针对活跃成员；撞已离队成员不判重，确认导入时走恢复链路
+  const existingNames = appData.members.filter(m => m.status !== '离队').map(m => m.name);
   importPreviewRows = lines.map(line => {
     const parsed = parseMemberRosterLine(line);
     if (!parsed) return { name: line, cls: '', include: false, status: 'bad' };
@@ -1924,13 +2178,34 @@ function importRemoveRow(i) {
 }
 
 // 规范 1.2.2 批处理例外：智能导入循环写入，完成后统一 reload 一次
+let importConfirming = false; // BUG-024：防重复点击
 async function importConfirmRoster() {
+  if (importConfirming) return;
   const picked = importPreviewRows.filter(r => r.include && r.name.trim() && r.cls);
   if (!picked.length) { showToast('没有可导入的成员（需勾选且名字、职业齐全）', 'error'); return; }
   const btn = document.getElementById('importConfirmBtn');
+  importConfirming = true;
   btn.disabled = true;
+  btn.dataset.originalText = btn.textContent;
+  btn.textContent = '导入中...';
   try {
+    // REQ-002（软删除）：撞已离队同名成员的行 → 不新建，逐一确认后恢复（恢复优先于新建；
+    // DB (guild_id,name) 唯一索引下放弃恢复也无法新建，故放弃即跳过该行）
+    const toAdd = [];
+    const toRestore = [];
     for (const r of picked) {
+      const departed = importSource === 'wcl'
+        ? findDepartedByNameWithServer(r.name.trim(), r.server || '')
+        : findDepartedByName(r.name.trim());
+      if (departed) {
+        if (confirm(`存在同名已离队成员「${departed.name}」，是否恢复？\n确认后不新建成员，该成员将恢复为「正式」并更新职业。`)) {
+          toRestore.push({ departed, cls: r.cls });
+        }
+        continue;
+      }
+      toAdd.push(r);
+    }
+    for (const r of toAdd) {
       await window.CloudSync.saveCloudData('members', 'add', {
         name: r.name.trim(),
         class: r.cls,
@@ -1944,22 +2219,42 @@ async function importConfirmRoster() {
         notes: ''
       });
     }
+    for (const t of toRestore) {
+      await window.CloudSync.saveCloudData('members', 'update', {
+        ...t.departed,
+        class: t.cls || t.departed.class, // 顺带更新本次输入的职业，其余字段保留原值
+        status: '正式',
+        id: t.departed.id
+      });
+    }
     await window.CloudSync.reloadData('members');
     saveData();
     closeModal('importMembersModal');
     renderMembers();
-    showToast(`成功导入 ${picked.length} 个成员（专精待补充）`, 'success');
+    const restoredMsg = toRestore.length ? `，恢复 ${toRestore.length} 个已离队成员` : '';
+    showToast(`成功导入 ${toAdd.length} 个成员（专精待补充）${restoredMsg}`, 'success');
+    // BUG-026（任务书 #12 补丁）：从 WCL 同步预览跳转过来的"添加为成员"，
+    // 导入成功后回标该行为「已添加」并回到同步预览弹窗，不阻塞后续考勤写入
+    if (typeof wclSyncRows !== 'undefined' && wclSyncRows.some(r => r._pendingAdd)) {
+      wclSyncRows.forEach(r => { if (r._pendingAdd) { r._pendingAdd = false; r.added = true; } });
+      if (wclSyncMeta) {
+        renderWclSyncPreview();
+        openModal('wclSyncModal');
+      }
+    }
   } catch (e) {
     console.error('成员智能导入失败:', e);
     showToast('导入失败：云端同步出错', 'error');
   } finally {
+    importConfirming = false;
     btn.disabled = false;
+    btn.textContent = btn.dataset.originalText || '确认导入';
   }
 }
 
 // ==================== 考勤记录 ====================
 function renderAttendance() {
-  if (attendanceView === 'calendar') {
+  if (getAttendanceView() === 'calendar') {
     renderCalendar();
   } else {
     renderActivityList();
@@ -1967,19 +2262,19 @@ function renderAttendance() {
 }
 
 function switchAttendanceView(view) {
-  attendanceView = view;
-  // REQ-011：记住用户上次选择
-  localStorage.setItem('wow_raid_attendance_view', view);
+  // REQ-011 + BUG-023：按「账号+公会」记住用户上次选择
+  localStorage.setItem(getAttendanceViewStorageKey(), view);
   syncAttendanceViewUI();
 }
 
-// REQ-011：按 attendanceView 同步 tab 高亮与视图容器显隐（页面初始化/切页时也要调）
+// REQ-011：按当前视图偏好同步 tab 高亮与视图容器显隐（页面初始化/切页时也要调）
 function syncAttendanceViewUI() {
+  const view = getAttendanceView();
   document.querySelectorAll('.view-tab').forEach((tab, i) => {
-    tab.classList.toggle('active', (attendanceView === 'calendar' && i === 0) || (attendanceView === 'list' && i === 1));
+    tab.classList.toggle('active', (view === 'calendar' && i === 0) || (view === 'list' && i === 1));
   });
-  document.getElementById('calendarView').style.display = attendanceView === 'calendar' ? 'block' : 'none';
-  document.getElementById('listView').style.display = attendanceView === 'list' ? 'block' : 'none';
+  document.getElementById('calendarView').style.display = view === 'calendar' ? 'block' : 'none';
+  document.getElementById('listView').style.display = view === 'list' ? 'block' : 'none';
   renderAttendance();
 }
 
@@ -2064,17 +2359,205 @@ function createActivityOnDate(dateStr) {
   document.getElementById('activityEndTime').value = '23:00';
   document.getElementById('activityNotes').value = '';
   document.getElementById('activityWclUrl').value = '';
+  document.getElementById('activityTeamTag').value = '';
+  renderRaidNameDatalist();
   updateActivityDuration();
+  updateActivityConflictWarning();
   openModal('activityModal');
+}
+
+// ==================== REQ-018：考勤筛选 ====================
+// 筛选状态存模块变量即可（不持久化）。
+// 「本赛季」口径：代码库无现成赛季定义（装备模块的 season 为自由文本，不适用），按最近 90 天处理。
+const ATT_FILTER_SEASON_DAYS = 90;
+const attFilter = { memberId: '', statuses: new Set(), range: 'all', from: '', to: '', includeCancelled: false };
+
+function attFilterChange() {
+  attFilter.memberId = document.getElementById('attFilterMember').value;
+  attFilter.statuses = new Set(Array.from(document.querySelectorAll('#attFilterStatuses input:checked')).map(cb => cb.value));
+  attFilter.range = document.getElementById('attFilterRange').value;
+  attFilter.from = document.getElementById('attFilterFrom').value;
+  attFilter.to = document.getElementById('attFilterTo').value;
+  attFilter.includeCancelled = document.getElementById('attFilterIncludeCancelled').checked;
+  const isCustom = attFilter.range === 'custom';
+  document.getElementById('attFilterFrom').style.display = isCustom ? '' : 'none';
+  document.getElementById('attFilterTo').style.display = isCustom ? '' : 'none';
+  renderActivityList();
+}
+
+function attFilterReset() {
+  document.getElementById('attFilterMember').value = '';
+  document.querySelectorAll('#attFilterStatuses input').forEach(cb => { cb.checked = false; });
+  document.getElementById('attFilterRange').value = 'all';
+  document.getElementById('attFilterFrom').value = '';
+  document.getElementById('attFilterTo').value = '';
+  document.getElementById('attFilterIncludeCancelled').checked = false;
+  attFilterChange();
+}
+
+function getAttFilteredActivities() {
+  let list = [...appData.activities];
+  // 含已取消开关：默认关，关掉时已取消活动不进列表
+  if (!attFilter.includeCancelled) list = list.filter(a => a.status !== 'cancelled');
+  // 时间范围
+  if (attFilter.range !== 'all') {
+    let from = null;
+    const to = attFilter.range === 'custom' ? (attFilter.to || null) : null;
+    if (attFilter.range === 'custom') {
+      from = attFilter.from || null;
+    } else {
+      const days = attFilter.range === 'season' ? ATT_FILTER_SEASON_DAYS : parseInt(attFilter.range, 10);
+      const cutoff = new Date();
+      cutoff.setDate(cutoff.getDate() - days);
+      from = formatDate(cutoff);
+    }
+    if (from) list = list.filter(a => a.date >= from);
+    if (to) list = list.filter(a => a.date <= to);
+  }
+  // 成员：该活动有此成员的考勤记录
+  if (attFilter.memberId) {
+    list = list.filter(a => (a.attendees || []).some(att => att.member_id === attFilter.memberId));
+  }
+  // 状态多选：选中具体成员时按其状态匹配；全部成员时任一成员状态命中即保留
+  if (attFilter.statuses.size > 0) {
+    list = list.filter(a => (a.attendees || []).some(att =>
+      (!attFilter.memberId || att.member_id === attFilter.memberId) && attFilter.statuses.has(att.status)));
+  }
+  return list;
+}
+
+// 出勤率小计：复用全站唯一算法源 getAttendanceStats，对筛选后的活动集聚合
+// （getAttendanceStats 内部跳过已取消活动，与全站统计口径一致）
+function attRenderFilterSubtotal(activities) {
+  const el = document.getElementById('attFilterSubtotal');
+  if (!el) return;
+  const targets = attFilter.memberId
+    ? appData.members.filter(m => m.id === attFilter.memberId)
+    : appData.members.filter(m => m.status !== '离队');
+  let present = 0, total = 0;
+  targets.forEach(m => {
+    const s = getAttendanceStats(m.id, activities);
+    present += s.present;
+    total += s.total;
+  });
+  const rate = total > 0 ? Math.round((present / total) * 100) : 0;
+  el.textContent = `小计：出勤率 ${rate}%（出勤 ${present}/应到 ${total}）`;
+}
+
+// ==================== REQ-017-B：活动批量删除 ====================
+let activitySelectedIds = new Set();
+
+function activityToggleSelect(id, checked) {
+  if (checked) activitySelectedIds.add(id);
+  else activitySelectedIds.delete(id);
+  activityUpdateBatchToolbar();
+}
+
+function activityClearSelection() {
+  activitySelectedIds.clear();
+  activityUpdateBatchToolbar();
+  renderActivityList();
+}
+
+function activityUpdateBatchToolbar() {
+  const toolbar = document.getElementById('activityBatchToolbar');
+  const countEl = document.getElementById('activityBatchCount');
+  if (!toolbar) return;
+  toolbar.style.display = activitySelectedIds.size > 0 ? 'flex' : 'none';
+  if (countEl) countEl.textContent = `已选择 ${activitySelectedIds.size} 个活动`;
+  const btn = document.getElementById('activityBatchDeleteBtn');
+  if (btn) btn.textContent = `批量删除（${activitySelectedIds.size}）`;
+}
+
+// ==================== 通用批量删除二次确认弹窗（REQ-017-B 活动 / REQ-042 成员共用） ====================
+let batchDeleteBusy = false;
+let batchDeleteOnConfirm = null;
+
+function openBatchDeleteModal({ title, lines, warning, onConfirm }) {
+  document.getElementById('batchDeleteTitle').textContent = title;
+  document.getElementById('batchDeleteList').innerHTML =
+    lines.map(l => `<div class="batch-delete-item">${l}</div>`).join('');
+  document.getElementById('batchDeleteWarning').textContent = warning;
+  batchDeleteOnConfirm = onConfirm;
+  const btn = document.getElementById('batchDeleteConfirmBtn');
+  btn.disabled = false;
+  btn.textContent = '确认删除';
+  openModal('batchDeleteModal');
+}
+
+async function confirmBatchDelete() {
+  if (batchDeleteBusy || !batchDeleteOnConfirm) return; // 防重复点击
+  batchDeleteBusy = true;
+  const btn = document.getElementById('batchDeleteConfirmBtn');
+  btn.disabled = true;
+  btn.textContent = '删除中...';
+  try {
+    await batchDeleteOnConfirm();
+  } finally {
+    batchDeleteBusy = false;
+    batchDeleteOnConfirm = null;
+    btn.disabled = false;
+    btn.textContent = '确认删除';
+  }
+}
+
+function activityBatchDelete() {
+  const acts = appData.activities.filter(a => activitySelectedIds.has(a.id));
+  if (!acts.length) { showToast('未选择任何活动', 'warning'); return; }
+  openBatchDeleteModal({
+    title: `批量删除活动（${acts.length}）`,
+    lines: [...acts].sort((a, b) => a.date.localeCompare(b.date))
+      .map(a => `${a.raid_name || '未命名活动'} — 📅 ${a.date}`),
+    warning: '⚠ 删除后不可恢复，活动的考勤记录将一并删除',
+    onConfirm: async () => {
+      // 规范 1.2.2 批处理例外：并发写库，完成后统一 reload 一次 + 单次 render
+      // （DB 外键 ON DELETE CASCADE 级联删考勤，无需显式删考勤）
+      // BUG-029（任务书 #12 补丁）：串行改并发——代理冷缓存下单个 DELETE 可达 2-4.6s，
+      // 串行 N 次等待过长；且 reloadData 失败时必须报错误而不是成功 toast
+      try {
+        const results = await Promise.allSettled(
+          acts.map(a => window.CloudSync.saveCloudData('activities', 'delete', { id: a.id }))
+        );
+        const ok = results.filter(r => r.status === 'fulfilled').length;
+        const fail = results.length - ok;
+        results.forEach((r, i) => { if (r.status === 'rejected') console.error('批量删除活动失败:', acts[i].id, r.reason); });
+        await window.CloudSync.reloadData('activities');
+        saveData();
+        activitySelectedIds.clear();
+        closeModal('batchDeleteModal');
+        renderAttendance();
+        if (fail) showToast(`删除完成：成功 ${ok} 个，失败 ${fail} 个`, 'warning');
+        else showToast(`已删除 ${ok} 个活动`, 'success');
+      } catch (e) {
+        console.error('批量删除活动后刷新失败:', e);
+        showToast('删除可能已提交，但刷新数据失败：' + (e.message || '请手动刷新页面'), 'error');
+      }
+    }
+  });
 }
 
 // 列表视图
 function renderActivityList() {
-  const activities = [...appData.activities].sort((a, b) => new Date(b.date) - new Date(a.date));
+  const activities = getAttFilteredActivities().sort((a, b) => new Date(b.date) - new Date(a.date));
   const container = document.getElementById('activityList');
-  
+
+  // REQ-018：成员下拉跟随成员名单刷新（保留当前选择；成员被删则回落"全部成员"）
+  const memberSel = document.getElementById('attFilterMember');
+  if (memberSel) {
+    const cur = memberSel.value;
+    memberSel.innerHTML = '<option value="">全部成员</option>' +
+      appData.members.filter(m => m.status !== '离队').map(m => `<option value="${m.id}">${m.name}</option>`).join('');
+    memberSel.value = cur;
+    if (memberSel.value !== cur) { attFilter.memberId = ''; }
+  }
+
   if (!activities.length) {
-    container.innerHTML = `<div class="empty-state"><div class="empty-icon">📅</div><div class="empty-text">暂无活动记录</div><button class="btn btn-primary" onclick="showActivityModal()">+ 创建第一个活动</button></div>`;
+    const hasAny = appData.activities.length > 0;
+    container.innerHTML = hasAny
+      ? `<div class="empty-state"><div class="empty-icon">🔍</div><div class="empty-text">无符合筛选条件的活动</div></div>`
+      : `<div class="empty-state"><div class="empty-icon">📅</div><div class="empty-text">暂无活动记录</div><button class="btn btn-primary" onclick="showActivityModal()">+ 创建第一个活动</button></div>`;
+    activityUpdateBatchToolbar();
+    attRenderFilterSubtotal(activities);
     return;
   }
   
@@ -2083,14 +2566,24 @@ function renderActivityList() {
     const absent = a.attendees.filter(att => att.status === '缺席').length;
     const total = appData.members.filter(m => m.status !== '离队').length;
     const rate = total > 0 ? Math.round((present / total) * 100) : 0;
-    
+    // REQ-020：已取消活动灰显 + 徽标
+    const isCancelled = a.status === 'cancelled';
+    // REQ-028：同标签同日时间交叉的活动黄色左边条 + ⚠（双向：本活动看别人与别人看自己规则相同）
+    const conflicts = findActivityConflicts(a, a.id);
+    const conflictTitle = conflicts.length
+      ? `时间冲突：${conflicts.map(c => `《${c.raid_name || '未命名活动'}》（${c.start_time || '--:--'}-${c.end_time || '--:--'}）`).join('、')}`
+      : '';
+
     return `
-      <div class="activity-item" onclick="openAttendanceDetail('${a.id}')">
+      <div class="activity-item${isCancelled ? ' activity-cancelled' : ''}${conflicts.length ? ' activity-conflict' : ''}"${conflictTitle ? ` title="${conflictTitle}"` : ''} onclick="openAttendanceDetail('${a.id}')">
+        <input type="checkbox" class="activity-select-checkbox" title="选择" ${activitySelectedIds.has(a.id) ? 'checked' : ''}
+               onclick="event.stopPropagation()" onchange="activityToggleSelect('${a.id}', this.checked)">
         <div class="activity-info">
-          <h4>${a.raid_name || '未命名活动'}</h4>
+          <h4>${conflicts.length ? '<span class="conflict-icon">⚠</span> ' : ''}${a.raid_name || '未命名活动'}${isCancelled ? ' <span class="badge badge-inactive">已取消</span>' : ''}</h4>
           <div class="activity-meta">
             <span>📅 ${a.date}</span>
             <span>⏰ ${a.start_time || '--:--'} - ${a.end_time || '--:--'}</span>
+            ${a.team_tag ? `<span>🏷 ${a.team_tag}</span>` : ''}
             <span>👥 ${a.attendees.length} 人登记</span>
             ${a.wcl_url ? `<a class="btn btn-sm" href="${a.wcl_url}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()" style="padding:2px 10px;font-size:12px">📊 WCL 复盘</a>` : ''}
           </div>
@@ -2112,6 +2605,11 @@ function renderActivityList() {
       </div>
     `;
   }).join('');
+
+  // REQ-017-B：剔除已不存在的选中项（如被他人删除），并同步工具条；REQ-018：刷新小计
+  activitySelectedIds.forEach(id => { if (!appData.activities.some(a => a.id === id)) activitySelectedIds.delete(id); });
+  activityUpdateBatchToolbar();
+  attRenderFilterSubtotal(activities);
 }
 
 function showActivityModal(activity = null) {
@@ -2124,7 +2622,11 @@ function showActivityModal(activity = null) {
   document.getElementById('activityNotes').value = activity ? activity.notes || '' : '';
   // REQ-014：回填 WCL 链接
   document.getElementById('activityWclUrl').value = activity ? (activity.wcl_url || '') : '';
+  // REQ-028：回填团队标签
+  document.getElementById('activityTeamTag').value = activity ? (activity.team_tag || '') : '';
+  renderRaidNameDatalist();
   updateActivityDuration();
+  updateActivityConflictWarning();
   openModal('activityModal');
 }
 
@@ -2195,9 +2697,12 @@ async function saveActivity() {
     end_time: document.getElementById('activityEndTime').value,
     notes: document.getElementById('activityNotes').value.trim(),
     wcl_url: wclParsed.url,
-    wcl_report_code: wclParsed.code
+    wcl_report_code: wclParsed.code,
+    // REQ-028：团队标签（trim；空串与 syncActivity 透传一致）
+    team_tag: document.getElementById('activityTeamTag').value.trim()
   };
-  
+  // REQ-028：时间冲突仅弹窗内黄色警告条提示（updateActivityConflictWarning 实时刷新），不阻断保存
+
   // 严格 DB-first
   try {
     // BUG-019：保存后把日历切到活动所在月份，保证新活动即时可见
@@ -2208,13 +2713,15 @@ async function saveActivity() {
       if (!activity) return;
       const payload = { ...activity, ...activityData, id: editingActivityId };
       await cloudCrud('activities', 'update', payload, { renderFn: renderAttendance });
+      rememberRecentRaidName(raidName); // REQ-029：真实写库成功才记最近使用
       showToast('活动已更新', 'success');
     } else {
       const attendees = appData.members.filter(m => m.status !== '离队').map(m => ({
         member_id: m.id, status: '缺席', notes: ''
       }));
-      const payload = { ...activityData, attendees };
+      const payload = { ...activityData, status: 'normal', attendees };
       await cloudCrud('activities', 'add', payload, { renderFn: renderAttendance });
+      rememberRecentRaidName(raidName); // REQ-029
       showToast('活动已创建', 'success');
     }
   } catch (e) {
@@ -2251,38 +2758,113 @@ function openAttendanceDetail(activityId) {
   if (wclSyncBtn) {
     wclSyncBtn.style.display = (activity.wcl_report_code || activity.wcl_url) ? '' : 'none';
   }
-  
+
+  // REQ-020：已取消活动——顶部横幅、取消/恢复按钮文案、状态标记控件禁用
+  const isCancelled = activity.status === 'cancelled';
+  const cancelledBanner = document.getElementById('attendanceCancelledBanner');
+  if (cancelledBanner) cancelledBanner.style.display = isCancelled ? '' : 'none';
+  const cancelBtn = document.getElementById('activityCancelBtn');
+  if (cancelBtn) cancelBtn.textContent = isCancelled ? '恢复活动' : '取消活动';
+  document.querySelectorAll('#attendanceBulkBar button').forEach(b => { b.disabled = isCancelled; });
+  // REQ-017-A：已取消活动时勾选批量条同样禁用（跟随上方批量四键的禁用逻辑）
+  document.querySelectorAll('#attendancePickBar button').forEach(b => { b.disabled = isCancelled; });
+  // REQ-017-A：每次打开详情清空勾选状态
+  attPickedIds.clear();
+
   renderAttendanceMembers(activity);
+  updateWclImportedBanner(activity); // REQ-037
   openModal('attendanceDetailModal');
 }
 
-function renderAttendanceMembers(activity) {
+// ==================== REQ-017-A：考勤区勾选批量标记 ====================
+// 只改 UI 状态（各行 status select 的值），保存仍走「保存考勤」按钮（saveAttendance 整表收集）
+let attPickedIds = new Set();
+
+function attPickToggle(memberId, checked) {
+  if (checked) attPickedIds.add(memberId);
+  else attPickedIds.delete(memberId);
+  attUpdatePickBar();
+}
+
+function attUpdatePickBar() {
+  const bar = document.getElementById('attendancePickBar');
+  const countEl = document.getElementById('attendancePickCount');
+  if (!bar) return;
+  bar.style.display = attPickedIds.size > 0 ? 'flex' : 'none';
+  if (countEl) countEl.textContent = `已选 ${attPickedIds.size} 人`;
+}
+
+// 批量标记：仅作用于勾选成员，与 setAllAttendance 同口径（select 值 + 出勤 checkbox 联动）
+function attPickMark(status) {
+  attPickedIds.forEach(memberId => {
+    const sel = document.querySelector(`.attend-status-select[data-member="${memberId}"]`);
+    if (!sel || sel.disabled) return;
+    sel.value = status;
+    const checkbox = document.querySelector(`.attend-checkbox[data-member="${memberId}"]`);
+    if (checkbox) checkbox.checked = status === '出席' || status === '替补' || status === '迟到';
+  });
+}
+
+function attPickClear() {
+  attPickedIds.clear();
+  document.querySelectorAll('.attend-pick-checkbox').forEach(cb => { cb.checked = false; });
+  attUpdatePickBar();
+}
+
+// ==================== REQ-037：WCL 已导入提示条 ====================
+// 显示条件：活动有 wcl_snapshot 且并非全员已标记；隐藏口径（与 REQ-033「已标记」一致）：
+// 全部非离队成员都有考勤行且状态非占位「缺席」。N 优先取快照 imported（新快照），旧快照回退为已标记人数。
+function updateWclImportedBanner(activity) {
+  const banner = document.getElementById('attendanceWclBanner');
+  if (!banner) return;
+  const snap = activity.wcl_snapshot;
+  if (!snap) { banner.style.display = 'none'; return; }
   const members = appData.members.filter(m => m.status !== '离队');
+  const marked = members.filter(m => {
+    const att = activity.attendees.find(a => a.member_id === m.id);
+    return att && att.status && att.status !== '缺席';
+  }).length;
+  if (members.length > 0 && marked >= members.length) { banner.style.display = 'none'; return; }
+  const n = (typeof snap.imported === 'number') ? snap.imported : marked;
+  banner.textContent = `已从 WCL 导入 ${n} 人考勤。日志以外的成员请手动标记（请假/替补），未标记的默认缺席。`;
+  banner.style.display = '';
+}
+
+function renderAttendanceMembers(activity) {
+  // REQ-042（软删除）：活跃成员全量展示；已离队成员若在该活动有考勤行（历史记录）也展示，
+  // 名字后加灰色「已离队」标记，状态仍可编辑（其考勤行随 saveAttendance 整表收集而保留）
+  const members = appData.members.filter(m =>
+    m.status !== '离队' || activity.attendees.some(a => a.member_id === m.id));
   const container = document.getElementById('attendanceMembersList');
-  
+  const isCancelled = activity.status === 'cancelled'; // REQ-020：已取消活动禁用状态标记控件
+
   container.innerHTML = members.map(m => {
     const attendee = activity.attendees.find(a => a.member_id === m.id);
     const status = attendee ? attendee.status : '缺席';
     const cls = classMap[m.class] || '';
     const checked = status === '出席' || status === '替补' || status === '迟到';
+    const departed = m.status === '离队';
     const mainSpec = m.main_spec || m.spec || '';
     const roles = m.role || [];
     const roleTagsHtml = roles.length > 0 ? roles.map(r => {
       const type = roleTypeMap[r] || 'dps';
       return `<span class="member-role-tag ${type}">${r}</span>`;
     }).join(' ') : '';
-    
+
     return `
-      <div class="attend-member-row">
-        <input type="checkbox" class="attend-checkbox" data-member="${m.id}" 
-               ${checked ? 'checked' : ''} 
+      <div class="attend-member-row${departed ? ' member-row-departed' : ''}">
+        <input type="checkbox" class="attend-pick-checkbox" data-member="${m.id}" title="选中以批量标记"
+               ${attPickedIds.has(m.id) ? 'checked' : ''} ${isCancelled ? 'disabled' : ''}
+               onchange="attPickToggle('${m.id}', this.checked)">
+        <input type="checkbox" class="attend-checkbox" data-member="${m.id}"
+               ${checked ? 'checked' : ''} ${isCancelled ? 'disabled' : ''}
                onchange="toggleAttendStatus(this, '${m.id}')">
         <div class="attend-name">
-          <span class="class-${cls}" style="font-weight:500">${m.name}</span>
+          <span class="class-${cls}" style="font-weight:500">${m.name}</span>${departed ? ' <span class="member-departed">（已离队）</span>' : ''}
           <span style="color:var(--text-muted);font-size:11px;margin-left:8px">${m.class}${mainSpec ? '·' + mainSpec : ''}</span>
           ${roleTagsHtml ? `<span style="margin-left:6px">${roleTagsHtml}</span>` : ''}
         </div>
-        <select class="attend-status-select" data-member="${m.id}" onchange="updateAttendCheckbox(this)">
+        <select class="attend-status-select" data-member="${m.id}" ${isCancelled ? 'disabled' : ''} onchange="updateAttendCheckbox(this)">
           <option value="出席" ${status === '出席' ? 'selected' : ''}>出席</option>
           <option value="缺席" ${status === '缺席' ? 'selected' : ''}>缺席</option>
           <option value="迟到" ${status === '迟到' ? 'selected' : ''}>迟到</option>
@@ -2292,6 +2874,42 @@ function renderAttendanceMembers(activity) {
       </div>
     `;
   }).join('');
+
+  // REQ-017-A：重绘后剔除已不在名单中的勾选（如 WCL 同步刷新），并同步批量条显隐
+  const renderedIds = new Set(members.map(m => m.id));
+  attPickedIds.forEach(id => { if (!renderedIds.has(id)) attPickedIds.delete(id); });
+  attUpdatePickBar();
+}
+
+// REQ-020：取消/恢复活动。仅改 activities.status，不删任何考勤记录；
+// 统计侧由 getAttendanceStats 过滤 cancelled，恢复正常即重新计入。
+let activityCancelling = false;
+async function toggleActivityCancelled() {
+  if (activityCancelling) return;
+  const activity = appData.activities.find(a => a.id === currentActivityId);
+  if (!activity) return;
+  const cancelling = activity.status !== 'cancelled';
+  activityCancelling = true;
+  const btn = document.getElementById('activityCancelBtn');
+  if (btn) { btn.disabled = true; btn.textContent = '处理中...'; }
+
+  // 严格 DB-first
+  try {
+    const payload = { ...activity, status: cancelling ? 'cancelled' : 'normal', id: activity.id };
+    await cloudCrud('activities', 'update', payload, { renderFn: renderAttendance });
+    showToast(cancelling ? '活动已取消，其考勤不再计入出勤率' : '活动已恢复正常', 'success');
+    // 刷新弹窗内状态（横幅 / 按钮文案 / 控件禁用）
+    openAttendanceDetail(currentActivityId);
+  } catch (e) {
+    console.error('活动状态变更失败:', e);
+  } finally {
+    activityCancelling = false;
+    if (btn) {
+      btn.disabled = false;
+      const cur = appData.activities.find(a => a.id === currentActivityId);
+      btn.textContent = cur && cur.status === 'cancelled' ? '恢复活动' : '取消活动';
+    }
+  }
 }
 
 function toggleAttendStatus(checkbox, memberId) {
@@ -2525,6 +3143,11 @@ function renderWclSyncPreview() {
     html += `<div class="wcl-sync-zone"><div class="wcl-sync-zone-title" style="color:var(--danger)">③ 未匹配（${unmatched.length}）</div>`;
     html += unmatched.map(r => {
       const i = wclSyncRows.indexOf(r);
+      // BUG-026：已成功添加为成员的行标「已添加」灰显，不再可操作
+      if (r.added) {
+        return rowShell(i, 'wcl-sync-unmatched', `<span style="color:var(--text-muted)">${r.name}</span>
+          <span style="color:var(--success);font-size:11px;margin-left:8px">✓ 已添加到成员管理</span>`);
+      }
       if (r.ignored) {
         return rowShell(i, 'wcl-sync-unmatched', `<span style="color:var(--text-muted);text-decoration:line-through">${r.name}</span>
           <span style="color:var(--text-muted);font-size:11px;margin-left:8px">已忽略</span>
@@ -2559,19 +3182,30 @@ function wclSyncIgnoreRow(i) {
 }
 
 // ③ 区"添加为成员"：预填进智能导入预览页（复用 REQ-032 预览/查重/入库全链路）
+// BUG-026（任务书 #12 补丁）：先关同步弹窗再开导入弹窗——两个 .modal-overlay 同 z-index
+// 按 DOM 序后者在上，wclSyncModal 在 importMembersModal 之后，不关闭会把导入弹窗完全压住，
+// 表现为"点击无任何反应"。导入成功后由 importConfirmRoster 回标 r.added 并重开同步预览。
 function wclSyncAddAsMember(i) {
   const r = wclSyncRows[i];
-  if (!r) return;
-  const existingNames = appData.members.map(m => m.name);
-  const dup = r.cls ? isDupMemberNameWithServer(r.name, r.server, existingNames) : false;
-  const status = !r.cls ? 'bad' : (dup ? 'dup' : 'ok');
-  importPreviewRows = [{ name: r.name, cls: r.cls, server: r.server, include: status === 'ok', status }];
-  importSource = 'wcl';
-  importWclTitle = wclSyncMeta ? wclSyncMeta.title : '';
-  document.getElementById('importTabPaste').classList.remove('active');
-  document.getElementById('importTabWcl').classList.add('active');
-  showImportPreviewStep();
-  openModal('importMembersModal');
+  if (!r || r.added || r._pendingAdd) return; // 防重复点击
+  try {
+    // REQ-002（软删除）：dup 判定只针对活跃成员；撞已离队成员不判重，确认导入时走恢复链路
+    const existingNames = appData.members.filter(m => m.status !== '离队').map(m => m.name);
+    const dup = r.cls ? isDupMemberNameWithServer(r.name, r.server, existingNames) : false;
+    const status = !r.cls ? 'bad' : (dup ? 'dup' : 'ok');
+    importPreviewRows = [{ name: r.name, cls: r.cls, server: r.server, include: status === 'ok', status }];
+    importSource = 'wcl';
+    importWclTitle = wclSyncMeta ? wclSyncMeta.title : '';
+    document.getElementById('importTabPaste').classList.remove('active');
+    document.getElementById('importTabWcl').classList.add('active');
+    showImportPreviewStep();
+    r._pendingAdd = true;
+    closeModal('wclSyncModal');
+    openModal('importMembersModal');
+  } catch (e) {
+    console.error('WCL 添加为成员失败:', e);
+    showToast('添加失败：' + (e.message || '未知错误'), 'error');
+  }
 }
 
 // 防重复提交标志
@@ -2586,9 +3220,11 @@ async function wclSyncConfirm() {
   const rows = wclSyncRows.filter(r => r.zone !== 'unmatched'); // ③ 未匹配角色一律不写考勤
   if (!rows.length) { showToast('没有可写入的考勤记录', 'error'); return; }
   const btn = document.getElementById('wclSyncConfirmBtn');
+  const writingHint = document.getElementById('wclSyncWritingHint');
   wclSyncWriting = true;
   btn.disabled = true;
   btn.textContent = '写入中...';
+  if (writingHint) writingHint.style.display = ''; // REQ-038：写入期间常驻提示
   try {
     const token = await window.CloudSync.getAccessToken();
     if (!token) throw new Error('未登录，请先登录');
@@ -2627,6 +3263,7 @@ async function wclSyncConfirm() {
           title: meta.title,
           synced_at: new Date().toISOString(),
           boss_fight_total: meta.bossFightTotal,
+          imported: added, // REQ-037：本次实际写入人数（提示条 N 的持久来源，刷新页面后仍准确）
           players: wclSyncRows.map(r => ({ name: r.name, server: r.server, subType: r.subType, bossFights: r.bossFights }))
         }
       }, { renderFn: renderAttendance });
@@ -2645,7 +3282,7 @@ async function wclSyncConfirm() {
     closeModal('wclSyncModal');
     // 考勤详情弹窗在下层仍开着，同步刷新成员状态列表
     const act = appData.activities.find(a => a.id === meta.activityId);
-    if (act) renderAttendanceMembers(act);
+    if (act) { renderAttendanceMembers(act); updateWclImportedBanner(act); } // REQ-037：刷新提示条
     if (snapshotOk) {
       showToast(`同步完成：新增 ${added} 条考勤，保留 ${kept} 条手动标记`, 'success');
     }
@@ -2656,12 +3293,12 @@ async function wclSyncConfirm() {
     wclSyncWriting = false;
     btn.disabled = false;
     btn.textContent = '确认写入考勤';
+    if (writingHint) writingHint.style.display = 'none'; // REQ-038：完成/失败后消失
   }
 }
 
 // WCL 导入
-function showWCLImportModal() {
-  document.getElementById('wclUrl').value = '';
+function showWCLImportModal() {  document.getElementById('wclUrl').value = '';
   document.getElementById('wclDate').value = formatDate(new Date());
   document.getElementById('wclRaidName').value = '';
   document.getElementById('wclPlayerList').value = '';
@@ -2873,8 +3510,8 @@ function drawLineChart() {
   
   ctx.clearRect(0, 0, w, h);
   
-  // 获取最近10次活动
-  const recent = [...appData.activities].sort((a, b) => new Date(a.date) - new Date(b.date)).slice(-10);
+  // 获取最近10次活动（REQ-020：已取消活动无真实出勤，不进出勤趋势图）
+  const recent = [...appData.activities].filter(a => a.status !== 'cancelled').sort((a, b) => new Date(a.date) - new Date(b.date)).slice(-10);
   
   if (!recent.length) {
     ctx.fillStyle = '#6e7681';
@@ -3403,6 +4040,14 @@ function lootRender() {
       : '-';
     // REQ-008："心愿"独立成列，非心愿装备显示 —
     const wishlistBadge = loot.is_wishlist ? '<span class="badge" style="background:#f0c060;color:#0d1117">心愿</span>' : '<span style="color:var(--text-muted)">—</span>';
+    // REQ-042（软删除）：assignedTo 为名字快照；按名字找到成员后看其 status，
+    // 离队（或软删除前的历史硬删，名字已找不到）→ 灰色「名字（已离队）」
+    const assignedMember = loot.assignedTo ? appData.members.find(m => m.name === loot.assignedTo) : null;
+    const assignedToHtml = !loot.assignedTo
+      ? '-'
+      : (assignedMember && assignedMember.status !== '离队')
+        ? loot.assignedTo
+        : `<span class="member-departed">${loot.assignedTo}（已离队）</span>`;
     
     return `
       <tr>
@@ -3414,7 +4059,7 @@ function lootRender() {
         <td>${loot.slot || ''}</td>
         <td>${loot.primaryStat || ''}</td>
         <td><div class="loot-secondary-stats">${secondaryStatsHtml || '-'}</div></td>
-        <td>${loot.assignedTo || '-'}</td>
+        <td>${assignedToHtml}</td>
         <td><span class="badge ${statusBadge}">${loot.status || '待分配'}</span></td>
         <td>${distMethodText}</td>
         <td>${rollText}</td>
@@ -4591,6 +5236,35 @@ function lootFillAssignedTo(name) {
 // ==================== 初始化 ====================
 // ==================== 更新日志 ====================
 const changelogData = [
+  {
+    id: 'v3.2.0-task11-12',
+    version: 'v3.2.0',
+    date: '2026-07-27',
+    type: 'feature',
+    typeLabel: '重大更新',
+    title: 'WCL 专项与考勤体验专项',
+    summary: 'WCL 战斗日志深度集成（链接导入名单、一键同步考勤），考勤筛选与批量操作上线，已结束活动考勤可随时补录修改。',
+    details: [
+      '—— 新增功能 ——',
+      '从 WCL 链接导入成员名单（智能导入新标签页，自动识别职业与服务器）',
+      '已挂 WCL 链接的活动可一键同步考勤（全勤/部分参战/未匹配三区预览，不覆盖手动标记）',
+      '考勤列表筛选：按成员、状态、时间范围（含本赛季）过滤，实时显示出勤率小计',
+      '考勤详情勾选多人后批量标记出席/缺席/替补/请假',
+      '活动列表与成员管理支持勾选后批量删除（二次确认、逐条列明）',
+      '成员删除改为软删除：单个/批量删除均为标记「离队」，历史考勤/装备记录全部保留',
+      '同名成员再次添加/导入时，可一键恢复已离队成员（恢复优先于新建）',
+      '—— 修复bug ——',
+      '修复智能导入确认按钮可重复点击导致重复导入',
+      '修复考勤视图偏好在刷新后丢失（按账号+公会记住列表/日历选择）',
+      '—— 功能优化 ——',
+      '活动可取消/恢复：取消后灰显且不计入出勤率，恢复即重新计入',
+      '活动团队标签同日时间交叉时黄色高亮预警；团本名称下拉记住最近使用',
+      'WCL 同步成功后常驻提示未标记成员，写入期间提示勿关闭页面',
+      '成员列表默认隐藏已离队成员（可开关显示），历史记录中已离队成员灰色标记',
+      '—— 模块调整 ——',
+      '出勤率统计全站过滤已取消活动（数据保留，仅统计口径调整）'
+    ]
+  },
   {
     id: 'v3.2.0',
     version: 'v3.2.0',

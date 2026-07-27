@@ -1,5 +1,5 @@
 // SEC-001 鉴权实证脚本：server.js 代理层公会级鉴权
-// 自建 4 个测试用户 + 2 个公会，覆盖任务书要求的全部越权场景（共 30 个断言），结束后自动清理。
+// 自建 4 个测试用户 + 2 个公会，覆盖任务书要求的全部越权场景（共 34 个断言），结束后自动清理。
 // 只读 .env，不打印密钥。用法: node scripts/verify-authz.js
 const fs = require('fs');
 const path = require('path');
@@ -134,6 +134,21 @@ async function wclApi(token, endpoint, body) {
     const actId = act.body[0].id;
     check('viewer PATCH 公会A 活动(按id) → 拒绝', await proxy(viewer.token, 'PATCH', 'activities', { notes: '越权' }, `?id=eq.${actId}`), 403);
     check('editor PATCH 公会A 活动(按id)', await proxy(editor.token, 'PATCH', 'activities', { notes: '正常' }, `?id=eq.${actId}`), 200);
+    // 6b. 任务书 #12 REQ-020：activities.status 白名单（normal/cancelled 放行，非法值 400）
+    // status 列由 sql/08 增量提供；未执行时合法值用例跳过（非法值用例在代理层拦截，不受影响）
+    const statusColProbe = await svcRest('GET', '/rest/v1/activities?select=status&limit=1');
+    if (statusColProbe.status === 400) {
+      console.log('- editor PATCH 活动 status=cancelled（合法）: 跳过（activities.status 列不存在，待运营执行 sql/08 后重跑）');
+    } else {
+      check('editor PATCH 活动 status=cancelled（合法）', await proxy(editor.token, 'PATCH', 'activities', { status: 'cancelled' }, `?id=eq.${actId}`), 200);
+    }
+    check('editor PATCH 活动 status=hacked（非法）→ 拒绝', await proxy(editor.token, 'PATCH', 'activities', { status: 'hacked' }, `?id=eq.${actId}`), 400);
+    // 6c. 任务书 #12 补丁 BUG-029 回归：删除后数据真实不存在（接口层断言）
+    const actDel = await svcRest('POST', '/rest/v1/activities', { guild_id: guildA, name: 'SEC待删活动', activity_date: '2026-07-26', raid: '测试', boss: '', notes: '', created_by: owner.uid });
+    const actDelId = actDel.body[0].id;
+    check('editor 删除活动 → 200', await proxy(editor.token, 'DELETE', 'activities', null, `?id=eq.${actDelId}`), 200);
+    const gone = await svcRest('GET', `/rest/v1/activities?id=eq.${actDelId}&select=id`);
+    check('删除后数据真实不存在', Array.isArray(gone.body) && gone.body.length === 0, true);
     // 7. activity_attendance 联查父表鉴权
     const rm = await svcRest('GET', `/rest/v1/raid_members?guild_id=eq.${guildA}&select=id&limit=1`);
     const raidMemberId = rm.body[0].id;

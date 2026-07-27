@@ -28,18 +28,19 @@
   async function initSupabase() {
     if (supabaseClient) return supabaseClient;
 
+    const t0 = performance.now(); // BUG-030（任务书 #12 补丁）：诊断埋点
     try {
       const resp = await fetch('/api/supabase-config');
       if (!resp.ok) throw new Error('无法获取 Supabase 配置');
       const config = await resp.json();
 
       if (!config.url || !config.anonKey) {
-        console.warn('Supabase 未配置，云端不可用');
+        console.warn('[diag] initSupabase FAIL: Supabase 未配置，云端不可用');
         return null;
       }
 
       if (typeof window.supabase === 'undefined') {
-        console.warn('Supabase SDK 未加载，云端不可用');
+        console.warn('[diag] initSupabase FAIL: Supabase SDK 未加载，云端不可用');
         return null;
       }
 
@@ -53,9 +54,10 @@
       });
 
       configLoaded = true;
+      console.debug(`[diag] initSupabase ok ${Math.round(performance.now() - t0)}ms`);
       return supabaseClient;
     } catch (e) {
-      console.warn('Supabase 初始化失败，云端不可用', e);
+      console.error('[diag] initSupabase FAIL:', e);
       return null;
     }
   }
@@ -162,10 +164,15 @@
   function setupAuthListener() {
     if (!supabaseClient) return;
 
-    supabaseClient.auth.onAuthStateChange(async (event, session) => {
+    // BUG-029/030（任务书 #12 补丁）：onAuthStateChange 回调触发期间 supabase-js 持有
+    // auth 锁，回调里直接 await 长链路（loadUserGuilds/selectGuild/loadCloudData）时，
+    // 并发的 getSession()（dbWrite 取 token）会被锁阻塞甚至卡死，造成写链路假性挂起。
+    // 官方建议：回调内不做 await，异步工作用 setTimeout 延后、先释放锁。
+    supabaseClient.auth.onAuthStateChange((event, session) => {
+      console.debug(`[diag] auth event: ${event}`);
       if (event === 'SIGNED_IN' && session) {
         currentUser = session.user;
-        await onUserSignedIn();
+        setTimeout(() => { onUserSignedIn(); }, 0);
       } else if (event === 'SIGNED_OUT') {
         currentUser = null;
         currentGuild = null;
@@ -470,121 +477,41 @@
 
     const guildId = currentGuild.id;
 
-    const [membersRes, activitiesRes, lootsRes, wishlistsRes] = await Promise.all([
-      supabaseClient.from('raid_members').select('*').eq('guild_id', guildId).order('created_at'),
-      supabaseClient.from('activities').select('*').eq('guild_id', guildId).order('activity_date', { ascending: false }),
-      supabaseClient.from('loot_records').select('*').eq('guild_id', guildId).order('obtained_date', { ascending: false }),
-      supabaseClient.from('wishlists').select('*').eq('guild_id', guildId),
-    ]);
-
-    if (membersRes.error) throw membersRes.error;
-    if (activitiesRes.error) throw activitiesRes.error;
-    if (lootsRes.error) throw lootsRes.error;
-    if (wishlistsRes.error) throw wishlistsRes.error;
-
-    // 加载每个活动的出勤记录
-    const activityIds = (activitiesRes.data || []).map(a => a.id);
-    let attendanceData = [];
-    if (activityIds.length > 0) {
-      const { data: attData, error: attError } = await supabaseClient
-        .from('activity_attendance')
-        .select('*')
-        .in('activity_id', activityIds);
-      if (attError) throw attError;
-      attendanceData = attData || [];
+    // BUG-030（任务书 #12 补丁）：旧实现是自写的一套映射（成员 status 恒为"正式"、
+    // 活动缺 status/team_tag/boss/wcl_snapshot 列），与 reloadData 的各表加载函数口径
+    // 不一致，每次登录/刷新后新列全部丢失。统一改走各表加载函数，单一映射口径。
+    // 逐表 try/catch 隔离：单表失败不再中断后续表，失败模块给页面可见横幅（禁止静默空白）。
+    const loaders = [
+      ['members', reloadMembers],
+      ['activities', reloadActivities],
+      ['loots', reloadLootRecords],
+      ['wishlists', reloadWishlists],
+    ];
+    const failed = [];
+    for (const [name, fn] of loaders) {
+      const t0 = performance.now();
+      try {
+        await fn(guildId);
+        console.debug(`[diag] loadCloudData ${name} ok ${Math.round(performance.now() - t0)}ms`);
+      } catch (e) {
+        failed.push(name);
+        console.error(`[diag] loadCloudData ${name} FAIL:`, e);
+      }
     }
-
-    // 转换为 appData 格式
-    const members = (membersRes.data || []).map(m => ({
-      id: m.id,
-      name: m.name,
-      class: m.class,
-      main_spec: m.spec,
-      off_spec: '',
-      off_specs: [],
-      role: [mapRoleFromDb(m.role)],
-      join_date: m.created_at ? m.created_at.split('T')[0] : '',
-      status: '正式',
-      notes: '',
-    }));
-
-    const activities = (activitiesRes.data || []).map(a => {
-      const att = attendanceData.filter(at => at.activity_id === a.id);
-      return {
-        id: a.id,
-        date: a.activity_date,
-        raid_name: a.raid,
-        start_time: a.start_time || '',
-        end_time: a.end_time || '',
-        wcl_url: a.wcl_url || '',
-        wcl_report_code: a.wcl_report_code || '',
-        attendees: att.map(at => ({
-          member_id: at.member_id,
-          status: mapStatusFromDb(at.status),
-          notes: '',
-        })),
-        notes: a.notes || '',
-      };
-    });
-
-    const loots = (lootsRes.data || []).map(l => {
-      const stats = l.item_stats || {};
-      return {
-        id: l.id,
-        name: l.item_name,
-        raid: l.raid_name || '',
-        difficulty: l.difficulty || '',
-        boss: l.boss_name || '',
-        category: l.item_category || stats.category || '',
-        slot: l.item_slot || '',
-        primaryStat: stats.primaryStat || '',
-        secondaryStats: stats.secondaryStats || [],
-        specialEffect: stats.specialEffect || '',
-        assignedTo: stats.assignedTo || '',
-        status: stats.status || '待分配',
-        priority: stats.priority || 'P2',
-        date: l.obtained_date || '',
-        note: l.note || '',
-        distribution_method: l.distribution_method || 'custom',
-        player_action: l.player_action || 'none',
-        roll_value: l.roll_value || null,
-        is_wishlist: l.is_wishlist || false,
-        rule_note: l.rule_note || '',
-        decision_note: l.decision_note || '',
-        season: l.season || '',
-        character_id: l.character_id || null,
-        assigned_by: l.assigned_by || null,
-        item_level: l.item_level || 0,
-      };
-    });
-
-    // 将数据库按 member 分组的 wishlist 格式展开为前端扁平数组
-    const wishlist = [];
-    (wishlistsRes.data || []).forEach(w => {
-      const memberItems = w.items || [];
-      memberItems.forEach(item => {
-        wishlist.push({
-          ...item,
-          memberId: item.memberId || w.member_id,
-          id: item.id || (typeof genId === 'function' ? genId() : Date.now().toString(36) + Math.random().toString(36).substr(2, 9)),
-        });
-      });
-    });
-
-    // 更新全局 appData
-    if (typeof window.appData !== 'undefined') {
-      window.appData.members = members;
-      window.appData.activities = activities;
-      window.appData.loots = loots;
-      window.appData.wishlist = wishlist;
-    }
-
     saveLocalCache();
+    if (failed.length && typeof window.showLoadFailureBanner === 'function') {
+      window.showLoadFailureBanner(failed);
+    }
   }
 
   // ---- 重新加载指定模块数据（写成功后回读数据库最新状态） ----
   async function reloadData(dataType) {
-    if (!supabaseClient || !currentGuild) return;
+    // BUG-029（任务书 #12 补丁）：原来是静默 return——会话/公会上下文在写流程中途
+    // 丢失（auth 事件竞态）时 reload 变 no-op，调用方照常 toast 成功但界面是旧数据
+    // （假成功）。改为明确抛错，让调用方走失败提示（规范：禁止静默失败）。
+    if (!supabaseClient || !currentGuild) {
+      throw new Error('云端连接未就绪（会话或公会上下文丢失），请刷新页面重试');
+    }
     const guildId = currentGuild.id;
     const perfT0 = performance.now(); // 任务书 #10：分表计时
 
@@ -749,6 +676,11 @@
       end_time: a.end_time || '',
       wcl_url: a.wcl_url || '',
       wcl_report_code: a.wcl_report_code || '',
+      // REQ-020/028（任务书 #12）：活动状态（normal/cancelled）与团队标签
+      status: a.status || 'normal',
+      team_tag: a.team_tag || '',
+      // REQ-037（任务书 #12）：WCL 同步快照（已导入提示条的数据来源，刷新后仍需可读）
+      wcl_snapshot: a.wcl_snapshot || null,
       attendees: attendanceMap[a.id] || []
     }));
 
@@ -759,7 +691,10 @@
 
   // ---- 保存数据到云端 ----
   async function saveCloudData(dataType, operation, item, extra) {
-    if (!supabaseClient || !currentGuild) return;
+    // BUG-029（任务书 #12 补丁）：同 reloadData，静默 return 会造成假成功，改为明确抛错
+    if (!supabaseClient || !currentGuild) {
+      throw new Error('云端连接未就绪（会话或公会上下文丢失），请刷新页面重试');
+    }
 
     const guildId = currentGuild.id;
 
@@ -850,6 +785,10 @@
           wcl_report_code: item.wcl_report_code || '',
           // REQ-033（任务书 #11）：WCL 同步考勤后写参战名单快照；未传时不触碰该列
           ...(item.wcl_snapshot !== undefined ? { wcl_snapshot: item.wcl_snapshot } : {}),
+          // REQ-020/028（任务书 #12）：status/team_tag 条件透传（同 wcl_snapshot 模式）；
+          // 新增时默认 normal，编辑未传时不触碰该列
+          ...(item.status !== undefined ? { status: item.status } : (operation === 'add' ? { status: 'normal' } : {})),
+          ...(item.team_tag !== undefined ? { team_tag: item.team_tag || '' } : {}),
           created_by: currentUser ? currentUser.id : null,
         };
 
@@ -1500,6 +1439,8 @@
     showAppView: showAppView,
     isCloudMode: () => isCloudMode,
     getCurrentGuild: () => currentGuild,
+    // BUG-023（任务书 #12）：同步读取当前用户（localStorage 视图偏好 key 需 userId，渲染链路是同步的）
+    getCachedUser: () => currentUser,
     getCurrentMembership: () => currentMembership,
     getUserGuilds: () => userGuilds,
     getWowServers: getWowServers,

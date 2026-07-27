@@ -151,6 +151,12 @@
 
   <!-- 主内容区 -->
   <main class="main-content" id="mainContent">
+    <!-- BUG-030（任务书 #12 补丁）：数据模块加载失败的可见提示（禁止静默空白） -->
+    <div id="loadFailureBanner" class="load-failure-banner" style="display:none">
+      <span id="loadFailureText"></span>
+      <button class="btn btn-sm btn-primary" onclick="location.reload()">刷新重试</button>
+      <button class="btn btn-sm" onclick="document.getElementById('loadFailureBanner').style.display='none'">知道了</button>
+    </div>
     <!-- 顶部栏 -->
     <header class="topbar">
       <div class="topbar-left">
@@ -236,16 +242,24 @@
                   <span class="role-filter-tag heal">治疗</span>
                 </label>
               </div>
+              <label class="att-filter-toggle"><input type="checkbox" id="memberShowDeparted" onchange="memberToggleShowDeparted(this.checked)">显示已离队</label>
             </div>
             <div class="toolbar-right">
               <button class="btn edit-only" onclick="showImportMembersModal()">📋 智能导入</button>
               <button class="btn btn-primary edit-only" onclick="showMemberModal()">+ 添加成员</button>
             </div>
           </div>
+          <!-- REQ-042：成员批量删除工具条（edit-only，勾选 ≥1 人时出现） -->
+          <div id="memberBatchToolbar" class="batch-toolbar edit-only" style="display:none">
+            <span class="batch-toolbar-count" id="memberBatchCount">已选择 0 人</span>
+            <button class="btn btn-danger btn-sm" id="memberBatchDeleteBtn" onclick="memberBatchDelete()">批量删除</button>
+            <button class="btn btn-sm" onclick="memberClearSelection()">取消选择</button>
+          </div>
           <div class="table-container">
             <table class="data-table">
               <thead>
                 <tr>
+                  <th style="width:36px"><input type="checkbox" id="memberSelectAll" class="edit-only" onchange="memberToggleSelectAll(this.checked)" title="全选"></th>
                   <th style="width:50px">#</th>
                   <th>角色名</th>
                   <th>职业</th>
@@ -309,6 +323,36 @@
 
           <!-- 列表视图 -->
           <div id="listView">
+            <!-- REQ-018：考勤筛选条（实时作用于列表 + 出勤率小计；状态不持久化） -->
+            <div class="att-filter-bar" id="attFilterBar">
+              <select class="form-select" id="attFilterMember" onchange="attFilterChange()">
+                <option value="">全部成员</option>
+              </select>
+              <div class="att-filter-statuses" id="attFilterStatuses">
+                <label><input type="checkbox" value="出席" onchange="attFilterChange()">出席</label>
+                <label><input type="checkbox" value="缺席" onchange="attFilterChange()">缺席</label>
+                <label><input type="checkbox" value="请假" onchange="attFilterChange()">请假</label>
+                <label><input type="checkbox" value="替补" onchange="attFilterChange()">替补</label>
+              </div>
+              <select class="form-select" id="attFilterRange" onchange="attFilterChange()">
+                <option value="all">全部时间</option>
+                <option value="7">近7天</option>
+                <option value="30">近30天</option>
+                <option value="season">本赛季</option>
+                <option value="custom">自定义</option>
+              </select>
+              <input type="date" class="form-input" id="attFilterFrom" style="display:none" onchange="attFilterChange()">
+              <input type="date" class="form-input" id="attFilterTo" style="display:none" onchange="attFilterChange()">
+              <label class="att-filter-toggle"><input type="checkbox" id="attFilterIncludeCancelled" onchange="attFilterChange()">含已取消</label>
+              <span class="att-filter-subtotal" id="attFilterSubtotal"></span>
+              <button class="btn btn-sm" onclick="attFilterReset()" title="清空全部筛选条件">重置筛选</button>
+            </div>
+            <!-- REQ-017-B：活动批量删除工具条（edit-only，勾选 ≥1 个活动时出现） -->
+            <div id="activityBatchToolbar" class="batch-toolbar edit-only" style="display:none">
+              <span class="batch-toolbar-count" id="activityBatchCount">已选择 0 个活动</span>
+              <button class="btn btn-danger btn-sm" id="activityBatchDeleteBtn" onclick="activityBatchDelete()">批量删除</button>
+              <button class="btn btn-sm" onclick="activityClearSelection()">取消选择</button>
+            </div>
             <div class="activity-list" id="activityList"></div>
           </div>
         </div>
@@ -740,25 +784,34 @@
       <div class="form-row">
         <div class="form-group">
           <label class="form-label">日期 *</label>
-          <input type="date" class="form-input" id="activityDate">
+          <input type="date" class="form-input" id="activityDate" onchange="updateActivityConflictWarning()">
         </div>
         <div class="form-group">
           <label class="form-label">团本名称 *</label>
-          <input type="text" class="form-input" id="activityRaidName" placeholder="如：尼鲁巴尔王宫">
+          <!-- REQ-029：datalist 建议（最近使用置顶），仍可手输兜底 -->
+          <input type="text" class="form-input" id="activityRaidName" list="raidNameOptions" placeholder="如：尼鲁巴尔王宫" autocomplete="off">
+          <datalist id="raidNameOptions"></datalist>
         </div>
       </div>
       <div class="form-row">
         <div class="form-group">
           <label class="form-label">开始时间</label>
-          <input type="time" class="form-input" id="activityStartTime" value="20:00" oninput="updateActivityDuration()">
+          <input type="time" class="form-input" id="activityStartTime" value="20:00" oninput="updateActivityDuration();updateActivityConflictWarning()">
         </div>
         <div class="form-group">
           <label class="form-label">结束时间</label>
-          <input type="time" class="form-input" id="activityEndTime" value="23:00" oninput="updateActivityDuration()">
+          <input type="time" class="form-input" id="activityEndTime" value="23:00" oninput="updateActivityDuration();updateActivityConflictWarning()">
         </div>
       </div>
       <!-- REQ-012：活动时长实时显示 -->
       <div id="activityDuration" style="font-size:12px;color:var(--text-muted);margin:-8px 0 12px 2px"></div>
+      <!-- REQ-028：团队标签（可选，空为默认团），冲突检测按标签分组 -->
+      <div class="form-group">
+        <label class="form-label">团队标签<span style="color:var(--text-muted);font-weight:400">（可选）</span></label>
+        <input type="text" class="form-input" id="activityTeamTag" placeholder="如 1 团 / 2 团，留空则为默认团" oninput="updateActivityConflictWarning()">
+      </div>
+      <!-- REQ-028：时间冲突黄色警告条（仅提示，不阻断保存） -->
+      <div id="activityConflictWarning" class="activity-conflict-warning" style="display:none"></div>
       <div class="form-group">
         <label class="form-label">备注</label>
         <textarea class="form-textarea" id="activityNotes" style="height:60px" placeholder="可选"></textarea>
@@ -787,16 +840,32 @@
       <div class="modal-close" onclick="closeModal('attendanceDetailModal')">×</div>
     </div>
     <div class="modal-body">
-      <div class="edit-only" style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+      <!-- REQ-020：已取消活动横幅（考勤保留但不计入出勤率，状态标记控件禁用） -->
+      <div id="attendanceCancelledBanner" class="attendance-cancelled-banner" style="display:none">⚠ 活动已取消：考勤记录保留，但不再计入出勤率统计</div>
+      <!-- REQ-037：WCL 同步成功后的常驻提示条（全部成员均已标记后自动消失） -->
+      <div id="attendanceWclBanner" class="attendance-wcl-banner" style="display:none"></div>
+      <div class="edit-only" id="attendanceBulkBar" style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
         <button class="btn btn-sm" onclick="setAllAttendance('出席')">全部出席</button>
         <button class="btn btn-sm" onclick="setAllAttendance('缺席')">全部缺席</button>
         <button class="btn btn-sm" onclick="setAllAttendance('替补')">全部替补</button>
         <button class="btn btn-sm" onclick="setAllAttendance('请假')">全部请假</button>
       </div>
+      <!-- REQ-017-A：勾选批量标记条（勾选 ≥1 人时出现，仅作用于勾选成员） -->
+      <div class="edit-only att-pick-bar" id="attendancePickBar" style="display:none">
+        <span class="batch-toolbar-count" id="attendancePickCount">已选 0 人</span>
+        <span style="color:var(--text-muted);font-size:12px">标记为</span>
+        <button class="btn btn-sm" onclick="attPickMark('出席')">出席</button>
+        <button class="btn btn-sm" onclick="attPickMark('缺席')">缺席</button>
+        <button class="btn btn-sm" onclick="attPickMark('替补')">替补</button>
+        <button class="btn btn-sm" onclick="attPickMark('请假')">请假</button>
+        <button class="btn btn-sm" onclick="attPickClear()">取消选择</button>
+      </div>
       <div class="attendance-members" id="attendanceMembersList"></div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-danger btn-sm edit-only" id="activityDeleteBtn" onclick="deleteCurrentActivity()" style="margin-right:auto">删除活动</button>
+      <!-- REQ-020：取消/恢复活动（owner/editor 可见），按当前状态显示其一 -->
+      <button class="btn btn-sm edit-only" id="activityCancelBtn" onclick="toggleActivityCancelled()">取消活动</button>
       <!-- REQ-014：已挂 WCL 链接的活动显示复盘入口（全体成员可见），新标签页打开 -->
       <a id="attendanceWclBtn" class="btn btn-sm" href="#" target="_blank" rel="noopener noreferrer" style="display:none">📊 WCL 复盘</a>
       <!-- REQ-033：已挂 WCL 链接的活动显示同步考勤入口（owner/editor 可见） -->
@@ -822,8 +891,28 @@
       <div id="wclSyncPreviewList" style="max-height:380px;overflow-y:auto"></div>
     </div>
     <div class="modal-footer">
+      <!-- REQ-038：写入期间常驻提示（完成后消失） -->
+      <span id="wclSyncWritingHint" style="display:none;margin-right:auto;font-size:12px;color:var(--warning)">⏳ 数据写入需要几秒，请勿关闭页面</span>
       <button class="btn" onclick="requestCloseModal('wclSyncModal')">取消</button>
       <button class="btn btn-primary" id="wclSyncConfirmBtn" onclick="wclSyncConfirm()">确认写入考勤</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 弹窗：批量删除二次确认（REQ-017-B 活动 / REQ-042 成员共用，纯确认类不登记防误关） ===== -->
+<div class="modal-overlay" id="batchDeleteModal">
+  <div class="modal" style="max-width:480px">
+    <div class="modal-header">
+      <div class="modal-title" id="batchDeleteTitle">批量删除确认</div>
+      <div class="modal-close" onclick="closeModal('batchDeleteModal')">×</div>
+    </div>
+    <div class="modal-body">
+      <div class="batch-delete-list" id="batchDeleteList"></div>
+      <div class="batch-delete-warning" id="batchDeleteWarning">⚠ 删除后不可恢复</div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('batchDeleteModal')">取消</button>
+      <button class="btn btn-danger" id="batchDeleteConfirmBtn" onclick="confirmBatchDelete()">确认删除</button>
     </div>
   </div>
 </div>
