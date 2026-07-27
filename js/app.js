@@ -90,6 +90,16 @@ function isDupMemberName(pastedName, existingNames) {
     n.startsWith(pastedName + '-') || pastedName.startsWith(n + '-'));
 }
 
+// REQ-032：带 server 维度的同服唯一查重（REQ-002）。库中名为"名字-服务器"形态时，
+// 仅当服务器一致才算重复（跨服同名按 WCL server 归属，不视为重复）；裸名相同仍算重复。
+function isDupMemberNameWithServer(name, server, existingNames) {
+  return existingNames.some(n => {
+    if (n === name) return true;
+    if (n.startsWith(name + '-')) return !server || n === name + '-' + server;
+    return false;
+  });
+}
+
 // 职业-专精映射
 const classSpecMap = {
   '战士': ['防护', '武器', '狂怒'],
@@ -1290,6 +1300,8 @@ function isModalFormDirty(modalId) {
 // 各弹窗"有未保存内容"判定；未登记的弹窗遮罩点击/ESC 直接关闭（维持现状）
 const modalDirtyChecks = {
   importMembersModal: () => isModalFormDirty('importMembersModal') || importPreviewRows.length > 0,
+  // REQ-033：同步预览弹窗内改过状态/忽略过角色即视为有未确认数据
+  wclSyncModal: () => wclSyncDirty || isModalFormDirty('wclSyncModal'),
   memberModal: () => isModalFormDirty('memberModal'),
   activityModal: () => isModalFormDirty('activityModal'),
   lootModal: () => isModalFormDirty('lootModal'),
@@ -1772,17 +1784,75 @@ async function deleteMember(id) {
 }
 
 // REQ-023：智能导入预览行 {name, cls, include, status: 'ok'|'dup'|'bad'}
+// REQ-032：WCL 来源的行额外带 server 字段（参与同服唯一查重，REQ-002）
 let importPreviewRows = [];
+// REQ-032：当前导入来源（'paste' 粘贴名单 / 'wcl' WCL 链接），WCL 来源时记录报告标题
+let importSource = 'paste';
+let importWclTitle = '';
 
 function showImportMembersModal() {
   document.getElementById('importMembersText').value = '';
+  document.getElementById('importWclUrl').value = '';
   importPreviewRows = [];
-  document.getElementById('importPasteStep').style.display = '';
+  importWclTitle = '';
+  switchImportTab('paste');
+  openModal('importMembersModal');
+}
+
+// REQ-032：切换"粘贴名单 / 从 WCL 链接导入"标签页（在预览页点标签 = 退出预览回到该步）
+function switchImportTab(tab) {
+  importSource = tab;
+  document.getElementById('importTabPaste').classList.toggle('active', tab === 'paste');
+  document.getElementById('importTabWcl').classList.toggle('active', tab === 'wcl');
+  document.getElementById('importPasteStep').style.display = tab === 'paste' ? '' : 'none';
+  document.getElementById('importWclStep').style.display = tab === 'wcl' ? '' : 'none';
   document.getElementById('importPreviewStep').style.display = 'none';
-  document.getElementById('importParseBtn').style.display = '';
+  document.getElementById('importParseBtn').style.display = tab === 'paste' ? '' : 'none';
   document.getElementById('importConfirmBtn').style.display = 'none';
   document.getElementById('importBackBtn').style.display = 'none';
-  openModal('importMembersModal');
+}
+
+// 进入预览确认步（粘贴解析与 WCL 解析共用）
+function showImportPreviewStep() {
+  document.getElementById('importPasteStep').style.display = 'none';
+  document.getElementById('importWclStep').style.display = 'none';
+  document.getElementById('importPreviewStep').style.display = '';
+  document.getElementById('importParseBtn').style.display = 'none';
+  document.getElementById('importConfirmBtn').style.display = '';
+  document.getElementById('importBackBtn').style.display = '';
+  renderImportPreview();
+}
+
+// REQ-032：解析 WCL 报告链接 → 玩家列表转预览行 → 复用现有预览确认全链路
+async function importParseWcl() {
+  const parsed = parseWclUrl(document.getElementById('importWclUrl').value);
+  if (!parsed || !parsed.code) { showToast('WCL 链接格式不正确，请输入 warcraftlogs.com 的报告链接', 'error'); return; }
+  const guild = window.CloudSync.getCurrentGuild();
+  if (!guild) { showToast('请先选择公会', 'error'); return; }
+  const btn = document.getElementById('importWclParseBtn');
+  btn.disabled = true;
+  btn.textContent = '解析中...';
+  try {
+    const data = await wclApiPost('/api/wcl/report-summary', { reportCode: parsed.code, guildId: guild.id });
+    const players = data.players || [];
+    if (!players.length) { showToast('该报告中未找到玩家名单', 'error'); return; }
+    importWclTitle = data.title || '';
+    const existingNames = appData.members.map(m => m.name);
+    importPreviewRows = players.map(p => {
+      const cls = wowClassEnToCn[(p.subType || '').toUpperCase()] || '';
+      // 未识别职业按现有 bad 状态处理（预览页可人工修正）
+      const dup = cls ? isDupMemberNameWithServer(p.name, p.server || '', existingNames) : false;
+      const status = !cls ? 'bad' : (dup ? 'dup' : 'ok');
+      return { name: p.name, cls, server: p.server || '', include: status === 'ok', status };
+    });
+    showImportPreviewStep();
+  } catch (e) {
+    console.error('WCL 名单解析失败:', e);
+    showToast(e.message || 'WCL 报告解析失败', 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '解析';
+  }
 }
 
 function copyImportMacro(elementId) {
@@ -1804,26 +1874,26 @@ function importParseRoster() {
     const status = !parsed.cls ? 'bad' : (dup ? 'dup' : 'ok');
     return { name: parsed.name, cls: parsed.cls, include: status === 'ok', status };
   });
-  document.getElementById('importPasteStep').style.display = 'none';
-  document.getElementById('importPreviewStep').style.display = '';
-  document.getElementById('importParseBtn').style.display = 'none';
-  document.getElementById('importConfirmBtn').style.display = '';
-  document.getElementById('importBackBtn').style.display = '';
-  renderImportPreview();
+  showImportPreviewStep();
 }
 
 function importBackToPaste() {
-  document.getElementById('importPasteStep').style.display = '';
-  document.getElementById('importPreviewStep').style.display = 'none';
-  document.getElementById('importParseBtn').style.display = '';
-  document.getElementById('importConfirmBtn').style.display = 'none';
-  document.getElementById('importBackBtn').style.display = 'none';
+  // REQ-032：按来源返回对应步（粘贴名单 / WCL 链接）
+  switchImportTab(importSource);
 }
 
 function renderImportPreview() {
   const classOptions = sel => '<option value="">（选职业）</option>' +
     Object.keys(classMap).map(c => `<option value="${c}" ${sel === c ? 'selected' : ''}>${c}</option>`).join('');
   const statusText = { ok: '新成员', dup: '已存在', bad: '需修正' };
+  // REQ-032：WCL 来源时在预览步顶部注明报告标题
+  const srcEl = document.getElementById('importPreviewSource');
+  if (importSource === 'wcl' && importWclTitle) {
+    srcEl.textContent = `来自 WCL 报告：${importWclTitle}`;
+    srcEl.style.display = '';
+  } else {
+    srcEl.style.display = 'none';
+  }
   document.getElementById('importPreviewBody').innerHTML = importPreviewRows.map((r, i) => {
     const color = r.status === 'bad' ? 'var(--danger)' : (r.status === 'dup' ? 'var(--warning)' : '');
     const nameCell = r.status === 'bad'
@@ -1833,6 +1903,7 @@ function renderImportPreview() {
       <td><input type="checkbox" ${r.include ? 'checked' : ''} onchange="importUpdateRow(${i},'include',this.checked)"></td>
       <td>${nameCell}</td>
       <td><select class="form-select" style="height:28px;padding:2px 6px" onchange="importUpdateRow(${i},'cls',this.value)">${classOptions(r.cls)}</select></td>
+      <td style="font-size:12px">${r.server || '—'}</td>
       <td>待补充</td>
       <td>${statusText[r.status]}</td>
       <td><button type="button" class="btn btn-sm btn-danger" onclick="importRemoveRow(${i})">剔除</button></td>
@@ -2174,6 +2245,12 @@ function openAttendanceDetail(activityId) {
       wclBtn.style.display = 'none';
     }
   }
+
+  // REQ-033：已挂 WCL 链接（report_code 或 url）的活动显示"从 WCL 同步考勤"（edit-only，viewer 隐藏）
+  const wclSyncBtn = document.getElementById('attendanceWclSyncBtn');
+  if (wclSyncBtn) {
+    wclSyncBtn.style.display = (activity.wcl_report_code || activity.wcl_url) ? '' : 'none';
+  }
   
   renderAttendanceMembers(activity);
   openModal('attendanceDetailModal');
@@ -2302,6 +2379,284 @@ async function deleteCurrentActivity() {
     if (delBtn) { delBtn.disabled = false; delBtn.textContent = delBtn.dataset.originalText || '删除活动'; }
   }
   closeModal('attendanceDetailModal');
+}
+
+// ==================== REQ-033：WCL 同步考勤（任务书 #11） ====================
+
+// 调 server.js 的 WCL 代理端点（与 cloud.js 代理写同一途径取 JWT；后端中文 message 直接透出）
+async function wclApiPost(path, body) {
+  const token = await window.CloudSync.getAccessToken();
+  if (!token) throw new Error('未登录，请先登录');
+  const resp = await fetch(path, {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  });
+  let data = null;
+  try { data = await resp.json(); } catch { data = null; }
+  if (!resp.ok) throw new Error((data && data.message) || `WCL 请求失败 (${resp.status})`);
+  return data;
+}
+
+// activity_attendance 直写 server.js 代理（与 cloud.js syncActivity 内批量插入同一途径）
+async function wclAttendanceWrite(method, body, query, token) {
+  const resp = await fetch('/api/db/rest/v1/activity_attendance' + (query ? `?${query}` : ''), {
+    method,
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
+      'Prefer': 'return=representation',
+    },
+    body: JSON.stringify(body)
+  });
+  if (!resp.ok) {
+    const text = await resp.text();
+    let msg = text;
+    try { msg = JSON.parse(text).message || text; } catch { /* 保留原文 */ }
+    throw new Error(msg);
+  }
+}
+
+// 考勤状态中文 → DB 英文（与 cloud.js mapStatusToDb 同口径）
+const wclAttStatusToDb = { '出席': 'present', '缺席': 'absent', '迟到': 'late', '替补': 'backup', '请假': 'leave' };
+
+// 同步预览行：{name, server, subType, cls, bossFights, zone:'full'|'partial'|'unmatched', memberId, status, ignored}
+let wclSyncRows = [];
+let wclSyncMeta = null; // { activityId, reportCode, title, bossFightTotal, preservedCount }
+let wclSyncDirty = false; // 弹窗防误关：忽略过角色即视为有未确认数据（状态改动由 isModalFormDirty 捕获）
+let wclSyncing = false;
+
+async function syncAttendanceFromWcl() {
+  if (wclSyncing) return; // 防重复点击
+  const activity = appData.activities.find(a => a.id === currentActivityId);
+  if (!activity) return;
+  // reportCode 优先取活动的 wcl_report_code，fallback 从 wcl_url 正则提取
+  const reportCode = activity.wcl_report_code || ((parseWclUrl(activity.wcl_url) || {}).code);
+  if (!reportCode) { showToast('该活动的 WCL 链接缺少报告编号，请编辑活动重新保存链接', 'error'); return; }
+  const guild = window.CloudSync.getCurrentGuild();
+  if (!guild) { showToast('请先选择公会', 'error'); return; }
+  const btn = document.getElementById('attendanceWclSyncBtn');
+  wclSyncing = true;
+  if (btn) { btn.disabled = true; btn.textContent = '同步中...'; }
+  try {
+    const data = await wclApiPost('/api/wcl/report-summary', { reportCode, guildId: guild.id });
+    buildWclSyncPreview(activity, reportCode, data);
+    openModal('wclSyncModal');
+  } catch (e) {
+    console.error('WCL 同步考勤失败:', e);
+    showToast(e.message || 'WCL 报告解析失败', 'error');
+  } finally {
+    wclSyncing = false;
+    if (btn) { btn.disabled = false; btn.textContent = '🔄 从 WCL 同步考勤'; }
+  }
+}
+
+// 与成员管理名单对照，构建三分区预览数据
+function buildWclSyncPreview(activity, reportCode, data) {
+  const bossFightTotal = data.bossFightTotal || 0;
+  // "已手动标记"口径：创建活动时会给全员预置"缺席"占位行（saveActivity），
+  // 真正手动标过的状态（出席/迟到/替补/请假）一律不动、计入保留数
+  const preservedCount = activity.attendees.filter(a => a.status && a.status !== '缺席').length;
+  const members = appData.members.filter(m => m.status !== '离队');
+  wclSyncRows = (data.players || []).map(p => {
+    const cls = wowClassEnToCn[(p.subType || '').toUpperCase()] || '';
+    const base = {
+      name: p.name, server: p.server || '', subType: p.subType || '', cls,
+      bossFights: p.bossFights || 0, memberId: null, status: '出席', ignored: false
+    };
+    // 按角色名逐一精确匹配，同一人多个号各算各的，不做合并
+    const member = members.find(m => m.name === p.name);
+    if (!member) return { ...base, zone: 'unmatched' };
+    // 已手动标记（非占位"缺席"）的成员不进预览，同步一律不动
+    const att = activity.attendees.find(a => a.member_id === member.id);
+    if (att && att.status && att.status !== '缺席') return null;
+    return { ...base, memberId: member.id, zone: base.bossFights >= bossFightTotal ? 'full' : 'partial' };
+  }).filter(Boolean);
+  wclSyncMeta = { activityId: activity.id, reportCode, title: data.title || '', bossFightTotal, preservedCount };
+  wclSyncDirty = false;
+  renderWclSyncPreview();
+}
+
+function renderWclSyncPreview() {
+  const meta = wclSyncMeta;
+  if (!meta) return;
+  const full = wclSyncRows.filter(r => r.zone === 'full');
+  const partial = wclSyncRows.filter(r => r.zone === 'partial');
+  const unmatched = wclSyncRows.filter(r => r.zone === 'unmatched');
+  document.getElementById('wclSyncSubtitle').textContent = meta.title ? `📊 ${meta.title}（BOSS 战共 ${meta.bossFightTotal} 场）` : '';
+  document.getElementById('wclSyncStats').innerHTML =
+    `自动出席 <strong style="color:var(--success)">${full.length}</strong> · ` +
+    `部分参战 <strong style="color:var(--warning)">${partial.length}</strong> · ` +
+    `未匹配 <strong style="color:var(--danger)">${unmatched.filter(r => !r.ignored).length}</strong>` +
+    (meta.preservedCount > 0 ? `　|　<strong>${meta.preservedCount}</strong> 条已手动标记，将被保留` : '');
+
+  const statusSelect = (r, i, opts) =>
+    `<select class="form-select" id="wclSyncStatus${i}" style="height:26px;padding:2px 6px;width:76px" onchange="wclSyncSetStatus(${i},this.value)">` +
+    opts.map(o => `<option value="${o}" ${r.status === o ? 'selected' : ''}>${o}</option>`).join('') + '</select>';
+  const rowShell = (i, cls, inner) =>
+    `<div class="wcl-sync-row ${cls}">${inner}</div>`;
+  const nameHtml = r =>
+    `<span style="font-weight:500">${r.name}</span>` +
+    `<span style="color:var(--text-muted);font-size:11px;margin-left:8px">${r.cls || r.subType || '未知职业'}${r.server ? ' · ' + r.server : ''}</span>`;
+
+  let html = '';
+  // ① 自动出席（绿）：同名且参战场次 = BOSS 总场次，默认出席，可改替补/缺席
+  if (full.length) {
+    html += `<div class="wcl-sync-zone"><div class="wcl-sync-zone-title" style="color:var(--success)">① 自动出席（${full.length}）</div>`;
+    html += full.map(r => {
+      const i = wclSyncRows.indexOf(r);
+      return rowShell(i, 'wcl-sync-full', `${nameHtml(r)}
+        <span style="color:var(--text-muted);font-size:11px;margin-left:8px">参战 ${r.bossFights}/${meta.bossFightTotal} 场</span>
+        <span style="margin-left:auto">${statusSelect(r, i, ['出席', '替补', '缺席'])}</span>`);
+    }).join('') + '</div>';
+  }
+  // ② 部分参战（黄）：同名但参战场次 < BOSS 总场次，默认出席，可改替补
+  if (partial.length) {
+    html += `<div class="wcl-sync-zone"><div class="wcl-sync-zone-title" style="color:var(--warning)">② 部分参战（${partial.length}）</div>`;
+    html += partial.map(r => {
+      const i = wclSyncRows.indexOf(r);
+      return rowShell(i, 'wcl-sync-partial', `${nameHtml(r)}
+        <span style="color:var(--warning);font-size:11px;margin-left:8px">仅参加 ${r.bossFights}/${meta.bossFightTotal} 场 BOSS 战，可改为替补</span>
+        <span style="margin-left:auto">${statusSelect(r, i, ['出席', '替补'])}</span>`);
+    }).join('') + '</div>';
+  }
+  // ③ 未匹配（红）：log 有、成员管理没有，不写入考勤；可添加为成员 / 忽略
+  if (unmatched.length) {
+    html += `<div class="wcl-sync-zone"><div class="wcl-sync-zone-title" style="color:var(--danger)">③ 未匹配（${unmatched.length}）</div>`;
+    html += unmatched.map(r => {
+      const i = wclSyncRows.indexOf(r);
+      if (r.ignored) {
+        return rowShell(i, 'wcl-sync-unmatched', `<span style="color:var(--text-muted);text-decoration:line-through">${r.name}</span>
+          <span style="color:var(--text-muted);font-size:11px;margin-left:8px">已忽略</span>
+          <span style="margin-left:auto"><button type="button" class="btn btn-sm" onclick="wclSyncIgnoreRow(${i})">恢复</button></span>`);
+      }
+      return rowShell(i, 'wcl-sync-unmatched', `${nameHtml(r)}
+        <span style="color:var(--danger);font-size:11px;margin-left:8px">该角色不在成员管理名单中</span>
+        <span style="margin-left:auto;display:flex;gap:6px">
+          <button type="button" class="btn btn-sm btn-primary" onclick="wclSyncAddAsMember(${i})">添加为成员</button>
+          <button type="button" class="btn btn-sm" onclick="wclSyncIgnoreRow(${i})">忽略</button>
+        </span>`);
+    }).join('') + '</div>';
+  }
+  if (!html) {
+    html = '<div style="color:var(--text-muted);font-size:13px;padding:12px 0">没有需要同步的考勤（成员管理中的角色均已手动标记，或报告中无匹配角色）。</div>';
+  }
+  document.getElementById('wclSyncPreviewList').innerHTML = html;
+}
+
+function wclSyncSetStatus(i, value) {
+  const r = wclSyncRows[i];
+  if (!r) return;
+  r.status = value; // 脏标记由 isModalFormDirty（select 带 id）捕获
+}
+
+function wclSyncIgnoreRow(i) {
+  const r = wclSyncRows[i];
+  if (!r) return;
+  r.ignored = !r.ignored;
+  wclSyncDirty = true;
+  renderWclSyncPreview();
+}
+
+// ③ 区"添加为成员"：预填进智能导入预览页（复用 REQ-032 预览/查重/入库全链路）
+function wclSyncAddAsMember(i) {
+  const r = wclSyncRows[i];
+  if (!r) return;
+  const existingNames = appData.members.map(m => m.name);
+  const dup = r.cls ? isDupMemberNameWithServer(r.name, r.server, existingNames) : false;
+  const status = !r.cls ? 'bad' : (dup ? 'dup' : 'ok');
+  importPreviewRows = [{ name: r.name, cls: r.cls, server: r.server, include: status === 'ok', status }];
+  importSource = 'wcl';
+  importWclTitle = wclSyncMeta ? wclSyncMeta.title : '';
+  document.getElementById('importTabPaste').classList.remove('active');
+  document.getElementById('importTabWcl').classList.add('active');
+  showImportPreviewStep();
+  openModal('importMembersModal');
+}
+
+// 防重复提交标志
+let wclSyncWriting = false;
+
+async function wclSyncConfirm() {
+  if (wclSyncWriting) return;
+  const meta = wclSyncMeta;
+  if (!meta) return;
+  const activity = appData.activities.find(a => a.id === meta.activityId);
+  if (!activity) { showToast('活动不存在，请刷新后重试', 'error'); return; }
+  const rows = wclSyncRows.filter(r => r.zone !== 'unmatched'); // ③ 未匹配角色一律不写考勤
+  if (!rows.length) { showToast('没有可写入的考勤记录', 'error'); return; }
+  const btn = document.getElementById('wclSyncConfirmBtn');
+  wclSyncWriting = true;
+  btn.disabled = true;
+  btn.textContent = '写入中...';
+  try {
+    const token = await window.CloudSync.getAccessToken();
+    if (!token) throw new Error('未登录，请先登录');
+    let added = 0, kept = 0;
+    // 规范 1.2.2 批处理例外：循环写入 activity_attendance（代理），完成后统一 reload 一次
+    for (const r of rows) {
+      // 幂等：写前再查已有考勤，已手动标记（非占位"缺席"）的一律不动；重复点同步不产生重复记录
+      const att = activity.attendees.find(a => a.member_id === r.memberId);
+      if (att && att.status && att.status !== '缺席') { kept++; continue; }
+      const dbStatus = wclAttStatusToDb[r.status] || 'present';
+      if (att) {
+        // 占位"缺席"行 → 更新为同步状态
+        await wclAttendanceWrite('PATCH', { status: dbStatus }, `activity_id=eq.${meta.activityId}&member_id=eq.${r.memberId}`, token);
+      } else {
+        await wclAttendanceWrite('POST', { activity_id: meta.activityId, member_id: r.memberId, status: dbStatus }, '', token);
+      }
+      added++;
+    }
+
+    // 写入成功后把参战名单快照存入 activities.wcl_snapshot（JSONB，WCL 免费日志约 2 年过期，快照保永久）
+    // 走 cloudCrud 更新活动；payload 不带 attendees，syncActivity 不会整表重写考勤
+    let snapshotOk = true;
+    try {
+      await cloudCrud('activities', 'update', {
+        id: activity.id,
+        date: activity.date,
+        raid_name: activity.raid_name,
+        start_time: activity.start_time,
+        end_time: activity.end_time,
+        notes: activity.notes || '',
+        boss: activity.boss || '',
+        wcl_url: activity.wcl_url || '',
+        wcl_report_code: activity.wcl_report_code || '',
+        wcl_snapshot: {
+          report_code: meta.reportCode,
+          title: meta.title,
+          synced_at: new Date().toISOString(),
+          boss_fight_total: meta.bossFightTotal,
+          players: wclSyncRows.map(r => ({ name: r.name, server: r.server, subType: r.subType, bossFights: r.bossFights }))
+        }
+      }, { renderFn: renderAttendance });
+    } catch (e) {
+      snapshotOk = false;
+      if (/wcl_snapshot|column/i.test((e && e.message) || '')) {
+        showToast('考勤已写入，但快照保存失败：请先在数据库执行 sql/07 增量（activities 表加 wcl_snapshot 列）', 'error');
+      }
+      // 快照失败不影响已写入的考勤，手动 reload 一次保证界面是最新
+      await window.CloudSync.reloadData('activities');
+      saveData();
+      renderAttendance();
+    }
+
+    wclSyncDirty = false;
+    closeModal('wclSyncModal');
+    // 考勤详情弹窗在下层仍开着，同步刷新成员状态列表
+    const act = appData.activities.find(a => a.id === meta.activityId);
+    if (act) renderAttendanceMembers(act);
+    if (snapshotOk) {
+      showToast(`同步完成：新增 ${added} 条考勤，保留 ${kept} 条手动标记`, 'success');
+    }
+  } catch (e) {
+    console.error('WCL 同步考勤写入失败:', e);
+    showToast('同步失败：' + (e.message || '云端同步出错'), 'error');
+  } finally {
+    wclSyncWriting = false;
+    btn.disabled = false;
+    btn.textContent = '确认写入考勤';
+  }
 }
 
 // WCL 导入

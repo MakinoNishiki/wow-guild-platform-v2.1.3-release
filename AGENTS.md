@@ -28,7 +28,7 @@ WoW 团本考勤管理系统，暗色史诗奇幻风格（WoW 主题），基于
 │       └── 更新日志
 ├── server.js           # Node.js 静态文件服务器 + /api/supabase-config + /api/db 写入代理（含公会级鉴权）
 ├── scripts/
-│   └── verify-authz.js # SEC-001 代理鉴权回归脚本（26 场景，自建测试用户/公会后自清理）
+│   └── verify-authz.js # SEC-001 代理鉴权回归脚本（30 场景，自建测试用户/公会后自清理）
 ├── DESIGN.md           # 设计规范
 └── AGENTS.md           # 项目说明
 ```
@@ -38,8 +38,8 @@ WoW 团本考勤管理系统，暗色史诗奇幻风格（WoW 主题），基于
 2. **公会系统** - 创建公会、邀请码加入、公会切换
 3. **权限管理** - 三级权限（owner/editor/viewer）、成员角色变更、公会设置、公会资料（REQ-025：简介/分配制度/规则说明，仅 owner 可编辑）
 4. **仪表盘**（page:dashboard） - 出勤率统计、排行、活动概览
-5. **成员管理**（page:members） - 13个职业、专精/职责联动、职责列（按专精推导）、出勤详情、智能导入（REQ-023：双宏教程、多格式解析+时间戳清洗、名字/名字-服务器双形态查重、预览确认，专精占位"待补充"）
-6. **考勤记录**（page:attendance） - 默认列表视图/日历视图（记住选择）、活动CRUD、BOSS选择、WCL 日志链接（REQ-014）
+5. **成员管理**（page:members） - 13个职业、专精/职责联动、职责列（按专精推导）、出勤详情、智能导入（REQ-023：双宏教程、多格式解析+时间戳清洗、名字/名字-服务器双形态查重、预览确认，专精占位"待补充"；REQ-032：「从 WCL 链接导入」标签页，复用同一预览确认链路，subType→中文职业映射、server 参与同服查重）
+6. **考勤记录**（page:attendance） - 默认列表视图/日历视图（记住选择）、活动CRUD、BOSS选择、WCL 日志链接（REQ-014）、WCL 同步考勤（REQ-033：已挂 WCL 链接的活动可一键同步，预览三分区——全勤绿/部分参战黄默认出席/未匹配红，不覆盖手动标记，幂等，成功后写 activities.wcl_snapshot 快照）
 7. **装备分配**（page:loot） - 103件装备库、多维筛选、心愿独立列、Roll 点循环输入（1-100）、分配记录
 8. **心愿单**（page:wishlist） - 按成员管理、竞争概览
 9. **统计报表**（page:reports） - 出勤率图表、角色分布
@@ -51,7 +51,7 @@ WoW 团本考勤管理系统，暗色史诗奇幻风格（WoW 主题），基于
 - `guilds` - 公会（name, owner_id, invite_code, description, loot_rule_type, loot_rule_text）
 - `guild_members` - 公会成员权限（user_id, guild_id, role: owner/editor/viewer）
 - `raid_members` - WoW 角色成员（guild_id, name, class, spec, role）
-- `activities` - 考勤活动（guild_id, name, activity_date, raid, boss）
+- `activities` - 考勤活动（guild_id, name, activity_date, raid, boss, wcl_url, wcl_report_code, wcl_snapshot）
 - `activity_attendance` - 出勤记录（activity_id, member_id, status）
 - `loots` - 装备分配（guild_id, item_name, member_id, boss, raid）
 - `wishlists` - 心愿单（guild_id, member_id, items JSONB）
@@ -72,6 +72,15 @@ WoW 团本考勤管理系统，暗色史诗奇幻风格（WoW 主题），基于
   - RPC 代理仅放行白名单函数（当前仅 `get_unread_notification_count`）
 - 批量导入/清空属规范 1.2.2 批处理例外：循环 saveCloudData 后统一 reload 一次
 - 读操作优先从云端加载，失败时回退到 localStorage 缓存
+
+### WCL 集成（任务书 #11，REQ-032/033）
+- 凭证：`WCL_CLIENT_ID` / `WCL_CLIENT_SECRET` 仅存服务端环境变量（.env），前端 js/ 禁止出现
+- 端点（server.js，JWT + 公会角色鉴权，owner/editor 可用，viewer 403）：
+  - `POST /api/wcl/report-summary` `{ reportCode, guildId }` → 标题/时间/Boss 战场次/玩家列表（name/server/subType/参战场次），reportCode 支持完整 URL 或纯 code
+  - `POST /api/wcl/attendance-snapshot` `{ reportCode, activityId, guildId }` → 同上 + 已存快照状态
+- token 管理：进程内缓存 access_token，提前 60s 刷新；**报告数据本身不缓存**（用户可能刚传完 log 就要同步）
+- 速率限制：WCL V2 GraphQL 免费档 3600 points/小时，单次同步远低于额度；错误中文透传（429 超限 / 504 超时 10s / 502 报告不存在或私有或服务暂不可用）
+- 回归脚本：`scripts/verify-wcl-api.js`（API 连通性）、`scripts/verify-wcl-endpoints.js`（端点端到端冒烟，需传入 WCL 凭证环境变量）
 
 ## 关键数据
 - 4个团本（12.0）：虚影尖塔、梦境裂隙、进军奎尔丹纳斯、孢陨幽境

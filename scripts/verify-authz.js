@@ -1,5 +1,5 @@
 // SEC-001 鉴权实证脚本：server.js 代理层公会级鉴权
-// 自建 4 个测试用户 + 2 个公会，覆盖任务书要求的全部越权场景，结束后自动清理。
+// 自建 4 个测试用户 + 2 个公会，覆盖任务书要求的全部越权场景（共 30 个断言），结束后自动清理。
 // 只读 .env，不打印密钥。用法: node scripts/verify-authz.js
 const fs = require('fs');
 const path = require('path');
@@ -65,6 +65,19 @@ async function proxy(token, method, table, body, query) {
       Prefer: 'return=representation',
     },
     body: body ? JSON.stringify(body) : undefined,
+  });
+  return res.status;
+}
+
+// 任务书 #11：WCL 端点（鉴权失败路径不接触 WCL API，无需真实 reportCode / WCL 凭证）
+async function wclApi(token, endpoint, body) {
+  const res = await fetch(`http://127.0.0.1:${TEST_PORT}/api/wcl/${endpoint}`, {
+    method: 'POST',
+    headers: {
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body || {}),
   });
   return res.status;
 }
@@ -153,7 +166,12 @@ async function proxy(token, method, table, body, query) {
       method: 'POST', headers: { Authorization: `Bearer ${owner.token}`, 'Content-Type': 'application/json' }, body: '{}',
     });
     check('RPC 非白名单函数 → 拒绝', rpcNo.status, 403);
-    // 13. viewer 删除自己的成员行（退出公会）→ 允许（放在最后，删完即清理）
+    // 13. 任务书 #11 WCL 端点鉴权（鉴权失败在调 WCL API 之前，假 reportCode 即可）
+    check('viewer 调 WCL report-summary → 拒绝', await wclApi(viewer.token, 'report-summary', { reportCode: 'fakeCode1234', guildId: guildA }), 403);
+    check('viewer 调 WCL attendance-snapshot → 拒绝', await wclApi(viewer.token, 'attendance-snapshot', { reportCode: 'fakeCode1234', activityId: actId, guildId: guildA }), 403);
+    check('无 JWT 调 WCL report-summary → 拒绝', await wclApi(null, 'report-summary', { reportCode: 'fakeCode1234', guildId: guildA }), 401);
+    check('非本公会成员调 WCL report-summary → 拒绝', await wclApi(outsider.token, 'report-summary', { reportCode: 'fakeCode1234', guildId: guildA }), 403);
+    // 14. viewer 删除自己的成员行（退出公会）→ 允许（放在最后，删完即清理）
     check('viewer 删除自己的成员行（退出公会）', await proxy(viewer.token, 'DELETE', 'guild_members', null, `?id=eq.${viewerMembershipId}`), 200);
   } finally {
     srv.kill();

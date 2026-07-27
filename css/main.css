@@ -1343,6 +1343,37 @@ body {
 .attend-member-row:last-child { border-bottom: none; }
 .attend-member-row:hover { background: var(--bg-tertiary); }
 
+/* REQ-033：WCL 同步考勤预览三分区（绿=自动出席 / 黄=部分参战 / 红=未匹配） */
+.wcl-sync-zone {
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  margin-bottom: 12px;
+  overflow: hidden;
+}
+
+.wcl-sync-zone-title {
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  background: var(--bg-tertiary);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.wcl-sync-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border-color);
+  font-size: 13px;
+}
+
+.wcl-sync-row:last-child { border-bottom: none; }
+.wcl-sync-row.wcl-sync-full { border-left: 3px solid var(--success); }
+.wcl-sync-row.wcl-sync-partial { border-left: 3px solid var(--warning); }
+.wcl-sync-row.wcl-sync-unmatched { border-left: 3px solid var(--danger); }
+
 .attend-checkbox {
   width: 18px;
   height: 18px;

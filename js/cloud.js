@@ -848,6 +848,8 @@
           end_time: item.end_time || '',
           wcl_url: item.wcl_url || '',
           wcl_report_code: item.wcl_report_code || '',
+          // REQ-033（任务书 #11）：WCL 同步考勤后写参战名单快照；未传时不触碰该列
+          ...(item.wcl_snapshot !== undefined ? { wcl_snapshot: item.wcl_snapshot } : {}),
           created_by: currentUser ? currentUser.id : null,
         };
 
@@ -1503,6 +1505,8 @@
     getWowServers: getWowServers,
     getAllWowServers: getAllWowServers,
     dbQuery: dbQuery,
+    // REQ-032/033（任务书 #11）：前端调 /api/wcl/* 端点需复用同一途径取用户 JWT
+    getAccessToken: getAccessToken,
     // 用户中心
     getUserProfile: getUserProfile,
     saveUserProfile: saveUserProfile,

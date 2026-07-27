@@ -473,6 +473,224 @@ async function authorizeProxyRequest(user, table, method, queryString, rawBody) 
   return deny("不允许代理访问该表");
 }
 
+// ==================== 任务书 #11 WCL 集成 ====================
+// 两个端点（/api/wcl/report-summary、/api/wcl/attendance-snapshot）共用：
+// JWT 验证 → 公会角色鉴权（owner/editor，viewer/非成员 403）→ 解析 reportCode → 调 WCL GraphQL。
+// 安全纪律：鉴权全部通过后才读取 WCL 凭证 / 调用 WCL API；报告数据不缓存，仅缓存 token。
+
+// 支持完整 URL 或纯 code 入参（与 scripts/verify-wcl-api.js 一致）
+function parseReportCode(input) {
+  const m = String(input || "").match(/reports\/([A-Za-z0-9]+)/);
+  if (m) return m[1];
+  if (/^[A-Za-z0-9]{10,20}$/.test(String(input || ""))) return input;
+  return null;
+}
+
+function wclError(status, message) {
+  const e = new Error(message);
+  e.wclStatus = status;
+  return e;
+}
+
+// 带 10s 超时的 HTTPS 请求（WCL 专用）
+function wclHttpsRequest(options, body) {
+  return new Promise((resolve, reject) => {
+    const req = https.request(options, (res) => {
+      let data = "";
+      res.on("data", (chunk) => { data += chunk; });
+      res.on("end", () => resolve({ status: res.statusCode, body: data }));
+    });
+    req.on("error", reject);
+    req.setTimeout(10000, () => {
+      const err = new Error("请求超时（10s）");
+      err.code = "WCL_TIMEOUT";
+      req.destroy(err);
+    });
+    if (body) req.write(body);
+    req.end();
+  });
+}
+
+// WCL client_credentials token 缓存：未过期（提前 60s）则复用
+const wclTokenCache = { accessToken: null, expiresAt: 0 };
+
+async function getWclAccessToken() {
+  if (wclTokenCache.accessToken && wclTokenCache.expiresAt > Date.now() + 60 * 1000) {
+    return wclTokenCache.accessToken;
+  }
+  const clientId = process.env.WCL_CLIENT_ID || "";
+  const clientSecret = process.env.WCL_CLIENT_SECRET || "";
+  if (!clientId || !clientSecret) throw wclError(500, "服务器未配置 WCL 凭证");
+  const basic = Buffer.from(`${clientId}:${clientSecret}`).toString("base64");
+  let res;
+  try {
+    res = await wclHttpsRequest(
+      {
+        hostname: "www.warcraftlogs.com",
+        path: "/oauth/token",
+        method: "POST",
+        headers: {
+          "Authorization": `Basic ${basic}`,
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+      },
+      "grant_type=client_credentials"
+    );
+  } catch {
+    throw wclError(502, "WCL 授权失败");
+  }
+  if (res.status !== 200) throw wclError(502, "WCL 授权失败");
+  let json = null;
+  try { json = JSON.parse(res.body); } catch { json = null; }
+  if (!json || !json.access_token) throw wclError(502, "WCL 授权失败");
+  wclTokenCache.accessToken = json.access_token;
+  wclTokenCache.expiresAt = Date.now() + (json.expires_in || 3600) * 1000;
+  return json.access_token;
+}
+
+// 与 scripts/verify-wcl-api.js 相同的报告查询
+const WCL_REPORT_QUERY = `
+query ($code: String!) {
+  reportData {
+    report(code: $code) {
+      title
+      startTime
+      endTime
+      masterData { actors(type: "Player") { id name server subType } }
+      fights { id encounterID name startTime endTime friendlyPlayers }
+    }
+  }
+  rateLimitData { limitPerHour pointsSpentThisHour pointsResetIn }
+}`;
+
+// 拉取报告并汇总为考勤比对结构（报告数据不缓存）
+async function fetchWclReportSummary(code) {
+  const token = await getWclAccessToken();
+  let res;
+  try {
+    res = await wclHttpsRequest(
+      {
+        hostname: "www.warcraftlogs.com",
+        path: "/api/v2/client",
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      },
+      JSON.stringify({ query: WCL_REPORT_QUERY, variables: { code } })
+    );
+  } catch (e) {
+    if (e && e.code === "WCL_TIMEOUT") throw wclError(504, "WCL 接口请求超时，请稍后再试");
+    throw wclError(502, "WCL 接口请求失败，请稍后再试");
+  }
+
+  const bodyText = res.body || "";
+  let json = null;
+  try { json = JSON.parse(bodyText); } catch { json = null; }
+  // rate limit 判定：HTTP 429，或 GraphQL errors 中含 rate limit 字样。
+  // 注意不能全文扫 bodyText——正常 200 响应里带有 rateLimitData 字段名，会误伤。
+  const hasGraphqlErrors = !!(json && json.errors && json.errors.length);
+  const rateLimited =
+    res.status === 429 ||
+    (hasGraphqlErrors && json.errors.some((e) => /rate ?limit/i.test((e && e.message) || "")));
+  if (rateLimited) {
+    throw wclError(429, "WCL 接口速率超限，请稍后再试");
+  }
+  // 区分上游故障与"报告不存在"（验收用例 9：错误提示须准确）：
+  // 非 JSON（如 WCL 的 HTML 错误页）或 HTTP 5xx 且无 GraphQL errors 结构 → 上游暂时不可用
+  if (!json || (res.status >= 500 && !hasGraphqlErrors)) {
+    throw wclError(502, "WCL 服务暂时不可用，请稍后再试");
+  }
+  // HTTP 200 且带 GraphQL errors，或其余非 200 响应 → 报告不存在/私有
+  if (res.status !== 200 || hasGraphqlErrors) {
+    throw wclError(502, "无法读取该 WCL 报告（不存在或为私有日志）");
+  }
+  const report = json.data && json.data.reportData && json.data.reportData.report;
+  if (!report) {
+    throw wclError(502, "无法读取该 WCL 报告（不存在或为私有日志）");
+  }
+
+  const actors = (report.masterData && report.masterData.actors) || [];
+  const fights = report.fights || [];
+  const bossFights = fights.filter((f) => f.encounterID > 0);
+  const players = actors.map((a) => ({
+    id: a.id,
+    name: a.name,
+    server: a.server || "",
+    subType: a.subType || "",
+    bossFights: bossFights.filter(
+      (f) => Array.isArray(f.friendlyPlayers) && f.friendlyPlayers.includes(a.id)
+    ).length,
+  }));
+  return {
+    title: report.title || "",
+    startTime: report.startTime,
+    endTime: report.endTime,
+    bossFightTotal: bossFights.length,
+    players,
+  };
+}
+
+// 两个 WCL 端点的共用处理器；withSnapshot=true 时附带活动已有快照供前端比对
+async function handleWclRequest(req, res, corsHeaders, withSnapshot) {
+  const t0 = Date.now();
+  const endpoint = withSnapshot ? "attendance-snapshot" : "report-summary";
+  const send = (status, obj) => {
+    res.writeHead(status, { "Content-Type": "application/json", ...corsHeaders });
+    res.end(JSON.stringify(obj));
+  };
+  try {
+    const authHeader = req.headers["authorization"] || "";
+    const token = authHeader.replace("Bearer ", "");
+    if (!token) return send(401, { message: "未登录或登录已过期，请重新登录" });
+    const user = await verifyTokenCached(token);
+    if (!user) return send(401, { message: "登录状态无效，请重新登录" });
+
+    const rawBody = await readBody(req);
+    let payload = {};
+    try { payload = JSON.parse(rawBody || "{}"); } catch { payload = {}; }
+
+    const guildId = payload.guildId;
+    if (!guildId) return send(400, { message: "缺少公会 ID（guildId）" });
+
+    const role = await getGuildRoleCached(guildId, user.id);
+    if (role !== "owner" && role !== "editor") {
+      return send(403, { message: "无权修改该公会数据（需要编辑或以上权限）" });
+    }
+
+    const code = parseReportCode(payload.reportCode);
+    if (!code) return send(400, { message: "无法识别的 WCL 报告链接或代码" });
+
+    let snapshotExtra = {};
+    if (withSnapshot) {
+      const activityId = payload.activityId;
+      if (!activityId) return send(400, { message: "缺少活动 ID（activityId）" });
+      const { body } = await supabaseRestGet(
+        `/rest/v1/activities?id=eq.${activityId}&select=guild_id,wcl_snapshot&limit=1`
+      );
+      const activity = Array.isArray(body) && body[0] ? body[0] : null;
+      if (!activity) return send(404, { message: "活动不存在" });
+      if (activity.guild_id !== guildId) {
+        return send(403, { message: "无权访问该公会的活动" });
+      }
+      snapshotExtra = {
+        existingSnapshot: activity.wcl_snapshot != null ? activity.wcl_snapshot : null,
+        hasSnapshot: activity.wcl_snapshot != null,
+      };
+    }
+
+    // 鉴权全部通过后才接触 WCL 凭证 / API
+    const summary = await fetchWclReportSummary(code);
+    console.log(`[perf] WCL ${endpoint} code=${code} total=${Date.now() - t0}ms`);
+    send(200, { ...summary, ...snapshotExtra });
+  } catch (e) {
+    const status = e.wclStatus || 500;
+    console.log(`[perf] WCL ${endpoint} failed total=${Date.now() - t0}ms err=${e.message}`);
+    send(status, { message: e.message || "服务器内部错误" });
+  }
+}
+
 function serveFile(res, filePath) {
   const ext = path.extname(filePath).toLowerCase();
   const contentType = MIME[ext] || "application/octet-stream";
@@ -510,6 +728,17 @@ const server = http.createServer(async (req, res) => {
     const config = getSupabaseConfig();
     res.writeHead(200, { "Content-Type": "application/json", ...corsHeaders });
     res.end(JSON.stringify(config));
+    return;
+  }
+
+  // API: WCL - /api/wcl/report-summary、/api/wcl/attendance-snapshot（任务书 #11）
+  // JWT + 公会角色鉴权（owner/editor 可用，viewer/非成员 403），鉴权通过后才调 WCL API
+  if (urlPath === "/api/wcl/report-summary" && req.method === "POST") {
+    handleWclRequest(req, res, corsHeaders, false);
+    return;
+  }
+  if (urlPath === "/api/wcl/attendance-snapshot" && req.method === "POST") {
+    handleWclRequest(req, res, corsHeaders, true);
     return;
   }
 

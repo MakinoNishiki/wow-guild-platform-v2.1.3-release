@@ -653,6 +653,11 @@
       <div class="modal-close" onclick="closeModal('importMembersModal')">×</div>
     </div>
     <div class="modal-body">
+      <!-- REQ-032：标签页（粘贴名单 / 从 WCL 链接导入） -->
+      <div class="view-tabs" id="importTabs" style="margin-bottom:12px">
+        <div class="view-tab active" id="importTabPaste" onclick="switchImportTab('paste')">粘贴名单</div>
+        <div class="view-tab" id="importTabWcl" onclick="switchImportTab('wcl')">从 WCL 链接导入</div>
+      </div>
       <!-- 第一步：粘贴名单 -->
       <div id="importPasteStep">
         <details style="margin-bottom:12px;font-size:13px" open>
@@ -679,8 +684,21 @@
         </p>
         <textarea class="form-textarea" id="importMembersText" style="height:180px" placeholder="战神阿瑞斯-死亡之翼,WARRIOR&#10;烈焰法师,法师&#10;圣光牧师-牧师&#10;暗影盗贼 盗贼&#10;兽王猎人"></textarea>
       </div>
+      <!-- REQ-032：从 WCL 链接导入（解析后进入下方现有预览确认页） -->
+      <div id="importWclStep" style="display:none">
+        <p style="font-size:13px;color:var(--text-muted);margin-bottom:8px">
+          粘贴 WCL (Warcraft Logs) 报告链接，自动提取参战玩家（角色名 + 职业 + 服务器）并进入预览确认页。
+        </p>
+        <div class="form-group">
+          <label class="form-label">WCL 报告链接</label>
+          <input type="text" class="form-input" id="importWclUrl" placeholder="https://www.warcraftlogs.com/reports/...">
+        </div>
+        <button class="btn btn-primary" id="importWclParseBtn" onclick="importParseWcl()">解析</button>
+      </div>
       <!-- 第二步：预览确认 -->
       <div id="importPreviewStep" style="display:none">
+        <!-- REQ-032：WCL 来源时显示报告标题 -->
+        <div id="importPreviewSource" style="display:none;font-size:12px;color:var(--info);margin-bottom:8px"></div>
         <p style="font-size:13px;color:var(--text-muted);margin-bottom:8px">
           确认导入内容：<span style="color:var(--danger)">红色 = 无法识别（可修正或剔除）</span>，<span style="color:var(--warning)">黄色 = 已存在（默认跳过，可勾选保留）</span>。专精统一为"待补充"，入库后请逐个补录。
         </p>
@@ -690,9 +708,10 @@
               <tr>
                 <th style="width:40px">导入</th>
                 <th>名字</th>
-                <th style="width:120px">职业</th>
-                <th style="width:80px">专精</th>
-                <th style="width:80px">状态</th>
+                <th style="width:110px">职业</th>
+                <th style="width:90px">服务器</th>
+                <th style="width:70px">专精</th>
+                <th style="width:70px">状态</th>
                 <th style="width:50px">操作</th>
               </tr>
             </thead>
@@ -780,8 +799,31 @@
       <button class="btn btn-danger btn-sm edit-only" id="activityDeleteBtn" onclick="deleteCurrentActivity()" style="margin-right:auto">删除活动</button>
       <!-- REQ-014：已挂 WCL 链接的活动显示复盘入口（全体成员可见），新标签页打开 -->
       <a id="attendanceWclBtn" class="btn btn-sm" href="#" target="_blank" rel="noopener noreferrer" style="display:none">📊 WCL 复盘</a>
+      <!-- REQ-033：已挂 WCL 链接的活动显示同步考勤入口（owner/editor 可见） -->
+      <button id="attendanceWclSyncBtn" class="btn btn-sm btn-primary edit-only" style="display:none" onclick="syncAttendanceFromWcl()">🔄 从 WCL 同步考勤</button>
       <button class="btn" onclick="closeModal('attendanceDetailModal')">关闭</button>
       <button id="attendanceSaveBtn" class="btn btn-primary edit-only" onclick="saveAttendance()">保存考勤</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 弹窗：WCL 同步考勤预览（REQ-033） ===== -->
+<div class="modal-overlay" id="wclSyncModal">
+  <div class="modal" style="max-width:680px">
+    <div class="modal-header">
+      <div>
+        <div class="modal-title">从 WCL 同步考勤</div>
+        <div class="card-subtitle" id="wclSyncSubtitle" style="font-size:12px"></div>
+      </div>
+      <div class="modal-close" onclick="requestCloseModal('wclSyncModal')">×</div>
+    </div>
+    <div class="modal-body">
+      <div id="wclSyncStats" style="font-size:12px;color:var(--text-muted);margin-bottom:12px"></div>
+      <div id="wclSyncPreviewList" style="max-height:380px;overflow-y:auto"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="requestCloseModal('wclSyncModal')">取消</button>
+      <button class="btn btn-primary" id="wclSyncConfirmBtn" onclick="wclSyncConfirm()">确认写入考勤</button>
     </div>
   </div>
 </div>
