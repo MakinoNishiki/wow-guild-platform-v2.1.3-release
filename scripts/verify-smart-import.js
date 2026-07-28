@@ -83,4 +83,54 @@ for (const [pasted, existing, expected, desc] of dupCases) {
   else { fail++; console.log(`  FAIL  ${desc}  "${pasted}" vs ${JSON.stringify(existing)} -> ${got}，期望 ${expected}`); }
 }
 console.log(`\n结果：${pass} 通过，${fail} 失败`);
-process.exit(fail ? 1 : 0);
+
+// ============ BUG-037（任务书 #12 补丁4）回归：唯一约束冲突三组场景 ============
+// 提取带 server 维度查重与离队恢复判定函数（依赖 appData，注入 mock）
+const dup2Start = src.indexOf('function isDupMemberNameWithServer');
+const departedStart = src.indexOf('function findDepartedByNameWithServer');
+if (dup2Start === -1 || departedStart === -1) {
+  console.error('FAIL: 未能在 app.js 中定位 isDupMemberNameWithServer / findDepartedByNameWithServer');
+  process.exit(1);
+}
+const rest2 = src.slice(dup2Start);
+const end2 = rest2.indexOf('\n}\n', rest2.indexOf('function findDepartedByNameWithServer'));
+if (end2 === -1) {
+  console.error('FAIL: 未能定位 findDepartedByNameWithServer 函数结尾');
+  process.exit(1);
+}
+const code2 = rest2.slice(0, end2 + 3);
+const mockAppData = {
+  members: [
+    { name: '小明', status: '离队' },            // 软删除离队
+    { name: '阿强-死亡之翼', status: 'inactive' }, // 历史英文离队状态
+    { name: '莉莉', status: '正式' },            // 活跃
+    { name: '  空格名  ', status: '离队' },       // 名字带首尾空格
+  ]
+};
+const { isDupMemberNameWithServer, findDepartedByName, findDepartedByNameWithServer } =
+  new Function('appData', code2 + '\nreturn { isDupMemberNameWithServer, findDepartedByName, findDepartedByNameWithServer };')(mockAppData);
+
+let pass2 = 0, fail2 = 0;
+function checkFn(desc, actual, expected) {
+  const ok = !!actual === !!expected && (typeof expected !== 'object' ? actual === expected : true);
+  if (ok) { pass2++; console.log(`  PASS  ${desc}`); }
+  else { fail2++; console.log(`  FAIL  ${desc}（实际 ${JSON.stringify(actual && actual.name !== undefined ? actual.name : actual)}，期望 ${JSON.stringify(expected && expected.name !== undefined ? expected.name : expected)}）`); }
+}
+
+console.log('\n== BUG-037 场景一：离队同名 → 导入走恢复链路（判定命中）==');
+checkFn('离队同名命中（status=离队）', (findDepartedByName('小明') || {}).name, '小明');
+checkFn('历史英文离队状态兼容（status=inactive）', (findDepartedByName('阿强') || {}).name, '阿强-死亡之翼');
+checkFn('名字带空格 trim 对齐', (findDepartedByName('空格名') || {}).name, '  空格名  ');
+
+console.log('\n== BUG-037 场景二：活跃同名 → 判重跳过（不撞索引、不走恢复）==');
+checkFn('活跃同名查重命中', isDupMemberName('莉莉', ['莉莉']), true);
+checkFn('活跃同名不走恢复（findDeparted 不命中）', findDepartedByName('莉莉'), null);
+
+console.log('\n== BUG-037 场景三：跨服同名 → 允许（REQ-002 仅同服唯一）==');
+checkFn('跨服同名不判重', isDupMemberNameWithServer('小明', '金色平原', ['小明-死亡之翼']), false);
+checkFn('同服同名判重', isDupMemberNameWithServer('小明', '死亡之翼', ['小明-死亡之翼']), true);
+checkFn('跨服撞离队不拦（可新建/恢复按同服口径）', findDepartedByNameWithServer('阿强', '金色平原'), null);
+checkFn('同服撞离队走恢复', (findDepartedByNameWithServer('阿强', '死亡之翼') || {}).name, '阿强-死亡之翼');
+
+console.log(`\nBUG-037 回归：${pass2} 通过，${fail2} 失败`);
+process.exit((fail + fail2) ? 1 : 0);

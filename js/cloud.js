@@ -101,7 +101,12 @@
 
     if (!resp.ok) {
       const errMsg = (data && data.message) || `数据库操作失败 (${resp.status})`;
-      throw new Error(errMsg);
+      // BUG-037（任务书 #12 补丁4）：透传 PostgREST 错误码（如 23505 唯一约束冲突），
+      // 供调用方分层提示，不再笼统报"云端同步出错"
+      const err = new Error(errMsg);
+      err.code = data && data.code;
+      err.status = resp.status;
+      throw err;
     }
 
     // POST/PATCH 返回数组或单个对象

@@ -113,17 +113,25 @@ function isDupMemberNameWithServer(name, server, existingNames) {
 
 // REQ-002（软删除）：与 isDupMemberName 同口径，返回匹配的「已离队」成员（无则 null）。
 // 撞活跃成员判重；撞离队成员不判重、走恢复链路（恢复优先于新建）。
+// BUG-037（任务书 #12 补丁4）：兼容历史英文状态 'inactive'；名字先 trim 再比对（与 DB/索引口径对齐）
+function isDepartedStatus(s) { return s === '离队' || s === 'inactive'; }
 function findDepartedByName(name) {
-  return appData.members.find(m => m.status === '离队' &&
-    (m.name === name || m.name.startsWith(name + '-') || name.startsWith(m.name + '-'))) || null;
+  const n = (name || '').trim();
+  return appData.members.find(m => {
+    if (!isDepartedStatus(m.status)) return false;
+    const mn = (m.name || '').trim();
+    return mn === n || mn.startsWith(n + '-') || n.startsWith(mn + '-');
+  }) || null;
 }
 
 // REQ-002（软删除）：与 isDupMemberNameWithServer 同口径的已离队成员查找（WCL 来源用）
 function findDepartedByNameWithServer(name, server) {
-  return appData.members.find(m => m.status === '离队' && (
-    m.name === name ||
-    (m.name.startsWith(name + '-') && (!server || m.name === name + '-' + server))
-  )) || null;
+  const n = (name || '').trim();
+  return appData.members.find(m => {
+    if (!isDepartedStatus(m.status)) return false;
+    const mn = (m.name || '').trim();
+    return mn === n || (mn.startsWith(n + '-') && (!server || mn === n + '-' + server));
+  }) || null;
 }
 
 // 职业-专精映射
@@ -2172,7 +2180,8 @@ function renderImportPreview() {
   const classOptions = sel => '<option value="">（选职业）</option>' +
     Object.keys(classMap).map(c => `<option value="${c}" ${sel === c ? 'selected' : ''}>${c}</option>`).join('');
   // REQ-048：departed-skip = 同名已离队未恢复（聚合确认中未勾选，跳过导入）
-  const statusText = { ok: '新成员', dup: '已存在', bad: '需修正', 'departed-skip': '已离队同名，未恢复' };
+  // BUG-036（任务书 #12 补丁4）：文案精简为"离队未恢复"（原"已离队同名，未恢复"在状态列竖排换行）
+  const statusText = { ok: '新成员', dup: '已存在', bad: '需修正', 'departed-skip': '离队未恢复' };
   // REQ-032：WCL 来源时在预览步顶部注明报告标题
   const srcEl = document.getElementById('importPreviewSource');
   if (importSource === 'wcl' && importWclTitle) {
@@ -2190,9 +2199,9 @@ function renderImportPreview() {
       <td><input type="checkbox" ${r.include ? 'checked' : ''} onchange="importUpdateRow(${i},'include',this.checked)"></td>
       <td>${nameCell}</td>
       <td><select class="form-select" style="height:28px;padding:2px 6px" onchange="importUpdateRow(${i},'cls',this.value)">${classOptions(r.cls)}</select></td>
-      <td style="font-size:12px">${r.server || '—'}</td>
-      <td>待补充</td>
-      <td>${statusText[r.status]}</td>
+      <td style="font-size:12px;white-space:nowrap">${r.server || '—'}</td>
+      <td style="white-space:nowrap">待补充</td>
+      <td style="white-space:nowrap">${statusText[r.status]}</td>
       <td><button type="button" class="btn btn-sm btn-danger" onclick="importRemoveRow(${i})">剔除</button></td>
     </tr>`;
   }).join('');
@@ -2271,6 +2280,10 @@ async function importRestoreConfirm() {
   const toAdd = pending.picked.filter(r => !collidingRows.has(r));
   importRestorePending = null;
   closeModal('importRestoreModal');
+  // BUG-035（任务书 #12 补丁4）：确认后立即更新预览行状态——未勾选恢复的行即时取消勾选
+  // 并标黄"离队未恢复"，不等写库完成（此前要等整个导入执行完才更新，等待期误导用户）
+  skipped.forEach(r => { r.status = 'departed-skip'; r.include = false; });
+  renderImportPreview();
   await importExecute(toAdd, toRestore, skipped);
 }
 
@@ -2283,42 +2296,63 @@ async function importExecute(toAdd, toRestore, skipped) {
   btn.dataset.originalText = btn.textContent;
   btn.textContent = '导入中...';
   try {
-    skipped.forEach(r => { r.status = 'departed-skip'; r.include = false; });
+    // BUG-037（任务书 #12 补丁4）：逐行容错——单行写失败不拖死整批、不让已成功的行停在未刷新状态。
+    // 23505（唯一约束冲突）给具体中文提示，其他错误走通用文案（用户提示分层）。
+    const failReason = (e) => (e && e.code === '23505') ? '同名成员已存在或与已离队成员重名' : ((e && e.message) || '未知错误');
+    const failedRows = [];
     for (const r of toAdd) {
-      await window.CloudSync.saveCloudData('members', 'add', {
-        name: r.name.trim(),
-        class: r.cls,
-        main_spec: '待补充',
-        spec: '待补充', // 向后兼容
-        off_spec: '',
-        off_specs: [],
-        role: [],
-        status: '正式',
-        join_date: formatDate(new Date()),
-        notes: ''
-      });
+      try {
+        await window.CloudSync.saveCloudData('members', 'add', {
+          name: r.name.trim(),
+          class: r.cls,
+          main_spec: '待补充',
+          spec: '待补充', // 向后兼容
+          off_spec: '',
+          off_specs: [],
+          role: [],
+          status: '正式',
+          join_date: formatDate(new Date()),
+          notes: ''
+        });
+      } catch (e) {
+        console.error('导入成员失败:', r.name, e);
+        failedRows.push({ name: r.name.trim(), reason: failReason(e) });
+      }
     }
     for (const t of toRestore) {
-      await window.CloudSync.saveCloudData('members', 'update', {
-        ...t.departed,
-        class: t.row.cls || t.departed.class, // 顺带更新本次输入的职业，其余字段保留原值
-        status: '正式',
-        id: t.departed.id
-      });
+      try {
+        await window.CloudSync.saveCloudData('members', 'update', {
+          ...t.departed,
+          class: t.row.cls || t.departed.class, // 顺带更新本次输入的职业，其余字段保留原值
+          status: '正式',
+          id: t.departed.id
+        });
+      } catch (e) {
+        console.error('恢复离队成员失败:', t.row.name, e);
+        failedRows.push({ name: t.row.name.trim(), reason: failReason(e) });
+      }
     }
-    if (toAdd.length || toRestore.length) {
+    const addedOk = toAdd.length - failedRows.filter(f => toAdd.some(r => r.name.trim() === f.name)).length;
+    const restoredOk = toRestore.length - failedRows.filter(f => toRestore.some(t => t.row.name.trim() === f.name)).length;
+    if (addedOk > 0 || restoredOk > 0) {
       await window.CloudSync.reloadData('members');
       saveData();
       renderMembers();
     }
+    const failedMsg = failedRows.length
+      ? `，失败 ${failedRows.length} 个（${failedRows.slice(0, 3).map(f => `${f.name}：${f.reason}`).join('；')}${failedRows.length > 3 ? ' 等' : ''}）`
+      : '';
     if (skipped.length) {
       // 有跳过行：停留预览页标出，由用户剔除或重新勾选后再导入
       renderImportPreview();
-      showToast(`导入 ${toAdd.length} 个、恢复 ${toRestore.length} 个，跳过 ${skipped.length} 个（同名离队未恢复）`, 'warning');
+      showToast(`导入 ${addedOk} 个、恢复 ${restoredOk} 个，跳过 ${skipped.length} 个（同名离队未恢复）${failedMsg}`, failedRows.length ? 'error' : 'warning');
+    } else if (failedRows.length && addedOk === 0 && restoredOk === 0) {
+      showToast(`导入失败${failedMsg.replace('，失败', '：')}`, 'error');
     } else {
-      closeModal('importMembersModal');
-      const restoredMsg = toRestore.length ? `，恢复 ${toRestore.length} 个已离队成员` : '';
-      showToast(`成功导入 ${toAdd.length} 个成员（专精待补充）${restoredMsg}`, 'success');
+      if (!failedRows.length) closeModal('importMembersModal');
+      else renderImportPreview();
+      const restoredMsg = restoredOk ? `，恢复 ${restoredOk} 个已离队成员` : '';
+      showToast(`成功导入 ${addedOk} 个成员（专精待补充）${restoredMsg}${failedMsg}`, failedRows.length ? 'warning' : 'success');
     }
     // BUG-026（任务书 #12 补丁）：从 WCL 同步预览跳转过来的"添加为成员"，
     // 导入成功后回到同步预览弹窗，不阻塞后续考勤写入
@@ -3062,6 +3096,14 @@ async function saveAttendance() {
       status: sel.value,
       notes: ''
     });
+  });
+  // BUG-038（任务书 #12 补丁4）：整表重写必须逐行保留已有状态——DOM 名单里没有
+  // 但 DB 已有考勤行的成员（如离队历史行），按原状态并入，缺席占位只用于新成员
+  const collectedIds = new Set(attendees.map(a => a.member_id));
+  (activity.attendees || []).forEach(a => {
+    if (!collectedIds.has(a.member_id)) {
+      attendees.push({ member_id: a.member_id, status: a.status, notes: a.notes || '' });
+    }
   });
   
   // 严格 DB-first
