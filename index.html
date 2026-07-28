@@ -3,7 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>WoW 团本考勤管理系统</title>
+<title>魔兽管家</title>
+<link rel="icon" type="image/png" sizes="32x32" href="assets/brand/favicon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="assets/brand/favicon-16.png">
 <link rel="stylesheet" href="css/main.css">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
@@ -12,9 +14,9 @@
 <!-- 认证遮罩层 -->
 <div class="auth-overlay" id="authOverlay" style="display:none">
   <div class="auth-container">
-    <div class="auth-logo">⚔</div>
-    <h1 class="auth-title">WoW 团本考勤系统</h1>
-    <p class="auth-subtitle">团队云端协作平台</p>
+    <div class="auth-logo"><img src="assets/brand/logo_B_256.png" alt="魔兽管家" class="auth-logo-img"></div>
+    <h1 class="auth-title">魔兽管家</h1>
+    <p class="auth-subtitle">WoW Butler · 团队云端协作平台</p>
 
     <!-- 登录表单 -->
     <div class="auth-form" id="authLoginForm">
@@ -47,7 +49,7 @@
         <input type="password" id="regPassword" placeholder="至少6位" class="auth-input">
       </div>
       <button class="btn btn-primary auth-btn" onclick="handleRegister()">注册</button>
-      <button class="btn auth-btn" style="background:transparent;border:1px solid var(--border-color);color:var(--text-secondary);margin-top:8px" onclick="showLoginForm()">返回登录</button>
+      <button class="btn btn-ghost auth-btn" style="margin-top:8px" onclick="showLoginForm()">返回登录</button>
     </div>
 
     <!-- 创建/加入公会 -->
@@ -83,7 +85,7 @@
       </div>
       <button class="btn auth-btn" onclick="handleJoinGuild()">加入公会</button>
       <div class="auth-divider"><span>或者</span></div>
-      <button class="btn auth-btn" style="background:transparent;border:1px solid var(--border-color);color:var(--text-secondary)" onclick="showLoginForm()">返回登录</button>
+      <button class="btn btn-ghost auth-btn" onclick="showLoginForm()">返回登录</button>
     </div>
 
     <div class="auth-error" id="authError"></div>
@@ -94,9 +96,9 @@
   <!-- 侧边栏 -->
   <aside class="sidebar" id="sidebar">
     <div class="sidebar-header">
-      <div class="sidebar-logo">⚔</div>
+      <div class="sidebar-logo"><img src="assets/brand/logo_B_64.png" alt="魔兽管家" class="sidebar-logo-img"></div>
       <div>
-        <div class="sidebar-title">WoW团本工具箱</div>
+        <div class="sidebar-title">魔兽管家 <span class="sidebar-brand-sub">WoW Butler</span></div>
         <div class="sidebar-subtitle" id="guildName">未加入公会</div>
       </div>
     </div>
@@ -165,9 +167,22 @@
       </div>
       <div class="topbar-right">
         <span id="userInfo" style="font-size:12px;color:var(--text-muted);margin-right:8px"></span>
-        <button class="guild-switch-btn" id="guildSwitchBtn" onclick="openGuildSwitcher()" style="display:none">
-          <span>🏰 切换公会</span>
-        </button>
+        <!-- REQ-044（任务书 #13）：头像菜单替代裸「切换公会」按钮 -->
+        <div class="user-menu" id="userMenu" style="display:none">
+          <button class="user-menu-trigger" id="userMenuTrigger" onclick="userMenuToggle(event)">
+            <span class="user-avatar" id="userAvatar">?</span>
+            <span class="user-nickname" id="userNickname"></span>
+            <!-- BUG-020（任务书 #13-补遗）：头像菜单旁身份徽章（盾形分色+图标） -->
+            <span class="role-badge" id="userRoleBadge" style="display:none"></span>
+            <span class="user-menu-caret">▾</span>
+          </button>
+          <div class="user-menu-dropdown" id="userMenuDropdown" style="display:none">
+            <div class="user-menu-item" onclick="userMenuAction('center')">👤 用户中心</div>
+            <div class="user-menu-item" onclick="userMenuAction('switch')">🏰 切换公会</div>
+            <div class="user-menu-divider"></div>
+            <div class="user-menu-item user-menu-item-danger" onclick="userMenuAction('logout')">🚪 退出登录</div>
+          </div>
+        </div>
         <span style="font-size:12px;color:var(--text-muted)" id="todayStr"></span>
       </div>
     </header>
@@ -260,15 +275,15 @@
               <thead>
                 <tr>
                   <th style="width:36px"><input type="checkbox" id="memberSelectAll" class="edit-only" onchange="memberToggleSelectAll(this.checked)" title="全选"></th>
-                  <th style="width:50px">#</th>
+                  <th style="width:50px" class="num">#</th>
                   <th>角色名</th>
                   <th>职业</th>
                   <th>专精</th>
                   <th>职责</th>
-                  <th>状态</th>
+                  <th class="center">状态</th>
                   <th>加入日期</th>
-                  <th>出勤率</th>
-                  <th style="width:100px">操作</th>
+                  <th class="num">出勤率</th>
+                  <th style="width:100px" class="center">操作</th>
                 </tr>
               </thead>
               <tbody id="membersTableBody"></tbody>
@@ -415,7 +430,7 @@
               <thead>
                 <tr>
                   <th>装备名称</th>
-                  <th>心愿</th>
+                  <th class="center">心愿</th>
                   <th>所属团本</th>
                   <th>掉落难度</th>
                   <th>掉落BOSS</th>
@@ -423,11 +438,11 @@
                   <th>主属性</th>
                   <th>副属性</th>
                   <th>分配给谁</th>
-                  <th>分配状态</th>
+                  <th class="center">分配状态</th>
                   <th>分配方式</th>
-                  <th>Roll</th>
+                  <th class="num">Roll</th>
                   <th>活动日期</th>
-                  <th style="width:90px">操作</th>
+                  <th style="width:90px" class="center">操作</th>
                 </tr>
               </thead>
               <tbody id="lootTableBody"></tbody>
@@ -495,10 +510,10 @@
                   <th>掉落BOSS</th>
                   <th>装备部位</th>
                   <th>需求成员</th>
-                  <th>优先级</th>
+                  <th class="center">优先级</th>
                   <th>专精</th>
-                  <th>状态</th>
-                  <th style="width:120px">操作</th>
+                  <th class="center">状态</th>
+                  <th style="width:120px" class="center">操作</th>
                 </tr>
               </thead>
               <tbody id="wishlistTableBody"></tbody>
@@ -750,13 +765,13 @@
           <table class="data-table">
             <thead>
               <tr>
-                <th style="width:40px">导入</th>
+                <th style="width:40px" class="center">导入</th>
                 <th>名字</th>
                 <th style="width:110px">职业</th>
                 <th style="width:90px">服务器</th>
                 <th style="width:70px">专精</th>
-                <th style="width:70px">状态</th>
-                <th style="width:50px">操作</th>
+                <th style="width:70px" class="center">状态</th>
+                <th style="width:50px" class="center">操作</th>
               </tr>
             </thead>
             <tbody id="importPreviewBody"></tbody>
@@ -806,9 +821,13 @@
         </div>
         <div class="form-group">
           <label class="form-label">团本名称 *</label>
-          <!-- REQ-029：datalist 建议（最近使用置顶），仍可手输兜底 -->
-          <input type="text" class="form-input" id="activityRaidName" list="raidNameOptions" placeholder="如：尼鲁巴尔王宫" autocomplete="off">
-          <datalist id="raidNameOptions"></datalist>
+          <!-- BUG-027（任务书 #13）：自定义下拉替代原生 datalist——暗色浮层面板、输入过滤、
+               最近使用置顶、"其他（手动输入）"兜底；数据源 RAID_NAME_OPTIONS（V2.2 主数据切换说明见 app.js 常量注释） -->
+          <div class="raid-select" id="raidSelect">
+            <input type="text" class="form-input" id="activityRaidName" placeholder="如：尼鲁巴尔王宫" autocomplete="off"
+                   onfocus="raidSelectOpen()" onclick="raidSelectOpen()" oninput="raidSelectFilter()" onkeydown="raidSelectKey(event)">
+            <div class="raid-select-panel" id="raidSelectPanel" style="display:none"></div>
+          </div>
         </div>
       </div>
       <div class="form-row">
@@ -1433,7 +1452,7 @@
           <div class="card-title" style="color:var(--danger)">退出公会</div>
         </div>
         <div class="card-body">
-          <button class="btn" style="border-color:var(--danger);color:var(--danger)" onclick="handleLeaveGuild()">退出此公会</button>
+          <button class="btn btn-danger" onclick="handleLeaveGuild()">退出此公会</button>
         </div>
       </div>
     </div>

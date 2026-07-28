@@ -1,7 +1,12 @@
-# AGENTS.md - WoW 团本考勤管理系统
+# AGENTS.md - 魔兽管家（WoW Butler）
 
 ## 项目概览
-WoW 团本考勤管理系统，暗色史诗奇幻风格（WoW 主题），基于 Supabase 云端协作。Supabase 是唯一主数据源（本地模式与飞书同步已移除）。
+魔兽管家（WoW Butler）——面向 WoW 公会的团本考勤管理平台，暗色史诗奇幻风格（WoW 主题），基于 Supabase 云端协作。Supabase 是唯一主数据源（本地模式与飞书同步已移除）。
+
+## 品牌与资源（任务书 #13）
+- 品牌名：魔兽管家 WoW Butler（侧边栏/登录页/页签/更新日志统一）
+- `assets/brand/`：logo_B_主标.png、logo_B_256.png、logo_B_64.png、favicon-32/16.png
+- `assets/icons/`：16 枚本地自绘 SVG（13 职业 + 3 职责，单色职业色，文件名用 classMap/roleTypeMap 英文 key），应用位置：成员列表、考勤名单、智能导入预览（图标+文字，不替换文字）；不使用暴雪官方素材/外链
 
 ## 技术栈
 - HTML5 + CSS3 + Vanilla JavaScript (ES6+)

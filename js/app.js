@@ -158,6 +158,19 @@ const roleTypeMap = {
   '输出': 'dps'
 };
 
+// 任务书 #13 §6：职业/职责本地 SVG 图标（assets/icons，单色职业色，16 枚）。
+// 图标+文字并用，不替换文字；加载失败（如图标缺失）自动隐藏不影响布局。
+function classIconHtml(cnClass) {
+  const key = classMap[cnClass];
+  if (!key) return '';
+  return `<img class="class-icon" src="assets/icons/${key}.svg" alt="" onerror="this.style.display='none'">`;
+}
+function roleIconHtml(cnRole) {
+  const key = roleTypeMap[cnRole];
+  if (!key) return '';
+  return `<img class="class-icon" src="assets/icons/${key}.svg" alt="" onerror="this.style.display='none'">`;
+}
+
 // REQ-009：专精 → 职责推导表（未列出的专精一律视为输出）
 const specRoleMap = {
   '防护': '坦克', '鲜血': '坦克', '复仇': '坦克', '酒仙': '坦克', '守护': '坦克',
@@ -202,14 +215,96 @@ function rememberRecentRaidName(name) {
   const list = [name, ...getRecentRaidNames().filter(n => n !== name)].slice(0, 3);
   localStorage.setItem(getRecentRaidNamesKey(), JSON.stringify(list));
 }
-// datalist 渲染：最近使用置顶，其余候选随后（去重）
-function renderRaidNameDatalist() {
-  const dl = document.getElementById('raidNameOptions');
-  if (!dl) return;
-  const recent = getRecentRaidNames();
-  const rest = RAID_NAME_OPTIONS.filter(n => !recent.includes(n));
-  dl.innerHTML = [...recent, ...rest].map(n => `<option value="${n}"></option>`).join('');
+// BUG-027（任务书 #13）：团本自定义下拉组件（替代原生 datalist）。
+// 暗色浮层面板（ui设计参考 §4 材质层级：比底层亮一档+柔和阴影）、输入实时过滤、
+// 最近使用置顶（按公会记忆 3 个，REQ-029 逻辑不变）、"其他（手动输入）"兜底、键盘 ↑↓/Enter/Esc 可用。
+let raidSelectActiveIdx = -1;
+let raidSelectOptions = []; // 当前面板可选项 [{label, tag}]
+
+function raidSelectRender() {
+  const input = document.getElementById('activityRaidName');
+  const panel = document.getElementById('raidSelectPanel');
+  if (!input || !panel) return;
+  const q = input.value.trim();
+  const recent = getRecentRaidNames().filter(n => !q || n.includes(q));
+  const rest = RAID_NAME_OPTIONS.filter(n => !getRecentRaidNames().includes(n) && (!q || n.includes(q)));
+  raidSelectOptions = [
+    ...recent.map(n => ({ label: n, tag: '最近' })),
+    ...rest.map(n => ({ label: n, tag: '' })),
+  ];
+  const otherLabel = q ? `其他（手动输入）："${q}"` : '其他（手动输入）';
+  let html = raidSelectOptions.map((o, i) =>
+    `<div class="raid-select-item${i === raidSelectActiveIdx ? ' active' : ''}" data-idx="${i}" onmousedown="raidSelectPick(${i})">
+       <span>${o.label}</span>${o.tag ? `<span class="raid-select-tag">${o.tag}</span>` : ''}
+     </div>`).join('');
+  // 兜底项 idx = raidSelectOptions.length
+  html += `<div class="raid-select-item raid-select-other${raidSelectActiveIdx === raidSelectOptions.length ? ' active' : ''}" data-idx="${raidSelectOptions.length}" onmousedown="raidSelectPick(${raidSelectOptions.length})">${otherLabel}</div>`;
+  panel.innerHTML = html;
 }
+
+function raidSelectOpen() {
+  const panel = document.getElementById('raidSelectPanel');
+  if (!panel) return;
+  raidSelectActiveIdx = -1;
+  raidSelectRender();
+  panel.style.display = 'block';
+}
+
+function raidSelectClose() {
+  const panel = document.getElementById('raidSelectPanel');
+  if (panel) panel.style.display = 'none';
+  raidSelectActiveIdx = -1;
+}
+
+function raidSelectFilter() {
+  raidSelectActiveIdx = -1;
+  raidSelectOpen();
+}
+
+function raidSelectPick(idx) {
+  const input = document.getElementById('activityRaidName');
+  if (!input) return;
+  // 兜底项"其他（手动输入）"：保留已输入文本，仅关闭面板
+  if (idx >= 0 && idx < raidSelectOptions.length) {
+    input.value = raidSelectOptions[idx].label;
+  }
+  raidSelectClose();
+  // 注意：不要 input.focus()——onfocus 会重新展开面板
+}
+
+function raidSelectKey(e) {
+  const panel = document.getElementById('raidSelectPanel');
+  const isOpen = panel && panel.style.display !== 'none';
+  const total = raidSelectOptions.length + 1; // 含兜底项
+  if (e.key === 'Escape' && isOpen) {
+    // 面板打开时 Esc 只关面板，不触发弹窗栈关闭（modalStack 体系）
+    e.stopPropagation();
+    e.preventDefault();
+    raidSelectClose();
+    return;
+  }
+  if (!isOpen) {
+    if (e.key === 'ArrowDown') { raidSelectOpen(); e.preventDefault(); }
+    return;
+  }
+  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+    e.preventDefault();
+    raidSelectActiveIdx = e.key === 'ArrowDown'
+      ? (raidSelectActiveIdx + 1) % total
+      : (raidSelectActiveIdx - 1 + total) % total;
+    raidSelectRender();
+    const activeEl = panel.querySelector('.raid-select-item.active');
+    if (activeEl) activeEl.scrollIntoView({ block: 'nearest' });
+  } else if (e.key === 'Enter' && raidSelectActiveIdx >= 0) {
+    e.preventDefault();
+    raidSelectPick(raidSelectActiveIdx);
+  }
+}
+
+// 点击组件外部关闭面板（onmousedown 先于此触发，选项点击不受影响）
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('#raidSelect')) raidSelectClose();
+});
 
 // REQ-028：活动时间段归一化为 [start, end) 分钟区间；结束 <= 开始视为跨天（+24h），与 REQ-012 时长口径一致。
 // 缺起止时间返回 null（不参与冲突判定）。
@@ -1073,12 +1168,13 @@ async function loadGuildMembers() {
         <div class="guild-member-actions">
           <span class="guild-member-role ${roleClasses[m.role] || ''}">${roleLabels[m.role] || m.role}</span>
           ${isOwner && m.user_id !== currentUserId ? `
-            <select onchange="handleChangeRole('${m.id}', this.value)">
+            <select data-prev="${m.role}" onchange="handleChangeRole('${m.id}', this)">
               <option value="viewer" ${m.role === 'viewer' ? 'selected' : ''}>浏览</option>
               <option value="editor" ${m.role === 'editor' ? 'selected' : ''}>编辑</option>
               <option value="owner" ${m.role === 'owner' ? 'selected' : ''}>会长</option>
             </select>
             <button onclick="handleRemoveMember('${m.id}', '${m.display_name}')">移除</button>
+            <span class="role-change-hint" style="font-size:12px"></span>
           ` : ''}
         </div>
       </div>
@@ -1088,14 +1184,21 @@ async function loadGuildMembers() {
   }
 }
 
-// 修改成员角色
-async function handleChangeRole(membershipId, newRole) {
+// 修改成员角色（REQ-043 任务书 #13：全程有感知——禁用防重+"变更中..."，成功 toast，失败就地提示并回滚选择）
+async function handleChangeRole(membershipId, selectEl) {
+  const newRole = selectEl.value;
+  const prevRole = selectEl.dataset.prev || '';
+  const hint = selectEl.parentElement ? selectEl.parentElement.querySelector('.role-change-hint') : null;
+  selectEl.disabled = true;
+  if (hint) { hint.style.color = 'var(--text-muted)'; hint.textContent = '变更中...'; }
   try {
     await window.CloudSync.updateMemberRole(membershipId, newRole);
-    showToast('角色已更新', 'success');
+    showToast('变更成功', 'success');
     await loadGuildMembers();
   } catch (e) {
-    showToast('更新失败: ' + e.message, 'error');
+    selectEl.value = prevRole; // 回滚选择
+    selectEl.disabled = false;
+    if (hint) { hint.style.color = 'var(--danger)'; hint.textContent = `变更失败：${e.message || '请重试'}`; }
   }
 }
 
@@ -1231,7 +1334,7 @@ function updatePermissionUI() {
 // 更新云端模式 UI
 function updateCloudUI() {
   const guildBar = document.getElementById('guildBar');
-  const guildSwitchBtn = document.getElementById('guildSwitchBtn');
+  const userMenu = document.getElementById('userMenu');
   const sidebarUser = document.getElementById('sidebarUser');
   const guildName = document.getElementById('guildName');
   const userInfo = document.getElementById('userInfo');
@@ -1239,10 +1342,19 @@ function updateCloudUI() {
   if (window.CloudSync && window.CloudSync.isCloudMode()) {
     const guild = window.CloudSync.getCurrentGuild();
     const membership = window.CloudSync.getCurrentMembership();
-    const user = window.CloudSync.getCurrentUser ? null : null; // async, skip
+    const user = window.CloudSync.getCachedUser ? window.CloudSync.getCachedUser() : null;
 
     if (guildBar) guildBar.style.display = guild ? '' : 'none';
-    if (guildSwitchBtn) guildSwitchBtn.style.display = '';
+    // REQ-044（任务书 #13）：头像菜单（昵称取显示名，缺省用邮箱前缀；头像=昵称首字圆形底）
+    if (userMenu) {
+      userMenu.style.display = '';
+      const nickname = (user && user.user_metadata && user.user_metadata.display_name)
+        || (user && user.email ? user.email.split('@')[0] : '用户');
+      const nickEl = document.getElementById('userNickname');
+      const avatarEl = document.getElementById('userAvatar');
+      if (nickEl) nickEl.textContent = nickname;
+      if (avatarEl) avatarEl.textContent = (nickname || '用').slice(0, 1);
+    }
     if (guild && guildName) {
       // 显示公会名称 + 服务器信息
       let displayName = guild.name;
@@ -1259,6 +1371,13 @@ function updateCloudUI() {
         // BUG-018：按角色着色，一眼可见自己身份
         guildRole.className = `guild-bar-role role-${membership.role}`;
       }
+      // BUG-020（任务书 #13-补遗）：头像菜单旁同步身份徽章
+      const userRoleBadge = document.getElementById('userRoleBadge');
+      if (userRoleBadge) {
+        userRoleBadge.textContent = roleLabels[membership.role] || membership.role;
+        userRoleBadge.className = `role-badge role-${membership.role}`;
+        userRoleBadge.style.display = '';
+      }
     }
     if (guild) {
       const guildBarName = document.getElementById('guildBarName');
@@ -1274,9 +1393,44 @@ function updateCloudUI() {
     if (cloudSyncStatus) cloudSyncStatus.textContent = '数据已云端同步';
   } else {
     if (guildBar) guildBar.style.display = 'none';
-    if (guildSwitchBtn) guildSwitchBtn.style.display = 'none';
+    if (userMenu) userMenu.style.display = 'none';
   }
 }
+
+// ==================== REQ-044（任务书 #13）：头像菜单 ====================
+function userMenuToggle(e) {
+  if (e) e.stopPropagation();
+  const dd = document.getElementById('userMenuDropdown');
+  if (!dd) return;
+  dd.style.display = dd.style.display === 'none' ? 'block' : 'none';
+}
+
+function userMenuClose() {
+  const dd = document.getElementById('userMenuDropdown');
+  if (dd) dd.style.display = 'none';
+}
+
+function userMenuAction(action) {
+  userMenuClose();
+  if (action === 'center') openUserCenter();      // 用户中心（已有实页，直接接真实入口）
+  else if (action === 'switch') openGuildSwitcher(); // 逻辑不变，仅入口迁移
+  else if (action === 'logout') handleSignOut();     // 逻辑不变，仅入口迁移
+}
+
+// 点击外部关闭菜单
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('#userMenu')) userMenuClose();
+});
+
+// Esc 关闭菜单（capture 阶段优先于弹窗栈 ESC：菜单打开时先关菜单，不触发弹窗关闭）
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Escape') return;
+  const dd = document.getElementById('userMenuDropdown');
+  if (dd && dd.style.display !== 'none') {
+    e.stopImmediatePropagation();
+    userMenuClose();
+  }
+}, true);
 
 // 渲染当前页面
 function renderCurrentPage() {
@@ -1652,18 +1806,25 @@ function renderMembers() {
     return matchSearch && matchClass && matchRole;
   });
 
-  // REQ-042（软删除）：默认隐藏已离队成员，「显示已离队」开关开启时灰显展示
-  if (!showDepartedMembers) filtered = filtered.filter(m => m.status !== '离队');
-  
+  // REQ-042（软删除）：默认隐藏已离队成员；
+  // REQ-049（任务书 #13）：开启「显示已离队」时活跃成员区在上、离队成员集中底部（分隔标题行），关闭时整组隐藏
+  const activeMembers = filtered.filter(m => m.status !== '离队');
+  const departedMembers = showDepartedMembers ? filtered.filter(m => m.status === '离队') : [];
+  const displayList = departedMembers.length
+    ? [...activeMembers, { __divider: true }, ...departedMembers]
+    : activeMembers;
+
   const tbody = document.getElementById('membersTableBody');
-  
-  if (!filtered.length) {
+
+  if (!displayList.length) {
     tbody.innerHTML = `<tr><td colspan="10"><div class="empty-state"><div class="empty-icon">👥</div><div class="empty-text">暂无成员数据</div><button class="btn btn-primary" onclick="showMemberModal()">+ 添加第一个成员</button></div></td></tr>`;
     memberUpdateBatchToolbar();
     return;
   }
-  
-  tbody.innerHTML = filtered.map((m, i) => {
+
+  tbody.innerHTML = displayList.map((m, i) => {
+    // REQ-049：离队分组分隔标题行
+    if (m.__divider) return '<tr class="member-divider-row"><td colspan="10">—— 已离队成员 ——</td></tr>';
     // BUG-034：行级防御——单行异常降级为提示行，不拖垮整表（否则整表停在旧渲染，出勤率列全是旧值）
     try {
     const cls = classMap[m.class] || '';
@@ -1675,7 +1836,7 @@ function renderMembers() {
     // REQ-009：职责列 = 按主/副专精推导的全部职责，tag 尺寸与职业 tag 一致（.badge）
     const derivedRoles = deriveMemberRoles(m);
     const roleTagsHtml = derivedRoles.length > 0
-      ? derivedRoles.map(r => `<span class="badge badge-role-${roleTypeMap[r] || 'dps'}">${r}</span>`).join(' ')
+      ? derivedRoles.map(r => `<span class="badge badge-role-${roleTypeMap[r] || 'dps'}">${roleIconHtml(r)}${r}</span>`).join(' ')
       : '<span style="color:var(--text-muted)">—</span>';
     
     // 专精显示
@@ -1686,17 +1847,17 @@ function renderMembers() {
     return `
       <tr${m.status === '离队' ? ' class="member-row-departed"' : ''}>
         <td><input type="checkbox" class="member-row-checkbox" value="${m.id}" ${memberSelectedIds.has(m.id) ? 'checked' : ''} onchange="memberToggleSelect('${m.id}', this.checked)"></td>
-        <td>${i + 1}</td>
+        <td class="num">${i + 1}</td>
         <td class="class-${cls}" style="font-weight:500">${m.name}</td>
         <td>
-          <span class="badge class-bg-${cls}" style="color:var(--${cls === 'priest' ? 'text-primary' : cls})">${m.class}</span>
+          <span class="badge class-bg-${cls}" style="color:var(--${cls === 'priest' ? 'text-primary' : cls})">${classIconHtml(m.class)}${m.class}</span>
         </td>
         <td style="color:var(--text-secondary)">${specHtml}</td>
         <td>${roleTagsHtml}</td>
-        <td><span class="badge ${m.status === '正式' || m.status?.trim() === 'active' ? 'badge-present' : m.status === '替补' ? 'badge-sub' : m.status === '试用' ? 'badge-late' : 'badge-inactive'}">${(function(){ const s = (m.status || '').trim(); if (s === 'inactive') return '离队'; if (s === 'active') return '正式'; return m.status || '-'; })()}</span></td>
+        <td class="center"><span class="badge ${m.status === '正式' || m.status?.trim() === 'active' ? 'badge-present' : m.status === '替补' ? 'badge-sub' : m.status === '试用' ? 'badge-late' : 'badge-inactive'}">${(function(){ const s = (m.status || '').trim(); if (s === 'inactive') return '离队'; if (s === 'active') return '正式'; return m.status || '-'; })()}</span></td>
         <td style="color:var(--text-secondary)">${m.join_date || '-'}</td>
-        <td><span style="color:${rate >= 80 ? 'var(--success)' : rate >= 60 ? 'var(--warning)' : 'var(--danger)'};font-weight:600">${rate}%</span></td>
-        <td>
+        <td class="num"><span style="color:${rate >= 80 ? 'var(--success)' : rate >= 60 ? 'var(--warning)' : 'var(--danger)'};font-weight:600">${rate}%</span></td>
+        <td class="center">
           <div class="action-btns">
             <button class="icon-btn" onclick="editMember('${m.id}')" title="编辑">✏️</button>
             ${m.status === '离队'
@@ -1716,7 +1877,7 @@ function renderMembers() {
   memberSelectedIds.forEach(id => { if (!appData.members.some(m => m.id === id)) memberSelectedIds.delete(id); });
   const selectAllEl = document.getElementById('memberSelectAll');
   if (selectAllEl) {
-    const visibleIds = filtered.map(m => m.id);
+    const visibleIds = activeMembers.map(m => m.id); // REQ-049：全选只覆盖活跃区，离队组不参与批量删除
     selectAllEl.checked = visibleIds.length > 0 && visibleIds.every(id => memberSelectedIds.has(id));
   }
   memberUpdateBatchToolbar();
@@ -2196,13 +2357,13 @@ function renderImportPreview() {
       ? `<input class="form-input" style="height:28px;padding:2px 6px" value="${r.name.replace(/"/g, '&quot;')}" oninput="importUpdateRow(${i},'name',this.value)">`
       : r.name;
     return `<tr${color ? ` style="color:${color}"` : ''}>
-      <td><input type="checkbox" ${r.include ? 'checked' : ''} onchange="importUpdateRow(${i},'include',this.checked)"></td>
+      <td class="center"><input type="checkbox" ${r.include ? 'checked' : ''} onchange="importUpdateRow(${i},'include',this.checked)"></td>
       <td>${nameCell}</td>
-      <td><select class="form-select" style="height:28px;padding:2px 6px" onchange="importUpdateRow(${i},'cls',this.value)">${classOptions(r.cls)}</select></td>
+      <td style="white-space:nowrap">${classMap[r.cls] ? `<img class="class-icon" id="importClsIcon${i}" src="assets/icons/${classMap[r.cls]}.svg" alt="" onerror="this.style.display='none'">` : `<span id="importClsIcon${i}"></span>`}<select class="form-select" style="height:28px;padding:2px 6px" onchange="importUpdateRow(${i},'cls',this.value)">${classOptions(r.cls)}</select></td>
       <td style="font-size:12px;white-space:nowrap">${r.server || '—'}</td>
       <td style="white-space:nowrap">待补充</td>
-      <td style="white-space:nowrap">${statusText[r.status]}</td>
-      <td><button type="button" class="btn btn-sm btn-danger" onclick="importRemoveRow(${i})">剔除</button></td>
+      <td class="center" style="white-space:nowrap">${statusText[r.status]}</td>
+      <td class="center"><button type="button" class="btn btn-sm btn-danger" onclick="importRemoveRow(${i})">剔除</button></td>
     </tr>`;
   }).join('');
 }
@@ -2211,6 +2372,18 @@ function importUpdateRow(i, field, value) {
   const r = importPreviewRows[i];
   if (!r) return;
   r[field] = value;
+  // 任务书 #13 §6：职业变更时同步更新行内图标
+  if (field === 'cls') {
+    const icon = document.getElementById(`importClsIcon${i}`);
+    if (icon) {
+      const key = classMap[value];
+      if (key) {
+        icon.outerHTML = `<img class="class-icon" id="importClsIcon${i}" src="assets/icons/${key}.svg" alt="" onerror="this.style.display='none'">`;
+      } else {
+        icon.outerHTML = `<span id="importClsIcon${i}"></span>`;
+      }
+    }
+  }
   // 不整表重绘（避免输入框失焦），状态在确认导入时最终校验
 }
 
@@ -2497,7 +2670,7 @@ function createActivityOnDate(dateStr) {
   document.getElementById('activityNotes').value = '';
   document.getElementById('activityWclUrl').value = '';
   document.getElementById('activityTeamTag').value = '';
-  renderRaidNameDatalist();
+  raidSelectClose(); // BUG-027：自定义下拉，打开弹窗时确保面板收起
   updateActivityDuration();
   updateActivityConflictWarning();
   openModal('activityModal');
@@ -2720,10 +2893,11 @@ function renderActivityList() {
           <div class="activity-meta">
             <span>📅 ${a.date}</span>
             <span>⏰ ${a.start_time || '--:--'} - ${a.end_time || '--:--'}</span>
-            ${a.team_tag ? `<span>🏷 ${a.team_tag}</span>` : ''}
+            ${a.team_tag ? `<span class="tag tag-blue">🏷 ${a.team_tag}</span>` : ''}
             <span>👥 ${a.attendees.length} 人登记</span>
             ${a.wcl_url ? `<a class="btn btn-sm" href="${a.wcl_url}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()" style="padding:2px 10px;font-size:12px">📊 WCL 复盘</a>` : ''}
           </div>
+          ${conflicts.length ? `<div class="activity-conflict-line">⚠ 与 ${conflicts.map(c => `《${c.raid_name || '未命名活动'}》${c.start_time || '--:--'}-${c.end_time || '--:--'}`).join('、')} 冲突</div>` : ''}
         </div>
         <div class="activity-stats">
           <div class="activity-stat">
@@ -2761,7 +2935,7 @@ function showActivityModal(activity = null) {
   document.getElementById('activityWclUrl').value = activity ? (activity.wcl_url || '') : '';
   // REQ-028：回填团队标签
   document.getElementById('activityTeamTag').value = activity ? (activity.team_tag || '') : '';
-  renderRaidNameDatalist();
+  raidSelectClose(); // BUG-027：自定义下拉，打开弹窗时确保面板收起
   updateActivityDuration();
   updateActivityConflictWarning();
   openModal('activityModal');
@@ -2998,7 +3172,7 @@ function renderAttendanceMembers(activity) {
                onchange="toggleAttendStatus(this, '${m.id}')">
         <div class="attend-name">
           <span class="class-${cls}" style="font-weight:500">${m.name}</span>${departed ? ' <span class="member-departed">（已离队）</span>' : ''}
-          <span style="color:var(--text-muted);font-size:11px;margin-left:8px">${m.class}${mainSpec ? '·' + mainSpec : ''}</span>
+          <span style="color:var(--text-muted);font-size:11px;margin-left:8px">${classIconHtml(m.class)}${m.class}${mainSpec ? '·' + mainSpec : ''}</span>
           ${roleTagsHtml ? `<span style="margin-left:6px">${roleTagsHtml}</span>` : ''}
         </div>
         <select class="attend-status-select" data-member="${m.id}" ${isCancelled ? 'disabled' : ''} onchange="updateAttendCheckbox(this)">
@@ -3220,7 +3394,14 @@ function buildWclSyncPreview(activity, reportCode, data) {
   const bossFightTotal = data.bossFightTotal || 0;
   // "已手动标记"口径：创建活动时会给全员预置"缺席"占位行（saveActivity），
   // 真正手动标过的状态（出席/迟到/替补/请假）一律不动、计入保留数
-  const preservedCount = activity.attendees.filter(a => a.status && a.status !== '缺席').length;
+  // REQ-046（任务书 #13）：保留名单同时存明细（成员名：状态），预览页悬浮展开
+  const preservedList = activity.attendees
+    .filter(a => a.status && a.status !== '缺席')
+    .map(a => {
+      const m = appData.members.find(mm => mm.id === a.member_id);
+      return { name: m ? m.name : '（名单外成员）', status: a.status };
+    });
+  const preservedCount = preservedList.length;
   const members = appData.members.filter(m => m.status !== '离队');
   wclSyncRows = (data.players || []).map(p => {
     const cls = wowClassEnToCn[(p.subType || '').toUpperCase()] || '';
@@ -3236,7 +3417,7 @@ function buildWclSyncPreview(activity, reportCode, data) {
     if (att && att.status && att.status !== '缺席') return null;
     return { ...base, memberId: member.id, zone: base.bossFights >= bossFightTotal ? 'full' : 'partial' };
   }).filter(Boolean);
-  wclSyncMeta = { activityId: activity.id, reportCode, title: data.title || '', bossFightTotal, preservedCount };
+  wclSyncMeta = { activityId: activity.id, reportCode, title: data.title || '', bossFightTotal, preservedCount, preservedList };
   wclSyncDirty = false;
   renderWclSyncPreview();
 }
@@ -3252,7 +3433,10 @@ function renderWclSyncPreview() {
     `自动出席 <strong style="color:var(--success)">${full.length}</strong> · ` +
     `部分参战 <strong style="color:var(--warning)">${partial.length}</strong> · ` +
     `未匹配 <strong style="color:var(--danger)">${unmatched.filter(r => !r.ignored).length}</strong>` +
-    (meta.preservedCount > 0 ? `　|　<strong>${meta.preservedCount}</strong> 条已手动标记，将被保留` : '');
+    (meta.preservedCount > 0
+      ? `　|　<span class="wcl-preserved-toggle"><strong>${meta.preservedCount}</strong> 条已手动标记，将被保留` +
+        `<span class="wcl-preserved-pop">${(meta.preservedList || []).map(p => `<span class="wcl-preserved-row"><span>${p.name}</span><span>${p.status}</span></span>`).join('')}</span></span>`
+      : '');
 
   const statusSelect = (r, i, opts) =>
     `<select class="form-select" id="wclSyncStatus${i}" style="height:26px;padding:2px 6px;width:76px" onchange="wclSyncSetStatus(${i},this.value)">` +
@@ -4199,7 +4383,7 @@ function lootRender() {
     return `
       <tr>
         <td><span class="loot-name">${loot.name}</span></td>
-        <td>${wishlistBadge}</td>
+        <td class="center">${wishlistBadge}</td>
         <td><span class="wishlist-raid-tag">${loot.raid || '-'}</span></td>
         <td>${loot.difficulty || ''}</td>
         <td>${loot.boss || ''}</td>
@@ -4207,11 +4391,11 @@ function lootRender() {
         <td>${loot.primaryStat || ''}</td>
         <td><div class="loot-secondary-stats">${secondaryStatsHtml || '-'}</div></td>
         <td>${assignedToHtml}</td>
-        <td><span class="badge ${statusBadge}">${loot.status || '待分配'}</span></td>
+        <td class="center"><span class="badge ${statusBadge}">${loot.status || '待分配'}</span></td>
         <td>${distMethodText}</td>
-        <td>${rollText}</td>
+        <td class="num">${rollText}</td>
         <td>${loot.date || '-'}</td>
-        <td>
+        <td class="center">
           <div class="action-btns">
             <button class="icon-btn" onclick="lootEdit('${loot.id}')" title="编辑">✏️</button>
             <button class="icon-btn danger" onclick="lootDelete('${loot.id}')" title="删除">🗑</button>
@@ -4823,13 +5007,13 @@ function wishlistRender() {
         <td>${w.boss || '-'}</td>
         <td>${w.slot || '-'}</td>
         <td class="${cls ? 'class-' + cls : ''}" style="font-weight:500">${memberName}</td>
-        <td><span class="badge ${priorityBadge}">${w.priority || 'P2'}</span></td>
+        <td class="center"><span class="badge ${priorityBadge}">${w.priority || 'P2'}</span></td>
         <td><span class="badge ${specBadge}">${specText}</span>${w.specName ? ` <span style="color:var(--text-muted);font-size:11px">(${w.specName})</span>` : ''}</td>
-        <td>
+        <td class="center">
           <span class="badge ${statusBadge}">${statusText}</span>
           ${w.obtained && w.obtainedDate ? `<div style="font-size:10px;color:var(--text-muted);margin-top:2px">${w.obtainedDate}</div>` : ''}
         </td>
-        <td>
+        <td class="center">
           <div class="action-btns">
             <button class="icon-btn" onclick="wishlistCopyTo('${w.id}')" title="复制给其他人">📋</button>
             <button class="icon-btn" onclick="wishlistToggleObtained('${w.id}')" title="${w.obtained ? '标记未获取' : '标记已获取'}">
@@ -5384,6 +5568,37 @@ function lootFillAssignedTo(name) {
 // ==================== 更新日志 ====================
 const changelogData = [
   {
+    id: 'v3.2.0-task13',
+    version: 'v3.2.0',
+    date: '2026-07-27',
+    type: 'feature',
+    typeLabel: '重大更新',
+    title: '品牌焕新「魔兽管家」与界面体验专项',
+    summary: '全站启用新品牌「魔兽管家 WoW Butler」，团本自定义下拉、活动卡片布局、头像菜单、交互反馈全面翻新，13 职业 + 3 职责本地图标上线。',
+    details: [
+      '—— 新增功能 ——',
+      '全站品牌焕新「魔兽管家 WoW Butler」：侧边栏盾标、登录页大标、页签标题与 favicon 全量替换',
+      '团本名称升级为自定义下拉面板：暗色浮层、输入过滤、最近使用置顶、其他手输兜底、键盘可用',
+      '右上角头像菜单：用户中心 / 切换公会 / 退出登录收进头像下拉',
+      '职业与职责本地图标 16 枚（单色职业色），成员列表、考勤名单、导入预览同步启用',
+      '—— 体验优化 ——',
+      '活动卡片左对齐信息组，出勤数据靠右，消除居中大空白；时间冲突直接显示小字不再依赖悬浮',
+      '调整成员角色全程有感知：变更中禁用防重、成功 toast、失败就地提示并回滚选择',
+      'WCL 同步预览"N 条已手动标记"悬浮展开逐行明细（成员：状态）',
+      '开启「显示已离队」时离队成员集中底部分组展示',
+      '—— 问题修复 ——',
+      '修复深色主题下日期/时间选择器、下拉箭头等原生控件图标看不清（全局 color-scheme: dark）',
+      '—— 其他 ——',
+      '更新日志四维分类确立为发布门禁（开发规范第五章）',
+      '—— 新增功能（#13-补遗） ——',
+      '身份徽章重设计：盾形底+图标+文字（会长金/编辑蓝/浏览灰），公会栏、成员列表、头像菜单旁统一',
+      '按钮四级规范落地（主/次幽灵/危险/文字），表格五表统一（文本左/数字右/状态居中+斑马纹+悬停+吸顶表头）',
+      '—— 体验优化（#13-补遗） ——',
+      '全站标签体系统一尺寸与语义色板（金管理/红危险/灰中性/黄警告/蓝信息/绿成功）',
+      '1366×768 中小分辨率适配：间距收紧、弹窗限宽、昵称省略、侧边栏可折叠'
+    ]
+  },
+  {
     id: 'v3.2.0-task11-12',
     version: 'v3.2.0',
     date: '2026-07-27',
@@ -5400,15 +5615,15 @@ const changelogData = [
       '活动列表与成员管理支持勾选后批量删除（二次确认、逐条列明）',
       '成员删除改为软删除：单个/批量删除均为标记「离队」，历史考勤/装备记录全部保留',
       '同名成员再次添加/导入时，可一键恢复已离队成员（恢复优先于新建）',
-      '—— 修复bug ——',
+      '—— 问题修复 ——',
       '修复智能导入确认按钮可重复点击导致重复导入',
       '修复考勤视图偏好在刷新后丢失（按账号+公会记住列表/日历选择）',
-      '—— 功能优化 ——',
+      '—— 体验优化 ——',
       '活动可取消/恢复：取消后灰显且不计入出勤率，恢复即重新计入',
       '活动团队标签同日时间交叉时黄色高亮预警；团本名称下拉记住最近使用',
       'WCL 同步成功后常驻提示未标记成员，写入期间提示勿关闭页面',
       '成员列表默认隐藏已离队成员（可开关显示），历史记录中已离队成员灰色标记',
-      '—— 模块调整 ——',
+      '—— 其他 ——',
       '出勤率统计全站过滤已取消活动（数据保留，仅统计口径调整）'
     ]
   },
@@ -5659,7 +5874,7 @@ const changelogData = [
     title: 'PC端UX视觉全面升级',
     summary: '桌面端视觉质感与交互体验全面升级，侧边栏收窄、卡片层次优化、统计卡片渐变动效、表格斑马纹、弹窗精致化，整体更具层次与精致感。',
     details: [
-      '侧边栏宽度从240px收窄至200px，标题升级为「WoW团本工具箱」，增加阴影层次感',
+      '侧边栏宽度从240px收窄至200px，标题区升级品牌展示，增加阴影层次感',
       '导航项选中态优化：金色渐变背景+左侧金色竖条+图标发光效果，悬停态金色微光',
       '所有功能模块卡片化升级：圆角阴影+悬浮加深阴影，卡片标题增加左侧金色渐变色条',
       '仪表盘统计卡片全面升级：金色大号数字+径向渐变背景+悬浮上浮动效+图标淡入',
