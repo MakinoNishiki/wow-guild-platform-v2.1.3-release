@@ -54,8 +54,8 @@
 3. **权限管理** - 三级权限（owner/editor/viewer）、成员角色变更、公会设置、公会资料（REQ-025：简介/分配制度/规则说明，仅 owner 可编辑）
 4. **仪表盘**（page:dashboard） - 出勤率统计、排行、活动概览
 5. **成员管理**（page:members） - 13个职业、专精/职责联动、职责列（按专精推导）、出勤详情、智能导入（REQ-023：双宏教程、多格式解析+时间戳清洗、名字/名字-服务器双形态查重、预览确认，专精占位"待补充"；REQ-032：「从 WCL 链接导入」标签页，复用同一预览确认链路，subType→中文职业映射、server 参与同服查重）、软删除与恢复（REQ-042：单个/批量删除 = status 置「离队」不真删行，历史考勤/心愿/装备记录全保留；列表默认隐藏离队成员，「显示已离队」开关灰显；REQ-002 查重只针对活跃成员，撞离队同名弹确认恢复优先于新建——DB 有 (guild_id,name) 唯一索引无法新建同名；装备分配/考勤详情中离队成员灰色「已离队」标记）
-6. **考勤记录**（page:attendance） - 默认列表视图/日历视图（按 userId+guildId 记忆，BUG-023）、活动CRUD、BOSS选择、WCL 日志链接（REQ-014）、WCL 同步考勤（REQ-033：已挂 WCL 链接的活动可一键同步，预览三分区——全勤绿/部分参战黄默认出席/未匹配红，不覆盖手动标记，幂等，成功后写 activities.wcl_snapshot 快照）、筛选条（REQ-018：成员/状态多选/时间范围/含已取消开关+出勤率小计，本赛季=最近90天）、考勤详情勾选批量标记（REQ-017-A）、活动列表勾选批量删除（REQ-017-B）、WCL 已导入提示条（REQ-037：快照存在且非全员已标记时显示，N 取快照 imported 字段）、活动状态（REQ-020：正常/已取消，已取消灰显+徽标、考勤区禁编辑、其考勤不计入任何出勤率，可恢复；status 服务端白名单 normal/cancelled）、团队标签与冲突检测（REQ-028：team_tag 自由文本，同标签同日时段交叉只警告不禁止，冲突活动列表黄色高亮）、团本下拉（REQ-029：datalist 可手输，最近 3 个按公会置顶，清单为 js 常量待 REQ-003 主数据切换）
-7. **装备分配**（page:loot） - 103件装备库、多维筛选、心愿独立列、Roll 点循环输入（1-100）、分配记录
+6. **考勤记录**（page:attendance） - 默认列表视图/日历视图（按 userId+guildId 记忆，BUG-023）、活动CRUD、BOSS选择、WCL 日志链接（REQ-014）、WCL 同步考勤（REQ-033：已挂 WCL 链接的活动可一键同步，预览三分区——全勤绿/部分参战黄默认出席/未匹配红，不覆盖手动标记，幂等，成功后写 activities.wcl_snapshot 快照）、筛选条（REQ-018：成员/状态多选/时间范围/含已取消开关+出勤率小计，本赛季=最近90天）、考勤详情勾选批量标记（REQ-017-A）、活动列表勾选批量删除（REQ-017-B）、WCL 已导入提示条（REQ-037：快照存在且非全员已标记时显示，N 取快照 imported 字段）、活动状态（REQ-020：正常/已取消，已取消灰显+徽标、考勤区禁编辑、其考勤不计入任何出勤率，可恢复；status 服务端白名单 normal/cancelled）、团队标签与冲突检测（REQ-028：同标签同日时段交叉只警告不禁止，冲突活动列表黄色高亮；REQ-064 起旧 team_tag 字段并入 team_label 并删列，冲突分组键同步切为团号）、团号徽章（REQ-062：team_label 可空，纯数字显示「N 团」、文字显示「团号：X」、空不显示）、团本下拉（REQ-029：datalist 可手输，最近 3 个按公会置顶，清单为 js 常量待 REQ-003 主数据切换）
+7. **装备分配**（page:loot） - 103件装备库、多维筛选、心愿独立列、Roll 点循环输入（1-100）、分配记录、从装备库选择自动带出赛季（REQ-063：按 boss_loot→game_bosses→game_raids→赛季链路回填，缺数据留空不报错）
 8. **心愿单**（page:wishlist） - 按成员管理、竞争概览
 9. **统计报表**（page:reports） - 出勤率图表、角色分布
 10. **数据管理**（page:data） - 设置、JSON导入导出、重置
@@ -66,7 +66,7 @@
 - `guilds` - 公会（name, owner_id, invite_code, description, loot_rule_type, loot_rule_text）
 - `guild_members` - 公会成员权限（user_id, guild_id, role: owner/editor/viewer）
 - `raid_members` - WoW 角色成员（guild_id, name, class, spec, role）
-- `activities` - 考勤活动（guild_id, name, activity_date, raid, boss, wcl_url, wcl_report_code, wcl_snapshot, status, team_tag）
+- `activities` - 考勤活动（guild_id, name, activity_date, raid, boss, wcl_url, wcl_report_code, wcl_snapshot, status, team_label）
 - `activity_attendance` - 出勤记录（activity_id, member_id, status）
 - `loots` - 装备分配（guild_id, item_name, member_id, boss, raid）
 - `wishlists` - 心愿单（guild_id, member_id, items JSONB）

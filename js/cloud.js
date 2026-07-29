@@ -688,9 +688,10 @@
       end_time: a.end_time || '',
       wcl_url: a.wcl_url || '',
       wcl_report_code: a.wcl_report_code || '',
-      // REQ-020/028（任务书 #12）：活动状态（normal/cancelled）与团队标签
+      // REQ-020（任务书 #12）：活动状态（normal/cancelled）
       status: a.status || 'normal',
-      team_tag: a.team_tag || '',
+      // REQ-062（任务书 #14-补丁3）：团号（可空，空串不显示徽章）。REQ-064：旧 team_tag 已并入本列，不再读取
+      team_label: a.team_label || '',
       // REQ-037（任务书 #12）：WCL 同步快照（已导入提示条的数据来源，刷新后仍需可读）
       wcl_snapshot: a.wcl_snapshot || null,
       attendees: attendanceMap[a.id] || []
@@ -797,10 +798,11 @@
           wcl_report_code: item.wcl_report_code || '',
           // REQ-033（任务书 #11）：WCL 同步考勤后写参战名单快照；未传时不触碰该列
           ...(item.wcl_snapshot !== undefined ? { wcl_snapshot: item.wcl_snapshot } : {}),
-          // REQ-020/028（任务书 #12）：status/team_tag 条件透传（同 wcl_snapshot 模式）；
+          // REQ-020（任务书 #12）：status 条件透传（同 wcl_snapshot 模式）；
           // 新增时默认 normal，编辑未传时不触碰该列
           ...(item.status !== undefined ? { status: item.status } : (operation === 'add' ? { status: 'normal' } : {})),
-          ...(item.team_tag !== undefined ? { team_tag: item.team_tag || '' } : {}),
+          // REQ-062（任务书 #14-补丁3）：团号条件透传（同 status 模式）。REQ-064：旧 team_tag 已并入本列，不再透传
+          ...(item.team_label !== undefined ? { team_label: item.team_label || '' } : {}),
           created_by: currentUser ? currentUser.id : null,
         };
 

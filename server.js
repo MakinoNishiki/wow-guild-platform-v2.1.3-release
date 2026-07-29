@@ -467,7 +467,7 @@ async function authorizeProxyRequest(user, table, method, queryString, rawBody) 
   // ---- 公会业务表：raid_members / activities / activity_attendance / loot_records / wishlists ----
   if (["raid_members", "activities", "activity_attendance", "loot_records", "wishlists"].includes(table)) {
     // REQ-020（任务书 #12）：activities.status 白名单校验，仅 normal / cancelled。
-    // 仅针对 activities 表（raid_members 的 status 是中文，不受影响）；行不带 status 字段不校验；team_tag 自由文本不校验。
+    // 仅针对 activities 表（raid_members 的 status 是中文，不受影响）；行不带 status 字段不校验。
     if (table === "activities" && (method === "POST" || method === "PATCH")) {
       for (const row of rows) {
         if (row && row.status !== undefined && row.status !== "normal" && row.status !== "cancelled") {

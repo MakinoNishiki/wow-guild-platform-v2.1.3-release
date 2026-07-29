@@ -1342,7 +1342,15 @@ body {
   font-size: 12px;
   color: var(--text-muted);
   display: flex;
-  gap: 16px;
+  gap: 6px 16px;
+  /* REQ-062（任务书 #14-补丁3）：徽章区布局重做——允许换行 + 垂直居中，
+     文字徽章不再被压缩裁剪（此前单行无 wrap，"1 团"被挤成 ▭1 的根因） */
+  flex-wrap: wrap;
+  align-items: center;
+}
+.activity-meta .tag,
+.activity-meta .btn {
+  flex: 0 0 auto;
 }
 
 .activity-stats {
@@ -4087,6 +4095,18 @@ body.viewer-mode #memberSelectAll {
 .loot-effect-green {
   color: #1eff00;
 }
+
+/* 任务书 #14-补丁3：专精区块 13 张职业表四列横向对齐——fixed 布局 + 固定列宽，与内容长度无关 */
+.md-specs-table {
+  table-layout: fixed;
+}
+.md-specs-table th:nth-child(1),
+.md-specs-table td:nth-child(1) { width: 60px; }
+.md-specs-table th:nth-child(2),
+.md-specs-table td:nth-child(2) { width: 130px; }
+.md-specs-table th:nth-child(3),
+.md-specs-table td:nth-child(3) { width: 150px; }
+.md-specs-table td:nth-child(4) { word-break: break-all; }
 
 /* ==================== REQ-055：考勤实时统计行 ==================== */
 .attendance-stats-line {

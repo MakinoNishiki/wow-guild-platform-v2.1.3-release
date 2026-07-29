@@ -874,10 +874,12 @@
       </div>
       <!-- REQ-012：活动时长实时显示 -->
       <div id="activityDuration" style="font-size:12px;color:var(--text-muted);margin:-8px 0 12px 2px"></div>
-      <!-- REQ-028：团队标签（可选，空为默认团），冲突检测按标签分组 -->
-      <div class="form-group">
-        <label class="form-label">团队标签<span style="color:var(--text-muted);font-weight:400">（可选）</span></label>
-        <input type="text" class="form-input" id="activityTeamTag" placeholder="如 1 团 / 2 团，留空则为默认团" oninput="updateActivityConflictWarning()">
+      <div class="form-row">
+        <!-- REQ-062（任务书 #14-补丁3）：团号（可选，卡片徽章显示）。REQ-064（补丁4）：旧「团队标签」已并入本字段，面板只保留这一个 -->
+        <div class="form-group">
+          <label class="form-label">团号<span style="color:var(--text-muted);font-weight:400">（可选）</span></label>
+          <input type="text" class="form-input" id="activityTeamLabel" placeholder="如 1 或 战战子" oninput="updateActivityConflictWarning()">
+        </div>
       </div>
       <!-- REQ-028：时间冲突黄色警告条（仅提示，不阻断保存） -->
       <div id="activityConflictWarning" class="activity-conflict-warning" style="display:none"></div>

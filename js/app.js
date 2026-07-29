@@ -381,19 +381,20 @@ function activityTimeRangeMinutes(a) {
   return [s, e];
 }
 
-// REQ-028：时间冲突检测。规则：同日 + 同团队标签（双方都空视为同组）+ 时间段交叉。
+// REQ-028：时间冲突检测。规则：同日 + 同团号（双方都空视为同组）+ 时间段交叉。
+// REQ-064（任务书 #14-补丁4）：旧「团队标签」team_tag 已并入「团号」team_label（值已迁移），分组键同步切换。
 // 交叉判定：半开区间 s1 < e2 && s2 < e1（首尾相接不算冲突）；跨天已按 +24h 归一。
 // 已取消的活动不占用时间，不参与冲突判定；编辑时由 excludeId 排除自身。
 function findActivityConflicts(candidate, excludeId) {
   if (!candidate || !candidate.date) return [];
   const range = activityTimeRangeMinutes(candidate);
   if (!range) return [];
-  const tag = (candidate.team_tag || '').trim();
+  const label = (candidate.team_label || '').trim();
   return appData.activities.filter(a => {
     if (a.id === excludeId) return false;
     if (a.status === 'cancelled') return false;
     if (a.date !== candidate.date) return false;
-    if ((a.team_tag || '').trim() !== tag) return false;
+    if ((a.team_label || '').trim() !== label) return false;
     const r = activityTimeRangeMinutes(a);
     if (!r) return false;
     return range[0] < r[1] && r[0] < range[1];
@@ -406,7 +407,7 @@ function updateActivityConflictWarning() {
   if (!el) return;
   const conflicts = findActivityConflicts({
     date: document.getElementById('activityDate').value,
-    team_tag: document.getElementById('activityTeamTag').value,
+    team_label: document.getElementById('activityTeamLabel').value,
     start_time: document.getElementById('activityStartTime').value,
     end_time: document.getElementById('activityEndTime').value
   }, editingActivityId);
@@ -2803,7 +2804,8 @@ function createActivityOnDate(dateStr) {
   document.getElementById('activityEndTime').value = '23:00';
   document.getElementById('activityNotes').value = '';
   document.getElementById('activityWclUrl').value = '';
-  document.getElementById('activityTeamTag').value = '';
+  // REQ-064：旧 team_tag 输入框已移除；此处一并清空团号（原补丁3漏清，日历格子连点会串值）
+  document.getElementById('activityTeamLabel').value = '';
   raidSelectClose(); // BUG-027：自定义下拉，打开弹窗时确保面板收起
   updateActivityDuration();
   updateActivityConflictWarning();
@@ -3036,7 +3038,7 @@ function renderActivityList() {
           <div class="activity-meta">
             <span>📅 ${a.date}</span>
             <span>⏰ ${a.start_time || '--:--'} - ${a.end_time || '--:--'}</span>
-            ${a.team_tag ? `<span class="tag tag-blue">🏷 ${a.team_tag}</span>` : ''}
+            ${a.team_label ? `<span class="tag tag-gold" title="团号">${/^\d+$/.test((a.team_label || '').trim()) ? `${(a.team_label || '').trim()} 团` : `团号：${a.team_label}`}</span>` : ''}
             <span>👥 ${a.attendees.length} 人登记</span>
             ${a.wcl_snapshot ? `<span class="tag tag-blue" title="已从 WCL 导入 ${(typeof a.wcl_snapshot.imported === 'number' ? a.wcl_snapshot.imported : a.attendees.filter(x => x.status && x.status !== '缺席').length)} 人考勤（快照留存）">手动标记 ${(typeof a.wcl_snapshot.imported === 'number' ? a.wcl_snapshot.imported : a.attendees.filter(x => x.status && x.status !== '缺席').length)}</span>` : ''}
             ${a.wcl_url ? `<a class="btn btn-sm" href="${a.wcl_url}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()" style="padding:2px 10px;font-size:12px">📊 WCL 复盘</a>` : ''}
@@ -3077,8 +3079,8 @@ function showActivityModal(activity = null) {
   document.getElementById('activityNotes').value = activity ? activity.notes || '' : '';
   // REQ-014：回填 WCL 链接
   document.getElementById('activityWclUrl').value = activity ? (activity.wcl_url || '') : '';
-  // REQ-028：回填团队标签
-  document.getElementById('activityTeamTag').value = activity ? (activity.team_tag || '') : '';
+  // REQ-062：回填团号
+  document.getElementById('activityTeamLabel').value = activity ? (activity.team_label || '') : '';
   raidSelectClose(); // BUG-027：自定义下拉，打开弹窗时确保面板收起
   updateActivityDuration();
   updateActivityConflictWarning();
@@ -3153,8 +3155,8 @@ async function saveActivity() {
     notes: document.getElementById('activityNotes').value.trim(),
     wcl_url: wclParsed.url,
     wcl_report_code: wclParsed.code,
-    // REQ-028：团队标签（trim；空串与 syncActivity 透传一致）
-    team_tag: document.getElementById('activityTeamTag').value.trim()
+    // REQ-062：团号（trim；空串不显示徽章）。REQ-064：旧 team_tag 已并入本字段，不再读写
+    team_label: document.getElementById('activityTeamLabel').value.trim()
   };
   // REQ-028：时间冲突仅弹窗内黄色警告条提示（updateActivityConflictWarning 实时刷新），不阻断保存
 
@@ -5765,6 +5767,80 @@ function lootFillAssignedTo(name) {
 // ==================== 初始化 ====================
 // ==================== 更新日志 ====================
 const changelogData = [
+  {
+    id: 'v3.2.0-task14-patch4-feature',
+    version: 'v3.2.0',
+    date: '2026-07-29',
+    type: 'feature',
+    typeLabel: '新增功能',
+    title: '装备库选择自动带出赛季',
+    summary: '装备分配从装备库选择装备后，按来源链路自动回填「赛季」字段。',
+    details: [
+      '确认选择后按 掉落→BOSS→团本→所属赛季 链路推导赛季名（如 12.1 团本 → S2），自动填入分配行「赛季」',
+      '装备无来源或链路任一环节缺数据时赛季留空，不报错、不阻断填充',
+      '内置库回退路径（回滚开关）同样按团本名反查赛季处理'
+    ]
+  },
+  {
+    id: 'v3.2.0-task14-patch4-refactor',
+    version: 'v3.2.0',
+    date: '2026-07-29',
+    type: 'refactor',
+    typeLabel: '模块调整',
+    title: '活动「团队标签」并入「团号」',
+    summary: '创建/编辑活动面板的旧「团队标签」（蓝色徽章）与新「团号」（黄色徽章）去重，只保留团号。',
+    details: [
+      '数据迁移：旧团队标签有值且团号为空的记录，旧值迁入团号（增量 SQL sql/13，待运营执行）',
+      '面板只保留「团号」一个字段；旧蓝色团队标签徽章下线，团号黄色徽章规则不变（纯数字→「N 团」、文字→「团号：X」、空不显）',
+      '时间冲突检测分组键同步切换为团号：同团号同日时段交叉仍黄色警告，不同团号互不干扰',
+      '数据库旧列 team_tag 随 sql/13 一并删除（已评估无其他引用方）'
+    ]
+  },
+  {
+    id: 'v3.2.0-task14-patch3-feature',
+    version: 'v3.2.0',
+    date: '2026-07-29',
+    type: 'feature',
+    typeLabel: '新增功能',
+    title: '活动「团号」徽章',
+    summary: '活动新增团号字段，考勤卡片直接显示「N 团 / 团号：X」徽章。',
+    details: [
+      '创建/编辑活动面板新增「团号」输入框（可空），填纯数字显示「N 团」、填文字显示「团号：X」、留空不显示',
+      '活动卡片徽章区布局重做：文字徽章不再被裁剪，与手动标记徽章/WCL 复盘按钮排列协调',
+      '旧活动记录无团号字段照常渲染，无需删改历史数据（增量 SQL 执行后生效）'
+    ]
+  },
+  {
+    id: 'v3.2.0-task14-patch3-improve',
+    version: 'v3.2.0',
+    date: '2026-07-29',
+    type: 'improve',
+    typeLabel: '功能优化',
+    title: '套装名物化与效果独立填写',
+    summary: 'S1/S2 套装名真实写入全部专精行，2件/4件效果不再绑定套装名。',
+    details: [
+      '套装名物化：S1/S2 已录套装名真实写入该职业全部专精行（共 77 行），不再依赖占位联动显示',
+      'S2 十三职业官方套装名全量入库（翡翠督军的统御 / 祝圣烈焰之耀 / 潜伏蝰蛇的伏击 等）',
+      '解除绑定：套装名为空时 2 件/4 件效果也可独立填写保存'
+    ]
+  },
+  {
+    id: 'v3.2.0-task14-patch3-fix',
+    version: 'v3.2.0',
+    date: '2026-07-29',
+    type: 'fix',
+    typeLabel: '修复BUG',
+    title: '装备库确认链路、专精表对齐与下拉合并',
+    summary: '修复装备库「确认选择」无反应（BUG-051），特效重复前缀、专精表列对齐、「其他」下拉合并。',
+    details: [
+      '修复装备库选择面板可选中但「确认选择」无反应（BUG-051）：主数据装备 UUID 未加引号导致选中失效',
+      '修复装备卡片特效显示「装备：装备：」重复前缀：录入文本已含前缀时显示层不再重复添加',
+      '修复数据中心专精区块 13 个职业表格列宽不一：四列固定宽度，全职业左对齐同一位置',
+      '掉落池部位/类型下拉删除单列「其他」，统一保留「其他（手动输入）」，历史已存"其他"值照常显示编辑',
+      '修复日期输入框 Ctrl+A 全选时原生 yyyy/mm/dd 白色高亮透出：拦截全选快捷键，空值框也只显示中文占位',
+      '清除掉落池测试垃圾数据 3 行，9 张主数据表全量复查'
+    ]
+  },
   {
     id: 'v3.2.0-task13-patch',
     version: 'v3.2.0',
@@ -9568,7 +9644,7 @@ function getMasterLootItems() {
       MasterData.getLoot(boss.id).forEach(l => {
         items.push({
           id: l.id, name: l.item_name,
-          raid: raid.name, raidName: raid.name,
+          raid: raid.name, raidName: raid.name, raidId: raid.id,
           boss: boss.name, bossIndex: `${boss.boss_order}号`,
           armorType: l.item_type || '', slot: l.slot || '',
           icon: '📦', quality: 'epic', itemLevel: '',
@@ -9682,7 +9758,7 @@ function renderItemDbList() {
     const sourceText = `${item.raidName} · ${item.bossIndex} ${item.boss}`;
     
     return `
-      <div class="item-card ${isSelected ? 'selected' : ''}" onclick="selectDbItem(${item.id})">
+      <div class="item-card ${isSelected ? 'selected' : ''}" onclick="selectDbItem('${item.id}')">
         <div class="item-card-icon">${item.icon}</div>
         <div class="item-card-info">
           <div class="item-card-name ${qualityClass}">${item.name}</div>
@@ -9690,7 +9766,7 @@ function renderItemDbList() {
           <div class="item-card-stats">
             <div><span class="stat-label">主属性：</span>${primaryStatHtml}</div>
             <div><span class="stat-label">副属性：</span>${secondaryStatHtml}</div>
-            ${item.equipEffect ? `<div class="loot-effect-green" style="margin-top:4px;">装备：${item.equipEffect.substring(0, 80)}${item.equipEffect.length > 80 ? '...' : ''}</div>` : ''}
+            ${item.equipEffect ? `<div class="loot-effect-green" style="margin-top:4px;">装备：${item.equipEffect.replace(/^装备[:：]\s*/, '').substring(0, 80)}${item.equipEffect.replace(/^装备[:：]\s*/, '').length > 80 ? '...' : ''}</div>` : ''}
           </div>
         </div>
         <div class="item-card-source">${sourceText}</div>
@@ -9702,7 +9778,8 @@ function renderItemDbList() {
 // 选择装备
 let itemDbPickerItems = []; // 当前 picker 数据源（主数据 boss_loot 或内置库）
 function selectDbItem(itemId) {
-  selectedDbItem = itemDbPickerItems.find(i => i.id === itemId) || itemDatabase.find(i => i.id === itemId);
+  // BUG-051：boss_loot 主键为 UUID 字符串，内置库为数字——统一按字符串比较，回退路径也兼容
+  selectedDbItem = itemDbPickerItems.find(i => String(i.id) === String(itemId)) || itemDatabase.find(i => String(i.id) === String(itemId));
   document.getElementById('itemDbConfirmBtn').disabled = false;
   renderItemDbList();
 }
@@ -9720,6 +9797,28 @@ function confirmItemDbSelection() {
   }
   
   closeModal('itemDbModal');
+}
+
+// REQ-063（任务书 #14-补丁4）：按来源链路 掉落(boss_loot)→BOSS(game_bosses)→团本(game_raids)→赛季(game_seasons)
+// 推导装备所属赛季名。主数据路径用 item.raidId 直查；内置库回退路径用团本中文名反查。
+// 装备无来源或链路任一环缺数据时返回 ''（留空），不报错。
+function resolveItemDbSeasonName(item, raidName) {
+  try {
+    if (typeof MasterData === 'undefined' || !MasterData.getRaids) return '';
+    let raid = null;
+    if (item && item.raidId) {
+      raid = MasterData.getRaids().find(r => r.id === item.raidId) || null;
+    }
+    if (!raid && raidName && typeof MasterData.getRaidByName === 'function') {
+      raid = MasterData.getRaidByName(raidName);
+    }
+    if (!raid || !raid.season_id) return '';
+    const season = (MasterData.getSeasons() || []).find(s => s.id === raid.season_id);
+    return season ? (season.name || '') : '';
+  } catch (e) {
+    console.warn('[REQ-063] 赛季推导失败，按留空处理:', e);
+    return '';
+  }
 }
 
 // 装备分配-从装备库填充
@@ -9815,6 +9914,10 @@ function lootFillFromItemDb(item) {
   
   // 特殊效果
   document.getElementById('lootSpecialEffect').value = item.equipEffect || '';
+  
+  // REQ-063（任务书 #14-补丁4）：按来源链路自动回填「赛季」；无来源/链路缺数据时留空不报错
+  const lootSeasonInput = document.getElementById('lootSeason');
+  if (lootSeasonInput) lootSeasonInput.value = resolveItemDbSeasonName(item, raidName);
   
   // 更新心愿单匹配
   if (typeof lootUpdateWishlistMatches === 'function') {
@@ -9959,11 +10062,11 @@ function mdOpenEditor(title, fields, row, onSave) {
         `<span class="tag tag-grey md-tag${selected.includes(o) ? ' md-tag-on' : ''}" onclick="mdTagToggle(this,'${f.key}','${o}')">${o}</span>`).join('')}</div>
         <input type="hidden" id="mdField_${f.key}" value='${JSON.stringify(selected)}'>`;
     } else if (f.type === 'selectCustom') {
-      // REQ-054：下拉 + 手动录入兜底（选"其他（手输）"时出现文本框）
+      // REQ-054：下拉 + 手动录入兜底（选"其他（手动输入）"时出现文本框）
       const inList = (f.options || []).includes(val);
       const selVal = inList || !val ? val : '__custom__';
       const opts = (f.options || []).map(o => `<option value="${o}" ${String(o) === String(selVal) ? 'selected' : ''}>${o}</option>`).join('') +
-        `<option value="__custom__" ${selVal === '__custom__' ? 'selected' : ''}>其他（手输）</option>`;
+        `<option value="__custom__" ${selVal === '__custom__' ? 'selected' : ''}>其他（手动输入）</option>`;
       control = `<select class="form-select" id="mdField_${f.key}" onchange="mdSelectCustomToggle('${f.key}');${f.onchange || ''}">${opts}</select>
         <input type="text" class="form-input" id="mdField_${f.key}_custom" style="margin-top:6px;${selVal === '__custom__' ? '' : 'display:none'}" value="${selVal === '__custom__' ? String(val).replace(/"/g, '&quot;') : ''}" placeholder="手动输入${f.label}">`;
     } else {
@@ -10040,9 +10143,9 @@ async function mdDeleteRow(table, id, label, cascadeNote) {
   }
 }
 
-// 表格骨架（遵循 REQ-026/030 组件规范）
-function mdTable(headers, rowsHtml) {
-  return `<div class="table-container"><table class="data-table"><thead><tr>${headers}</tr></thead><tbody>${rowsHtml || `<tr><td colspan="10" style="text-align:center;color:var(--text-muted);padding:20px">暂无数据</td></tr>`}</tbody></table></div>`;
+// 表格骨架（遵循 REQ-026/030 组件规范）；tableClass 用于需要固定列宽的区块（如专精表）
+function mdTable(headers, rowsHtml, tableClass) {
+  return `<div class="table-container"><table class="data-table${tableClass ? ' ' + tableClass : ''}"><thead><tr>${headers}</tr></thead><tbody>${rowsHtml || `<tr><td colspan="10" style="text-align:center;color:var(--text-muted);padding:20px">暂无数据</td></tr>`}</tbody></table></div>`;
 }
 const mdActionBtns = (editFn, delFn) => `<td class="center"><div class="action-btns"><button class="icon-btn" onclick="${editFn}" title="编辑">✏️</button><button class="icon-btn danger" onclick="${delFn}" title="删除">🗑</button></div></td>`;
 
@@ -10225,10 +10328,12 @@ function mdEditBoss(id, raidId) {
 // ---------- 5. 掉落池（两级导航 + 批量录入） ----------
 // REQ-054：部位/类型下拉+手输兜底，特效多行文本，主/副属性标签多选
 // REQ-060：部位↔类型联动（映射表任务书给定，照此实现）；类型按上表细分单手/双手
-const MD_LOOT_SLOTS = ['武器', '头部', '颈部', '肩部', '背部', '胸部', '手腕', '手部', '腰部', '腿部', '脚部', '手指', '饰品', '副手', '其他'];
+// 任务书 #14-补丁3：「其他」项合并——下拉只保留「其他（手动输入）」兜底（selectCustom __custom__），
+// 不再单列「其他」选项；历史已存"其他"值编辑时自动落入手输框、列表显示原值，兼容不报错
+const MD_LOOT_SLOTS = ['武器', '头部', '颈部', '肩部', '背部', '胸部', '手腕', '手部', '腰部', '腿部', '脚部', '手指', '饰品', '副手'];
 const MD_LOOT_TYPES = ['板甲', '锁甲', '皮甲', '布甲', '披风', '项链', '戒指', '饰品',
   '单手剑', '双手剑', '单手斧', '双手斧', '单手锤', '双手锤', '匕首', '拳套', '长柄武器', '法杖', '弓', '枪', '弩', '魔杖', '战刃',
-  '盾牌', '副手物品', '其他'];
+  '盾牌', '副手物品'];
 const MD_ARMOR_TYPES = ['板甲', '锁甲', '皮甲', '布甲'];
 const MD_SLOT_TYPE_MAP = {
   '头部': MD_ARMOR_TYPES, '肩部': MD_ARMOR_TYPES, '胸部': MD_ARMOR_TYPES, '手腕': MD_ARMOR_TYPES,
@@ -10251,7 +10356,7 @@ function mdLootSlotChanged() {
   const legal = MD_SLOT_TYPE_MAP[slot];
   const current = typeEl.value;
   const options = legal ? [...legal, '__custom__'] : [...MD_LOOT_TYPES, '__custom__'];
-  typeEl.innerHTML = options.map(o => `<option value="${o}">${o === '__custom__' ? '其他（手输）' : o}</option>`).join('');
+  typeEl.innerHTML = options.map(o => `<option value="${o}">${o === '__custom__' ? '其他（手动输入）' : o}</option>`).join('');
   if (legal && legal.includes(current)) typeEl.value = current;
   else if (!legal) typeEl.value = MD_LOOT_TYPES.includes(current) ? current : typeEl.value;
   // 不合法已选值自动清空（选回第一项或留空）
@@ -10427,15 +10532,16 @@ function mdRenderTierSets(panel) {
         }).join('');
       }).join('')) : '<div style="color:var(--text-muted)">请先在「赛季」区新增赛季</div>'}`;
 }
-// 套装格子保存：行不存在时仅套装名可建行；套装名改动后提示同步同职业其他专精行
+// 套装格子保存：行不存在时任一字段均可建行（任务书 #14-补丁3：效果不再绑定套装名，可独立填写保存）；
+// 套装名改动后提示同步同职业其他专精行
 async function mdTierSetSave(classId, specId, label, value, rowId, field) {
   if (!mdTierSeasonId) return;
   try {
     if (rowId) {
       await MasterData.mdUpdate('tier_sets', { [field]: value }, `id=eq.${rowId}`);
     } else {
-      if (field !== 'set_name' || !value.trim()) { showToast('请先填写套装名再录效果', 'warning'); renderDatacenter(); return; }
-      await MasterData.mdInsert('tier_sets', { season_id: mdTierSeasonId, class_id: classId, spec_id: specId, set_name: value.trim() });
+      // set_name 列 NOT NULL：效果先行建行时套装名以空串占位，后续可补
+      await MasterData.mdInsert('tier_sets', { season_id: mdTierSeasonId, class_id: classId, spec_id: specId, set_name: field === 'set_name' ? value.trim() : '', [field]: field === 'set_name' ? value.trim() : value });
     }
     await MasterData.refresh('tier_sets');
     // REQ-053：套装名职业级联动——改一行后提示同步同职业其他专精行
@@ -10526,7 +10632,7 @@ function mdRenderSpecs(panel) {
     if (!specs.length) return '';
     return `<div style="margin-bottom:16px">
       <div style="font-weight:600;margin-bottom:8px;color:${c.color || 'var(--gold)'}">${c.name_zh}</div>
-      ${mdTable('<th class="num" style="width:50px">ID</th><th>专精</th><th>职责</th><th>图标路径</th>',
+      ${mdTable('<th class="num">ID</th><th>专精</th><th>职责</th><th>图标路径</th>',
         specs.map(s => `<tr>
           <td class="num">${s.spec_key}</td>
           <td style="font-weight:500">${s.name_zh}</td>
@@ -10534,7 +10640,7 @@ function mdRenderSpecs(panel) {
             ${['TANK', 'HEALER', 'DAMAGE'].map(r => `<option value="${r}" ${s.role === r ? 'selected' : ''}>${r}</option>`).join('')}
           </select></td>
           <td><input class="form-input" style="height:32px;padding:2px 8px;font-size:12px" value="${s.icon || ''}" onchange="mdSpecFieldSave('${s.id}','icon',this.value)"></td>
-        </tr>`).join(''))}
+        </tr>`).join(''), 'md-specs-table')}
     </div>`;
   }).join('');
   panel.innerHTML = html || '<div style="color:var(--text-muted)">尚无专精数据，请先运行「导入职业/专精字典」</div>';
@@ -10617,6 +10723,12 @@ function zhWrapDateInput(input) {
   };
   input.addEventListener('input', render);
   input.addEventListener('change', render);
+  // 任务书 #14-补丁3 第五项：Ctrl+A 全选时 Chrome 对原生 date 分段用「高亮底色+强制白字」自绘
+  // （非 ::selection，CSS 管不到），空值时白色 yyyy/mm/dd 字母透出盖过中文遮罩。
+  // date 输入为分段编辑，全选无实际编辑意义——拦截 Ctrl/Cmd+A，杜绝原生选中态自绘。
+  input.addEventListener('keydown', (e) => {
+    if ((e.ctrlKey || e.metaKey) && (e.key === 'a' || e.key === 'A')) e.preventDefault();
+  });
   // REQ-061/BUG-050 衍生：程序切换 input 显隐时（如自定义日期范围），遮罩同步显隐
   const syncVisibility = () => { wrap.style.display = input.style.display === 'none' ? 'none' : ''; };
   new MutationObserver(syncVisibility).observe(input, { attributes: true, attributeFilter: ['style'] });
