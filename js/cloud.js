@@ -602,6 +602,8 @@
       primaryStat: l.item_stats ? l.item_stats.primaryStat : '',
       secondaryStats: l.item_stats ? l.item_stats.secondaryStats : [],
       specialEffect: l.item_stats ? l.item_stats.specialEffect : '',
+      // REQ-054：主数据掉落新字段展示侧（有则显示，无则隐藏）
+      effect: l.item_stats ? (l.item_stats.effect || '') : '',
       assignedTo: l.item_stats ? l.item_stats.assignedTo : '',
       status: l.item_stats ? l.item_stats.status : '待分配',
       priority: l.item_stats ? l.item_stats.priority : 'P2',
@@ -859,6 +861,8 @@
       primaryStat: item.primaryStat,
       secondaryStats: item.secondaryStats,
       specialEffect: item.specialEffect,
+      // REQ-054：特效字段透传（展示侧"有则显示"）
+      ...(item.effect !== undefined ? { effect: item.effect } : {}),
       assignedTo: item.assignedTo,
       status: item.status,
       priority: item.priority,
@@ -1458,6 +1462,8 @@
     getWowServers: getWowServers,
     getAllWowServers: getAllWowServers,
     dbQuery: dbQuery,
+    // 任务书 #14：主数据层直连读取（RLS select 放行 authenticated；写仍走代理超管校验）
+    getClient: () => supabaseClient,
     // REQ-032/033（任务书 #11）：前端调 /api/wcl/* 端点需复用同一途径取用户 JWT
     getAccessToken: getAccessToken,
     // 用户中心

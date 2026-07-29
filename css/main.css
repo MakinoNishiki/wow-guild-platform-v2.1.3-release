@@ -4000,3 +4000,104 @@ body.viewer-mode #memberSelectAll {
   justify-content: center;
   text-align: center;
 }
+
+/* ==================== REQ-052：日期输入中文遮罩 ==================== */
+.date-zh-wrap {
+  position: relative;
+  display: block;
+}
+/* BUG-049（补丁2 根治）：原生 datetime-edit 文本全状态透明（不设例外），
+   显示职责完全交给遮罩层——普通文本、字段、选中高亮全部不可见 */
+.date-zh-wrap input[type="date"] {
+  color: transparent;
+  width: 100%;
+  caret-color: transparent;
+}
+.date-zh-wrap input[type="date"]::-webkit-datetime-edit,
+.date-zh-wrap input[type="date"]::-webkit-datetime-edit-fields-wrapper,
+.date-zh-wrap input[type="date"]::-webkit-datetime-edit-text,
+.date-zh-wrap input[type="date"]::-webkit-datetime-edit-year-field,
+.date-zh-wrap input[type="date"]::-webkit-datetime-edit-month-field,
+.date-zh-wrap input[type="date"]::-webkit-datetime-edit-day-field {
+  color: transparent;
+  background: transparent;
+}
+.date-zh-wrap input[type="date"]::selection,
+.date-zh-wrap input[type="date"]::-webkit-datetime-edit::selection,
+.date-zh-wrap input[type="date"]::-webkit-datetime-edit-text::selection,
+.date-zh-wrap input[type="date"]::-webkit-datetime-edit-year-field::selection,
+.date-zh-wrap input[type="date"]::-webkit-datetime-edit-month-field::selection,
+.date-zh-wrap input[type="date"]::-webkit-datetime-edit-day-field::selection {
+  color: transparent;
+  background: transparent;
+}
+
+.date-zh-wrap .date-zh-text {
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+  color: var(--text-primary);
+  font-size: 13px;
+  white-space: nowrap;
+}
+.date-zh-wrap .date-zh-text.date-zh-empty {
+  color: var(--text-muted);
+}
+/* 选择器图标保持可见（color-scheme: dark 已保证对比度） */
+.date-zh-wrap input[type="date"]::-webkit-calendar-picker-indicator {
+  opacity: 1;
+  cursor: pointer;
+}
+/* BUG-050：遮罩包裹为 inline-block，考勤筛选行内不再撑满整行挤压「含已取消」；
+   筛选行日期框给固定宽度（全分辨率不重叠不折行） */
+.date-zh-wrap {
+  display: inline-block;
+  width: 100%;
+}
+#attFilterBar .date-zh-wrap {
+  width: 140px;
+  flex: 0 0 auto;
+}
+
+/* ==================== REQ-054：标签多选（数据中心掉落表单） ==================== */
+.md-tags {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.md-tag {
+  cursor: pointer;
+  user-select: none;
+}
+.md-tag-on {
+  background: rgba(240, 192, 96, 0.2);
+  color: var(--gold);
+}
+
+/* REQ-053 整改：套装名占位联动样式——更浅+斜体+"如："前缀，与实值一眼可辨 */
+.md-tier-setname::placeholder {
+  color: var(--text-muted);
+  opacity: 0.55;
+  font-style: italic;
+}
+
+/* REQ-059：装备特效文本游戏绿（WoW tooltip 绿字） */
+.loot-effect-green {
+  color: #1eff00;
+}
+
+/* ==================== REQ-055：考勤实时统计行 ==================== */
+.attendance-stats-line {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-bottom: 10px;
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.attendance-stats-line .att-stat-zero {
+  color: var(--text-muted);
+  opacity: 0.6;
+}

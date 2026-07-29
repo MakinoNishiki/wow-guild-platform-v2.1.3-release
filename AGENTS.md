@@ -1,5 +1,15 @@
 # AGENTS.md - 魔兽管家（WoW Butler）
 
+## 开工铁律（持久生效，适用于所有后续任务）
+
+任何任务（任务书/补丁/BUG 修复）开工前，**必须先完整阅读 `docs/开发规范.md` 与 `docs/问题与需求清单.md` 最新版**——无需运营在任务指令中重复此要求。
+
+核心红线摘要（防止不翻文件）：
+
+1. **验证纪律**：修改报告声称"真浏览器实测"必须写明具体页面/按钮/交互；主链路（CRUD/保存）未实测视为交付未完成。
+2. **git 纪律**：运营验收通过前一律不提交 git。
+3. **编号纪律**：新需求/BUG 必须登记台账（REQ/BUG/FIXED 编号），changelog 按「新增功能/功能优化/修复BUG/模块调整」四维补录。
+
 ## 项目概览
 魔兽管家（WoW Butler）——面向 WoW 公会的团本考勤管理平台，暗色史诗奇幻风格（WoW 主题），基于 Supabase 云端协作。Supabase 是唯一主数据源（本地模式与飞书同步已移除）。
 
@@ -86,6 +96,14 @@
 - token 管理：进程内缓存 access_token，提前 60s 刷新；**报告数据本身不缓存**（用户可能刚传完 log 就要同步）
 - 速率限制：WCL V2 GraphQL 免费档 3600 points/小时，单次同步远低于额度；错误中文透传（429 超限 / 504 超时 10s / 502 报告不存在或私有或服务暂不可用）
 - 回归脚本：`scripts/verify-wcl-api.js`（API 连通性）、`scripts/verify-wcl-endpoints.js`（端点端到端冒烟，需传入 WCL 凭证环境变量）
+
+### 主数据层（任务书 #14，V2.2）
+- 9 张游戏字典表（sql/10）：game_patches / game_seasons（is_current 部分唯一索引=赛季口径权威源）/ game_raids（type 仅 raid|lair，巢穴 15-25）/ game_bosses / boss_loot / tier_sets / game_dungeons / game_classes / game_specs
+- 权限（运营拍板）：全产品共用一套字典，全登录用户可读（RLS select authenticated），仅产品超管可写（`app_metadata.role='superadmin'`；server.js 代理主数据分支校验，RLS 为直连最后防线）；超管设置 = 运营在 Supabase Dashboard 给本人账号写 app_metadata
+- 加载层 `js/masterData.js`（window.MasterData）：登录后并行拉 9 表 + 5s 超时 + `js/masterDataSnapshot.js` 内置快照兜底（失败 toast 不白屏）；访问函数 getRaids/getBosses/getClasses/getSpecs/getCurrentSeason/getDungeons/getLoot/getTierSets；写助手 mdInsert/mdUpdate/mdDelete/mdUpsert
+- 维护页「数据中心」（侧边栏 tab，仅超管可见 + switchPage 守卫）：9 区块 CRUD + 字典导入器（数据源=内置快照 masterDataSnapshot.js，幂等 upsert，BUG-046 起不再依赖外部文件）+ 掉落批量录入
+- 消费方统一走 app.js 访问层：getGameRaidNames/getGameBossNames/getGameSpecs/getGameRaidType/getGameCurrentSeasonStart（MasterData 优先，常量回退）；REQ-018 本赛季口径读 game_seasons.is_current
+- 回归脚本：`scripts/verify-master-data.js`（8 项，sql/10 未执行时结构类自动跳过）
 
 ## 关键数据
 - 4个团本（12.0）：虚影尖塔、梦境裂隙、进军奎尔丹纳斯、孢陨幽境

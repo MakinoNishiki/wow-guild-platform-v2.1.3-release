@@ -201,6 +201,46 @@ const raidBossMap = {
 // 主数据层 V2.2 上线后切换为数据库驱动（REQ-003/004）
 const RAID_NAME_OPTIONS = ['尼鲁巴尔王宫', ...Object.keys(raidBossMap)];
 
+// ==================== 任务书 #14：游戏字典统一访问层 ====================
+// 主数据（MasterData）已加载 → 读数据库；未加载/快照模式 → 回退上方常量（快照=常量固化）。
+function getGameRaidNames() {
+  if (window.MasterData && MasterData.isLoaded()) {
+    const names = MasterData.getRaids().map(r => r.name);
+    if (names.length) return names;
+  }
+  return RAID_NAME_OPTIONS;
+}
+function getGameBossNames(raidName) {
+  if (window.MasterData && MasterData.isLoaded()) {
+    const raid = MasterData.getRaidByName(raidName);
+    return raid ? MasterData.getBosses(raid.id).map(b => b.name) : [];
+  }
+  return raidBossMap[raidName] || [];
+}
+function getGameSpecs(cls) {
+  if (window.MasterData && MasterData.isLoaded()) {
+    const specs = MasterData.getSpecsByClassName(cls).map(s => s.name_zh);
+    if (specs.length) return specs;
+  }
+  return classSpecMap[cls] || [];
+}
+// 巢穴类型查询（任务书 #14 第七节：lair 15-25 弹性标识）
+function getGameRaidType(raidName) {
+  if (window.MasterData && MasterData.isLoaded()) {
+    const raid = MasterData.getRaidByName(raidName);
+    return raid ? raid.type : null;
+  }
+  return null;
+}
+// REQ-018（V2.2 覆盖）：当前赛季起点统一读 game_seasons.is_current，禁止再读代码常量
+function getGameCurrentSeasonStart() {
+  if (window.MasterData && MasterData.isLoaded()) {
+    const cur = MasterData.getCurrentSeason();
+    if (cur && cur.start_date) return cur.start_date;
+  }
+  return null;
+}
+
 // REQ-029：「最近使用」团本，按公会记忆最近 3 个
 function getRecentRaidNamesKey() {
   const guild = window.CloudSync && window.CloudSync.getCurrentGuild && window.CloudSync.getCurrentGuild();
@@ -227,10 +267,11 @@ function raidSelectRender() {
   if (!input || !panel) return;
   const q = input.value.trim();
   const recent = getRecentRaidNames().filter(n => !q || n.includes(q));
-  const rest = RAID_NAME_OPTIONS.filter(n => !getRecentRaidNames().includes(n) && (!q || n.includes(q)));
+  // 任务书 #14：团本清单读主数据（巢穴类型带标识）；未加载时回退内置常量
+  const rest = getGameRaidNames().filter(n => !getRecentRaidNames().includes(n) && (!q || n.includes(q)));
   raidSelectOptions = [
     ...recent.map(n => ({ label: n, tag: '最近' })),
-    ...rest.map(n => ({ label: n, tag: '' })),
+    ...rest.map(n => ({ label: n, tag: getGameRaidType(n) === 'lair' ? '巢穴 15-25' : '' })),
   ];
   const otherLabel = q ? `其他（手动输入）："${q}"` : '其他（手动输入）';
   let html = raidSelectOptions.map((o, i) =>
@@ -1400,6 +1441,8 @@ function showAppView() {
   updatePermissionUI();
   loadData();
   renderCurrentPage();
+  // 任务书 #14：登录后加载主数据（并行拉取 + 5s 超时 + 快照兜底，不阻塞界面）
+  if (window.MasterData) MasterData.init();
 }
 
 // BUG-012：viewer 权限门。viewer 登录后隐藏/禁用全部写入口（界面收口，
@@ -1469,6 +1512,9 @@ function updateCloudUI() {
     }
     const cloudSyncStatus = document.getElementById('cloudSyncStatus');
     if (cloudSyncStatus) cloudSyncStatus.textContent = '数据已云端同步';
+    // 任务书 #14：数据中心 tab 仅超管可见（非超管不渲染）
+    const navDc = document.getElementById('navDatacenter');
+    if (navDc) navDc.style.display = (window.MasterData && MasterData.isSuperadmin()) ? '' : 'none';
   } else {
     if (guildBar) guildBar.style.display = 'none';
     if (userMenu) userMenu.style.display = 'none';
@@ -1561,7 +1607,8 @@ const pageTitles = {
   wishlist: '心愿单',
   reports: '统计报表',
   data: '数据管理',
-  changelog: '更新日志'
+  changelog: '更新日志',
+  datacenter: '数据中心'
 };
 
 function switchPage(pageName) {
@@ -1592,6 +1639,15 @@ function switchPage(pageName) {
   }
   if (pageName === 'changelog') {
     changelogRender();
+  }
+  // 任务书 #14：数据中心仅超管可进（非超管即使绕过 tab 隐藏也被拦回）
+  if (pageName === 'datacenter') {
+    if (!window.MasterData || !MasterData.isSuperadmin()) {
+      showToast('数据中心仅产品超管可用', 'warning');
+      switchPage('dashboard');
+      return;
+    }
+    renderDatacenter();
   }
   
   // 移动端关闭侧边栏
@@ -2080,7 +2136,7 @@ function showMemberModal(member = null) {
 // 职业变更时更新专精下拉选项
 function onMemberClassChange() {
   const cls = document.getElementById('memberClass').value;
-  const specs = classSpecMap[cls] || [];
+  const specs = getGameSpecs(cls); // 任务书 #14：专精读主数据，未加载回退常量
   
   // 保存当前主专精值
   const mainSelect = document.getElementById('memberMainSpec');
@@ -2126,7 +2182,7 @@ function updateSpecFieldsDisplay() {
   if (!container) return;
   
   const cls = document.getElementById('memberClass').value;
-  const specs = classSpecMap[cls] || [];
+  const specs = getGameSpecs(cls); // 任务书 #14：专精读主数据，未加载回退常量
   
   // 保存当前选中的值
   const currentMain = document.getElementById('memberMainSpec') ? document.getElementById('memberMainSpec').value : '';
@@ -2756,7 +2812,7 @@ function createActivityOnDate(dateStr) {
 
 // ==================== REQ-018：考勤筛选 ====================
 // 筛选状态存模块变量即可（不持久化）。
-// 「本赛季」口径：代码库无现成赛季定义（装备模块的 season 为自由文本，不适用），按最近 90 天处理。
+// 「本赛季」口径（V2.2 覆盖）：统一读 game_seasons.is_current 起点，未设当前赛季回退最近 90 天。
 const ATT_FILTER_SEASON_DAYS = 90;
 const attFilter = { memberId: '', statuses: new Set(), range: 'all', from: '', to: '', includeCancelled: false };
 
@@ -2793,8 +2849,17 @@ function getAttFilteredActivities() {
     const to = attFilter.range === 'custom' ? (attFilter.to || null) : null;
     if (attFilter.range === 'custom') {
       from = attFilter.from || null;
+    } else if (attFilter.range === 'season') {
+      // REQ-018（V2.2 覆盖）：本赛季起点统一读 game_seasons.is_current；
+      // 主数据未加载/未设当前赛季时回退最近 90 天
+      from = getGameCurrentSeasonStart();
+      if (!from) {
+        const cutoff = new Date();
+        cutoff.setDate(cutoff.getDate() - ATT_FILTER_SEASON_DAYS);
+        from = formatDate(cutoff);
+      }
     } else {
-      const days = attFilter.range === 'season' ? ATT_FILTER_SEASON_DAYS : parseInt(attFilter.range, 10);
+      const days = parseInt(attFilter.range, 10);
       const cutoff = new Date();
       cutoff.setDate(cutoff.getDate() - days);
       from = formatDate(cutoff);
@@ -2973,6 +3038,7 @@ function renderActivityList() {
             <span>⏰ ${a.start_time || '--:--'} - ${a.end_time || '--:--'}</span>
             ${a.team_tag ? `<span class="tag tag-blue">🏷 ${a.team_tag}</span>` : ''}
             <span>👥 ${a.attendees.length} 人登记</span>
+            ${a.wcl_snapshot ? `<span class="tag tag-blue" title="已从 WCL 导入 ${(typeof a.wcl_snapshot.imported === 'number' ? a.wcl_snapshot.imported : a.attendees.filter(x => x.status && x.status !== '缺席').length)} 人考勤（快照留存）">手动标记 ${(typeof a.wcl_snapshot.imported === 'number' ? a.wcl_snapshot.imported : a.attendees.filter(x => x.status && x.status !== '缺席').length)}</span>` : ''}
             ${a.wcl_url ? `<a class="btn btn-sm" href="${a.wcl_url}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()" style="padding:2px 10px;font-size:12px">📊 WCL 复盘</a>` : ''}
           </div>
           ${conflicts.length ? `<div class="activity-conflict-line">⚠ 与 ${conflicts.map(c => `《${c.raid_name || '未命名活动'}》${c.start_time || '--:--'}-${c.end_time || '--:--'}`).join('、')} 冲突</div>` : ''}
@@ -3192,6 +3258,7 @@ function attPickMark(status) {
     const checkbox = document.querySelector(`.attend-checkbox[data-member="${memberId}"]`);
     if (checkbox) checkbox.checked = status === '出席' || status === '替补' || status === '迟到';
   });
+  updateAttendanceStatsLine(); // REQ-055
 }
 
 function attPickClear() {
@@ -3268,6 +3335,21 @@ function renderAttendanceMembers(activity) {
   const renderedIds = new Set(members.map(m => m.id));
   attPickedIds.forEach(id => { if (!renderedIds.has(id)) attPickedIds.delete(id); });
   attUpdatePickBar();
+  updateAttendanceStatsLine(); // REQ-055：渲染后同步统计行
+}
+
+// REQ-055：考勤编辑弹窗实时统计行——从 DOM 下拉当前值聚合（0 项灰显不隐藏，位置稳定）
+function updateAttendanceStatsLine() {
+  const el = document.getElementById('attendanceStatsLine');
+  if (!el) return;
+  const counts = { '出席': 0, '替补': 0, '请假': 0, '缺席': 0, '迟到': 0 };
+  let total = 0;
+  document.querySelectorAll('.attend-status-select').forEach(sel => {
+    total++;
+    if (counts[sel.value] !== undefined) counts[sel.value]++;
+  });
+  el.innerHTML = `已登记 ${total} 人：` + Object.entries(counts).map(([k, n]) =>
+    `<span class="${n === 0 ? 'att-stat-zero' : ''}">${k} ${n}</span>`).join(' · ');
 }
 
 // REQ-020：取消/恢复活动。仅改 activities.status，不删任何考勤记录；
@@ -3311,6 +3393,7 @@ function toggleAttendStatus(checkbox, memberId) {
   } else {
     select.value = '缺席';
   }
+  updateAttendanceStatsLine(); // REQ-055
 }
 
 function updateAttendCheckbox(select) {
@@ -3318,6 +3401,7 @@ function updateAttendCheckbox(select) {
   const checkbox = document.querySelector(`.attend-checkbox[data-member="${memberId}"]`);
   const status = select.value;
   checkbox.checked = status === '出席' || status === '替补' || status === '迟到';
+  updateAttendanceStatsLine(); // REQ-055
 }
 
 function setAllAttendance(status) {
@@ -3327,6 +3411,7 @@ function setAllAttendance(status) {
     const checkbox = document.querySelector(`.attend-checkbox[data-member="${memberId}"]`);
     checkbox.checked = status === '出席' || status === '替补' || status === '迟到';
   });
+  updateAttendanceStatsLine(); // REQ-055
 }
 
 // 防重复提交标志
@@ -4294,8 +4379,7 @@ function lootInitRaidSelect(selectedRaid = '虚影尖塔', selectedBoss = '') {
   const raidSelect = document.getElementById('lootRaid');
   if (!raidSelect) return;
   
-  const raids = Object.keys(raidBossMap || {});
-  raids.push('其他');
+  const raids = getGameRaidNames().concat(['其他']); // 任务书 #14：团本清单读主数据
   raidSelect.innerHTML = raids.map(r => 
     `<option value="${r}" ${r === selectedRaid ? 'selected' : ''}>${r}</option>`
   ).join('');
@@ -4315,7 +4399,7 @@ function lootUpdateBossOptions(selectedBoss = '') {
   const bossSelect = document.getElementById('lootBoss');
   if (!bossSelect) return;
   
-  const bosses = raidBossMap?.[raid] || [];
+  const bosses = getGameBossNames(raid); // 任务书 #14：BOSS 清单读主数据
   
   if (raid === '其他' || bosses.length === 0) {
     // 自定义团本，改成文本输入
@@ -4496,7 +4580,7 @@ function lootRender() {
     
     return `
       <tr>
-        <td><span class="loot-name">${loot.name}</span></td>
+        <td><span class="loot-name">${loot.name}</span>${loot.effect ? `<div class="loot-effect-green" style="font-size:11px;margin-top:2px" title="${loot.effect.replace(/"/g, '&quot;')}">${loot.effect.length > 30 ? loot.effect.slice(0, 30) + '…' : loot.effect}</div>` : ''}</td>
         <td class="center">${wishlistBadge}</td>
         <td><span class="wishlist-raid-tag">${loot.raid || '-'}</span></td>
         <td>${loot.difficulty || ''}</td>
@@ -4994,7 +5078,7 @@ function wishlistOnRaidChange() {
     bossSelect.style.display = 'block';
     bossText.style.display = 'none';
 
-    const bosses = raidBossMap[raid] || [];
+    const bosses = getGameBossNames(raid); // 任务书 #14：BOSS 清单读主数据
     if (bosses.length > 0) {
       bossSelect.innerHTML = '<option value="">请选择BOSS</option>' +
         bosses.map(b => `<option value="${b}">${b}</option>`).join('');
@@ -5240,9 +5324,9 @@ function wishlistShowModal(wishId = null, presetData = null) {
   document.getElementById('wishlistMemberMulti').style.display = isEdit ? 'none' : 'block';
   memberSelect.style.display = isEdit ? 'block' : 'none';
 
-  // 填充团本下拉（raidBossMap keys + 其他）
+  // 填充团本下拉（任务书 #14：主数据清单 + 其他）
   const raidSelect = document.getElementById('wishlistRaid');
-  const raidOptions = Object.keys(raidBossMap).map(r => `<option value="${r}">${r}</option>`).join('');
+  const raidOptions = getGameRaidNames().map(r => `<option value="${r}">${r}</option>`).join(''); // 任务书 #14：团本清单读主数据
   raidSelect.innerHTML = raidOptions + '<option value="其他">其他</option>';
 
   if (isEdit) {
@@ -5254,7 +5338,7 @@ function wishlistShowModal(wishId = null, presetData = null) {
 
       // 设置团本
       const raidVal = wish.raid || '虚影尖塔';
-      if (raidBossMap.hasOwnProperty(raidVal)) {
+      if (getGameRaidNames().includes(raidVal)) {
         raidSelect.value = raidVal;
       } else {
         raidSelect.value = '其他';
@@ -5263,7 +5347,7 @@ function wishlistShowModal(wishId = null, presetData = null) {
       wishlistOnRaidChange();
 
       // 设置BOSS值
-      if (raidBossMap.hasOwnProperty(raidVal)) {
+      if (getGameRaidNames().includes(raidVal)) {
         document.getElementById('wishlistBoss').value = wish.boss || '';
       } else {
         document.getElementById('wishlistBossText').value = wish.boss || '';
@@ -5288,14 +5372,14 @@ function wishlistShowModal(wishId = null, presetData = null) {
       document.getElementById('wishlistItemName').value = presetData.itemName || '';
       
       const raidVal = presetData.raid || '虚影尖塔';
-      if (raidBossMap.hasOwnProperty(raidVal)) {
+      if (getGameRaidNames().includes(raidVal)) {
         raidSelect.value = raidVal;
       } else {
         raidSelect.value = '其他';
       }
       wishlistOnRaidChange();
       
-      if (raidBossMap.hasOwnProperty(raidVal)) {
+      if (getGameRaidNames().includes(raidVal)) {
         document.getElementById('wishlistBoss').value = presetData.boss || '';
       } else {
         document.getElementById('wishlistBossText').value = presetData.boss || '';
@@ -5312,7 +5396,7 @@ function wishlistShowModal(wishId = null, presetData = null) {
     } else {
       document.getElementById('wishlistItemName').value = '';
       // 默认选第一个团本
-      const firstRaid = Object.keys(raidBossMap)[0] || '其他';
+      const firstRaid = getGameRaidNames()[0] || '其他';
       raidSelect.value = firstRaid;
       wishlistOnRaidChange();
       document.getElementById('wishlistCategory').value = '武器';
@@ -5690,6 +5774,10 @@ const changelogData = [
     title: '品牌焕新「魔兽管家」与界面组件升级',
     summary: '全站启用新品牌「魔兽管家 WoW Butler」，团本自定义下拉、头像菜单、职业图标、身份徽章全面上线。',
     details: [
+      'V2.2 主数据层：团本/BOSS/职业/专精/赛季/大米/掉落池/套装 9 张字典表入库，游戏更新不再发版',
+      '新增「数据中心」维护页（仅产品超管可见）：九区块维护 + 职业专精字典一键导入 + 掉落批量录入',
+      '套装按 赛季×职业×专精 展开维护（12.1 套装按专精区分），掉落池支持特效与主/副属性标签',
+      '考勤编辑弹窗新增实时统计行：已登记人数与出席/替补/请假/缺席/迟到即时汇总',
       '全站品牌焕新「魔兽管家 WoW Butler」：侧边栏盾标、登录页大标、页签标题与 favicon 全量替换',
       '团本名称升级为自定义下拉面板：暗色浮层、输入过滤、最近使用置顶、其他手输兜底、键盘可用，输入框右侧新增 ✕ 一键清空重选',
       '职业与职责本地图标 16 枚（单色职业色），成员列表、考勤名单、导入预览同步启用',
@@ -5711,7 +5799,16 @@ const changelogData = [
       '修复装备分配等宽表窄屏看不到右侧列：纳入横向滚动体系、表头吸顶、首列钉住',
       '修复统计报表缺席榜被挤成贴边竖条、出勤率图表成员名重叠（旋转 45°+省略号）',
       '修复退出公会/退出登录后登录按钮卡"登录中..."：按钮状态机闭环，失败复位+错误提示',
-      '修复切换公会弹窗内退出登录偶发不跳转登录页：任何入口退出统一清会话、弹窗全出栈、直达登录页'
+      '修复切换公会弹窗内退出登录偶发不跳转登录页：任何入口退出统一清会话、弹窗全出栈、直达登录页',
+      '修复字典导入器读外部文件失败：改读内置快照一键入库，连点不重复',
+      '修复数据中心九区块保存按钮点击无反应（按钮事件复位缺陷），九区块全链路实测通过',
+      '修复专精职责/图标导入缺失与错配：导入以快照为准强制覆盖，图标缺省回填职业图标',
+      '修复职责下拉"空值"假象：26px 下拉文本被裁剪，13 职业职责全部正常显示',
+      '修复日期输入 focus 态透出英文格式、考勤筛选行日期与复选框重叠',
+      '日期范围筛选框改为仅"自定义"时显示',
+      '装备库选择列表只列主数据团本装备，旧英文装备历史引用保底显示',
+      '活动卡片"手动标记"改为文字标签，大秘境"新本"否项红色语义化',
+      '日期输入全站中文化：年月日中文显示，保留原生选择器'
     ]
   },
   {
@@ -9459,22 +9556,45 @@ const itemDbRaidBossMap = {
   ]
 };
 
-// 更新首领掉落下拉选项
+// REQ-057（方案 B，运营拍板）：装备库选择列表数据源正式切换为 boss_loot 主数据。
+// 103 件内置英文装备全部移出选择列表；历史分配/心愿引用保底显示不删除。
+// 回退方案：MD_PICKER_MASTER_ONLY 改 false 即恢复内置库路径（当前前端保留该开关便于回滚）。
+const MD_PICKER_MASTER_ONLY = true;
+// 主数据掉落 → picker 条目结构（与既有填充链路 lootFillFromItemDb/wishlistFillFromItemDb 兼容）
+function getMasterLootItems() {
+  const items = [];
+  MasterData.getRaids().forEach(raid => {
+    MasterData.getBosses(raid.id).forEach(boss => {
+      MasterData.getLoot(boss.id).forEach(l => {
+        items.push({
+          id: l.id, name: l.item_name,
+          raid: raid.name, raidName: raid.name,
+          boss: boss.name, bossIndex: `${boss.boss_order}号`,
+          armorType: l.item_type || '', slot: l.slot || '',
+          icon: '📦', quality: 'epic', itemLevel: '',
+          stats: { primary: (l.primary_stats || []).join('/'), secondary: l.secondary_stats || [], primaryDetail: null, secondaryDetail: null },
+          equipEffect: l.effect || ''
+        });
+      });
+    });
+  });
+  return items;
+}
+
+// 更新首领掉落下拉选项（REQ-057B：只列主数据中有掉落的 BOSS）
 function updateItemDbBossFilter() {
   const raidVal = document.getElementById('itemDbRaidFilter').value;
   const bossSelect = document.getElementById('itemDbBossFilter');
   bossSelect.innerHTML = '<option value="">全部首领</option>';
-  
-  if (!raidVal || !itemDbRaidBossMap[raidVal]) {
-    bossSelect.disabled = true;
-    return;
-  }
-  
+  if (!raidVal) { bossSelect.disabled = true; return; }
+  const raid = MasterData.getRaidByName(raidVal);
+  const bosses = raid ? MasterData.getBosses(raid.id).filter(b => MasterData.getLoot(b.id).length) : [];
+  if (!bosses.length) { bossSelect.disabled = true; return; }
   bossSelect.disabled = false;
-  itemDbRaidBossMap[raidVal].forEach(boss => {
+  bosses.forEach(b => {
     const opt = document.createElement('option');
-    opt.value = boss.value;
-    opt.textContent = boss.label;
+    opt.value = b.name;
+    opt.textContent = `${b.boss_order}号 ${b.name}`;
     bossSelect.appendChild(opt);
   });
 }
@@ -9515,8 +9635,24 @@ function renderItemDbList() {
   const slotFilter = document.getElementById('itemDbSlotFilter').value;
   const armorFilter = document.getElementById('itemDbArmorFilter').value;
   const statFilter = document.getElementById('itemDbStatFilter').value;
-  
-  let filtered = itemDatabase.filter(item => {
+
+  // REQ-057（方案 B）：装备库只显示 boss_loot 主数据装备；
+  // 回退开关关闭时（false）走旧逻辑：只显示所属团本存在于 game_raids 的内置装备
+  const base = MD_PICKER_MASTER_ONLY
+    ? getMasterLootItems()
+    : itemDatabase.filter(item => new Set(getGameRaidNames()).has(item.raidName));
+  itemDbPickerItems = base; // selectDbItem 查找池
+
+  // 左侧团本筛选同步只列有掉落的主数据团本（每次渲染重建，保留当前选择）
+  const raidSelect = document.getElementById('itemDbRaidFilter');
+  if (raidSelect) {
+    const cur = raidSelect.value;
+    const keys = [...new Set(base.map(i => i.raid))];
+    raidSelect.innerHTML = '<option value="">全部团本</option>' +
+      keys.map(k => `<option value="${k}" ${k === cur ? 'selected' : ''}>${k}</option>`).join('');
+  }
+
+  let filtered = base.filter(item => {
     if (search && !item.name.toLowerCase().includes(search) && !item.boss.toLowerCase().includes(search)) return false;
     if (raidFilter && item.raid !== raidFilter) return false;
     if (bossFilter && item.boss !== bossFilter) return false;
@@ -9529,6 +9665,10 @@ function renderItemDbList() {
   document.getElementById('itemDbCount').textContent = `共 ${filtered.length} 件装备`;
   
   const listEl = document.getElementById('itemDbList');
+  if (base.length === 0) {
+    listEl.innerHTML = '<div class="item-db-empty">数据中心尚无掉落数据，请先在「数据中心 → 掉落池」录入</div>';
+    return;
+  }
   if (filtered.length === 0) {
     listEl.innerHTML = '<div class="item-db-empty">没有找到匹配的装备</div>';
     return;
@@ -9550,7 +9690,7 @@ function renderItemDbList() {
           <div class="item-card-stats">
             <div><span class="stat-label">主属性：</span>${primaryStatHtml}</div>
             <div><span class="stat-label">副属性：</span>${secondaryStatHtml}</div>
-            ${item.equipEffect ? `<div style="color:var(--gold);margin-top:4px;">装备：${item.equipEffect.substring(0, 80)}${item.equipEffect.length > 80 ? '...' : ''}</div>` : ''}
+            ${item.equipEffect ? `<div class="loot-effect-green" style="margin-top:4px;">装备：${item.equipEffect.substring(0, 80)}${item.equipEffect.length > 80 ? '...' : ''}</div>` : ''}
           </div>
         </div>
         <div class="item-card-source">${sourceText}</div>
@@ -9560,8 +9700,9 @@ function renderItemDbList() {
 }
 
 // 选择装备
+let itemDbPickerItems = []; // 当前 picker 数据源（主数据 boss_loot 或内置库）
 function selectDbItem(itemId) {
-  selectedDbItem = itemDatabase.find(i => i.id === itemId);
+  selectedDbItem = itemDbPickerItems.find(i => i.id === itemId) || itemDatabase.find(i => i.id === itemId);
   document.getElementById('itemDbConfirmBtn').disabled = false;
   renderItemDbList();
 }
@@ -9607,7 +9748,14 @@ function lootFillFromItemDb(item) {
     }
   }
   
-  // 装备大类和部位映射
+  // 装备大类和部位映射（REQ-060 新类型词汇 → 大类）
+  const typeCategory = (t) => {
+    if (!t) return '防具';
+    if (['板甲', '锁甲', '皮甲', '布甲', '披风'].includes(t)) return '防具';
+    if (t === '饰品') return '饰品';
+    if (['项链', '戒指'].includes(t)) return '首饰';
+    return '武器'; // 单手剑…战刃 / 盾牌 / 副手物品
+  };
   const categoryMap = {
     '武器': '武器',
     '布甲': '防具', '皮甲': '防具', '锁甲': '防具', '板甲': '防具', '披风': '防具',
@@ -9622,7 +9770,7 @@ function lootFillFromItemDb(item) {
     '副手': '副手物品',
     '披风': '背部'
   };
-  const category = categoryMap[item.armorType] || '防具';
+  const category = categoryMap[item.armorType] || typeCategory(item.armorType);
   const targetSlot = slotNameMap[item.slot] || item.slot;
   const categorySelect = document.getElementById('lootCategory');
   if (categorySelect) {
@@ -9705,7 +9853,14 @@ function wishlistFillFromItemDb(selectedDbItem) {
     }
   }
   
-  // 设置部位和类型
+  // 设置部位和类型（REQ-060 新类型词汇 → 大类）
+  const typeCategoryW = (t) => {
+    if (!t) return '防具';
+    if (['板甲', '锁甲', '皮甲', '布甲', '披风'].includes(t)) return '防具';
+    if (t === '饰品') return '饰品';
+    if (['项链', '戒指'].includes(t)) return '首饰';
+    return '武器';
+  };
   const categoryMap = {
     '武器': '武器',
     '布甲': '防具', '皮甲': '防具', '锁甲': '防具', '板甲': '防具', '披风': '防具',
@@ -9720,7 +9875,7 @@ function wishlistFillFromItemDb(selectedDbItem) {
     '副手': '副手物品',
     '披风': '背部'
   };
-  const category = categoryMap[selectedDbItem.armorType] || '防具';
+  const category = categoryMap[selectedDbItem.armorType] || typeCategoryW(selectedDbItem.armorType);
   const targetSlot = slotNameMap[selectedDbItem.slot] || selectedDbItem.slot;
   const categorySelect = document.getElementById('wishlistCategory');
   if (categorySelect) {
@@ -9741,3 +9896,740 @@ function wishlistFillFromItemDb(selectedDbItem) {
     }
   }
 }
+
+
+// ==================== 任务书 #14：数据中心（V2.2 主数据维护页，仅超管） ====================
+// 权限：tab 隐藏 + switchPage 守卫 + server.js 代理超管校验（最后防线）。
+// 写路径：MasterData.mdInsert/mdUpdate/mdDelete（server.js 代理）→ refresh 缓存 → 重渲。
+let mdCurrentTab = 'patches';
+let mdLootNav = { raidId: '', bossId: '' }; // 掉落池两级导航状态
+let mdTierSeasonId = ''; // 套装区当前赛季
+
+modalDirtyChecks.mdEditorModal = () => isModalFormDirty('mdEditorModal');
+
+function mdSwitchTab(tab) {
+  mdCurrentTab = tab;
+  document.querySelectorAll('#mdTabs .view-tab').forEach(t => t.classList.toggle('active', t.dataset.mdtab === tab));
+  renderDatacenter();
+}
+
+async function renderDatacenter() {
+  if (!window.MasterData) return;
+  if (!MasterData.isLoaded()) await MasterData.init();
+  const panel = document.getElementById('mdPanel');
+  if (!panel) return;
+  const renderers = {
+    patches: mdRenderPatches, seasons: mdRenderSeasons, raids: mdRenderRaids,
+    bosses: mdRenderBosses, loot: mdRenderLoot, tiersets: mdRenderTierSets,
+    dungeons: mdRenderDungeons, classes: mdRenderClasses, specs: mdRenderSpecs
+  };
+  (renderers[mdCurrentTab] || mdRenderPatches)(panel);
+}
+
+// ---------- 通用行编辑器 ----------
+// fields: [{ key, label, type: 'text'|'number'|'date'|'select', options?, placeholder, required, default }]
+let mdEditorCtx = null;
+function mdOpenEditor(title, fields, row, onSave) {
+  mdEditorCtx = { fields, row: row || {}, onSave };
+  document.getElementById('mdEditorTitle').textContent = title;
+  // 复位保存按钮（批量录入模式会改写 onclick/文案）。
+  // BUG-047 根因：此前用 saveBtn.onclick = null 复位——IDL 赋值会连带移除
+  // 内容属性 onclick="mdEditorSave()" 编译出的处理器，按钮从此点击无效（静默无反应）。
+  // 正确做法：直接赋函数引用（覆盖批量模式的属性赋值；属性处理器优先于内容属性）。
+  const saveBtn = document.getElementById('mdEditorSaveBtn');
+  saveBtn.onclick = mdEditorSave;
+  saveBtn.disabled = false;
+  saveBtn.textContent = '保存';
+  document.getElementById('mdEditorBody').innerHTML = fields.map(f => {
+    const val = (row && row[f.key] !== undefined && row[f.key] !== null) ? row[f.key] : (f.default !== undefined ? f.default : '');
+    let control = '';
+    if (f.type === 'select') {
+      const opts = (f.options || []).map(o => {
+        const v = typeof o === 'object' ? o.value : o;
+        const l = typeof o === 'object' ? o.label : o;
+        return `<option value="${v}" ${String(v) === String(val) ? 'selected' : ''}>${l}</option>`;
+      }).join('');
+      control = `<select class="form-select" id="mdField_${f.key}">${opts}</select>`;
+    } else if (f.type === 'textarea') {
+      control = `<textarea class="form-textarea" id="mdField_${f.key}" style="height:80px" placeholder="${f.placeholder || ''}">${String(val).replace(/</g, '&lt;')}</textarea>`;
+    } else if (f.type === 'tags') {
+      // REQ-054：标签多选（点击选中/再点取消），选中集以 JSON 存隐藏 input
+      const selected = Array.isArray(val) ? val : (val ? [val] : []);
+      control = `<div class="md-tags" id="mdFieldTags_${f.key}">${(f.options || []).map(o =>
+        `<span class="tag tag-grey md-tag${selected.includes(o) ? ' md-tag-on' : ''}" onclick="mdTagToggle(this,'${f.key}','${o}')">${o}</span>`).join('')}</div>
+        <input type="hidden" id="mdField_${f.key}" value='${JSON.stringify(selected)}'>`;
+    } else if (f.type === 'selectCustom') {
+      // REQ-054：下拉 + 手动录入兜底（选"其他（手输）"时出现文本框）
+      const inList = (f.options || []).includes(val);
+      const selVal = inList || !val ? val : '__custom__';
+      const opts = (f.options || []).map(o => `<option value="${o}" ${String(o) === String(selVal) ? 'selected' : ''}>${o}</option>`).join('') +
+        `<option value="__custom__" ${selVal === '__custom__' ? 'selected' : ''}>其他（手输）</option>`;
+      control = `<select class="form-select" id="mdField_${f.key}" onchange="mdSelectCustomToggle('${f.key}');${f.onchange || ''}">${opts}</select>
+        <input type="text" class="form-input" id="mdField_${f.key}_custom" style="margin-top:6px;${selVal === '__custom__' ? '' : 'display:none'}" value="${selVal === '__custom__' ? String(val).replace(/"/g, '&quot;') : ''}" placeholder="手动输入${f.label}">`;
+    } else {
+      control = `<input type="${f.type || 'text'}" class="form-input" id="mdField_${f.key}" value="${String(val).replace(/"/g, '&quot;')}" placeholder="${f.placeholder || ''}">`;
+    }
+    return `<div class="form-group"><label class="form-label">${f.label}${f.required ? ' *' : ''}</label>${control}</div>`;
+  }).join('');
+  // REQ-052：动态渲染的日期字段同样包裹中文遮罩
+  mdEditorCtx.fields.filter(f => f.type === 'date').forEach(f => zhWrapDateInput(document.getElementById(`mdField_${f.key}`)));
+  openModal('mdEditorModal');
+}
+
+// REQ-054：标签多选切换 / 下拉手输兜底切换
+function mdTagToggle(el, key, opt) {
+  const hidden = document.getElementById(`mdField_${key}`);
+  let arr;
+  try { arr = JSON.parse(hidden.value); } catch { arr = []; }
+  if (arr.includes(opt)) {
+    arr = arr.filter(x => x !== opt);
+    el.classList.remove('md-tag-on');
+  } else {
+    arr.push(opt);
+    el.classList.add('md-tag-on');
+  }
+  hidden.value = JSON.stringify(arr);
+}
+function mdSelectCustomToggle(key) {
+  const sel = document.getElementById(`mdField_${key}`);
+  const custom = document.getElementById(`mdField_${key}_custom`);
+  if (custom) custom.style.display = sel.value === '__custom__' ? '' : 'none';
+}
+
+async function mdEditorSave() {
+  const ctx = mdEditorCtx;
+  if (!ctx) return;
+  const out = { ...ctx.row };
+  for (const f of ctx.fields) {
+    const el = document.getElementById(`mdField_${f.key}`);
+    if (!el) continue;
+    let v = el.value;
+    if (f.type === 'number') v = v === '' ? null : parseInt(v, 10);
+    if (f.type === 'tags') { try { v = JSON.parse(v); } catch { v = []; } }
+    if (f.type === 'selectCustom' && v === '__custom__') {
+      v = (document.getElementById(`mdField_${f.key}_custom`) || { value: '' }).value.trim();
+    }
+    if (f.required && (v === '' || v === null)) { showToast(`请填写${f.label}`, 'error'); return; }
+    out[f.key] = v === '' ? null : v;
+  }
+  const btn = document.getElementById('mdEditorSaveBtn');
+  btn.disabled = true; btn.dataset.originalText = btn.textContent; btn.textContent = '保存中...';
+  try {
+    await ctx.onSave(out);
+    mdEditorCtx = null;
+    closeModal('mdEditorModal');
+  } catch (e) {
+    console.error('数据中心保存失败:', e);
+    showToast('保存失败：' + (e.message || '未知错误'), 'error');
+  } finally {
+    btn.disabled = false; btn.textContent = btn.dataset.originalText || '保存';
+  }
+}
+
+// 通用删除（二次确认 + 级联提示文本）
+async function mdDeleteRow(table, id, label, cascadeNote) {
+  const msg = `确定删除「${label}」吗？${cascadeNote ? '\n' + cascadeNote : ''}`;
+  if (!confirm(msg)) return;
+  try {
+    await MasterData.mdDelete(table, `id=eq.${id}`);
+    await MasterData.refresh(table);
+    renderDatacenter();
+    showToast('已删除', 'success');
+  } catch (e) {
+    showToast('删除失败：' + (e.message || '未知错误'), 'error');
+  }
+}
+
+// 表格骨架（遵循 REQ-026/030 组件规范）
+function mdTable(headers, rowsHtml) {
+  return `<div class="table-container"><table class="data-table"><thead><tr>${headers}</tr></thead><tbody>${rowsHtml || `<tr><td colspan="10" style="text-align:center;color:var(--text-muted);padding:20px">暂无数据</td></tr>`}</tbody></table></div>`;
+}
+const mdActionBtns = (editFn, delFn) => `<td class="center"><div class="action-btns"><button class="icon-btn" onclick="${editFn}" title="编辑">✏️</button><button class="icon-btn danger" onclick="${delFn}" title="删除">🗑</button></div></td>`;
+
+// ---------- 1. 版本 ----------
+function mdRenderPatches(panel) {
+  const rows = MasterData.getPatches();
+  panel.innerHTML = `
+    <div style="margin-bottom:12px"><button class="btn btn-primary btn-sm" onclick="mdEditPatch()">+ 新增版本</button></div>
+    ${mdTable('<th>版本号</th><th>版本名</th><th>上线日</th><th class="center">操作</th>',
+      rows.map(p => `<tr>
+        <td style="font-weight:600">${p.version}</td>
+        <td>${p.name || '-'}</td>
+        <td>${p.release_date || '-'}</td>
+        ${mdActionBtns(`mdEditPatch('${p.id}')`, `mdDeleteRow('game_patches','${p.id}','${p.version}','赛季将保留但失去版本关联')`)}
+      </tr>`).join(''))}`;
+}
+function mdEditPatch(id) {
+  const row = id ? MasterData.getPatches().find(p => p.id === id) : null;
+  mdOpenEditor(id ? '编辑版本' : '新增版本', [
+    { key: 'version', label: '版本号', required: true, placeholder: '如 12.1' },
+    { key: 'name', label: '版本名', placeholder: '可空' },
+    { key: 'release_date', label: '上线日', type: 'date' }
+  ], row, async (out) => {
+    if (id) await MasterData.mdUpdate('game_patches', { version: out.version, name: out.name, release_date: out.release_date }, `id=eq.${id}`);
+    else await MasterData.mdInsert('game_patches', { version: out.version, name: out.name, release_date: out.release_date });
+    await MasterData.refresh('game_patches');
+    renderDatacenter();
+    showToast('已保存', 'success');
+  });
+}
+
+// ---------- 2. 赛季 ----------
+function mdRenderSeasons(panel) {
+  const rows = MasterData.getSeasons();
+  const patches = MasterData.getPatches();
+  const patchName = (pid) => (patches.find(p => p.id === pid) || {}).version || '-';
+  panel.innerHTML = `
+    <div style="margin-bottom:12px"><button class="btn btn-primary btn-sm" onclick="mdEditSeason()">+ 新增赛季</button></div>
+    ${mdTable('<th>赛季</th><th>归属版本</th><th>开始</th><th>结束</th><th class="center">当前赛季</th><th class="center">操作</th>',
+      rows.map(s => `<tr>
+        <td style="font-weight:600">${s.name}</td>
+        <td>${patchName(s.patch_id)}</td>
+        <td>${s.start_date || '-'}</td>
+        <td>${s.end_date || '进行中'}</td>
+        <td class="center">${s.is_current ? '<span class="tag tag-green">当前</span>' : `<button class="btn btn-ghost btn-sm" onclick="mdSetCurrentSeason('${s.id}','${s.name}')">设为当前</button>`}</td>
+        ${mdActionBtns(`mdEditSeason('${s.id}')`, `mdDeleteRow('game_seasons','${s.id}','${s.name}','其下团本/大米/套装将失去赛季关联')`)}
+      </tr>`).join(''))}`;
+}
+function mdEditSeason(id) {
+  const row = id ? MasterData.getSeasons().find(s => s.id === id) : null;
+  const patchOpts = [{ value: '', label: '（无）' }, ...MasterData.getPatches().map(p => ({ value: p.id, label: p.version }))];
+  mdOpenEditor(id ? '编辑赛季' : '新增赛季', [
+    { key: 'name', label: '赛季名', required: true, placeholder: '如 S2' },
+    { key: 'patch_id', label: '归属版本', type: 'select', options: patchOpts },
+    { key: 'start_date', label: '开始日期', type: 'date', required: true },
+    { key: 'end_date', label: '结束日期', type: 'date' }
+  ], row, async (out) => {
+    if (id) await MasterData.mdUpdate('game_seasons', { name: out.name, patch_id: out.patch_id, start_date: out.start_date, end_date: out.end_date }, `id=eq.${id}`);
+    else await MasterData.mdInsert('game_seasons', { name: out.name, patch_id: out.patch_id, start_date: out.start_date, end_date: out.end_date });
+    await MasterData.refresh('game_seasons');
+    renderDatacenter();
+    showToast('已保存', 'success');
+  });
+}
+// 设为当前赛季：二次确认 → 旧 false → 新 true（DB 部分唯一索引兜底）
+async function mdSetCurrentSeason(id, name) {
+  const cur = MasterData.getCurrentSeason();
+  if (!confirm(`确定把「${name}」设为当前赛季吗？${cur ? `\n将把「${cur.name}」设为非当前。` : ''}\n全站赛季口径（统计/掉落池/大米/套装）刷新后切换。`)) return;
+  try {
+    if (cur) await MasterData.mdUpdate('game_seasons', { is_current: false }, `id=eq.${cur.id}`);
+    await MasterData.mdUpdate('game_seasons', { is_current: true }, `id=eq.${id}`);
+    await MasterData.refresh('game_seasons');
+    renderDatacenter();
+    showToast(`「${name}」已设为当前赛季`, 'success');
+  } catch (e) {
+    showToast('设置失败：' + (e.message || '未知错误'), 'error');
+  }
+}
+
+// ---------- 3. 团本 ----------
+function mdRenderRaids(panel) {
+  const rows = MasterData.getRaids();
+  const seasons = MasterData.getSeasons();
+  const seasonName = (sid) => (seasons.find(s => s.id === sid) || {}).name || '-';
+  const typeLabel = { raid: '固定团本', lair: '巢穴弹性' };
+  panel.innerHTML = `
+    <div style="margin-bottom:12px"><button class="btn btn-primary btn-sm" onclick="mdEditRaid()">+ 新增团本</button></div>
+    ${mdTable('<th>名称</th><th>赛季</th><th>类型</th><th class="num">人数</th><th>最高难度</th><th>开放日</th><th class="num">排序</th><th class="center">操作</th>',
+      rows.map(r => `<tr>
+        <td style="font-weight:600">${r.name}</td>
+        <td>${seasonName(r.season_id)}</td>
+        <td><span class="tag ${r.type === 'lair' ? 'tag-blue' : 'tag-gold'}">${typeLabel[r.type] || r.type}</span></td>
+        <td class="num">${r.min_players === r.max_players ? r.max_players : `${r.min_players}-${r.max_players}`}</td>
+        <td>${r.max_difficulty || '-'}</td>
+        <td>${r.open_date || '-'}</td>
+        <td class="num">${r.sort_order ?? 0}</td>
+        ${mdActionBtns(`mdEditRaid('${r.id}')`, `mdDeleteRaid('${r.id}','${r.name}')`)}
+      </tr>`).join(''))}`;
+}
+function mdEditRaid(id) {
+  const row = id ? MasterData.getRaids().find(r => r.id === id) : null;
+  const seasonOpts = [{ value: '', label: '（无）' }, ...MasterData.getSeasons().map(s => ({ value: s.id, label: s.name }))];
+  mdOpenEditor(id ? '编辑团本' : '新增团本', [
+    { key: 'name', label: '名称', required: true, placeholder: '如 烈毒之渊' },
+    { key: 'season_id', label: '归属赛季', type: 'select', options: seasonOpts },
+    { key: 'type', label: '类型', type: 'select', options: [{ value: 'raid', label: '固定团本（20 人）' }, { value: 'lair', label: '巢穴弹性（15-25 人）' }], default: row ? row.type : 'raid' },
+    { key: 'min_players', label: '人数下限', type: 'number', default: row ? row.min_players : 20, required: true },
+    { key: 'max_players', label: '人数上限', type: 'number', default: row ? row.max_players : 20, required: true },
+    { key: 'max_difficulty', label: '最高难度', placeholder: '如 史诗' },
+    { key: 'open_date', label: '开放日期', type: 'date' },
+    { key: 'sort_order', label: '排序', type: 'number', default: row ? row.sort_order : 0 }
+  ], row, async (out) => {
+    // 巢穴规则：lair 必须 15-25；任何类型 min <= max。
+    // 校验失败必须 throw（mdEditorSave 只 catch 不关弹窗）——BUG-047 实测抓获：
+    // 仅 toast+return 会被当作保存成功，弹窗照关、数据未入库（"假失败"）。
+    if (out.type === 'lair' && (out.min_players !== 15 || out.max_players !== 25)) {
+      throw new Error('巢穴弹性类型人数必须为 15-25');
+    }
+    if (out.min_players === null || out.max_players === null || out.min_players > out.max_players) {
+      throw new Error('人数下限必须小于等于上限');
+    }
+    const payload = { name: out.name, season_id: out.season_id, type: out.type, min_players: out.min_players, max_players: out.max_players, max_difficulty: out.max_difficulty, open_date: out.open_date, sort_order: out.sort_order };
+    if (id) await MasterData.mdUpdate('game_raids', payload, `id=eq.${id}`);
+    else await MasterData.mdInsert('game_raids', payload);
+    await MasterData.refresh('game_raids');
+    renderDatacenter();
+    showToast('已保存', 'success');
+  });
+}
+// 团本删除前级联提示（任务书 5.4）
+async function mdDeleteRaid(id, name) {
+  const bosses = MasterData.getBosses(id);
+  const lootCount = bosses.reduce((sum, b) => sum + MasterData.getLoot(b.id).length, 0);
+  await mdDeleteRow('game_raids', id, name, (bosses.length || lootCount) ? `将同时删除 ${bosses.length} 个 BOSS、${lootCount} 条掉落记录。` : '');
+}
+
+// ---------- 4. BOSS ----------
+function mdFindBoss(id) {
+  for (const r of MasterData.getRaids()) {
+    const f = MasterData.getBosses(r.id).find(b => b.id === id);
+    if (f) return f;
+  }
+  return null;
+}
+function mdRenderBosses(panel) {
+  const raids = MasterData.getRaids();
+  panel.innerHTML = raids.map(raid => {
+    const bosses = MasterData.getBosses(raid.id);
+    return `<div style="margin-bottom:16px">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+        <span style="font-weight:600;color:var(--gold)">${raid.name}</span>
+        <button class="btn btn-ghost btn-sm" onclick="mdEditBoss(null,'${raid.id}')">+ 新增 BOSS</button>
+      </div>
+      ${mdTable('<th class="num" style="width:60px">序号</th><th>BOSS 名</th><th class="center" style="width:100px">操作</th>',
+        bosses.map(b => `<tr>
+          <td class="num">${b.boss_order}</td>
+          <td style="font-weight:500">${b.name}</td>
+          ${mdActionBtns(`mdEditBoss('${b.id}')`, `mdDeleteRow('game_bosses','${b.id}','${b.name}','将同时删除其 ${MasterData.getLoot(b.id).length} 条掉落记录')`)}
+        </tr>`).join(''))}
+    </div>`;
+  }).join('') || '<div style="color:var(--text-muted)">请先在「团本」区新增团本</div>';
+}
+function mdEditBoss(id, raidId) {
+  const boss = id ? mdFindBoss(id) : null;
+  const rid = boss ? boss.raid_id : raidId;
+  if (!rid) { showToast('缺少目标团本', 'error'); return; }
+  const nextOrder = boss ? boss.boss_order : (MasterData.getBosses(rid).reduce((m, b) => Math.max(m, b.boss_order || 0), 0) + 1);
+  mdOpenEditor(boss ? '编辑 BOSS' : '新增 BOSS', [
+    { key: 'name', label: 'BOSS 名', required: true },
+    { key: 'boss_order', label: '序号（第几号）', type: 'number', default: nextOrder, required: true }
+  ], boss, async (out) => {
+    if (boss) await MasterData.mdUpdate('game_bosses', { name: out.name, boss_order: out.boss_order }, `id=eq.${boss.id}`);
+    else await MasterData.mdInsert('game_bosses', { raid_id: rid, name: out.name, boss_order: out.boss_order });
+    await MasterData.refresh('game_bosses');
+    renderDatacenter();
+    showToast('已保存', 'success');
+  });
+}
+
+// ---------- 5. 掉落池（两级导航 + 批量录入） ----------
+// REQ-054：部位/类型下拉+手输兜底，特效多行文本，主/副属性标签多选
+// REQ-060：部位↔类型联动（映射表任务书给定，照此实现）；类型按上表细分单手/双手
+const MD_LOOT_SLOTS = ['武器', '头部', '颈部', '肩部', '背部', '胸部', '手腕', '手部', '腰部', '腿部', '脚部', '手指', '饰品', '副手', '其他'];
+const MD_LOOT_TYPES = ['板甲', '锁甲', '皮甲', '布甲', '披风', '项链', '戒指', '饰品',
+  '单手剑', '双手剑', '单手斧', '双手斧', '单手锤', '双手锤', '匕首', '拳套', '长柄武器', '法杖', '弓', '枪', '弩', '魔杖', '战刃',
+  '盾牌', '副手物品', '其他'];
+const MD_ARMOR_TYPES = ['板甲', '锁甲', '皮甲', '布甲'];
+const MD_SLOT_TYPE_MAP = {
+  '头部': MD_ARMOR_TYPES, '肩部': MD_ARMOR_TYPES, '胸部': MD_ARMOR_TYPES, '手腕': MD_ARMOR_TYPES,
+  '手部': MD_ARMOR_TYPES, '腰部': MD_ARMOR_TYPES, '腿部': MD_ARMOR_TYPES, '脚部': MD_ARMOR_TYPES,
+  '背部': ['披风'],
+  '颈部': ['项链'],
+  '手指': ['戒指'],
+  '饰品': ['饰品'],
+  '武器': ['单手剑', '双手剑', '单手斧', '双手斧', '单手锤', '双手锤', '匕首', '拳套', '长柄武器', '法杖', '弓', '枪', '弩', '魔杖', '战刃'],
+  '副手': ['盾牌', '副手物品']
+};
+// 部位变化 → 类型下拉只保留合法项；不合法已选值自动清空
+function mdLootSlotChanged() {
+  const slotEl = document.getElementById('mdField_slot');
+  const typeEl = document.getElementById('mdField_item_type');
+  if (!slotEl || !typeEl) return;
+  const slot = slotEl.value === '__custom__'
+    ? (document.getElementById('mdField_slot_custom') || { value: '' }).value.trim()
+    : slotEl.value;
+  const legal = MD_SLOT_TYPE_MAP[slot];
+  const current = typeEl.value;
+  const options = legal ? [...legal, '__custom__'] : [...MD_LOOT_TYPES, '__custom__'];
+  typeEl.innerHTML = options.map(o => `<option value="${o}">${o === '__custom__' ? '其他（手输）' : o}</option>`).join('');
+  if (legal && legal.includes(current)) typeEl.value = current;
+  else if (!legal) typeEl.value = MD_LOOT_TYPES.includes(current) ? current : typeEl.value;
+  // 不合法已选值自动清空（选回第一项或留空）
+  if (legal && current && !legal.includes(current)) typeEl.value = legal[0];
+  mdSelectCustomToggle('item_type');
+}
+const MD_PRIMARY_STATS = ['力量', '敏捷', '智力'];
+const MD_SECONDARY_STATS = ['暴击', '急速', '精通', '全能'];
+function mdRenderLoot(panel) {
+  const raids = MasterData.getRaids();
+  if (!mdLootNav.raidId && raids.length) mdLootNav.raidId = raids[0].id;
+  const raid = raids.find(r => r.id === mdLootNav.raidId);
+  const bosses = raid ? MasterData.getBosses(raid.id) : [];
+  if (raid && !bosses.find(b => b.id === mdLootNav.bossId)) mdLootNav.bossId = bosses.length ? bosses[0].id : '';
+  const boss = bosses.find(b => b.id === mdLootNav.bossId);
+  const loot = boss ? MasterData.getLoot(boss.id) : [];
+  panel.innerHTML = `
+    <div style="display:flex;gap:12px;margin-bottom:12px;flex-wrap:wrap;align-items:center">
+      <select class="form-select" style="width:200px" onchange="mdLootNav.raidId=this.value;mdLootNav.bossId='';renderDatacenter()">
+        ${raids.map(r => `<option value="${r.id}" ${r.id === mdLootNav.raidId ? 'selected' : ''}>${r.name}</option>`).join('')}
+      </select>
+      <select class="form-select" style="width:200px" onchange="mdLootNav.bossId=this.value;renderDatacenter()">
+        ${bosses.map(b => `<option value="${b.id}" ${b.id === mdLootNav.bossId ? 'selected' : ''}>${b.boss_order}号 ${b.name}</option>`).join('')}
+      </select>
+      ${boss ? `<button class="btn btn-primary btn-sm" onclick="mdEditLootItem(null)">+ 新增掉落</button>
+      <button class="btn btn-sm" onclick="mdOpenLootBatch()">📋 批量录入</button>` : ''}
+    </div>
+    ${boss ? mdTable('<th>装备名</th><th>部位</th><th>类型</th><th>主属性</th><th>副属性</th><th>特效</th><th class="center">操作</th>',
+      loot.map(l => `<tr>
+        <td style="font-weight:500">${l.item_name}</td>
+        <td>${l.slot || '-'}</td>
+        <td>${l.item_type || '-'}</td>
+        <td>${(l.primary_stats || []).join('、') || '-'}</td>
+        <td>${(l.secondary_stats || []).join('、') || '-'}</td>
+        <td style="font-size:12px;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${(l.effect || '').replace(/"/g, '&quot;')}">${l.effect ? `<span class="loot-effect-green">${l.effect}</span>` : '-'}</td>
+        ${mdActionBtns(`mdEditLootItem('${l.id}')`, `mdDeleteRow('boss_loot','${l.id}','${l.item_name}','')`)}
+      </tr>`).join('')) : '<div style="color:var(--text-muted)">该团本暂无 BOSS，请先到「BOSS」区新增</div>'}`;
+}
+function mdEditLootItem(id) {
+  const row = id ? MasterData.getLoot(mdLootNav.bossId).find(l => l.id === id) : null;
+  mdOpenEditor(id ? '编辑掉落' : '新增掉落', [
+    { key: 'item_name', label: '装备名', required: true },
+    { key: 'slot', label: '部位', type: 'selectCustom', options: MD_LOOT_SLOTS, onchange: 'mdLootSlotChanged()' },
+    { key: 'item_type', label: '类型', type: 'selectCustom', options: MD_LOOT_TYPES },
+    { key: 'primary_stats', label: '主属性（可多选）', type: 'tags', options: MD_PRIMARY_STATS },
+    { key: 'secondary_stats', label: '副属性（可多选）', type: 'tags', options: MD_SECONDARY_STATS },
+    { key: 'effect', label: '特效', type: 'textarea', placeholder: '装备：……（可空，多行）' }
+  ], row, async (out) => {
+    // REQ-060：手输非法组合保存前弹提示确认（兜底优先，不硬拦；取消则中止保持弹窗）
+    if (out.slot && out.item_type && MD_SLOT_TYPE_MAP[out.slot] && !MD_SLOT_TYPE_MAP[out.slot].includes(out.item_type)) {
+      if (!confirm(`部位「${out.slot}」与类型「${out.item_type}」不是常见组合，仍要保存吗？`)) {
+        throw new Error('已取消保存');
+      }
+    }
+    const payload = { item_name: out.item_name, slot: out.slot, item_type: out.item_type, effect: out.effect, primary_stats: out.primary_stats, secondary_stats: out.secondary_stats };
+    if (id) await MasterData.mdUpdate('boss_loot', payload, `id=eq.${id}`);
+    else await MasterData.mdInsert('boss_loot', { boss_id: mdLootNav.bossId, ...payload });
+    await MasterData.refresh('boss_loot');
+    renderDatacenter();
+    showToast('已保存', 'success');
+  });
+  mdLootSlotChanged(); // 初始化：按当前部位过滤类型选项（编辑已有值合法则保留）
+  // 编辑场景恢复原有类型值（若合法）
+  if (row && row.item_type) {
+    const typeEl = document.getElementById('mdField_item_type');
+    const opts = [...typeEl.options].map(o => o.value);
+    if (opts.includes(row.item_type)) typeEl.value = row.item_type;
+    else { typeEl.value = '__custom__'; mdSelectCustomToggle('item_type'); const c = document.getElementById('mdField_item_type_custom'); if (c) c.value = row.item_type; }
+  }
+}
+// 批量录入模式：多行文本「装备名,部位,类型」→ 解析预览 → 确认入库
+let mdLootBatchRows = null;
+function mdOpenLootBatch() {
+  mdEditorCtx = { fields: [], row: {}, onSave: async () => {} };
+  document.getElementById('mdEditorTitle').textContent = '批量录入掉落（每行：装备名,部位,类型,主属性,副属性,特效）';
+  document.getElementById('mdEditorBody').innerHTML = `
+    <div class="form-group">
+      <label class="form-label">掉落清单（REQ-054 扩展格式：后三列可空，主/副属性多值用「、」分隔）</label>
+      <textarea class="form-textarea" id="mdField__batch" style="height:160px" placeholder="烈毒巨剑,武器,剑,力量,暴击、急速,装备：攻击附带剧毒&#10;毒牙项坠,颈部,饰品,智力,,"></textarea>
+    </div>
+    <div id="mdLootBatchPreview"></div>`;
+  const btn = document.getElementById('mdEditorSaveBtn');
+  btn.textContent = '解析预览';
+  btn.onclick = mdLootBatchParse;
+  openModal('mdEditorModal');
+}
+function mdLootBatchParse() {
+  const text = document.getElementById('mdField__batch').value;
+  const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+  const rows = [];
+  const bad = [];
+  lines.forEach((l, i) => {
+    const parts = l.split(/[,，]/).map(s => s.trim());
+    if (!parts[0]) { bad.push(`${i + 1}（无装备名）`); return; }
+    // REQ-054 扩展行格式：装备名,部位,类型,主属性,副属性,特效（后三列可空，属性多值「、」分隔）
+    // REQ-060：部位↔类型合法性按行校验，坏行报行号+原因
+    if (parts[1] && parts[2] && MD_SLOT_TYPE_MAP[parts[1]] && !MD_SLOT_TYPE_MAP[parts[1]].includes(parts[2])) {
+      bad.push(`${i + 1}（部位「${parts[1]}」与类型「${parts[2]}」不匹配）`);
+      return;
+    }
+    rows.push({
+      item_name: parts[0],
+      slot: parts[1] || '',
+      item_type: parts[2] || '',
+      primary_stats: (parts[3] || '').split('、').map(s => s.trim()).filter(Boolean),
+      secondary_stats: (parts[4] || '').split('、').map(s => s.trim()).filter(Boolean),
+      effect: parts[5] || ''
+    });
+  });
+  if (!rows.length) { showToast('没有可解析的有效行', 'error'); return; }
+  mdLootBatchRows = rows;
+  document.getElementById('mdLootBatchPreview').innerHTML =
+    `<div style="margin-top:12px;max-height:200px;overflow-y:auto">${mdTable('<th>装备名</th><th>部位</th><th>类型</th><th>主属性</th><th>副属性</th><th>特效</th>',
+      rows.map(r => `<tr><td>${r.item_name}</td><td>${r.slot || '-'}</td><td>${r.item_type || '-'}</td><td>${r.primary_stats.join('、') || '-'}</td><td>${r.secondary_stats.join('、') || '-'}</td><td style="font-size:12px;color:var(--text-muted)">${r.effect || '-'}</td></tr>`).join(''))}</div>
+    ${bad.length ? `<div style="color:var(--warning);font-size:12px;margin-top:6px">第 ${bad.join('、')} 行无法识别，已跳过</div>` : ''}`;
+  const btn = document.getElementById('mdEditorSaveBtn');
+  btn.textContent = `确认入库（${rows.length} 条）`;
+  btn.onclick = mdLootBatchConfirm;
+}
+async function mdLootBatchConfirm() {
+  if (!mdLootBatchRows || !mdLootBatchRows.length) return;
+  const count = mdLootBatchRows.length;
+  const btn = document.getElementById('mdEditorSaveBtn');
+  btn.disabled = true; btn.textContent = '入库中...';
+  try {
+    // 规范 1.2.2 批处理例外：一次数组 POST 批量插入，完成后统一 refresh 一次
+    await MasterData.mdInsert('boss_loot', mdLootBatchRows.map(r => ({ ...r, boss_id: mdLootNav.bossId })));
+    await MasterData.refresh('boss_loot');
+    mdLootBatchRows = null;
+    closeModal('mdEditorModal');
+    renderDatacenter();
+    showToast(`已批量入库 ${count} 条掉落`, 'success');
+  } catch (e) {
+    showToast('批量入库失败：' + (e.message || '未知错误'), 'error');
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+// ---------- 6. 套装（REQ-053：赛季 × 职业 × 专精 分行，12.1 套装按专精区分） ----------
+function mdRenderTierSets(panel) {
+  const seasons = MasterData.getSeasons();
+  if (!mdTierSeasonId) {
+    const cur = MasterData.getCurrentSeason();
+    mdTierSeasonId = cur ? cur.id : (seasons.length ? seasons[seasons.length - 1].id : '');
+  }
+  const classes = MasterData.getClasses();
+  const sets = MasterData.getTierSets(mdTierSeasonId);
+  panel.innerHTML = `
+    <div style="margin-bottom:12px;display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+      <label style="font-size:13px;color:var(--text-secondary)">赛季</label>
+      <select class="form-select" style="width:160px" onchange="mdTierSeasonId=this.value;renderDatacenter()">
+        ${seasons.map(s => `<option value="${s.id}" ${s.id === mdTierSeasonId ? 'selected' : ''}>${s.name}${s.is_current ? '（当前）' : ''}</option>`).join('')}
+      </select>
+      <span style="font-size:12px;color:var(--text-muted)">按 职业 → 专精 分行；套装名为职业级概念，改一行可同步同职业其他专精行</span>
+    </div>
+    ${mdTierSeasonId ? mdTable('<th>职业 · 专精</th><th>套装名</th><th>2 件效果</th><th>4 件效果</th>',
+      classes.map(c => {
+        const specs = MasterData.getSpecs(c.id);
+        return specs.map(s => {
+          const t = sets.find(x => x.class_id === c.id && x.spec_id === s.id);
+          // 同职业其他专精行的套装名作为占位提示（联动填充语义）
+          const sibling = sets.find(x => x.class_id === c.id && x.spec_id !== s.id && x.set_name);
+          return `<tr>
+            <td style="font-weight:500;white-space:nowrap"><span style="color:${c.color || 'inherit'}">${c.name_zh}</span><span style="color:var(--text-muted);font-size:12px"> · ${s.name_zh}</span></td>
+            <td><input class="form-input md-tier-setname" style="height:28px" value="${(t && t.set_name || '').replace(/"/g, '&quot;')}" placeholder="${(sibling ? '如：' + sibling.set_name : '套装名').replace(/"/g, '&quot;')}"
+              onchange="mdTierSetSave('${c.id}','${s.id}','${c.name_zh}·${s.name_zh}', this.value, '${t ? t.id : ''}', 'set_name')"></td>
+            <td><input class="form-input" style="height:28px" value="${(t && t.bonus_2 || '').replace(/"/g, '&quot;')}" placeholder="可空"
+              onchange="mdTierSetSave('${c.id}','${s.id}','${c.name_zh}·${s.name_zh}', this.value, '${t ? t.id : ''}', 'bonus_2')"></td>
+            <td><input class="form-input" style="height:28px" value="${(t && t.bonus_4 || '').replace(/"/g, '&quot;')}" placeholder="可空"
+              onchange="mdTierSetSave('${c.id}','${s.id}','${c.name_zh}·${s.name_zh}', this.value, '${t ? t.id : ''}', 'bonus_4')"></td>
+          </tr>`;
+        }).join('');
+      }).join('')) : '<div style="color:var(--text-muted)">请先在「赛季」区新增赛季</div>'}`;
+}
+// 套装格子保存：行不存在时仅套装名可建行；套装名改动后提示同步同职业其他专精行
+async function mdTierSetSave(classId, specId, label, value, rowId, field) {
+  if (!mdTierSeasonId) return;
+  try {
+    if (rowId) {
+      await MasterData.mdUpdate('tier_sets', { [field]: value }, `id=eq.${rowId}`);
+    } else {
+      if (field !== 'set_name' || !value.trim()) { showToast('请先填写套装名再录效果', 'warning'); renderDatacenter(); return; }
+      await MasterData.mdInsert('tier_sets', { season_id: mdTierSeasonId, class_id: classId, spec_id: specId, set_name: value.trim() });
+    }
+    await MasterData.refresh('tier_sets');
+    // REQ-053：套装名职业级联动——改一行后提示同步同职业其他专精行
+    if (field === 'set_name' && value.trim()) {
+      const className = label.split('·')[0];
+      const siblings = MasterData.getTierSets(mdTierSeasonId).filter(t => t.class_id === classId && t.spec_id !== specId && t.set_name !== value.trim());
+      if (siblings.length && confirm(`是否把套装名「${value.trim()}」同步到 ${className} 的其他专精行（${siblings.length} 行）？`)) {
+        for (const s of siblings) {
+          await MasterData.mdUpdate('tier_sets', { set_name: value.trim() }, `id=eq.${s.id}`);
+        }
+        await MasterData.refresh('tier_sets');
+      }
+    }
+    renderDatacenter();
+    showToast(`${label} 套装已保存`, 'success');
+  } catch (e) {
+    showToast('保存失败：' + (e.message || '未知错误'), 'error');
+  }
+}
+
+// ---------- 7. 大秘境 ----------
+function mdRenderDungeons(panel) {
+  const seasons = MasterData.getSeasons();
+  const groups = seasons.map(s => {
+    const dgs = MasterData.getDungeons(s.id);
+    if (!dgs.length) return '';
+    return `<div style="margin-bottom:16px">
+      <div style="font-weight:600;color:var(--gold);margin-bottom:8px">${s.name}${s.is_current ? ' <span class="tag tag-green">当前</span>' : ''}</div>
+      ${mdTable('<th>名称</th><th class="center">新本</th><th class="num">排序</th><th class="center">操作</th>',
+        dgs.map(d => `<tr>
+          <td style="font-weight:500">${d.name}</td>
+          <td class="center">${d.is_new ? '<span class="tag tag-blue">新</span>' : '<span class="tag tag-red">否</span>'}</td>
+          <td class="num">${d.sort_order ?? 0}</td>
+          ${mdActionBtns(`mdEditDungeon('${d.id}')`, `mdDeleteRow('game_dungeons','${d.id}','${d.name}','')`)}
+        </tr>`).join(''))}
+    </div>`;
+  }).join('');
+  panel.innerHTML = `
+    <div style="margin-bottom:12px"><button class="btn btn-primary btn-sm" onclick="mdEditDungeon()">+ 新增大秘境</button></div>
+    ${groups || '<div style="color:var(--text-muted)">请先在「赛季」区新增赛季，再录大秘境</div>'}`;
+}
+function mdEditDungeon(id) {
+  const seasons = MasterData.getSeasons();
+  let row = null;
+  if (id) seasons.forEach(s => { const f = MasterData.getDungeons(s.id).find(d => d.id === id); if (f) row = f; });
+  mdOpenEditor(id ? '编辑大秘境' : '新增大秘境', [
+    { key: 'season_id', label: '归属赛季', type: 'select', options: seasons.map(s => ({ value: s.id, label: s.name })), required: true, default: row ? row.season_id : ((MasterData.getCurrentSeason() || {}).id || '') },
+    { key: 'name', label: '名称', required: true, placeholder: '如 毒牙祭坛' },
+    { key: 'is_new', label: '本赛季新本', type: 'select', options: [{ value: 'false', label: '否' }, { value: 'true', label: '是' }], default: row && row.is_new ? 'true' : 'false' },
+    { key: 'sort_order', label: '排序', type: 'number', default: row ? row.sort_order : 0 }
+  ], row, async (out) => {
+    const payload = { season_id: out.season_id, name: out.name, is_new: out.is_new === 'true', sort_order: out.sort_order };
+    if (id) await MasterData.mdUpdate('game_dungeons', payload, `id=eq.${id}`);
+    else await MasterData.mdInsert('game_dungeons', payload);
+    await MasterData.refresh('game_dungeons');
+    renderDatacenter();
+    showToast('已保存', 'success');
+  });
+}
+
+// ---------- 8. 职业（只读为主，icon/color 可改） ----------
+function mdRenderClasses(panel) {
+  const rows = MasterData.getClasses();
+  panel.innerHTML = mdTable('<th class="num">ID</th><th>职业</th><th>英文</th><th>色值</th><th>图标路径</th>',
+    rows.map(c => `<tr>
+      <td class="num">${c.class_key}</td>
+      <td style="font-weight:600;color:${c.color || 'inherit'}">${c.name_zh}</td>
+      <td style="color:var(--text-muted)">${c.name_en}</td>
+      <td><input class="form-input" style="height:32px;padding:2px 8px;width:90px;font-size:12px" value="${c.color || ''}" onchange="mdClassFieldSave('${c.id}','color',this.value)"></td>
+      <td><input class="form-input" style="height:32px;padding:2px 8px;font-size:12px" value="${c.icon || ''}" onchange="mdClassFieldSave('${c.id}','icon',this.value)"></td>
+    </tr>`).join(''));
+}
+async function mdClassFieldSave(id, field, value) {
+  try {
+    await MasterData.mdUpdate('game_classes', { [field]: value }, `id=eq.${id}`);
+    await MasterData.refresh('game_classes');
+    showToast('已保存', 'success');
+  } catch (e) {
+    showToast('保存失败：' + (e.message || '未知错误'), 'error');
+  }
+}
+
+// ---------- 9. 专精（按职业分组，只读为主 + icon/role 可改） ----------
+function mdRenderSpecs(panel) {
+  const classes = MasterData.getClasses();
+  const html = classes.map(c => {
+    const specs = MasterData.getSpecs(c.id);
+    if (!specs.length) return '';
+    return `<div style="margin-bottom:16px">
+      <div style="font-weight:600;margin-bottom:8px;color:${c.color || 'var(--gold)'}">${c.name_zh}</div>
+      ${mdTable('<th class="num" style="width:50px">ID</th><th>专精</th><th>职责</th><th>图标路径</th>',
+        specs.map(s => `<tr>
+          <td class="num">${s.spec_key}</td>
+          <td style="font-weight:500">${s.name_zh}</td>
+          <td><select class="form-select" style="height:32px;padding:2px 8px;width:110px;font-size:12px" onchange="mdSpecFieldSave('${s.id}','role',this.value)">
+            ${['TANK', 'HEALER', 'DAMAGE'].map(r => `<option value="${r}" ${s.role === r ? 'selected' : ''}>${r}</option>`).join('')}
+          </select></td>
+          <td><input class="form-input" style="height:32px;padding:2px 8px;font-size:12px" value="${s.icon || ''}" onchange="mdSpecFieldSave('${s.id}','icon',this.value)"></td>
+        </tr>`).join(''))}
+    </div>`;
+  }).join('');
+  panel.innerHTML = html || '<div style="color:var(--text-muted)">尚无专精数据，请先运行「导入职业/专精字典」</div>';
+}
+async function mdSpecFieldSave(id, field, value) {
+  try {
+    await MasterData.mdUpdate('game_specs', { [field]: value }, `id=eq.${id}`);
+    await MasterData.refresh('game_specs');
+    showToast('已保存', 'success');
+  } catch (e) {
+    showToast('保存失败：' + (e.message || '未知错误'), 'error');
+  }
+}
+
+// ---------- 字典导入器（一次性工具，长期保留；幂等 upsert） ----------
+// BUG-046：数据源从「读取项目内 字典数据.json」改为内置快照 masterDataSnapshot.js
+// ——快照自带 13 职业/40 专精全量（verify 6b 实证），导入器不再依赖任何外部文件；
+// 版本更新时更新快照即可跟着一键入库。upsert 幂等逻辑不变。
+let mdImporting = false;
+async function mdImportDict() {
+  if (mdImporting) return;
+  const btn = document.getElementById('mdImportBtn');
+  mdImporting = true;
+  btn.disabled = true; btn.dataset.originalText = btn.textContent; btn.textContent = '导入中...';
+  try {
+    const dict = window.MASTER_DATA_SNAPSHOT;
+    if (!dict || !Array.isArray(dict.classes) || !dict.classes.length) {
+      throw new Error('内置快照数据缺失（masterDataSnapshot.js 未加载）');
+    }
+    // 1) 职业 upsert（class_key 冲突更新）
+    const classRows = dict.classes.map(c => ({
+      class_key: c.class_key, name_zh: c.name_zh, name_en: c.name_en, color: c.color, icon: c.icon
+    }));
+    const upsertedClasses = await MasterData.mdUpsert('game_classes', classRows, 'class_key');
+    await MasterData.refresh('game_classes');
+    // 2) 专精 upsert（class_id + spec_key 冲突更新）
+    // BUG-048：role 以快照为准（merge 会覆盖库内错值）；icon 缺省回填职业图标
+    // （快照专精无独立 icon 时不得入库空串，验收要求 icon 非空率 100%）
+    const dbClasses = MasterData.getClasses();
+    const specRows = (dict.specs || []).map(s => {
+      const cls = dbClasses.find(c => c.class_key === s.class_key);
+      return cls ? { class_id: cls.id, spec_key: s.spec_key, name_zh: s.name_zh, name_en: s.name_en || '', role: s.role, icon: s.icon || cls.icon || '' } : null;
+    }).filter(Boolean);    const upsertedSpecs = await MasterData.mdUpsert('game_specs', specRows, 'class_id,spec_key');
+    await MasterData.refresh('game_specs');
+    renderDatacenter();
+    showToast(`职业 ${(upsertedClasses || []).length} 行、专精 ${(upsertedSpecs || []).length} 行 upsert 完成`, 'success');
+  } catch (e) {
+    console.error('字典导入失败:', e);
+    showToast('字典导入失败：' + (e.message || '未知错误'), 'error');
+  } finally {
+    mdImporting = false;
+    btn.disabled = false; btn.textContent = btn.dataset.originalText || '📥 导入职业/专精字典';
+  }
+}
+
+// ==================== REQ-052：日期输入中文化（原生 date input + 中文遮罩） ====================
+// 背景：原生 <input type="date"> 的占位/显示格式由浏览器区域设置决定，英文 Chrome 显示
+// mm/dd/yyyy 类英文占位符，无法改文案。方案（报告取舍说明）：保留原生输入与选择器行为，
+// 输入文本透明化 + 覆盖中文格式文本（YYYY年M月D日），零交互差异、零依赖。
+function zhWrapDateInput(input) {
+  if (!input || input.dataset.zhWrapped) return;
+  input.dataset.zhWrapped = '1';
+  const wrap = document.createElement('span');
+  wrap.className = 'date-zh-wrap';
+  input.parentNode.insertBefore(wrap, input);
+  wrap.appendChild(input);
+  const text = document.createElement('span');
+  text.className = 'date-zh-text date-zh-empty';
+  wrap.appendChild(text);
+  const render = () => {
+    const v = input.value;
+    if (v && /^\d{4}-\d{2}-\d{2}$/.test(v)) {
+      const [y, m, d] = v.split('-').map(Number);
+      text.textContent = `${y}年${m}月${d}日`;
+      text.classList.remove('date-zh-empty');
+    } else {
+      text.textContent = '年 / 月 / 日';
+      text.classList.add('date-zh-empty');
+    }
+  };
+  input.addEventListener('input', render);
+  input.addEventListener('change', render);
+  // REQ-061/BUG-050 衍生：程序切换 input 显隐时（如自定义日期范围），遮罩同步显隐
+  const syncVisibility = () => { wrap.style.display = input.style.display === 'none' ? 'none' : ''; };
+  new MutationObserver(syncVisibility).observe(input, { attributes: true, attributeFilter: ['style'] });
+  syncVisibility();
+  // 覆盖 value 属性赋值（程序写入 .value 时同步刷新遮罩）
+  const desc = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value');
+  Object.defineProperty(input, 'value', {
+    get: desc.get,
+    set: (v) => { desc.set.call(input, v); render(); },
+    configurable: true
+  });
+  render();
+}
+
+// 全站静态日期输入统一包裹（脚本位于 body 末尾，DOM 已就绪）
+document.querySelectorAll('input[type="date"]').forEach(zhWrapDateInput);

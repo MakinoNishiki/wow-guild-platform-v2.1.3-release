@@ -453,6 +453,17 @@ async function authorizeProxyRequest(user, table, method, queryString, rawBody) 
     return { ok: true };
   }
 
+  // ---- 主数据表（任务书 #14 V2.2）：全登录用户可读，仅产品超管（app_metadata.role='superadmin'）可写 ----
+  // 决策 #1（运营拍板）：全产品共用一套字典，所有公会只读，仅超管维护。
+  // 正常读取前端直连 Supabase（RLS select 放行），代理读仅兜底；写必须超管。
+  const MASTER_TABLES = ["game_patches", "game_seasons", "game_raids", "game_bosses", "boss_loot", "tier_sets", "game_dungeons", "game_classes", "game_specs"];
+  if (MASTER_TABLES.includes(table)) {
+    if (method === "GET") return { ok: true };
+    const appRole = user.app_metadata && user.app_metadata.role;
+    if (appRole !== "superadmin") return deny("仅产品超管可以维护游戏字典");
+    return { ok: true };
+  }
+
   // ---- 公会业务表：raid_members / activities / activity_attendance / loot_records / wishlists ----
   if (["raid_members", "activities", "activity_attendance", "loot_records", "wishlists"].includes(table)) {
     // REQ-020（任务书 #12）：activities.status 白名单校验，仅 normal / cancelled。
