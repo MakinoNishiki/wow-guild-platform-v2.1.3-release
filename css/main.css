@@ -3647,6 +3647,73 @@ body.viewer-mode #memberSelectAll {
   margin-top: 4px;
 }
 
+/* REQ-050（任务书 #13-补丁）：团本输入框清空按钮 */
+.raid-select .form-input {
+  padding-right: 30px;
+}
+.raid-select-clear {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1;
+  padding: 4px;
+  border-radius: 4px;
+}
+.raid-select-clear:hover {
+  color: var(--gold);
+}
+
+/* BUG-042（任务书 #13-补丁2）：报表排名区流式网格（宽度不足自动换行，缺席榜不被挤成竖条） */
+.reports-rank-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+  gap: 20px;
+}
+.reports-rank-grid .card {
+  min-width: 0;
+}
+
+/* BUG-040（任务书 #13-补丁）：宽表横向滚动兜底（容器内 min-width 保底，窗口不足时表内横滚） */
+/* flex 子项默认 min-width:auto 拒绝收缩——宽表会把整页撑出横向滚动；
+   补 min-width:0 让收缩发生在容器层，滚动留在 .table-container 内 */
+.main-content { min-width: 0; }
+.content-area { min-width: 0; }
+#page-loot .table-container .data-table {
+  min-width: 1050px;
+}
+/* 窄屏横滚时首列（装备名称）保持可见：sticky 首列。
+   sticky 单元格需不透明背景，故装备表行底色显式化（与全局斑马纹/悬停同色系） */
+#page-loot .table-container .data-table tbody tr { background: var(--bg-card); }
+#page-loot .table-container .data-table tbody tr:nth-child(odd) { background: #252c34; }
+#page-loot .table-container .data-table tbody tr:hover { background: #2f3132; }
+#page-loot .table-container .data-table td:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background: inherit;
+}
+#page-loot .table-container .data-table th:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 3;
+  background: var(--bg-tertiary);
+}
+#page-members .table-container .data-table {
+  min-width: 900px;
+}
+#page-wishlist .table-container .data-table {
+  min-width: 960px;
+}
+#page-reports .table-container .data-table {
+  min-width: 720px;
+}
+
 /* ==================== 任务书 #13 REQ-045：冲突信息直显 ==================== */
 .activity-conflict-line {
   color: var(--warning);
@@ -3654,43 +3721,34 @@ body.viewer-mode #memberSelectAll {
   margin-top: 4px;
 }
 
-/* ==================== 任务书 #13 REQ-046：手动标记悬浮展开 ==================== */
-.wcl-preserved-toggle {
-  position: relative;
-  cursor: help;
-  text-decoration: underline dotted;
-  text-underline-offset: 3px;
+/* ==================== 任务书 #13 REQ-046（补丁2 方案变更）：手动标记折叠区 ==================== */
+/* 预览页内嵌第四区，默认收起、点击就地展开（废弃悬浮浮层：弹窗堆叠中空间不可控必截断） */
+.wcl-preserved-header {
+  cursor: pointer;
+  color: var(--text-secondary);
+  user-select: none;
 }
-.wcl-preserved-pop {
-  display: none;
-  position: absolute;
-  bottom: calc(100% + 6px);
-  right: 0;
-  z-index: 20;
-  min-width: 180px;
-  max-height: 220px;
+.wcl-preserved-header:hover {
+  color: var(--text-primary);
+}
+.wcl-preserved-caret {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.wcl-preserved-body {
+  max-height: 264px; /* 约 10 行，超出区内滚动，无行数上限 */
   overflow-y: auto;
-  background: var(--bg-tertiary);
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.55);
-  padding: 6px;
-  font-weight: 400;
-  text-decoration: none;
 }
-.wcl-preserved-toggle:hover .wcl-preserved-pop {
-  display: block;
-}
-.wcl-preserved-row {
+.wcl-preserved-line {
   display: flex;
   justify-content: space-between;
   gap: 16px;
-  padding: 3px 6px;
+  padding: 6px 10px;
+  margin-top: 4px;
+  border-radius: 4px;
+  background: var(--bg-primary);
   font-size: 12px;
-  color: var(--text-primary);
-}
-.wcl-preserved-row span:last-child {
-  color: var(--text-muted);
+  color: var(--text-secondary);
 }
 
 /* ==================== 任务书 #13 REQ-049：离队成员分组 ==================== */
@@ -3933,4 +3991,12 @@ body.viewer-mode #memberSelectAll {
     white-space: nowrap;
   }
   .topbar { padding: 0 16px; }
+}
+
+/* ==================== REQ-051：登录/注册按钮文本居中 ==================== */
+/* .btn 为 inline-flex 默认左排；登录/注册按钮（含"登录中.../注册中..."忙碌态）
+   文本水平居中。纯样式覆盖，不涉及 FIXED-023 按钮状态机逻辑。 */
+.auth-btn {
+  justify-content: center;
+  text-align: center;
 }

@@ -28,7 +28,7 @@
         <label>密码</label>
         <input type="password" id="authPassword" placeholder="至少6位" class="auth-input">
       </div>
-      <button class="btn btn-primary auth-btn" onclick="handleLogin()">登录</button>
+      <button class="btn btn-primary auth-btn" id="authLoginBtn" onclick="handleLogin()">登录</button>
       <div class="auth-switch">
         还没有账号？<a href="javascript:void(0)" onclick="showRegisterForm()">立即注册</a>
       </div>
@@ -48,7 +48,7 @@
         <label>密码</label>
         <input type="password" id="regPassword" placeholder="至少6位" class="auth-input">
       </div>
-      <button class="btn btn-primary auth-btn" onclick="handleRegister()">注册</button>
+      <button class="btn btn-primary auth-btn" id="authRegisterBtn" onclick="handleRegister()">注册</button>
       <button class="btn btn-ghost auth-btn" style="margin-top:8px" onclick="showLoginForm()">返回登录</button>
     </div>
 
@@ -548,7 +548,8 @@
             </div>
           </div>
 
-          <div style="display:grid;grid-template-columns:2fr 1fr;gap:20px">
+          <!-- BUG-042（任务书 #13-补丁2）：流式网格——宽度不足时缺席榜自动换行到下方，禁止挤成贴边竖条 -->
+          <div class="reports-rank-grid">
             <div class="card" style="margin-bottom:0">
               <div class="card-header">
                 <div class="card-title">出勤率排名</div>
@@ -826,6 +827,8 @@
           <div class="raid-select" id="raidSelect">
             <input type="text" class="form-input" id="activityRaidName" placeholder="如：尼鲁巴尔王宫" autocomplete="off"
                    onfocus="raidSelectOpen()" onclick="raidSelectOpen()" oninput="raidSelectFilter()" onkeydown="raidSelectKey(event)">
+            <!-- REQ-050（任务书 #13-补丁）：清空按钮——有内容时显示，点击清空并重新展开面板 -->
+            <button type="button" class="raid-select-clear" id="raidSelectClear" style="display:none" title="清空并重选" onclick="raidSelectClearInput(event)">✕</button>
             <div class="raid-select-panel" id="raidSelectPanel" style="display:none"></div>
           </div>
         </div>

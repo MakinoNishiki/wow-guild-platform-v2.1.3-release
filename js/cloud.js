@@ -272,6 +272,7 @@
   async function onUserSignedIn() {
     if (!currentUser) return;
     isCloudMode = true;
+    const signInUserId = currentUser.id; // BUG-045：竞态守卫锚点
 
     try {
       await loadUserGuilds();
@@ -279,6 +280,10 @@
       const guild = userGuilds.find(g => g.id === lastGuildId) || userGuilds[0];
       if (guild) {
         await selectGuild(guild.id);
+        // BUG-045（任务书 #13-补丁3）：登录链路异步期间用户可能已退出（如弹窗内退出登录），
+        // 迟到的 showAppView 会把登录页盖回"已退出的公会页"（首次退出不跳转的根因）。
+        // 落地前校验会话未被登出/换人。
+        if (!currentUser || currentUser.id !== signInUserId) return;
         showAppView();
       }
     } catch (e) {
@@ -1147,6 +1152,8 @@
     const appContainer = document.querySelector('.app-container');
     if (authOverlay) authOverlay.style.display = 'flex';
     if (appContainer) appContainer.style.display = 'none';
+    // BUG-044（任务书 #13-补丁2）：回登录页复位按钮状态机（退出登录/退出公会不残留"登录中..."）
+    if (typeof window.resetAuthButtons === 'function') window.resetAuthButtons();
   }
 
   function showAppView() {

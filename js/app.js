@@ -248,16 +248,37 @@ function raidSelectOpen() {
   raidSelectActiveIdx = -1;
   raidSelectRender();
   panel.style.display = 'block';
+  raidSelectSyncClear();
+}
+
+// REQ-050（任务书 #13-补丁）：清空按钮显隐（有内容才显示）
+function raidSelectSyncClear() {
+  const btn = document.getElementById('raidSelectClear');
+  const input = document.getElementById('activityRaidName');
+  if (btn && input) btn.style.display = input.value ? '' : 'none';
+}
+
+// REQ-050：清空文本框并重新展开下拉面板（不清空"最近使用"记忆）
+function raidSelectClearInput(e) {
+  if (e) e.stopPropagation();
+  const input = document.getElementById('activityRaidName');
+  if (!input) return;
+  input.value = '';
+  raidSelectSyncClear();
+  raidSelectOpen(); // 重新展开全量面板供重选
+  input.focus();
 }
 
 function raidSelectClose() {
   const panel = document.getElementById('raidSelectPanel');
   if (panel) panel.style.display = 'none';
   raidSelectActiveIdx = -1;
+  raidSelectSyncClear(); // REQ-050：弹窗打开/面板收起时同步清空按钮显隐
 }
 
 function raidSelectFilter() {
   raidSelectActiveIdx = -1;
+  raidSelectSyncClear();
   raidSelectOpen();
 }
 
@@ -880,7 +901,7 @@ function showLoginForm() {
   document.getElementById('authLoginForm').style.display = '';
   document.getElementById('authRegisterForm').style.display = 'none';
   document.getElementById('authGuildForm').style.display = 'none';
-  showAuthError('');
+  resetAuthButtons(); // BUG-044：回登录表单统一复位按钮与提示
 }
 
 // 显示注册表单
@@ -893,6 +914,7 @@ function showRegisterForm() {
 
 // 显示公会选择表单
 function showGuildForm() {
+  resetAuthButtons(); // BUG-044：退出公会等路径落到公会表单时，登录/注册按钮一并复位
   // 确保认证遮罩层显示
   const authOverlay = document.getElementById('authOverlay');
   if (authOverlay) authOverlay.style.display = 'flex';
@@ -906,6 +928,27 @@ function showGuildForm() {
   showAuthError('');
 }
 
+// BUG-044（任务书 #13-补丁2）：登录/注册按钮状态机——任何路径不得把按钮卡在"登录中..."
+function authSetBusy(form, busy) {
+  const btn = document.getElementById(form === 'register' ? 'authRegisterBtn' : 'authLoginBtn');
+  if (!btn) return;
+  if (busy) {
+    btn.dataset.originalText = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = form === 'register' ? '注册中...' : '登录中...';
+  } else {
+    btn.disabled = false;
+    btn.textContent = btn.dataset.originalText || (form === 'register' ? '注册' : '登录');
+  }
+}
+// 回到登录页/切换表单时统一复位（退出公会、退出登录、表单切换均覆盖）
+function resetAuthButtons() {
+  authSetBusy('login', false);
+  authSetBusy('register', false);
+  showAuthError('');
+}
+window.resetAuthButtons = resetAuthButtons; // cloud.js showAuthView 回登录页时调用
+
 // 登录
 async function handleLogin() {
   const email = document.getElementById('authEmail').value.trim();
@@ -913,10 +956,20 @@ async function handleLogin() {
   if (!email || !password) { showAuthError('请填写邮箱和密码'); return; }
 
   try {
-    showAuthError('登录中...');
+    authSetBusy('login', true); // 防重复提交
+    showAuthError('');
     await window.CloudSync.signIn(email, password);
+    // BUG-045（任务书 #13-补丁3）：登录等待期间用户可能已走退出流程（如弹窗内退出登录），
+    // 迟到的 showAppView 会把登录页盖回"已退出的公会页"——落地视图前校验会话仍在
+    const token = await window.CloudSync.getAccessToken();
+    if (!token) {
+      authSetBusy('login', false);
+      window.CloudSync.showAuthView();
+      return;
+    }
     // 检查是否有公会
     const guilds = window.CloudSync.getUserGuilds();
+    showAuthError(''); // 成功路径清除瞬时状态，视图随后切换
     if (guilds.length === 0) {
       // 没有公会，显示创建/加入公会表单
       showGuildForm();
@@ -924,7 +977,9 @@ async function handleLogin() {
       // 有公会，跳转到应用界面
       showAppView();
     }
+    authSetBusy('login', false); // 复位，供下次回到登录页时处于初始态
   } catch (e) {
+    authSetBusy('login', false); // 失败复位 + 错误提示
     showAuthError(mapAuthError(e) || '登录失败');
   }
 }
@@ -938,11 +993,22 @@ async function handleRegister() {
   if (password.length < 6) { showAuthError('密码至少6位'); return; }
 
   try {
-    showAuthError('注册中...');
+    authSetBusy('register', true); // 防重复提交
+    showAuthError('');
     await window.CloudSync.signUp(email, password, displayName);
+    // BUG-045：同 handleLogin，注册等待期间会话若已失效则不落视图
+    const regToken = await window.CloudSync.getAccessToken();
+    if (!regToken) {
+      authSetBusy('register', false);
+      window.CloudSync.showAuthView();
+      return;
+    }
     // 注册后一定没有公会，显示创建/加入公会表单
+    showAuthError('');
     showGuildForm();
+    authSetBusy('register', false);
   } catch (e) {
+    authSetBusy('register', false);
     showAuthError(mapAuthError(e) || '注册失败');
   }
 }
@@ -1304,10 +1370,22 @@ async function handleSwitchGuild(guildId) {
   }
 }
 
-// 退出登录
+// 退出登录（全站唯一 logout 路径：头像菜单 / 切换公会弹窗 都走这里）
 async function handleSignOut() {
-  await window.CloudSync.signOut();
-  closeModal('guildSwitcherModal');
+  try {
+    await window.CloudSync.signOut(); // ①清理登录态（supabase 会话）与公会态（SIGNED_OUT 清空上下文）
+  } catch (e) {
+    // 接口异常时 supabase-js 仍已清本地会话；此处兜底再保一道
+    console.error('退出登录接口异常:', e);
+    try { localStorage.removeItem('wow_raid_supabase'); } catch { /* 忽略 */ }
+    window.CloudSync.clearCurrentGuild();
+  }
+  // ②清空 modalStack 所有弹窗（不止切换公会弹窗——任何入口叠开的弹窗一律出栈）
+  modalStack.slice().forEach(id => closeModal(id));
+  // ③跳转登录页（SIGNED_OUT 事件通常已触发，此处兜底幂等）
+  window.CloudSync.showAuthView();
+  // ④按 FIXED-023 状态机复位登录按钮（showAuthView 内已调，显式再保一道）
+  if (typeof resetAuthButtons === 'function') resetAuthButtons();
 }
 
 // 显示应用视图（登录后）
@@ -3419,6 +3497,7 @@ function buildWclSyncPreview(activity, reportCode, data) {
   }).filter(Boolean);
   wclSyncMeta = { activityId: activity.id, reportCode, title: data.title || '', bossFightTotal, preservedCount, preservedList };
   wclSyncDirty = false;
+  wclPreservedOpen = false; // REQ-046：展开状态不记住，每次打开预览默认收起
   renderWclSyncPreview();
 }
 
@@ -3432,11 +3511,7 @@ function renderWclSyncPreview() {
   document.getElementById('wclSyncStats').innerHTML =
     `自动出席 <strong style="color:var(--success)">${full.length}</strong> · ` +
     `部分参战 <strong style="color:var(--warning)">${partial.length}</strong> · ` +
-    `未匹配 <strong style="color:var(--danger)">${unmatched.filter(r => !r.ignored).length}</strong>` +
-    (meta.preservedCount > 0
-      ? `　|　<span class="wcl-preserved-toggle"><strong>${meta.preservedCount}</strong> 条已手动标记，将被保留` +
-        `<span class="wcl-preserved-pop">${(meta.preservedList || []).map(p => `<span class="wcl-preserved-row"><span>${p.name}</span><span>${p.status}</span></span>`).join('')}</span></span>`
-      : '');
+    `未匹配 <strong style="color:var(--danger)">${unmatched.filter(r => !r.ignored).length}</strong>`;
 
   const statusSelect = (r, i, opts) =>
     `<select class="form-select" id="wclSyncStatus${i}" style="height:26px;padding:2px 6px;width:76px" onchange="wclSyncSetStatus(${i},this.value)">` +
@@ -3494,7 +3569,27 @@ function renderWclSyncPreview() {
   if (!html) {
     html = '<div style="color:var(--text-muted);font-size:13px;padding:12px 0">没有需要同步的考勤（成员管理中的角色均已手动标记，或报告中无匹配角色）。</div>';
   }
+  // REQ-046 方案变更（任务书 #13-补丁2）：第四区「已手动标记」折叠区——默认收起，
+  // 点击就地展开完整列表（替代悬浮浮层：弹窗堆叠中空间不可控、19 条必然截断，已废弃）
+  if (meta.preservedCount > 0) {
+    html += `<div class="wcl-sync-zone wcl-preserved-zone">
+      <div class="wcl-sync-zone-title wcl-preserved-header" onclick="wclPreservedToggle()">
+        已手动标记（${meta.preservedCount}），将被保留 <span class="wcl-preserved-caret">${wclPreservedOpen ? '▾' : '▸'}</span>
+      </div>
+      <div class="wcl-preserved-body" style="display:${wclPreservedOpen ? '' : 'none'}">
+        ${(meta.preservedList || []).map(p =>
+          `<div class="wcl-preserved-line"><span>${p.name}</span><span>${p.status}</span></div>`).join('')}
+      </div>
+    </div>`;
+  }
   document.getElementById('wclSyncPreviewList').innerHTML = html;
+}
+
+// REQ-046 方案变更：折叠区展开/收起（展开状态不记住，每次打开预览默认收起，见 buildWclSyncPreview）
+let wclPreservedOpen = false;
+function wclPreservedToggle() {
+  wclPreservedOpen = !wclPreservedOpen;
+  renderWclSyncPreview();
 }
 
 function wclSyncSetStatus(i, value) {
@@ -3751,8 +3846,8 @@ function drawBarChart(data) {
   const w = rect.width;
   const h = rect.height;
   const padding = { top: 20, right: 20, bottom: 40, left: 50 };
-  const chartW = w - padding.left - padding.right;
-  const chartH = h - padding.top - padding.bottom;
+  let chartW = w - padding.left - padding.right;
+  let chartH = h - padding.top - padding.bottom;
   
   // 清空
   ctx.clearRect(0, 0, w, h);
@@ -3767,6 +3862,15 @@ function drawBarChart(data) {
   
   const barWidth = Math.min(40, (chartW / data.length) - 8);
   const gap = (chartW - barWidth * data.length) / (data.length + 1);
+  // BUG-043（任务书 #13-补丁2）：成员名超过约 6 个时 X 轴标签旋转 45°，柱宽/间距随数量自适应；
+  // 长名截断加省略号，完整名单由下方排名表提供，canvas title 兜底全名悬浮
+  const rotateLabels = data.length > 6;
+  if (rotateLabels) {
+    padding.bottom = 64;
+    chartW = w - padding.left - padding.right;
+    chartH = h - padding.top - padding.bottom;
+  }
+  canvas.title = data.map(d => d.member.name).join('、');
   
   // 绘制网格线
   ctx.strokeStyle = 'rgba(48, 54, 61, 0.5)';
@@ -3807,11 +3911,21 @@ function drawBarChart(data) {
     ctx.textAlign = 'center';
     ctx.fillText(`${item.rate}%`, x + barWidth / 2, y - 5);
     
-    // X轴标签
+    // X轴标签（BUG-043：超 6 个旋转 45°，长名 6 字截断加省略号，canvas title 悬浮全名）
     ctx.fillStyle = '#8b949e';
     ctx.font = '10px sans-serif';
-    const name = item.member.name.length > 4 ? item.member.name.slice(0, 4) + '...' : item.member.name;
-    ctx.fillText(name, x + barWidth / 2, padding.top + chartH + 18);
+    const name = item.member.name.length > 6 ? item.member.name.slice(0, 6) + '…' : item.member.name;
+    if (rotateLabels) {
+      ctx.save();
+      ctx.translate(x + barWidth / 2, padding.top + chartH + 6);
+      ctx.rotate(-Math.PI / 4);
+      ctx.textAlign = 'right';
+      ctx.fillText(name, 0, 10);
+      ctx.restore();
+    } else {
+      ctx.textAlign = 'center';
+      ctx.fillText(name, x + barWidth / 2, padding.top + chartH + 18);
+    }
   });
   
   // Y轴
@@ -5568,63 +5682,145 @@ function lootFillAssignedTo(name) {
 // ==================== 更新日志 ====================
 const changelogData = [
   {
-    id: 'v3.2.0-task13',
+    id: 'v3.2.0-task13-patch',
     version: 'v3.2.0',
-    date: '2026-07-27',
+    date: '2026-07-28',
     type: 'feature',
-    typeLabel: '重大更新',
-    title: '品牌焕新「魔兽管家」与界面体验专项',
-    summary: '全站启用新品牌「魔兽管家 WoW Butler」，团本自定义下拉、活动卡片布局、头像菜单、交互反馈全面翻新，13 职业 + 3 职责本地图标上线。',
+    typeLabel: '新增功能',
+    title: '品牌焕新「魔兽管家」与界面组件升级',
+    summary: '全站启用新品牌「魔兽管家 WoW Butler」，团本自定义下拉、头像菜单、职业图标、身份徽章全面上线。',
     details: [
-      '—— 新增功能 ——',
       '全站品牌焕新「魔兽管家 WoW Butler」：侧边栏盾标、登录页大标、页签标题与 favicon 全量替换',
-      '团本名称升级为自定义下拉面板：暗色浮层、输入过滤、最近使用置顶、其他手输兜底、键盘可用',
-      '右上角头像菜单：用户中心 / 切换公会 / 退出登录收进头像下拉',
+      '团本名称升级为自定义下拉面板：暗色浮层、输入过滤、最近使用置顶、其他手输兜底、键盘可用，输入框右侧新增 ✕ 一键清空重选',
       '职业与职责本地图标 16 枚（单色职业色），成员列表、考勤名单、导入预览同步启用',
-      '—— 体验优化 ——',
-      '活动卡片左对齐信息组，出勤数据靠右，消除居中大空白；时间冲突直接显示小字不再依赖悬浮',
+      '身份徽章重设计：盾形底+图标+文字（会长金/编辑蓝/浏览灰），公会栏、成员列表、头像菜单旁统一'
+    ]
+  },
+  {
+    id: 'v3.2.0-task13-fix',
+    version: 'v3.2.0',
+    date: '2026-07-28',
+    type: 'fix',
+    typeLabel: '修复BUG',
+    title: '界面组件与窄屏修复',
+    summary: '原生控件深色渲染、活动卡片布局、手动标记浮层、窄屏表格横滚。',
+    details: [
+      '修复深色主题下日期/时间选择器、下拉箭头等原生控件图标看不清',
+      '修复活动卡片居中大空白：信息组左对齐、出勤数据靠右',
+      '修复手动标记明细展示：改为预览页内嵌折叠区，就地展开完整列表（替代悬浮浮层）',
+      '修复装备分配等宽表窄屏看不到右侧列：纳入横向滚动体系、表头吸顶、首列钉住',
+      '修复统计报表缺席榜被挤成贴边竖条、出勤率图表成员名重叠（旋转 45°+省略号）',
+      '修复退出公会/退出登录后登录按钮卡"登录中..."：按钮状态机闭环，失败复位+错误提示',
+      '修复切换公会弹窗内退出登录偶发不跳转登录页：任何入口退出统一清会话、弹窗全出栈、直达登录页'
+    ]
+  },
+  {
+    id: 'v3.2.0-task13-improve',
+    version: 'v3.2.0',
+    date: '2026-07-28',
+    type: 'improve',
+    typeLabel: '功能优化',
+    title: '交互感知与中小分辨率适配',
+    summary: '角色变更全程有感知、冲突直显、手动标记明细、离队分组、1366×768 适配。',
+    details: [
       '调整成员角色全程有感知：变更中禁用防重、成功 toast、失败就地提示并回滚选择',
-      'WCL 同步预览"N 条已手动标记"悬浮展开逐行明细（成员：状态）',
+      '时间冲突的活动卡片直接显示冲突小字，不再依赖悬浮',
+      'WCL 同步预览"N 条已手动标记"可展开逐行明细（成员：状态）',
       '开启「显示已离队」时离队成员集中底部分组展示',
-      '—— 问题修复 ——',
-      '修复深色主题下日期/时间选择器、下拉箭头等原生控件图标看不清（全局 color-scheme: dark）',
-      '—— 其他 ——',
-      '更新日志四维分类确立为发布门禁（开发规范第五章）',
-      '—— 新增功能（#13-补遗） ——',
-      '身份徽章重设计：盾形底+图标+文字（会长金/编辑蓝/浏览灰），公会栏、成员列表、头像菜单旁统一',
-      '按钮四级规范落地（主/次幽灵/危险/文字），表格五表统一（文本左/数字右/状态居中+斑马纹+悬停+吸顶表头）',
-      '—— 体验优化（#13-补遗） ——',
-      '全站标签体系统一尺寸与语义色板（金管理/红危险/灰中性/黄警告/蓝信息/绿成功）',
+      '登录/注册按钮文本居中（默认态与"登录中.../注册中..."忙碌态一致）',
       '1366×768 中小分辨率适配：间距收紧、弹窗限宽、昵称省略、侧边栏可折叠'
     ]
   },
   {
-    id: 'v3.2.0-task11-12',
+    id: 'v3.2.0-task13-refactor',
+    version: 'v3.2.0',
+    date: '2026-07-28',
+    type: 'refactor',
+    typeLabel: '模块调整',
+    title: '导航重构与组件规范统一',
+    summary: '头像菜单导航、按钮/标签/表格规范统一、更新日志四维门禁。',
+    details: [
+      '右上角改为头像菜单：用户中心 / 切换公会 / 退出登录收进头像下拉，功能不变',
+      '按钮四级规范（主/次幽灵/危险/文字）全站收口',
+      '标签体系统一尺寸与语义色板（金管理/红危险/灰中性/黄警告/蓝信息/绿成功）',
+      '表格五表统一：文本左/数字右/状态居中 + 斑马纹 + 悬停高亮 + 吸顶表头',
+      '更新日志四维分类确立为发布门禁（开发规范第五章）'
+    ]
+  },
+  {
+    id: 'v3.2.0-task11',
     version: 'v3.2.0',
     date: '2026-07-27',
     type: 'feature',
-    typeLabel: '重大更新',
-    title: 'WCL 专项与考勤体验专项',
-    summary: 'WCL 战斗日志深度集成（链接导入名单、一键同步考勤），考勤筛选与批量操作上线，已结束活动考勤可随时补录修改。',
+    typeLabel: '新增功能',
+    title: 'WCL 战斗日志深度集成',
+    summary: '从 WCL 链接导入名单、一键同步考勤，参战快照永久留存。',
     details: [
-      '—— 新增功能 ——',
       '从 WCL 链接导入成员名单（智能导入新标签页，自动识别职业与服务器）',
-      '已挂 WCL 链接的活动可一键同步考勤（全勤/部分参战/未匹配三区预览，不覆盖手动标记）',
+      '已挂 WCL 链接的活动可一键同步考勤：全勤/部分参战/未匹配三区预览，不覆盖手动标记，重复同步幂等',
+      '同步成功后参战名单快照存入活动，免费日志过期后仍可查'
+    ]
+  },
+  {
+    id: 'v3.2.0-task12',
+    version: 'v3.2.0',
+    date: '2026-07-27',
+    type: 'feature',
+    typeLabel: '新增功能',
+    title: '考勤批量操作、筛选与活动状态',
+    summary: '考勤筛选、批量标记/删除、活动取消恢复、软删除，考勤管理全面提效。',
+    details: [
       '考勤列表筛选：按成员、状态、时间范围（含本赛季）过滤，实时显示出勤率小计',
       '考勤详情勾选多人后批量标记出席/缺席/替补/请假',
       '活动列表与成员管理支持勾选后批量删除（二次确认、逐条列明）',
-      '成员删除改为软删除：单个/批量删除均为标记「离队」，历史考勤/装备记录全部保留',
-      '同名成员再次添加/导入时，可一键恢复已离队成员（恢复优先于新建）',
-      '—— 问题修复 ——',
-      '修复智能导入确认按钮可重复点击导致重复导入',
-      '修复考勤视图偏好在刷新后丢失（按账号+公会记住列表/日历选择）',
-      '—— 体验优化 ——',
       '活动可取消/恢复：取消后灰显且不计入出勤率，恢复即重新计入',
-      '活动团队标签同日时间交叉时黄色高亮预警；团本名称下拉记住最近使用',
-      'WCL 同步成功后常驻提示未标记成员，写入期间提示勿关闭页面',
-      '成员列表默认隐藏已离队成员（可开关显示），历史记录中已离队成员灰色标记',
-      '—— 其他 ——',
-      '出勤率统计全站过滤已取消活动（数据保留，仅统计口径调整）'
+      '成员删除改为软删除：标记「离队」不丢历史记录；同名再添加可一键恢复',
+      '活动团队标签同日时间交叉时黄色高亮预警；团本名称下拉记住最近使用'
+    ]
+  },
+  {
+    id: 'v3.2.0-task12-fix',
+    version: 'v3.2.0',
+    date: '2026-07-27',
+    type: 'fix',
+    typeLabel: '修复BUG',
+    title: '考勤与导入稳定性修复',
+    summary: '视图偏好串号、假成功、弹窗遮挡、加载不全、导入撞唯一约束等一批稳定性修复。',
+    details: [
+      '修复考勤视图偏好串号：按账号+公会记住列表/日历选择，换身份不再错乱',
+      '修复智能导入确认按钮可重复点击导致重复导入',
+      '修复 WCL 同步预览「添加为成员」被弹窗层叠遮挡无响应',
+      '修复批量删除活动/成员偶发"假成功"（提示成功但列表不刷新），并修复偶发刷新后数据加载不全（失败时页面明确提示）',
+      '修复智能导入撞同名报"云端同步出错"：识别唯一约束冲突给出具体中文原因，单行失败不再拖死整批',
+      '修复离队成员操作列残留无效删除按钮（改为恢复按钮）；聚合确认后预览行状态即时更新；状态列文字不再竖排换行',
+      '防御性加固：考勤整表保存时名单外的既有考勤行按原状态保留'
+    ]
+  },
+  {
+    id: 'v3.2.0-task12-improve',
+    version: 'v3.2.0',
+    date: '2026-07-27',
+    type: 'improve',
+    typeLabel: '功能优化',
+    title: '考勤感知与提示优化',
+    summary: 'WCL 同步全程提示、红区成员一键添加、未标记成员常驻提醒。',
+    details: [
+      'WCL 同步写入期间提示"请勿关闭页面"，成功后常驻提醒手动标记日志外成员',
+      'WCL 同步预览红色未匹配角色可一键添加为成员，添加后自动纳入考勤写入',
+      '已结束活动的考勤可随时补录修改，报表即时重算'
+    ]
+  },
+  {
+    id: 'v3.2.0-task12-refactor',
+    version: 'v3.2.0',
+    date: '2026-07-27',
+    type: 'refactor',
+    typeLabel: '模块调整',
+    title: '出勤率统计口径调整',
+    summary: '已取消活动不再计入任何人的出勤率，数据保留可恢复。',
+    details: [
+      '出勤率统计全站过滤已取消活动（数据保留，仅统计口径调整）',
+      '成员"删除"语义统一为软删除（标记离队），历史考勤/装备记录全保留'
     ]
   },
   {
@@ -5696,7 +5892,7 @@ const changelogData = [
     id: 'v2.12.2',
     version: 'v2.12.2',
     date: '2026-07-22',
-    type: 'bugfix',
+    type: 'fix',
     typeLabel: '问题修复',
     title: '修复 Supabase RLS INSERT 策略失效问题',
     summary: '通过 server.js 代理写入操作解决 PostgREST RLS INSERT 策略不生效的问题。',
@@ -5744,7 +5940,7 @@ const changelogData = [
     id: 'v2.11.4',
     version: 'v2.11.4',
     date: '2026-07-07',
-    type: 'bugfix',
+    type: 'fix',
     typeLabel: '数据修正',
     title: '虚影尖塔BOSS列表修正',
     summary: '修正虚影尖塔团本BOSS序列：威厄高尔与艾佐拉克为双子BOSS（同一战斗），新增遗漏的光盲先锋BOSS。',
@@ -5758,7 +5954,7 @@ const changelogData = [
     id: 'v2.11.3',
     version: 'v2.11.3',
     date: '2026-07-07',
-    type: 'bugfix',
+    type: 'fix',
     typeLabel: '数据与映射修复',
     title: '装备库归属与分类映射全面修复',
     summary: '彻查并修复装备库模块的多处数据映射问题：装备分类映射错误、slot名称不统一、团本数据缺失、BOSS名称不一致等，确保从装备库选择后所有字段准确填充。',
@@ -5776,7 +5972,7 @@ const changelogData = [
     id: 'v2.11.2',
     version: 'v2.11.2',
     date: '2026-07-07',
-    type: 'bugfix',
+    type: 'fix',
     typeLabel: '数据修正',
     title: '装备库数据修正',
     summary: '修正装备库中2处数据错误：虚影尖塔1号BOSS归属、贝罗梅洛恩武器类型。',
@@ -5789,7 +5985,7 @@ const changelogData = [
     id: 'v2.11.1',
     version: 'v2.11.1',
     date: '2026-07-07',
-    type: 'bugfix',
+    type: 'fix',
     typeLabel: 'Bug修复',
     title: '心愿单装备库填充字段丢失',
     summary: '修复心愿单从装备库选择装备后，团本、装备大类、部位等字段未填充的问题。原因是装备库使用英文raid标识而心愿单下拉使用中文名，且分类映射只覆盖了布皮锁板四类防具。',
@@ -5821,7 +6017,7 @@ const changelogData = [
     id: 'v2.10.1',
     version: 'v2.10.1',
     date: '2026-07-07',
-    type: 'enhancement',
+    type: 'improve',
     typeLabel: '体验优化',
     title: '成员下拉选项职业色',
     summary: '装备分配成员下拉选择器中每个选项文字显示对应职业颜色，选中后下拉框本身也同步显示职业色，视觉识别更直观。',
