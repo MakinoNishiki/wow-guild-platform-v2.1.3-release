@@ -5768,6 +5768,34 @@ function lootFillAssignedTo(name) {
 // ==================== 更新日志 ====================
 const changelogData = [
   {
+    id: 'v3.2.0-task16-refactor',
+    version: 'v3.2.0',
+    date: '2026-08-02',
+    type: 'refactor',
+    typeLabel: '模块调整',
+    title: 'Supabase SDK 改为本地内嵌',
+    summary: '前端 Supabase JS SDK 由海外 CDN 引用改为随站点本地加载，首开不再依赖外部 CDN 可用性。',
+    details: [
+      'index.html 仅改 script 引用一行，SDK 文件（supabase-js@2 官方版）存放于 assets/vendor/ 随站点分发',
+      '业务逻辑零改动，登录/读写行为与之前完全一致'
+    ]
+  },
+  {
+    id: 'v3.2.0-task15-refactor',
+    version: 'v3.2.0',
+    date: '2026-08-02',
+    type: 'refactor',
+    typeLabel: '模块调整',
+    title: '数据库迁移至国内自托管（REQ-035）',
+    summary: '数据库由海外 Supabase 云整体迁移至国内自托管服务器，国内读写不再跨太平洋，写入超时根治。',
+    details: [
+      '数据一行不丢：切换前最终导出，public + auth 全部 42 张表逐表对账全等（成员/考勤/心愿/装备/主数据全量）',
+      '老用户登录态保留：复用原 JWT 密钥，全员免重新登录',
+      '国内实测热请求 0.10~0.14 秒，告别跨太平洋 524 超时',
+      '业务代码零改动，功能与权限行为与迁移前完全一致'
+    ]
+  },
+  {
     id: 'v3.2.0-task14-patch4-feature',
     version: 'v3.2.0',
     date: '2026-07-29',
