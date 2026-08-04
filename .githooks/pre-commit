@@ -1,9 +1,10 @@
-#!/bin/bash
+#!/bin/sh
 # .githooks/pre-commit — SEC-003 密钥扫描钩子（任务书 #17）
 # 扫描暂存区文件内容，命中密钥特征即拒绝提交并打印文件名。
 # 本脚本自身不含任何真实密钥。
 # 白名单：.githooks/secret-allowlist 逐行精确路径（# 起为注释）；
 #         *.example/*.sample/*.template 与 .githooks/ 自身自动放行。
+# 兼容性：POSIX sh（GitHub Desktop 内置 git 环境无 bash，issue #5628），不得使用 bash 专有写法。
 
 set -u
 
@@ -16,14 +17,18 @@ is_allowed() {
   [ -f "$ALLOWLIST" ] || return 1
   while IFS= read -r line; do
     line="${line%%#*}"
-    line="${line//[[:space:]]/}"
+    # POSIX：bash 的 ${var//pattern/} 替换在 sh 下不可用，用 tr 去空白
+    line=$(printf '%s' "$line" | tr -d '[:space:]')
     [ -n "$line" ] && [ "$1" = "$line" ] && return 0
   done < "$ALLOWLIST"
   return 1
 }
 
-offenders=""
-while IFS= read -r f; do
+# while 管道循环运行在子 shell，命中结果无法写回父变量，落临时文件回传
+offenders_tmp=$(mktemp 2>/dev/null || printf '.git/.pre-commit-offenders.%s' "$$")
+trap 'rm -f "$offenders_tmp"' EXIT
+
+git diff --cached --name-only --diff-filter=ACMR | while IFS= read -r f; do
   [ -z "$f" ] && continue
   is_allowed "$f" && continue
   content=$(git show ":$f" 2>/dev/null) || continue
@@ -41,15 +46,13 @@ while IFS= read -r f; do
     hit="带密码的 postgres 连接串"
   fi
   if [ -n "$hit" ]; then
-    offenders="$offenders  $f  （命中：$hit）\n"
+    printf '  %s  （命中：%s）\n' "$f" "$hit" >> "$offenders_tmp"
   fi
-done <<EOF
-$(git diff --cached --name-only --diff-filter=ACMR)
-EOF
+done
 
-if [ -n "$offenders" ]; then
+if [ -s "$offenders_tmp" ]; then
   echo "❌ pre-commit 密钥扫描拦截：以下暂存文件疑似包含密钥，已拒绝提交：" >&2
-  printf '%b' "$offenders" >&2
+  cat "$offenders_tmp" >&2
   echo "如确属示例/占位内容，请将文件路径加入 $ALLOWLIST 后重试。" >&2
   exit 1
 fi
