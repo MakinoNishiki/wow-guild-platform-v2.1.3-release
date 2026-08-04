@@ -6,6 +6,19 @@ const path = require("path");
 const { execSync } = require("child_process");
 
 const ROOT = __dirname;
+const PUBLIC_STATIC_FILES = new Set([path.join(ROOT, "index.html")]);
+const PUBLIC_STATIC_ROOTS = ["assets", "css", "js"].map(
+  (dir) => `${path.join(ROOT, dir)}${path.sep}`
+);
+
+// ------------------------------------------------------------
+// 静态文件边界：项目目录不是 Web 根目录。
+// 只公开浏览器运行所需文件，其余文件默认不可达。
+// ------------------------------------------------------------
+function isPublicStaticFile(filePath) {
+  if (PUBLIC_STATIC_FILES.has(filePath)) return true;
+  return PUBLIC_STATIC_ROOTS.some((root) => filePath.startsWith(root));
+}
 
 // 读取项目根目录 .env 文件（手写解析，零依赖）。
 // 已存在的系统环境变量优先，.env 只补缺。
@@ -31,6 +44,14 @@ function loadDotEnv() {
 loadDotEnv();
 
 const PORT = parseInt(process.env.DEPLOY_RUN_PORT || "5000", 10);
+const HOST = process.env.DEPLOY_RUN_HOST || "127.0.0.1";
+const MAX_REQUEST_BODY_BYTES = 1024 * 1024;
+const ALLOWED_CORS_ORIGINS = new Set(
+  (process.env.CORS_ALLOWED_ORIGINS || "https://ddctl.com")
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean)
+);
 
 const MIME = {
   ".html": "text/html; charset=utf-8",
@@ -239,10 +260,11 @@ function proxyToSupabase(method, supabasePath, headers, body, callback) {
         errCode: code,
       });
     } else {
+      console.error("Supabase proxy error", { code, message: err && err.message });
       finish({
         statusCode: 500,
         headers: {},
-        body: JSON.stringify({ error: err.message }),
+        body: JSON.stringify({ message: "数据库服务暂时不可用，请稍后重试" }),
         errCode: code,
       });
     }
@@ -254,13 +276,66 @@ function proxyToSupabase(method, supabasePath, headers, body, callback) {
   req.end();
 }
 
-// Read request body
+// ------------------------------------------------------------
+// 请求体边界：超过 1 MiB 后停止缓存，其余数据直接排空。
+// ------------------------------------------------------------
 function readBody(req) {
-  return new Promise((resolve) => {
-    let body = "";
-    req.on("data", (chunk) => { body += chunk; });
-    req.on("end", () => resolve(body));
+  return new Promise((resolve, reject) => {
+    const chunks = [];
+    let size = 0;
+    let settled = false;
+    const failTooLarge = () => {
+      if (settled) return;
+      settled = true;
+      req.removeListener("data", onData);
+      req.resume();
+      const error = new Error("请求体超过 1 MiB 限制");
+      error.statusCode = 413;
+      reject(error);
+    };
+    const onData = (chunk) => {
+      size += chunk.length;
+      if (size > MAX_REQUEST_BODY_BYTES) return failTooLarge();
+      chunks.push(chunk);
+    };
+    if (Number(req.headers["content-length"] || 0) > MAX_REQUEST_BODY_BYTES) {
+      failTooLarge();
+      return;
+    }
+    req.on("data", onData);
+    req.on("end", () => {
+      if (!settled) resolve(Buffer.concat(chunks).toString("utf8"));
+    });
+    req.on("error", reject);
   });
+}
+
+function getCorsHeaders(req) {
+  const origin = req.headers.origin || "";
+  if (!origin || !ALLOWED_CORS_ORIGINS.has(origin)) return {};
+  return {
+    "Access-Control-Allow-Origin": origin,
+    "Access-Control-Allow-Methods": "GET, POST, PATCH, DELETE, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization, Prefer, Accept",
+    "Vary": "Origin",
+  };
+}
+
+function isJsonRequest(req) {
+  return /^application\/json(?:\s*;|$)/i.test(req.headers["content-type"] || "");
+}
+
+function authorizeRpcPayload(user, fnName, rawBody) {
+  let payload;
+  try {
+    payload = JSON.parse(rawBody || "{}");
+  } catch {
+    return { ok: false, status: 400, message: "请求体不是有效 JSON" };
+  }
+  if (fnName === "get_unread_notification_count" && payload.p_user_id !== user.id) {
+    return { ok: false, status: 403, message: "只能查询本人的未读通知" };
+  }
+  return { ok: true };
 }
 
 // ==================== SEC-001 代理层公会级鉴权 ====================
@@ -290,9 +365,10 @@ const jwtCache = new Map(); // token → { user, exp }
 const roleCache = new Map(); // `${userId}:${guildId}` → { role, exp }
 
 function cacheSet(map, key, value) {
-  if (map.size > 5000) { // 防内存膨胀：超限顺带清理过期项
+  if (map.size >= 5000) { // 防内存膨胀：先清过期，再淘汰最早项
     const now = Date.now();
     for (const [k, v] of map) { if (v.exp <= now) map.delete(k); }
+    while (map.size >= 5000) map.delete(map.keys().next().value);
   }
   map.set(key, value);
 }
@@ -422,8 +498,16 @@ async function fetchRowById(table, id, select) {
 async function authorizeProxyRequest(user, table, method, queryString, rawBody) {
   const uid = user.id;
   const deny = (message) => ({ ok: false, status: 403, message });
+  const badRequest = (message) => ({ ok: false, status: 400, message });
   const filters = parseEqFilters(queryString);
   const rows = parseBodyRows(rawBody);
+
+  if ((method === "POST" || method === "PATCH") && rows.length === 0) {
+    return badRequest("新增或修改必须提供有效的 JSON 数据");
+  }
+  if ((method === "PATCH" || method === "DELETE") && Object.keys(filters).length === 0) {
+    return badRequest("修改或删除必须提供精确过滤条件");
+  }
 
   // ---- GET：仅放行 guilds（邀请码/按 id 查找公会的唯一代理读场景），且必须带精确过滤，防止全表遍历 ----
   if (method === "GET") {
@@ -434,9 +518,15 @@ async function authorizeProxyRequest(user, table, method, queryString, rawBody) 
 
   // ---- guilds ----
   if (table === "guilds") {
-    if (method === "POST") return { ok: true }; // 任何登录用户可创建公会
+    if (method === "POST") {
+      if (rows.some((row) => !row || row.owner_id !== uid)) {
+        return deny("只能以当前账号创建公会");
+      }
+      return { ok: true };
+    }
     // PATCH/DELETE：仅 owner
     const ids = filters.id || [];
+    if (ids.length === 0) return badRequest("修改或删除公会必须提供公会 ID");
     for (const guildId of ids) {
       const role = await getGuildRoleCached(guildId, uid);
       if (role !== "owner") return deny("仅公会会长可以修改或删除公会");
@@ -463,6 +553,7 @@ async function authorizeProxyRequest(user, table, method, queryString, rawBody) 
     }
     // PATCH/DELETE：解析目标行
     const ids = filters.id || [];
+    if (ids.length === 0) return badRequest("修改或删除公会成员必须提供成员关系 ID");
     for (const rowId of ids) {
       const row = await fetchRowById("guild_members", rowId, "guild_id,user_id");
       if (!row) continue; // 目标不存在，no-op 放行
@@ -490,6 +581,9 @@ async function authorizeProxyRequest(user, table, method, queryString, rawBody) 
       return { ok: true };
     }
     // PATCH/DELETE：仅限本人通知
+    if (!filters.user_id && !filters.id) {
+      return badRequest("修改或删除通知必须提供通知 ID 或用户 ID");
+    }
     if (filters.user_id && filters.user_id.some((v) => v !== uid)) return deny("只能操作本人的通知");
     for (const rowId of filters.id || []) {
       const row = await fetchRowById("notifications", rowId, "user_id");
@@ -505,6 +599,9 @@ async function authorizeProxyRequest(user, table, method, queryString, rawBody) 
 
   // ---- user_profiles / user_characters：仅限本人 ----
   if (table === "user_profiles" || table === "user_characters") {
+    if ((method === "PATCH" || method === "DELETE") && !filters.user_id && !filters.id) {
+      return badRequest("修改或删除用户数据必须提供记录 ID 或用户 ID");
+    }
     if (filters.user_id && filters.user_id.some((v) => v !== uid)) return deny("只能操作本人的数据");
     for (const row of rows) {
       if (row && row.user_id && row.user_id !== uid) return deny("只能操作本人的数据");
@@ -540,8 +637,9 @@ async function authorizeProxyRequest(user, table, method, queryString, rawBody) 
     }
     const guildIds = await resolveGuildIds(table, filters, rows);
     if (guildIds.size === 0) {
-      // 无法定位目标公会（如删除不存在的行）：放行，操作必然 no-op
-      return { ok: true };
+      // 精确 id 指向不存在记录时操作必然 no-op；其余归属不明请求一律拒绝。
+      if ((method === "PATCH" || method === "DELETE") && filters.id) return { ok: true };
+      return badRequest("无法确认目标数据所属公会");
     }
     for (const guildId of guildIds) {
       const role = await getGuildRoleCached(guildId, uid);
@@ -768,7 +866,7 @@ async function handleWclRequest(req, res, corsHeaders, withSnapshot) {
     console.log(`[perf] WCL ${endpoint} code=${code} total=${Date.now() - t0}ms`);
     send(200, { ...summary, ...snapshotExtra });
   } catch (e) {
-    const status = e.wclStatus || 500;
+    const status = e.statusCode || e.wclStatus || 500;
     console.log(`[perf] WCL ${endpoint} failed total=${Date.now() - t0}ms err=${e.message}`);
     send(status, { message: e.message || "服务器内部错误" });
   }
@@ -791,18 +889,44 @@ function serveFile(res, filePath) {
 
 const server = http.createServer(async (req, res) => {
   let urlPath = req.url.split("?")[0];
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("X-Frame-Options", "SAMEORIGIN");
+  res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+  res.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
+  if (urlPath.startsWith("/api/")) res.setHeader("Cache-Control", "no-store");
 
-  // CORS headers for all API routes
-  const corsHeaders = {
-    "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Methods": "GET, POST, PUT, PATCH, DELETE, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type, Authorization, Prefer, Accept",
-  };
+  const corsHeaders = getCorsHeaders(req);
 
   // Handle CORS preflight
   if (req.method === "OPTIONS" && urlPath.startsWith("/api/")) {
+    const origin = req.headers.origin || "";
+    if (origin && !ALLOWED_CORS_ORIGINS.has(origin)) {
+      res.writeHead(403, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ message: "不允许的跨域来源" }));
+      return;
+    }
     res.writeHead(204, corsHeaders);
     res.end();
+    return;
+  }
+
+  if (
+    urlPath.startsWith("/api/") &&
+    Number(req.headers["content-length"] || 0) > MAX_REQUEST_BODY_BYTES
+  ) {
+    req.resume();
+    res.writeHead(413, { "Content-Type": "application/json", ...corsHeaders });
+    res.end(JSON.stringify({ message: "请求体超过 1 MiB 限制" }));
+    return;
+  }
+
+  if (
+    urlPath.startsWith("/api/") &&
+    (req.method === "POST" || req.method === "PATCH" || req.method === "PUT") &&
+    !isJsonRequest(req)
+  ) {
+    res.writeHead(415, { "Content-Type": "application/json", ...corsHeaders });
+    res.end(JSON.stringify({ message: "请求必须使用 application/json" }));
     return;
   }
 
@@ -849,7 +973,14 @@ const server = http.createServer(async (req, res) => {
 
       const table = urlPath.replace("/api/db/rest/v1/", "").split("/")[0];
       const queryString = req.url.includes("?") ? req.url.substring(req.url.indexOf("?")) : "";
-      const body = await readBody(req);
+      let body;
+      try {
+        body = await readBody(req);
+      } catch (e) {
+        res.writeHead(e.statusCode || 400, { "Content-Type": "application/json", ...corsHeaders });
+        res.end(JSON.stringify({ message: e.message || "无法读取请求内容" }));
+        return;
+      }
 
       // SEC-001：公会级鉴权，失败返回 401/403 + 中文提示
       try {
@@ -919,18 +1050,27 @@ const server = http.createServer(async (req, res) => {
       const supabasePath = `/rest/v1/rpc/${fnName}`;
 
       readBody(req).then((body) => {
+        const authz = authorizeRpcPayload(user, fnName, body);
+        if (!authz.ok) {
+          res.writeHead(authz.status, { "Content-Type": "application/json", ...corsHeaders });
+          res.end(JSON.stringify({ message: authz.message }));
+          return;
+        }
         proxyToSupabase("POST", supabasePath, req.headers, body, (result) => {
           const responseHeaders = { ...corsHeaders, "Content-Type": "application/json" };
           res.writeHead(result.statusCode, responseHeaders);
           res.end(result.body);
         });
+      }).catch((e) => {
+        res.writeHead(e.statusCode || 400, { "Content-Type": "application/json", ...corsHeaders });
+        res.end(JSON.stringify({ message: e.message || "无法读取请求内容" }));
       });
     });
     return;
   }
 
   // API: PRD Document Download - /api/prd
-  if (urlPath === "/api/prd") {
+  if (urlPath === "/api/prd" && req.method === "GET") {
     const prdPath = path.join(ROOT, "PRD.docx");
     fs.stat(prdPath, (err, stats) => {
       if (err || !stats.isFile()) {
@@ -950,7 +1090,7 @@ const server = http.createServer(async (req, res) => {
   }
 
   // API: Loot Design Document Download - /api/loot-design
-  if (urlPath === "/api/loot-design") {
+  if (urlPath === "/api/loot-design" && req.method === "GET") {
     const docPath = path.join(ROOT, "public", "V2.1-装备履历模型设计方案.docx");
     fs.stat(docPath, (err, stats) => {
       if (err || !stats.isFile()) {
@@ -972,29 +1112,18 @@ const server = http.createServer(async (req, res) => {
 
   if (urlPath === "/") urlPath = "/index.html";
 
-  const safePath = path.normalize(urlPath).replace(/^(\.\.(\/|\\|$))+/, "");
-
-  // 任务书 #17 M7（安全红线）：封堵敏感路径泄露。
-  // 任何以 /. 开头的路径（/.env、/.git/config、/.s6-ssh/、/.github/ 等）与
-  // 服务器自身文件一律 404；/.well-known/ 例外放行（证书续期要用）。
-  // 在归一化后的路径上判定（防 /./.env、/x/../.env 绕过）；统一成正斜杠兼容 Windows 本地调试。
-  const checkPath = safePath.replace(/\\/g, "/").toLowerCase();
-  if (
-    (checkPath.startsWith("/.") && !checkPath.startsWith("/.well-known/")) ||
-    checkPath === "/server.js" ||
-    checkPath === "/package.json" ||
-    checkPath === "/package-lock.json"
-  ) {
-    res.writeHead(404, { "Content-Type": "text/html" });
-    res.end("Not Found");
+  if (req.method !== "GET" && req.method !== "HEAD") {
+    res.writeHead(405, { "Content-Type": "text/plain; charset=utf-8", "Allow": "GET, HEAD" });
+    res.end("Method Not Allowed");
     return;
   }
 
+  const safePath = path.normalize(urlPath).replace(/^(\.\.(\/|\\|$))+/, "");
   const filePath = path.join(ROOT, safePath);
 
-  if (!filePath.startsWith(ROOT)) {
-    res.writeHead(403);
-    res.end("Forbidden");
+  if (!filePath.startsWith(ROOT) || !isPublicStaticFile(filePath)) {
+    res.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" });
+    res.end("Not Found");
     return;
   }
 
@@ -1008,6 +1137,17 @@ const server = http.createServer(async (req, res) => {
   });
 });
 
-server.listen(PORT, "0.0.0.0", () => {
-  process.stderr.write(`Server listening on port ${PORT}\n`);
-});
+function startServer() {
+  return server.listen(PORT, HOST, () => {
+    process.stderr.write(`Server listening on ${HOST}:${PORT}\n`);
+  });
+}
+
+if (require.main === module) startServer();
+
+module.exports = {
+  authorizeProxyRequest,
+  authorizeRpcPayload,
+  isPublicStaticFile,
+  startServer,
+};

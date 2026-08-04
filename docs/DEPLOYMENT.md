@@ -33,4 +33,6 @@ master push / workflow_dispatch
 
 ## 变更日志
 
+- 2026-08-04：静态服务改为公开资源白名单，并收紧监听地址、请求体、CORS、Content-Type、响应头、错误输出与 service_role 代理失败关闭边界。
+- 2026-08-04：新增无需连接数据库的服务端安全边界回归测试。
 - 2026-07-25：新增 GitHub Actions 生产自动部署入口。
