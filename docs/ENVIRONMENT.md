@@ -8,6 +8,8 @@
 | `SUPABASE_ANON_KEY` | Supabase 匿名公钥（前端读取用） | `eyJhbGciOi...` |
 | `SUPABASE_SERVICE_ROLE_KEY` | Supabase 服务角色密钥（服务端写入用） | `eyJhbGciOi...` |
 | `DEPLOY_RUN_PORT` | 服务监听端口 | `5000` |
+| `DEPLOY_RUN_HOST` | 服务监听地址；生产环境保持本机监听 | `127.0.0.1` |
+| `CORS_ALLOWED_ORIGINS` | 允许跨域访问 API 的来源，多个值以逗号分隔 | `https://ddctl.com` |
 
 ## Supabase 配置步骤
 
@@ -45,6 +47,8 @@ SUPABASE_URL=https://your-project.supabase.co
 SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 DEPLOY_RUN_PORT=5000
+DEPLOY_RUN_HOST=127.0.0.1
+CORS_ALLOWED_ORIGINS=https://ddctl.com
 ```
 
 ## 数据流说明
