@@ -108,6 +108,11 @@ function getSupabaseUrl() {
   return process.env.COZE_SUPABASE_URL || process.env.SUPABASE_URL || "";
 }
 
+// 任务书 #17 M1：转发专用连接池，keepAlive=false——每次请求全新 TCP 连接。
+// 病根：Node 19+ 全局默认 agent 复用跨国旧连接，连接被链路悄悄掐死后靠 TCP 重传
+// （RTO 约 15-18 秒）才恢复，EdgeOne 约 15 秒放弃返回 524，但写入最后实际落库（幽灵成功）。
+const upstreamAgent = new https.Agent({ keepAlive: false });
+
 // Verify JWT token with Supabase Auth
 function verifyToken(accessToken, callback) {
   const supabaseUrl = getSupabaseUrl();
@@ -124,11 +129,20 @@ function verifyToken(accessToken, callback) {
     port: url.port || 443,
     path: url.pathname,
     method: "GET",
+    agent: upstreamAgent, // 任务书 #17 M1：全新连接，禁用全局复用池
     headers: {
       "apikey": anonKey,
       "Authorization": `Bearer ${accessToken}`,
       "Content-Type": "application/json",
     },
+  };
+
+  // 任务书 #17 M2：done 标志，保证 callback 只被调用一次
+  let done = false;
+  const finish = (user) => {
+    if (done) return;
+    done = true;
+    callback(user);
   };
 
   const req = https.request(options, (res) => {
@@ -137,17 +151,24 @@ function verifyToken(accessToken, callback) {
     res.on("end", () => {
       if (res.statusCode === 200) {
         try {
-          callback(JSON.parse(data));
+          finish(JSON.parse(data));
         } catch {
-          callback(null);
+          finish(null);
         }
       } else {
-        callback(null);
+        finish(null);
       }
     });
   });
 
-  req.on("error", () => callback(null));
+  // 任务书 #17 M4：验证 6 秒超时，超时按验证失败处理（走原有 callback(null) → 401 路径）
+  req.setTimeout(6000, () => {
+    const err = new Error("verify token timeout");
+    err.code = "ETIMEDOUT";
+    req.destroy(err);
+  });
+
+  req.on("error", () => finish(null));
   req.end();
 }
 
@@ -164,6 +185,11 @@ function proxyToSupabase(method, supabasePath, headers, body, callback) {
     "Prefer": headers["prefer"] || "return=representation",
   };
 
+  // 任务书 #17 M3：显式 Content-Length，去掉 chunked 传输编码（跨国中间设备对 chunked 处理不可靠）
+  if (body) {
+    forwardHeaders["Content-Length"] = Buffer.byteLength(body);
+  }
+
   // Forward query params are already in supabasePath
 
   const options = {
@@ -172,13 +198,22 @@ function proxyToSupabase(method, supabasePath, headers, body, callback) {
     path: url.pathname + url.search,
     method: method,
     headers: forwardHeaders,
+    agent: upstreamAgent, // 任务书 #17 M1：全新连接，禁用全局复用池
+  };
+
+  // 任务书 #17 M2：done 标志，保证 callback 只被调用一次（响应完成后又触发 error 的场景）
+  let done = false;
+  const finish = (result) => {
+    if (done) return;
+    done = true;
+    callback(result);
   };
 
   const req = https.request(options, (res) => {
     let data = "";
     res.on("data", (chunk) => { data += chunk; });
     res.on("end", () => {
-      callback({
+      finish({
         statusCode: res.statusCode,
         headers: res.headers,
         body: data,
@@ -186,12 +221,31 @@ function proxyToSupabase(method, supabasePath, headers, body, callback) {
     });
   });
 
+  // 任务书 #17 M2：上游 10 秒超时；Node 不会自动销毁，timeout 事件里必须 destroy
+  req.setTimeout(10000, () => {
+    const err = new Error("upstream timeout");
+    err.code = "ETIMEDOUT";
+    req.destroy(err);
+  });
+
   req.on("error", (err) => {
-    callback({
-      statusCode: 500,
-      headers: {},
-      body: JSON.stringify({ error: err.message }),
-    });
+    const code = err && err.code;
+    // 任务书 #17 M2：超时/ECONNRESET → 504 + 中文提示（errCode 供 supabaseRestGet 重试判定，M5）
+    if (code === "ETIMEDOUT" || code === "ECONNRESET") {
+      finish({
+        statusCode: 504,
+        headers: {},
+        body: JSON.stringify({ message: "数据库响应超时：本次写入结果未知，请先刷新列表确认，再决定是否重试" }),
+        errCode: code,
+      });
+    } else {
+      finish({
+        statusCode: 500,
+        headers: {},
+        body: JSON.stringify({ error: err.message }),
+        errCode: code,
+      });
+    }
   });
 
   if (body) {
@@ -263,13 +317,22 @@ async function getGuildRoleCached(guildId, userId) {
 
 // service_role REST 查询（仅鉴权模块内部使用）
 function supabaseRestGet(restPath) {
-  return new Promise((resolve) => {
-    proxyToSupabase("GET", restPath, {}, null, (result) => {
-      let body = null;
-      try { body = JSON.parse(result.body); } catch { body = null; }
-      resolve({ status: result.statusCode, body });
+  // 任务书 #17 M5：鉴权内部 GET 幂等，超时/ECONNRESET 允许重试 1 次
+  // （M1 之后每次请求本来就是新连接，直接重发即可）。
+  // POST/PATCH/DELETE 一律禁止自动重试——上游可能已落库，自动重试 = 制造重复数据。
+  const attempt = (retried) =>
+    new Promise((resolve) => {
+      proxyToSupabase("GET", restPath, {}, null, (result) => {
+        if (!retried && (result.errCode === "ETIMEDOUT" || result.errCode === "ECONNRESET")) {
+          resolve(attempt(true));
+          return;
+        }
+        let body = null;
+        try { body = JSON.parse(result.body); } catch { body = null; }
+        resolve({ status: result.statusCode, body });
+      });
     });
-  });
+  return attempt(false);
 }
 
 // 查询用户在指定公会的角色（owner/editor/viewer），非成员返回 null
@@ -910,6 +973,23 @@ const server = http.createServer(async (req, res) => {
   if (urlPath === "/") urlPath = "/index.html";
 
   const safePath = path.normalize(urlPath).replace(/^(\.\.(\/|\\|$))+/, "");
+
+  // 任务书 #17 M7（安全红线）：封堵敏感路径泄露。
+  // 任何以 /. 开头的路径（/.env、/.git/config、/.s6-ssh/、/.github/ 等）与
+  // 服务器自身文件一律 404；/.well-known/ 例外放行（证书续期要用）。
+  // 在归一化后的路径上判定（防 /./.env、/x/../.env 绕过）；统一成正斜杠兼容 Windows 本地调试。
+  const checkPath = safePath.replace(/\\/g, "/").toLowerCase();
+  if (
+    (checkPath.startsWith("/.") && !checkPath.startsWith("/.well-known/")) ||
+    checkPath === "/server.js" ||
+    checkPath === "/package.json" ||
+    checkPath === "/package-lock.json"
+  ) {
+    res.writeHead(404, { "Content-Type": "text/html" });
+    res.end("Not Found");
+    return;
+  }
+
   const filePath = path.join(ROOT, safePath);
 
   if (!filePath.startsWith(ROOT)) {
