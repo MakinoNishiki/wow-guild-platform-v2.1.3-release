@@ -1553,33 +1553,42 @@ body {
 }
 
 /* ========== 提示消息 ========== */
+/* 任务书 #19 WP2：toast 改版——顶部居中（避开右上角用户面板与主操作按钮）、
+   背景不透明、z-index 置顶；行为不变（自动消失、多条堆叠） */
 .toast-container {
   position: fixed;
-  top: 20px;
-  right: 20px;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
   z-index: 2000;
   display: flex;
   flex-direction: column;
+  align-items: center;
   gap: 10px;
+  pointer-events: none; /* 不遮挡下方用户面板与页面主按钮的点击 */
 }
 
 .toast {
   padding: 12px 20px;
   border-radius: 6px;
   font-size: 13px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.55);
   animation: slideIn 0.3s ease;
+  border: 1px solid;
   border-left: 3px solid;
+  background: var(--bg-secondary); /* 不透明基底，alpha=1 */
+  pointer-events: auto;
+  max-width: min(560px, 92vw);
 }
 
-.toast.success { background: rgba(63, 185, 80, 0.15); border-color: var(--success); color: var(--success); }
-.toast.error { background: rgba(248, 81, 73, 0.15); border-color: var(--danger); color: var(--danger); }
-.toast.info { background: rgba(88, 166, 255, 0.15); border-color: var(--info); color: var(--info); }
-.toast.warning { background: rgba(210, 153, 34, 0.15); border-color: var(--warning); color: var(--warning); }
+.toast.success { border-color: var(--success); color: var(--success); }
+.toast.error { border-color: var(--danger); color: var(--danger); }
+.toast.info { border-color: var(--info); color: var(--info); }
+.toast.warning { border-color: var(--warning); color: var(--warning); }
 
 @keyframes slideIn {
-  from { transform: translateX(100%); opacity: 0; }
-  to { transform: translateX(0); opacity: 1; }
+  from { transform: translateY(-100%); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
 }
 
 /* ========== 空状态 ========== */
