@@ -1997,7 +1997,8 @@ function renderMembers() {
             <button class="icon-btn" onclick="editMember('${m.id}')" title="编辑">✏️</button>
             ${m.status === '离队'
               ? `<button class="icon-btn" onclick="restoreMember('${m.id}', this)" title="恢复">♻️</button>`
-              : `<button class="icon-btn danger" onclick="deleteMember('${m.id}')" title="删除">🗑</button>`}
+              : `<button class="icon-btn" onclick="deleteMember('${m.id}')" title="离队">🚪</button>`}
+            <button class="icon-btn danger" onclick="hardDeleteMember('${m.id}')" title="彻底删除（仅零历史成员）">🗑</button>
           </div>
         </td>
       </tr>
@@ -2340,10 +2341,10 @@ async function saveMember() {
   }
 }
 
-// REQ-042（软删除）：删除 = status 置「离队」，不再 DELETE 行
+// REQ-042（软删除）：离队 = status 置「离队」，不 DELETE 行
 // （activity_attendance.member_id 外键 ON DELETE CASCADE，真删会连带清空历史考勤）
 async function deleteMember(id) {
-  if (!confirm('确定要删除这个成员吗？其状态将标记为「离队」，历史考勤/装备记录将保留并标记为已离队。')) return;
+  if (!confirm('确定将该成员标记为离队吗？离队后保留其全部历史记录，移出正式名单。')) return;
 
   const member = appData.members.find(m => m.id === id);
   if (!member) return;
@@ -2352,6 +2353,57 @@ async function deleteMember(id) {
   try {
     await cloudCrud('members', 'update', { ...member, status: '离队', id: member.id }, { renderFn: renderMembers });
     showToast('成员已标记为离队（编辑成员可改回正式）', 'success');
+  } catch (e) {
+    // 错误已在 cloudCrud 中提示
+  }
+}
+
+// 任务书 #18 WP1：「删除」与「离队」分离——真删除 raid_members 行，带历史计数护栏。
+// 先并行计数该成员的 考勤(activity_attendance.member_id) / 心愿单(wishlists.member_id) /
+// 装备记录(loot_records.character_id=成员 id；由于该列历史上恒为 NULL，实际关联靠
+// item_stats->>assignedTo=成员名，两种口径一并计入，宁可多拦不可漏拦)。
+// 三项全 0 才允许删；任一 >0 只提示拦截，不提供强删入口。
+async function hardDeleteMember(id) {
+  const member = appData.members.find(m => m.id === id);
+  if (!member) return;
+
+  const client = window.CloudSync.getClient();
+  if (!client) { showToast('云端未连接，无法校验历史记录', 'error'); return; }
+
+  let attCount = 0, wishCount = 0, lootCount = 0;
+  try {
+    const nameFilter = String(member.name || '').replace(/"/g, '\\"');
+    const [att, wish, loot] = await Promise.all([
+      client.from('activity_attendance').select('id', { count: 'exact', head: true }).eq('member_id', id),
+      client.from('wishlists').select('id', { count: 'exact', head: true }).eq('member_id', id),
+      client.from('loot_records').select('id', { count: 'exact', head: true })
+        .or(`character_id.eq.${id},item_stats->>assignedTo.eq."${nameFilter}"`),
+    ]);
+    if (att.error || wish.error || loot.error) {
+      throw (att.error || wish.error || loot.error);
+    }
+    attCount = att.count || 0;
+    wishCount = wish.count || 0;
+    lootCount = loot.count || 0;
+  } catch (e) {
+    console.error('成员历史计数失败:', e);
+    showToast('历史记录校验失败，已取消删除（安全起见请稍后重试）', 'error');
+    return;
+  }
+
+  // 任一 >0 → 拦截，只提示，不提供强删入口
+  if (attCount > 0 || wishCount > 0 || lootCount > 0) {
+    document.getElementById('memberDeleteBlockText').textContent =
+      `该成员有 ${attCount} 条考勤 / ${wishCount} 条心愿单 / ${lootCount} 条装备记录，删除会将这些历史一并清空且不可恢复。若该成员确实退会，请使用「离队」。`;
+    openModal('memberDeleteBlockModal');
+    return;
+  }
+
+  // 三项全 0 → 二次确认后真删
+  if (!confirm(`将彻底删除成员「${member.name}」，不可恢复。确定删除吗？`)) return;
+  try {
+    await cloudCrud('members', 'delete', { ...member, id: member.id }, { renderFn: renderMembers });
+    showToast(`成员「${member.name}」已彻底删除`, 'success');
   } catch (e) {
     // 错误已在 cloudCrud 中提示
   }

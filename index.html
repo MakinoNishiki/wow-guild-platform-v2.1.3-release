@@ -990,6 +990,22 @@
   </div>
 </div>
 
+<!-- ===== 弹窗：成员删除拦截提示（任务书 #18 WP1，纯提示无编辑内容不登记防误关） ===== -->
+<div class="modal-overlay" id="memberDeleteBlockModal">
+  <div class="modal" style="max-width:480px">
+    <div class="modal-header">
+      <div class="modal-title">无法删除该成员</div>
+      <div class="modal-close" onclick="closeModal('memberDeleteBlockModal')">×</div>
+    </div>
+    <div class="modal-body">
+      <p id="memberDeleteBlockText" style="font-size:13px;line-height:1.8;color:var(--text-secondary)"></p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-primary" onclick="closeModal('memberDeleteBlockModal')">知道了</button>
+    </div>
+  </div>
+</div>
+
 <!-- ===== 弹窗：WCL 导入 ===== -->
 <div class="modal-overlay" id="wclImportModal">
   <div class="modal">
