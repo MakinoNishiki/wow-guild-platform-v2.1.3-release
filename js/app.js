@@ -500,6 +500,105 @@ function switchUserTab(tabName) {
   if (tabName === 'notifications') {
     loadNotifications();
   }
+  if (tabName === 'claims') {
+    loadMyClaims();
+  }
+}
+
+// 任务书 #18 WP2 R2/R3：用户中心「我的认领」——跨公会列出我认领的 raid_members，
+// 逐条展示角色名/职业专精/公会/区服/在队状态并提供解绑；本公会部分附 R2 聚合行。
+async function loadMyClaims() {
+  const listEl = document.getElementById('myClaimsList');
+  const sumEl = document.getElementById('myClaimsSummary');
+  if (!listEl) return;
+  const me = window.CloudSync.getCachedUser();
+  if (!me) { listEl.innerHTML = '<p class="uc-empty">未登录</p>'; return; }
+  const client = window.CloudSync.getClient();
+  if (!client) { listEl.innerHTML = '<p class="uc-empty">云端未连接</p>'; return; }
+
+  const { data: rows, error } = await client.from('raid_members').select('*').eq('user_id', me.id);
+  if (error) {
+    console.error('我的认领加载失败:', error);
+    listEl.innerHTML = '<p class="uc-empty">加载失败</p>';
+    return;
+  }
+  if (!rows || rows.length === 0) {
+    if (sumEl) sumEl.textContent = '';
+    listEl.innerHTML = '<p class="uc-empty">暂无认领的角色（认领入口：成员管理 → 成员行 🤝）</p>';
+    return;
+  }
+
+  const guildIds = [...new Set(rows.map(r => r.guild_id))];
+  const { data: guilds } = await client.from('guilds').select('id,name,server_region,server_name').in('id', guildIds);
+  const gMap = new Map((guilds || []).map(g => [g.id, g]));
+  const currentGuild = window.CloudSync.getCurrentGuild();
+
+  listEl.innerHTML = rows.map(r => {
+    const g = gMap.get(r.guild_id) || {};
+    const region = [g.server_region, g.server_name].filter(Boolean).join(' - ') || '未设置';
+    const specText = [r.class, r.spec].filter(Boolean).join(' / ') || '-';
+    return `
+      <div class="uc-character-card">
+        <div class="uc-character-header">
+          <div>
+            <span class="uc-character-name">${r.name}</span>
+            <span class="uc-character-server">${g.name || '未知公会'}</span>
+            <span class="uc-character-region">${region}</span>
+          </div>
+        </div>
+        <div class="uc-character-details">
+          <div class="uc-character-detail">职业/专精：<span>${specText}</span></div>
+          <div class="uc-character-detail">在队状态：<span>${r.status || '正式'}</span></div>
+        </div>
+        <div class="uc-character-actions">
+          <button class="uc-btn uc-btn-danger" onclick="unclaimFromCenter('${r.id}', '${(r.name || '').replace(/'/g, '')}')">解除认领</button>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  // R2 个人视角聚合（本公会口径：appData 即当前公会数据）
+  if (sumEl) {
+    const mineHere = rows.filter(r => currentGuild && r.guild_id === currentGuild.id);
+    if (!mineHere.length) {
+      sumEl.textContent = '当前公会内无认领角色';
+    } else {
+      const ids = new Set(mineHere.map(r => r.id));
+      const names = new Set(mineHere.map(r => r.name));
+      let present = 0, total = 0;
+      mineHere.forEach(r => {
+        const s = getAttendanceStats(r.id, appData.activities);
+        present += s.present;
+        total += s.total;
+      });
+      const lootCount = (appData.loots || []).filter(l =>
+        (l.character_id && ids.has(l.character_id)) || (l.assignedTo && names.has(l.assignedTo))).length;
+      const wishCount = (appData.wishlist || []).filter(w => ids.has(w.memberId)).length;
+      const rate = total > 0 ? Math.round((present / total) * 100) : 0;
+      sumEl.textContent = `本公会认领 ${mineHere.length} 人 · 合计出勤率 ${rate}%（出勤 ${present}/应到 ${total}） · 装备 ${lootCount} 件 · 心愿 ${wishCount} 条`;
+    }
+  }
+}
+
+// 任务书 #18 WP2 R3：从用户中心解除认领（只能解自己的；confirmed 后清空该成员 user_id）
+async function unclaimFromCenter(memberId, memberName) {
+  if (!confirm(`确定解除对「${memberName || '该角色'}」的认领吗？`)) return;
+  try {
+    await window.CloudSync.unclaimRaidMember(memberId);
+    // 若是当前公会的成员，同步刷新 appData 与列表
+    const currentGuild = window.CloudSync.getCurrentGuild();
+    const inAppData = (appData.members || []).some(m => m.id === memberId);
+    if (currentGuild && inAppData) {
+      await window.CloudSync.reloadData('members');
+      saveData();
+      renderCurrentPage();
+    }
+    showToast('已解除认领', 'success');
+  } catch (e) {
+    console.error('解除认领失败:', e);
+    showToast('解除认领失败: ' + (e.message || '未知错误'), 'error');
+  }
+  await loadMyClaims();
 }
 
 // 加载用户资料
@@ -1211,6 +1310,12 @@ async function openGuildSettings() {
   typeEl.value = guild.loot_rule_type || '';
   textEl.value = guild.loot_rule_text || '';
   [descEl, typeEl, textEl].forEach(el => { el.disabled = !profileOwner; });
+  // 任务书 #18 WP2 R4：认领人标签开关（默认开；列未迁移时按开处理，勾选状态仅展示）
+  const claimerEl = document.getElementById('guildShowClaimerLabel');
+  if (claimerEl) {
+    claimerEl.checked = guild.show_claimer_label !== false;
+    claimerEl.disabled = !profileOwner;
+  }
   document.getElementById('guildProfileSaveBtn').style.display = profileOwner ? '' : 'none';
   document.getElementById('guildProfileOwnerHint').style.display = profileOwner ? 'none' : '';
   toggleGuildProfileCustomHint();
@@ -1240,7 +1345,9 @@ async function saveGuildProfile() {
     await window.CloudSync.updateGuildProfile({
       description: description || null,
       loot_rule_type: lootRuleType || null,
-      loot_rule_text: lootRuleText || null
+      loot_rule_text: lootRuleText || null,
+      // 任务书 #18 WP2 R4：认领人标签开关（列不存在时服务端会报错，由迁移 sql/14 解锁）
+      show_claimer_label: document.getElementById('guildShowClaimerLabel') ? document.getElementById('guildShowClaimerLabel').checked : true
     });
     showToast('公会资料已保存', 'success');
   } catch (e) {
@@ -1720,9 +1827,12 @@ const modalDirtyChecks = {
   // 公会设置：成员角色变更即时保存不算未保存内容，只跟踪公会资料三字段
   guildSettingsModal: () => {
     const g = (window.CloudSync && window.CloudSync.getCurrentGuild()) || {};
+    const claimerEl = document.getElementById('guildShowClaimerLabel');
     return document.getElementById('guildProfileDesc').value !== (g.description || '') ||
       document.getElementById('guildProfileLootRuleType').value !== (g.loot_rule_type || '') ||
-      document.getElementById('guildProfileLootRuleText').value !== (g.loot_rule_text || '');
+      document.getElementById('guildProfileLootRuleText').value !== (g.loot_rule_text || '') ||
+      // 任务书 #18 WP2 R4：认领人标签开关同样纳入未保存判定（默认开）
+      (claimerEl && claimerEl.checked !== (g.show_claimer_label !== false));
   }
 };
 
@@ -1918,9 +2028,65 @@ function memberToggleShowDeparted(checked) {
   renderMembers();
 }
 
+// 任务书 #18 WP2：认领人显示名缓存（user_id → display_name，来源 guild_members）
+// 心愿单/装备列表的认领人标签与成员编辑弹窗的认领人下拉共用；按公会缓存，切公会自动重取。
+const claimerNames = { guildId: null, map: null, loading: false };
+
+// 异步版：确保当前公会的认领人名单已加载（渲染链路用，完成后重渲染当前页）
+function ensureClaimerNames() {
+  const g = window.CloudSync.getCurrentGuild();
+  if (!g || claimerNames.loading || claimerNames.guildId === g.id) return;
+  claimerNames.loading = true;
+  window.CloudSync.getGuildMembers()
+    .then(ms => {
+      claimerNames.guildId = g.id;
+      claimerNames.map = new Map((ms || []).map(m => [m.user_id, m.display_name || '']));
+    })
+    .catch(e => console.error('认领人名单加载失败:', e))
+    .finally(() => {
+      claimerNames.loading = false;
+      try { renderCurrentPage(); } catch (e) { /* 页面已切换时忽略 */ }
+    });
+}
+
+// 同步版：await 到名单就绪（编辑弹窗打开前用，避免下拉缺项误清认领人）
+async function ensureClaimerNamesAsync() {
+  const g = window.CloudSync.getCurrentGuild();
+  if (!g || claimerNames.guildId === g.id) return;
+  if (claimerNames.loading) {
+    for (let i = 0; i < 50 && claimerNames.loading; i++) await new Promise(r => setTimeout(r, 100));
+    return;
+  }
+  claimerNames.loading = true;
+  try {
+    const ms = await window.CloudSync.getGuildMembers();
+    claimerNames.guildId = g.id;
+    claimerNames.map = new Map((ms || []).map(m => [m.user_id, m.display_name || '']));
+  } catch (e) {
+    console.error('认领人名单加载失败:', e);
+  } finally {
+    claimerNames.loading = false;
+  }
+}
+
+// 任务书 #18 WP2 R4：认领人小字标签（公会开关 show_claimer_label 关闭时不渲染；
+// 成员找不到时不渲染——历史装备的成员可能已被彻底删除，无法判定认领态）
+function claimerLabelHtml(member) {
+  if (!member) return '';
+  const g = window.CloudSync.getCurrentGuild();
+  if (!g || g.show_claimer_label === false) return '';
+  ensureClaimerNames();
+  const uid = member.user_id;
+  const text = uid ? `认领人：${(claimerNames.map && claimerNames.map.get(uid)) || '（已退会用户）'}` : '未认领';
+  return `<div style="font-size:11px;color:var(--text-muted);margin-top:2px">${text}</div>`;
+}
+
+
 function renderMembers() {
   const search = document.getElementById('memberSearch').value.toLowerCase();
   const classFilter = document.getElementById('classFilter').value;
+  // 任务书 #18 WP2：认领/解除认领按钮按当前用户判定
+  const currentUserId = (window.CloudSync.getCachedUser() || {}).id || null;
   
   // 职责过滤：获取所有勾选的职责
   const roleCheckboxes = document.querySelectorAll('#roleFilter input[type="checkbox"]:checked');
@@ -1998,6 +2164,11 @@ function renderMembers() {
             ${m.status === '离队'
               ? `<button class="icon-btn" onclick="restoreMember('${m.id}', this)" title="恢复">♻️</button>`
               : `<button class="icon-btn" onclick="deleteMember('${m.id}')" title="离队">🚪</button>`}
+            ${!m.user_id
+              ? `<button class="icon-btn" onclick="claimMember('${m.id}')" title="认领为我的角色">🤝</button>`
+              : (currentUserId && m.user_id === currentUserId
+                ? `<button class="icon-btn" onclick="unclaimMember('${m.id}')" title="解除认领">🔓</button>`
+                : '')}
             <button class="icon-btn danger" onclick="hardDeleteMember('${m.id}')" title="彻底删除（仅零历史成员）">🗑</button>
           </div>
         </td>
@@ -2131,7 +2302,30 @@ function showMemberModal(member = null) {
       updateSpecFieldsDisplay();
     }
   }
-  
+
+  // 任务书 #18 WP2 R1：认领人指定/调整（仅编辑已有成员且 owner/editor 可见）
+  const claimGroup = document.getElementById('memberClaimGroup');
+  const claimSel = document.getElementById('memberClaimUser');
+  if (claimGroup && claimSel) {
+    if (member && window.CloudSync.canEdit()) {
+      const opts = ['<option value="">未认领</option>'];
+      if (claimerNames.map) {
+        for (const [uid, dn] of claimerNames.map) {
+          opts.push(`<option value="${uid}">${dn || uid}</option>`);
+        }
+      }
+      // 认领人已退出公会（不在 guild_members 名单）时保留原值占位
+      if (member.user_id && !(claimerNames.map && claimerNames.map.has(member.user_id))) {
+        opts.push(`<option value="${member.user_id}">（已退会用户）</option>`);
+      }
+      claimSel.innerHTML = opts.join('');
+      claimSel.value = member.user_id || '';
+      claimGroup.style.display = '';
+    } else {
+      claimGroup.style.display = 'none';
+    }
+  }
+
   openModal('memberModal');
 }
 
@@ -2255,7 +2449,13 @@ function onOffSpecChange() {
 
 function editMember(id) {
   const member = appData.members.find(m => m.id === id);
-  if (member) showMemberModal(member);
+  if (!member) return;
+  // 任务书 #18 WP2 R1：owner/editor 编辑时认领人下拉需先就绪名单，避免缺项误清
+  if (window.CloudSync.canEdit()) {
+    ensureClaimerNamesAsync().then(() => showMemberModal(member));
+    return;
+  }
+  showMemberModal(member);
 }
 
 // 防重复提交标志
@@ -2296,6 +2496,13 @@ async function saveMember() {
     join_date: document.getElementById('memberJoinDate').value || formatDate(new Date()),
     notes: document.getElementById('memberNotes').value.trim()
   };
+
+  // 任务书 #18 WP2 R1：编辑时认领人随表单保存（新增成员不入列，默认未认领；
+  // 下拉隐藏/非编辑场景不带 user_id，syncMember 不会触碰认领人）
+  const claimGroupEl = document.getElementById('memberClaimGroup');
+  if (editingMemberId && claimGroupEl && claimGroupEl.style.display !== 'none') {
+    memberData.user_id = document.getElementById('memberClaimUser').value || null;
+  }
 
   // REQ-002（软删除）：新增时撞同名已离队成员 → 不判重、不新建，确认后恢复优先于新建
   // （恢复 = status 改回「正式」，顺带更新本次输入的职业/专精/职责等字段，加入日期保留原值）
@@ -2420,6 +2627,35 @@ async function restoreMember(id, btn) {
   } catch (e) {
     // 错误已在 cloudCrud 中提示
     if (btn) { btn.disabled = false; }
+  }
+}
+
+// 任务书 #18 WP2 R1：认领为我的角色（先到先得；每个成员仍只能被一个用户认领）
+async function claimMember(id) {
+  const member = appData.members.find(m => m.id === id);
+  const me = window.CloudSync.getCachedUser();
+  if (!member || !me) return;
+  if (member.user_id) { showToast('该角色已被认领', 'error'); return; }
+  try {
+    await cloudCrud('members', 'update', { ...member, user_id: me.id, id: member.id }, { renderFn: renderMembers });
+    showToast(`已认领「${member.name}」`, 'success');
+  } catch (e) {
+    // 错误已在 cloudCrud 中提示
+  }
+}
+
+// 任务书 #18 WP2 R1：解除认领（成员列表内，仅本人认领的行显示该按钮）
+async function unclaimMember(id) {
+  const member = appData.members.find(m => m.id === id);
+  const me = window.CloudSync.getCachedUser();
+  if (!member || !me) return;
+  if (member.user_id !== me.id) { showToast('只能解除自己的认领', 'error'); return; }
+  if (!confirm(`确定解除对「${member.name}」的认领吗？`)) return;
+  try {
+    await cloudCrud('members', 'update', { ...member, user_id: null, id: member.id }, { renderFn: renderMembers });
+    showToast(`已解除对「${member.name}」的认领`, 'success');
+  } catch (e) {
+    // 错误已在 cloudCrud 中提示
   }
 }
 
@@ -4642,7 +4878,7 @@ function lootRender() {
         <td>${loot.slot || ''}</td>
         <td>${loot.primaryStat || ''}</td>
         <td><div class="loot-secondary-stats">${secondaryStatsHtml || '-'}</div></td>
-        <td>${assignedToHtml}</td>
+        <td>${assignedToHtml}${claimerLabelHtml(assignedMember)}</td>
         <td class="center"><span class="badge ${statusBadge}">${loot.status || '待分配'}</span></td>
         <td>${distMethodText}</td>
         <td class="num">${rollText}</td>
@@ -5258,7 +5494,7 @@ function wishlistRender() {
         <td><span class="wishlist-raid-tag">${w.raid || '-'}</span></td>
         <td>${w.boss || '-'}</td>
         <td>${w.slot || '-'}</td>
-        <td class="${cls ? 'class-' + cls : ''}" style="font-weight:500">${memberName}</td>
+        <td class="${cls ? 'class-' + cls : ''}" style="font-weight:500">${memberName}${claimerLabelHtml(member)}</td>
         <td class="center"><span class="badge ${priorityBadge}">${w.priority || 'P2'}</span></td>
         <td><span class="badge ${specBadge}">${specText}</span>${w.specName ? ` <span style="color:var(--text-muted);font-size:11px">(${w.specName})</span>` : ''}</td>
         <td class="center">

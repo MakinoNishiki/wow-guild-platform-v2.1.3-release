@@ -726,6 +726,11 @@
         <label class="form-label">备注</label>
         <textarea class="form-textarea" id="memberNotes" placeholder="可选"></textarea>
       </div>
+      <!-- 任务书 #18 WP2：认领人指定/调整（仅编辑已有成员且 owner/editor 时由 showMemberModal 显示） -->
+      <div class="form-group" id="memberClaimGroup" style="display:none">
+        <label class="form-label">认领人</label>
+        <select class="form-select" id="memberClaimUser"></select>
+      </div>
     </div>
     <div class="modal-footer">
       <button class="btn" onclick="closeModal('memberModal')">取消</button>
@@ -1483,6 +1488,10 @@
             <label class="form-label">分配规则说明<span id="guildProfileCustomHint" style="color:var(--warning);display:none">（自定义时必填）</span></label>
             <textarea class="form-textarea" id="guildProfileLootRuleText" style="height:70px" placeholder="例如：主天赋一需多贪，套装优先坦克治疗"></textarea>
           </div>
+          <!-- 任务书 #18 WP2 R4：认领人标签公会级开关（仅 owner 可改，默认开） -->
+          <div class="form-group" style="margin-top:12px;margin-bottom:0">
+            <label class="att-filter-toggle"><input type="checkbox" id="guildShowClaimerLabel"> 显示角色认领人标签（心愿单/装备分配列表）</label>
+          </div>
           <div id="guildProfileOwnerHint" style="font-size:12px;color:var(--text-muted);display:none;margin-top:8px">仅会长可编辑公会资料</div>
         </div>
       </div>
@@ -1554,6 +1563,7 @@
         <div class="uc-tabs">
           <button class="uc-tab active" data-tab="profile" onclick="switchUserTab('profile')">📝 个人资料</button>
           <button class="uc-tab" data-tab="characters" onclick="switchUserTab('characters')">⚔️ 我的角色</button>
+          <button class="uc-tab" data-tab="claims" onclick="switchUserTab('claims')">🤝 我的认领</button>
           <button class="uc-tab" data-tab="notifications" onclick="switchUserTab('notifications')">
             🔔 通知 <span class="uc-badge" id="notifBadge" style="display:none">0</span>
           </button>
@@ -1584,6 +1594,19 @@
             </div>
             <div id="characterList" class="uc-character-list">
               <p class="uc-empty">暂无角色，点击上方按钮添加</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- 我的认领标签页（任务书 #18 WP2 R2/R3：展示+解绑，认领动作在公会成员管理页） -->
+        <div class="uc-tab-content" id="tab-claims" style="display:none">
+          <div class="uc-section">
+            <div class="uc-header-row">
+              <h3>我认领的公会角色</h3>
+            </div>
+            <div id="myClaimsSummary" style="font-size:12px;color:var(--text-secondary);margin-bottom:12px"></div>
+            <div id="myClaimsList" class="uc-character-list">
+              <p class="uc-empty">加载中...</p>
             </div>
           </div>
         </div>

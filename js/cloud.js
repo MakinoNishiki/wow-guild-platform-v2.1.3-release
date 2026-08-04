@@ -572,6 +572,7 @@
       status: m.status || '正式',
       join_date: m.join_date || formatDate(new Date()),
       notes: m.notes || '',
+      user_id: m.user_id || null, // 任务书 #18 WP2：认领人（多角色认领的读取入口）
       created_at: m.created_at,
       updated_at: m.updated_at
     }));
@@ -750,8 +751,10 @@
           status: item.status || '正式',
           join_date: item.join_date || formatDate(new Date()),
           notes: item.notes || '',
-          user_id: currentUser ? currentUser.id : null,
         };
+        // 任务书 #18 WP2：认领人（user_id）仅在显式携带时写入，新增默认未认领。
+        // 旧行为（无条件写当前用户 id）会把认领人覆盖成最后一次编辑者，已堵。
+        if (item.user_id !== undefined) row.user_id = item.user_id;
         const data = await dbInsert('raid_members', row);
         if (data && data.id) item.id = data.id;
         break;
@@ -768,8 +771,10 @@
           status: item.status || '正式',
           join_date: item.join_date || formatDate(new Date()),
           notes: item.notes || '',
-          user_id: currentUser ? currentUser.id : null,
         };
+        // 任务书 #18 WP2：user_id 仅在显式携带时更新（认领/解除/指定认领人）；
+        // 普通编辑、离队、恢复等调用方经 appData 成员对象扩散时自带原值，等同保留。
+        if (item.user_id !== undefined) row.user_id = item.user_id;
         await dbUpdate('raid_members', row, { id: item.id });
         break;
       }
@@ -1008,9 +1013,14 @@
     }
   }
 
+  // 任务书 #18 WP2 R3：解除认领（清空 raid_members.user_id，跨公会可用，走代理鉴权）。
+  // 服务端口径：owner/editor 可解除任何人的认领；viewer 会被代理 403（红线不动 server.js）。
+  async function unclaimRaidMember(memberId) {
+    await dbUpdate('raid_members', { user_id: null }, { id: memberId });
+  }
+
   // ---- 公会成员管理 (SELECT 走 Supabase, 写入走代理) ----
-  async function getGuildMembers() {
-    if (!supabaseClient || !currentGuild) return [];
+  async function getGuildMembers() {    if (!supabaseClient || !currentGuild) return [];
     const { data, error } = await supabaseClient
       .from('guild_members')
       .select('*')
@@ -1445,6 +1455,7 @@
     saveCloudData: saveCloudData,
     reloadData: reloadData,
     getGuildMembers: getGuildMembers,
+    unclaimRaidMember: unclaimRaidMember,
     updateMemberRole: updateMemberRole,
     removeGuildMember: removeGuildMember,
     clearCurrentGuild: clearCurrentGuild,
