@@ -2164,12 +2164,14 @@ function renderMembers() {
             ${m.status === '离队'
               ? `<button class="icon-btn" onclick="restoreMember('${m.id}', this)" title="恢复">♻️</button>`
               : `<button class="icon-btn" onclick="deleteMember('${m.id}')" title="离队">🚪</button>`}
+            <button class="icon-btn danger" onclick="hardDeleteMember('${m.id}')" title="彻底删除（仅零历史成员）">🗑</button>
+          </div>
+          <div class="claim-btns">
             ${!m.user_id
               ? `<button class="icon-btn" onclick="claimMember('${m.id}')" title="认领为我的角色">🤝</button>`
               : (currentUserId && m.user_id === currentUserId
                 ? `<button class="icon-btn" onclick="unclaimMember('${m.id}')" title="解除认领">🔓</button>`
-                : '')}
-            <button class="icon-btn danger" onclick="hardDeleteMember('${m.id}')" title="彻底删除（仅零历史成员）">🗑</button>
+                : claimerLabelHtml(m))}
           </div>
         </td>
       </tr>
@@ -2631,20 +2633,25 @@ async function restoreMember(id, btn) {
 }
 
 // 任务书 #18 WP2 R1：认领为我的角色（先到先得；每个成员仍只能被一个用户认领）
+// 任务书 #19 WP1：改走窄通道（PATCH 体只含 user_id），viewer 亦可自助认领
 async function claimMember(id) {
   const member = appData.members.find(m => m.id === id);
   const me = window.CloudSync.getCachedUser();
   if (!member || !me) return;
   if (member.user_id) { showToast('该角色已被认领', 'error'); return; }
   try {
-    await cloudCrud('members', 'update', { ...member, user_id: me.id, id: member.id }, { renderFn: renderMembers });
-    showToast(`已认领「${member.name}」`, 'success');
+    await window.CloudSync.setRaidMemberClaim(id, me.id);
+    await window.CloudSync.reloadData('members');
+    saveData();
+    renderMembers();
+    showToast(`已认领：${member.name}`, 'success');
   } catch (e) {
-    // 错误已在 cloudCrud 中提示
+    // 任务书 #19 WP2：失败透传后端具体原因（被抢/无权限等）
+    showToast('认领失败: ' + (e.message || '未知错误'), 'error');
   }
 }
 
-// 任务书 #18 WP2 R1：解除认领（成员列表内，仅本人认领的行显示该按钮）
+// 任务书 #18 WP2 R1 / #19 WP1：解除认领（成员列表内，仅本人认领的行显示该按钮）
 async function unclaimMember(id) {
   const member = appData.members.find(m => m.id === id);
   const me = window.CloudSync.getCachedUser();
@@ -2652,10 +2659,13 @@ async function unclaimMember(id) {
   if (member.user_id !== me.id) { showToast('只能解除自己的认领', 'error'); return; }
   if (!confirm(`确定解除对「${member.name}」的认领吗？`)) return;
   try {
-    await cloudCrud('members', 'update', { ...member, user_id: null, id: member.id }, { renderFn: renderMembers });
-    showToast(`已解除对「${member.name}」的认领`, 'success');
+    await window.CloudSync.setRaidMemberClaim(id, null);
+    await window.CloudSync.reloadData('members');
+    saveData();
+    renderMembers();
+    showToast('已解除认领', 'success');
   } catch (e) {
-    // 错误已在 cloudCrud 中提示
+    showToast('解除认领失败: ' + (e.message || '未知错误'), 'error');
   }
 }
 

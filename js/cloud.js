@@ -1013,8 +1013,14 @@
     }
   }
 
+  // 任务书 #19 WP1：认领/解绑专用窄通道——PATCH 体只含 user_id 一个字段，
+  // 与 server.js 鉴权窄例外配套（viewer 可自助认领/解绑；owner/editor 同路径可用）。
+  async function setRaidMemberClaim(memberId, userId) {
+    await dbUpdate('raid_members', { user_id: userId }, { id: memberId });
+  }
+
   // 任务书 #18 WP2 R3：解除认领（清空 raid_members.user_id，跨公会可用，走代理鉴权）。
-  // 服务端口径：owner/editor 可解除任何人的认领；viewer 会被代理 403（红线不动 server.js）。
+  // 任务书 #19 WP1 起 viewer 也可解自己的认领（server.js 窄例外放行）；解他人仍需 owner/editor。
   async function unclaimRaidMember(memberId) {
     await dbUpdate('raid_members', { user_id: null }, { id: memberId });
   }
@@ -1455,6 +1461,7 @@
     saveCloudData: saveCloudData,
     reloadData: reloadData,
     getGuildMembers: getGuildMembers,
+    setRaidMemberClaim: setRaidMemberClaim,
     unclaimRaidMember: unclaimRaidMember,
     updateMemberRole: updateMemberRole,
     removeGuildMember: removeGuildMember,

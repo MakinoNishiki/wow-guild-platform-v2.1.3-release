@@ -624,6 +624,28 @@ async function authorizeProxyRequest(user, table, method, queryString, rawBody) 
     return { ok: true };
   }
 
+  // ---- 任务书 #19 WP1：viewer 自助认领/解绑 窄例外 ----
+  // 仅 raid_members PATCH 且请求体字段集合 ⊆ {user_id} 时进入；这是"开口"不是"改规则"——
+  // 不满足放行条件时不直接 403，落入下方通用分支（owner/editor 的改派/编辑原样保留，viewer 自然被 403）。
+  // 放行条件（任一）：
+  //   认领：user_id 改为当前用户本人 且 目标行未被认领（防抢）；
+  //   解绑：user_id 清空 且 目标行当前认领人是本人（只能解自己的）。
+  if (table === "raid_members" && method === "PATCH") {
+    const claimIds = filters.id || [];
+    const onlyUserIdField =
+      rows.length > 0 &&
+      rows.every((r) => r && "user_id" in r && Object.keys(r).every((k) => k === "user_id"));
+    if (claimIds.length === 1 && onlyUserIdField) {
+      const target = await fetchRowById("raid_members", claimIds[0], "user_id");
+      if (target) {
+        const newVal = rows[0].user_id;
+        const isSelfClaim = newVal === uid && target.user_id === null;
+        const isSelfUnclaim = newVal === null && target.user_id === uid;
+        if (isSelfClaim || isSelfUnclaim) return { ok: true };
+      }
+    }
+  }
+
   // ---- 公会业务表：raid_members / activities / activity_attendance / loot_records / wishlists ----
   if (["raid_members", "activities", "activity_attendance", "loot_records", "wishlists"].includes(table)) {
     // REQ-020（任务书 #12）：activities.status 白名单校验，仅 normal / cancelled。
