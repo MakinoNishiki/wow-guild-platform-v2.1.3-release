@@ -13,6 +13,9 @@ WoW 团本考勤管理系统，支持云端协作（Supabase）和本地模式�
 # Node.js 18+ 必需
 node -v
 
+# 启用密钥扫描钩子（SEC-003，克隆后必做）
+git config core.hooksPath .githooks
+
 # 安装依赖（仅原生 Node.js，无需 npm install）
 ```
 
