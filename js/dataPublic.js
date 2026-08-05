@@ -88,14 +88,11 @@
     $('dpTypeFilter').onchange = e => { state.type = e.target.value; render(); };
     $('dpSearch').oninput = e => { state.search = e.target.value.trim().toLowerCase(); render(); };
 
-    // 主/副属性多标签筛选（任务书 #23-补丁 修正项③：数据源 = boss_loot/dungeon_loot 的 primary_stats/secondary_stats，多标签 AND）
-    const pStats = new Set(), sStats = new Set();
-    [...state.loot, ...state.dungeonLoot].forEach(l => {
-      (l.primary_stats || []).forEach(s => pStats.add(s));
-      (l.secondary_stats || []).forEach(s => sStats.add(s));
-    });
-    buildChips($('dpPrimaryChips'), [...pStats].sort((a, b) => a.localeCompare(b, 'zh')), state.primaryStats);
-    buildChips($('dpSecondaryChips'), [...sStats].sort((a, b) => a.localeCompare(b, 'zh')), state.secondaryStats);
+    // 主/副属性多标签筛选（任务书 #23-补丁 修正项③：多标签 AND；
+    // #23-补丁2 修正项③：筛选项为 WoW 封闭枚举固定全量——主：力量/敏捷/智力，副：暴击/急速/精通/全能，
+    // 不再从已录入数据聚合；选中无匹配装备时显示空结果属正常）
+    buildChips($('dpPrimaryChips'), ['力量', '敏捷', '智力'], state.primaryStats);
+    buildChips($('dpSecondaryChips'), ['暴击', '急速', '精通', '全能'], state.secondaryStats);
 
     render();
   }

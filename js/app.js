@@ -2330,8 +2330,9 @@ function renderMembers() {
     const mname = m.name || '';
     const matchSearch = !search || mname.toLowerCase().includes(search) || (m.class || '').includes(search) || mainSpec.toLowerCase().includes(search) || offSpecText.toLowerCase().includes(search);
     const matchClass = !classFilter || m.class === classFilter;
-    // 职责匹配：成员的role数组必须包含所有勾选的职责（AND逻辑）；未勾选任何职责则不过滤
-    const memberRoles = m.role || [];
+    // 职责匹配：成员职责 = 按主/副专精推导的职责集合（REQ-009 deriveMemberRoles，可有多职责），
+    // 多选为 AND 语义——成员职责集合 ⊇ 选中集合才被筛出（任务书 #23-补丁2 修正项②：不再读存档 role 字段）；未勾选则不过滤
+    const memberRoles = deriveMemberRoles(m);
     const matchRole = roleFilter.length === 0 || roleFilter.every(r => memberRoles.includes(r));
     return matchSearch && matchClass && matchRole;
   });
@@ -6344,6 +6345,33 @@ function lootFillAssignedTo(name) {
 // ==================== 初始化 ====================
 // ==================== 更新日志 ====================
 const changelogData = [
+  {
+    id: 'v3.2.0-task23-patch2-fix',
+    version: 'v3.2.0',
+    date: '2026-08-05',
+    type: 'fix',
+    typeLabel: '修复BUG',
+    title: '成员管理职责多选筛选不出双职责成员 + 「全部职业」下拉箭头定位（REQ-075）',
+    summary: '职责筛选同时勾选「治疗+输出」时，主专精织雾（治疗）+副专精踏风（输出）的成员筛不出；筛选条件改按主/副专精实时推导成员全部职责，多选为 AND 语义（必须同时具备全部选中职责）。',
+    details: [
+      '根因：筛选读的是成员存档的单一职责字段，未按主/副专精推导多职责集合',
+      '修复后：勾选「治疗+输出」只显示双职责成员，单选语义不变，与职业下拉/搜索框/「显示已离队」组合联动不回归',
+      '顺带修正：成员管理筛选条「全部职业」下拉箭头改为自绘样式，垂直居中、右侧留足间距（纯样式，不碰交互）'
+    ]
+  },
+  {
+    id: 'v3.2.0-task23-patch2-improve',
+    version: 'v3.2.0',
+    date: '2026-08-05',
+    type: 'improve',
+    typeLabel: '功能优化',
+    title: '公示页主/副属性筛选项定稿为固定枚举',
+    summary: '主/副属性筛选标签不再从已录入装备聚合（数据少时选项残缺），改为 WoW 封闭枚举全量：主属性 力量/敏捷/智力，副属性 暴击/急速/精通/全能。',
+    details: [
+      '选中某属性但当前赛季无匹配装备时显示空结果，属正常而非筛选项缺失',
+      'AND 过滤、大秘境双视图联动、赛季切换复位等行为维持不变'
+    ]
+  },
   {
     id: 'v3.2.0-task23-patch-feature',
     version: 'v3.2.0',
