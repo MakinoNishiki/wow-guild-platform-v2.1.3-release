@@ -658,9 +658,16 @@ async function authorizeProxyRequest(user, table, method, queryString, rawBody) 
         if (isSelfClaim) {
           const g = await fetchRowById("guilds", target.guild_id, "claim_mode");
           const mode = (g && g.claim_mode) || "free";
-          if (mode === "assign") return deny("本公会由管理者统一分配认领");
-          if (mode === "approval") return deny("本公会认领需审核，请提交认领申请");
-          return { ok: true };
+          if (mode === "free") return { ok: true };
+          // 任务书 #21-补丁 A：approval/assign 拒绝「认领形态」前先解析角色（复用 getGuildRoleCached）——
+          // owner/editor 的管理权不被窄例外短路：不落拒绝，放行落入下方通用业务分支（通用分支再校验一次，双保险）；
+          // viewer/非成员维持现状拒绝（文案不变）。
+          const role = await getGuildRoleCached(target.guild_id, uid);
+          const isManager = role === "owner" || role === "editor";
+          if (!isManager) {
+            if (mode === "assign") return deny("本公会由管理者统一分配认领");
+            return deny("本公会认领需审核，请提交认领申请");
+          }
         }
       }
     }

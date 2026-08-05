@@ -2886,14 +2886,15 @@ function claimMember(id) {
   }
   pendingClaimMemberId = id;
   document.getElementById('claimConfirmName').textContent = member.name;
-  // approval 模式：确认即提交申请，按钮与说明随模式切换
+  // approval 模式：viewer 确认即提交申请；任务书 #21-补丁 A——owner/editor 无需审核，与 free 同款二次确认直接认领
+  const needApproval = mode === 'approval' && !window.CloudSync.canEdit();
   const approvalNote = document.getElementById('claimConfirmApprovalNote');
-  if (approvalNote) approvalNote.style.display = mode === 'approval' ? '' : 'none';
-  document.getElementById('claimConfirmBtn').textContent = mode === 'approval' ? '提交认领申请' : '确认认领';
+  if (approvalNote) approvalNote.style.display = needApproval ? '' : 'none';
+  document.getElementById('claimConfirmBtn').textContent = needApproval ? '提交认领申请' : '确认认领';
   openModal('claimConfirmModal');
 }
 
-// 认领确认弹窗「确认认领/提交认领申请」：free 直接认领；approval 生成认领申请待审核
+// 认领确认弹窗「确认认领/提交认领申请」：free 直接认领；approval 下 viewer 生成申请、管理者直接认领（#21-补丁 A）
 async function confirmClaimMember() {
   const id = pendingClaimMemberId;
   const member = appData.members.find(m => m.id === id);
@@ -2902,7 +2903,7 @@ async function confirmClaimMember() {
   const btn = document.getElementById('claimConfirmBtn');
   if (btn) btn.disabled = true;
   try {
-    if (getClaimMode() === 'approval') {
+    if (getClaimMode() === 'approval' && !window.CloudSync.canEdit()) {
       // 任务书 #21 WP2：approval 不直写 raid_members，生成申请（server.js 窄例外）
       const g = window.CloudSync.getCurrentGuild();
       await window.CloudSync.insertClaimRequest(g.id, id, me.id);
@@ -6339,6 +6340,20 @@ function lootFillAssignedTo(name) {
 // ==================== 初始化 ====================
 // ==================== 更新日志 ====================
 const changelogData = [
+  {
+    id: 'v3.2.0-task21-patchA-fix',
+    version: 'v3.2.0',
+    date: '2026-08-05',
+    type: 'fix',
+    typeLabel: '修复BUG',
+    title: '认领需审核/仅管理者分配模式下，管理者「批准/认领自己」被误拒',
+    summary: '认领需审核模式下，会长在审核区块批准自己的申请时报错「请提交认领申请」；仅管理者分配模式下会长认领自己也被拦。',
+    details: [
+      '根因：服务端认领护栏在做权限判定前就按认领方式拦截，把管理者的管理权短路',
+      '修复：拦截前先判定身份，会长/管理一律放行（防线对普通成员不变）',
+      '前端同步：认领需审核模式下，管理者点「待认领」改为与自由认领相同的确认后直接生效，普通成员仍是提交申请'
+    ]
+  },
   {
     id: 'v3.2.0-task23-wp2-feature',
     version: 'v3.2.0',
