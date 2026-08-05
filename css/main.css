@@ -4209,3 +4209,31 @@ body.viewer-mode #memberSelectAll {
 
 /* 4. 成员表加入日期列不换行（日期折行会撑高行、破坏行内对齐） */
 #page-members .data-table td:nth-child(8) { white-space: nowrap; }
+
+/* ==================== 任务书 #22 WP2：职业徽标换装（图标+文字+职业色点缀） ==================== */
+/* 职业色仅作底色/描边点缀而非整片色块；几何与 .tag/.badge 表格规范一致（20px 高） */
+.wow-class-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 20px;
+  padding: 0 8px;
+  border-radius: 5px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+  vertical-align: middle;
+  color: var(--cc, var(--text-primary));
+  background: color-mix(in srgb, var(--cc, #8b949e) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--cc, #8b949e) 38%, transparent);
+}
+.wow-class-chip .class-icon {
+  width: 14px;
+  height: 14px;
+  margin-right: 0;
+  vertical-align: 0;
+  border-radius: 3px;
+}
+/* PNG 图标圆角微收（官方素材为直角方形） */
+img.class-icon[src$=".png"] { border-radius: 3px; }

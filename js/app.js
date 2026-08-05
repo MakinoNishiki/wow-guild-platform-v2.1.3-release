@@ -161,14 +161,35 @@ const roleTypeMap = {
 // 任务书 #13 §6：职业/职责本地 SVG 图标（assets/icons，单色职业色，16 枚）。
 // 图标+文字并用，不替换文字；加载失败（如图标缺失）自动隐藏不影响布局。
 function classIconHtml(cnClass) {
+  // 任务书 #22 WP2：优先官方 PNG（js/iconMap.js 集中映射），映射缺失回退旧 SVG；加载失败隐藏图标保留文字（不裂图）
+  const png = window.IconMap && window.IconMap.classIcon(cnClass);
   const key = classMap[cnClass];
-  if (!key) return '';
-  return `<img class="class-icon" src="assets/icons/${key}.svg" alt="" onerror="this.style.display='none'">`;
+  const src = png || (key ? `assets/icons/${key}.svg` : '');
+  if (!src) return '';
+  return `<img class="class-icon" src="${src}" alt="" onerror="this.style.display='none'">`;
 }
 function roleIconHtml(cnRole) {
+  const png = window.IconMap && window.IconMap.roleIcon(cnRole);
   const key = roleTypeMap[cnRole];
-  if (!key) return '';
-  return `<img class="class-icon" src="assets/icons/${key}.svg" alt="" onerror="this.style.display='none'">`;
+  const src = png || (key ? `assets/icons/${key}.svg` : '');
+  if (!src) return '';
+  return `<img class="class-icon" src="${src}" alt="" onerror="this.style.display='none'">`;
+}
+// 任务书 #22 WP2：专精图标（无图返回空串，文字常驻即回退；不出现裂图）
+function specIconHtml(cnClass, cnSpec) {
+  const src = window.IconMap && window.IconMap.specIcon(cnClass, cnSpec);
+  if (!src) return '';
+  return `<img class="class-icon" src="${src}" alt="" onerror="this.style.display='none'">`;
+}
+// 任务书 #22 WP2：职业徽标换装——图标+文字+职业色点缀（底色/描边，非整片色块）；
+// IconMap 未加载时回退旧 class-bg 色块徽标
+function classChipHtml(cnClass) {
+  const cls = classMap[cnClass] || '';
+  const cc = window.IconMap && window.IconMap.classColor(cnClass);
+  if (cc && window.IconMap.classIcon(cnClass)) {
+    return `<span class="wow-class-chip" style="--cc:${cc}">${classIconHtml(cnClass)}${cnClass}</span>`;
+  }
+  return `<span class="badge class-bg-${cls}" style="color:var(--${cls === 'priest' ? 'text-primary' : cls})">${classIconHtml(cnClass)}${cnClass}</span>`;
 }
 
 // REQ-009：专精 → 职责推导表（未列出的专精一律视为输出）
@@ -547,7 +568,7 @@ async function loadMyClaims() {
           </div>
         </div>
         <div class="uc-character-details">
-          <div class="uc-character-detail">职业/专精：<span>${specText}</span></div>
+          <div class="uc-character-detail">职业/专精：<span>${classIconHtml(r.class)}${specText}</span></div>
           <div class="uc-character-detail">在队状态：<span>${r.status || '正式'}</span></div>
         </div>
         <div class="uc-character-actions">
@@ -2302,9 +2323,9 @@ function renderMembers() {
       ? derivedRoles.map(r => `<span class="badge badge-role-${roleTypeMap[r] || 'dps'}">${roleIconHtml(r)}${r}</span>`).join(' ')
       : '<span style="color:var(--text-muted)">—</span>';
     
-    // 专精显示
+    // 专精显示（任务书 #22 WP2：主专精带专精图标，缺图仅文字）
     const specHtml = mainSpec 
-      ? `<span>${mainSpec}</span>${offSpecText ? `<span class="off-spec-text">（副：${offSpecText}）</span>` : ''}` 
+      ? `<span>${specIconHtml(m.class, mainSpec)}${mainSpec}</span>${offSpecText ? `<span class="off-spec-text">（副：${offSpecText}）</span>` : ''}` 
       : '-';
     
     return `
@@ -2313,7 +2334,7 @@ function renderMembers() {
         <td class="num">${i + 1}</td>
         <td class="class-${cls}" style="font-weight:500">${m.name}</td>
         <td>
-          <span class="badge class-bg-${cls}" style="color:var(--${cls === 'priest' ? 'text-primary' : cls})">${classIconHtml(m.class)}${m.class}</span>
+          ${classChipHtml(m.class)}
         </td>
         <td style="color:var(--text-secondary)">${specHtml}</td>
         <td>${roleTagsHtml}</td>
@@ -6269,6 +6290,21 @@ function lootFillAssignedTo(name) {
 // ==================== 初始化 ====================
 // ==================== 更新日志 ====================
 const changelogData = [
+  {
+    id: 'v3.2.0-task22-wp2-feature',
+    version: 'v3.2.0',
+    date: '2026-08-05',
+    type: 'feature',
+    typeLabel: '新增功能',
+    title: '职业/专精/职责官方图标换装（REQ-069）',
+    summary: '全站职业、专精、职责徽标从 CSS 色块换装为魔兽官方图标（56 枚），图标+文字同行显示。',
+    details: [
+      '素材：13 职业 + 40 专精 + 3 职责官方 PNG，集中映射 js/iconMap.js 全站唯一取图处',
+      '成员管理列表职业列改为「图标+文字」职业色描边 chip，主专精带专精图标，职责图标同步换装',
+      '成员编辑弹窗职责选择、考勤名单、用户中心「我的认领」同步换装',
+      '缺图自动回退文字徽标不裂图；旧色块样式保留为回退'
+    ]
+  },
   {
     id: 'v3.2.0-task22-wp1-improve',
     version: 'v3.2.0',
