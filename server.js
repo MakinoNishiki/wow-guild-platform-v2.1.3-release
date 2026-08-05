@@ -558,8 +558,16 @@ async function authorizeProxyRequest(user, table, method, queryString, rawBody) 
       const row = await fetchRowById("guild_members", rowId, "guild_id,user_id");
       if (!row) continue; // 目标不存在，no-op 放行
       if (method === "PATCH") {
-        const role = await getGuildRoleCached(row.guild_id, uid);
-        if (role !== "owner") return deny("仅公会会长可以变更成员角色");
+        // 任务书 #22 WP3-④：本人改名同步公会快照 窄例外——单行（filters.id 与 body 均单条）
+        // + body 字段 ⊆ {display_name} + 目标行 user_id=本人；不满足落原有分支（owner 角色变更等逻辑一字不动）。
+        const onlyDisplayName =
+          ids.length === 1 && rows.length === 1 && rows[0] &&
+          "display_name" in rows[0] &&
+          Object.keys(rows[0]).every((k) => k === "display_name");
+        if (!(onlyDisplayName && row.user_id === uid)) {
+          const role = await getGuildRoleCached(row.guild_id, uid);
+          if (role !== "owner") return deny("仅公会会长可以变更成员角色");
+        }
       } else if (method === "DELETE") {
         if (row.user_id === uid) continue; // 退出自己的公会，允许
         const role = await getGuildRoleCached(row.guild_id, uid);

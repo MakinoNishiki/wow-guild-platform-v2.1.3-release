@@ -4237,3 +4237,16 @@ body.viewer-mode #memberSelectAll {
 }
 /* PNG 图标圆角微收（官方素材为直角方形） */
 img.class-icon[src$=".png"] { border-radius: 3px; }
+
+/* ==================== 任务书 #22 WP3-③：公会设置保存栏吸附底部 ==================== */
+.guild-settings-footer {
+  justify-content: flex-end;
+  align-items: center;
+  background: var(--bg-secondary);
+  border-radius: 0 0 12px 12px;
+}
+.guild-settings-dirty {
+  margin-right: auto;
+  font-size: 12px;
+  color: var(--warning);
+}

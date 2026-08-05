@@ -1102,6 +1102,22 @@
     }
   }
 
+  // 任务书 #22 WP3-④：改名同步公会快照——本人所有公会的 guild_members.display_name
+  // 经代理同步为新名（server.js 窄例外：单行 + body ⊆ {display_name} + 目标行本人）。
+  // 快照用于向他人展示名字（审核区块申请人、「认领人：XXX」标签等），真源仍是 user_metadata。
+  async function syncMyGuildDisplayName(displayName) {
+    if (!supabaseClient || !currentUser) return;
+    const { data: rows, error } = await supabaseClient
+      .from('guild_members')
+      .select('id, display_name')
+      .eq('user_id', currentUser.id);
+    if (error) throw error;
+    const stale = (rows || []).filter(r => r.display_name !== displayName);
+    for (const r of stale) {
+      await dbUpdate('guild_members', { display_name: displayName }, { id: r.id });
+    }
+  }
+
   // ---- 公会成员管理 (SELECT 走 Supabase, 写入走代理) ----
   async function getGuildMembers() {    if (!supabaseClient || !currentGuild) return [];
     const { data, error } = await supabaseClient
@@ -1544,6 +1560,8 @@
     deleteClaimRequest: deleteClaimRequest,
     getRaidMemberClaimState: getRaidMemberClaimState,
     createClaimResultNotification: createClaimResultNotification,
+    // 任务书 #22 WP3-④：改名同步公会快照
+    syncMyGuildDisplayName: syncMyGuildDisplayName,
     updateMemberRole: updateMemberRole,
     removeGuildMember: removeGuildMember,
     clearCurrentGuild: clearCurrentGuild,

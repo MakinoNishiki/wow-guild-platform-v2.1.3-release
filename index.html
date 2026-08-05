@@ -4,10 +4,11 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>魔兽管家</title>
+<!-- 静态资源版本号：20260805.1（任务书 #22 WP3-②：凡改动 js/css 的 commit 必须同步递增此处与所有 ?v= 查询串，见 docs/开发规范.md 第五章） -->
 <link rel="icon" type="image/png" sizes="32x32" href="assets/brand/favicon-32.png">
 <link rel="icon" type="image/png" sizes="16x16" href="assets/brand/favicon-16.png">
-<link rel="stylesheet" href="css/main.css">
-<script src="assets/vendor/supabase-js-2.js"></script>
+<link rel="stylesheet" href="css/main.css?v=20260805.1">
+<script src="assets/vendor/supabase-js-2.js?v=20260805.1"></script>
 </head>
 <body>
 
@@ -1531,7 +1532,13 @@
               <option value="approval">认领需审核</option>
               <option value="assign">仅管理者分配</option>
             </select>
-            <div style="font-size:12px;color:var(--text-muted);margin-top:4px">自由认领：成员可自助认领未被认领的角色，先到先得；认领需审核：成员提交申请，管理者在成员管理顶部批准后生效；仅管理者分配：成员不可自助认领，由管理者在编辑成员时指定。切换不影响已存在的认领。</div>
+            <div style="font-size:12px;color:var(--text-muted);margin-top:4px">
+              <!-- 任务书 #22 WP3-①：三档说明分段，一行一个模式 -->
+              <div>自由认领：成员可自助认领未被认领的角色，先到先得。</div>
+              <div>认领需审核：成员提交申请，管理者在成员管理顶部批准后生效。</div>
+              <div>仅管理者分配：成员不可自助认领，由管理者在编辑成员时指定。</div>
+              <div>切换不影响已存在的认领。</div>
+            </div>
           </div>
           <div id="guildProfileOwnerHint" style="font-size:12px;color:var(--text-muted);display:none;margin-top:8px">仅会长可编辑公会资料</div>
         </div>
@@ -1557,6 +1564,11 @@
           <button class="btn btn-danger" onclick="handleLeaveGuild()">退出此公会</button>
         </div>
       </div>
+    </div>
+    <!-- 任务书 #22 WP3-③：保存栏吸附底部——左侧未保存提示（有改动时显示），右侧保存（与顶部按钮同逻辑并存） -->
+    <div class="modal-footer guild-settings-footer">
+      <span id="guildSettingsDirtyHint" class="guild-settings-dirty" style="display:none">● 有未保存的修改</span>
+      <button class="btn btn-primary" onclick="saveGuildProfile()">保存</button>
     </div>
   </div>
 </div>
@@ -1774,12 +1786,12 @@
   </div>
 </div>
 
-<script src="js/cloud.js"></script>
+<script src="js/cloud.js?v=20260805.1"></script>
 <!-- 任务书 #14：主数据层（快照兜底 + 加载层），须在 app.js 之前 -->
-<script src="js/masterDataSnapshot.js"></script>
-<script src="js/masterData.js"></script>
+<script src="js/masterDataSnapshot.js?v=20260805.1"></script>
+<script src="js/masterData.js?v=20260805.1"></script>
 <!-- 任务书 #22 WP2：职业/专精/职责图标集中映射（全站唯一取图处） -->
-<script src="js/iconMap.js"></script>
-<script src="js/app.js"></script>
+<script src="js/iconMap.js?v=20260805.1"></script>
+<script src="js/app.js?v=20260805.1"></script>
 </body>
 </html>

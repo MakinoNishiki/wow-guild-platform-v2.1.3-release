@@ -647,7 +647,17 @@ async function saveUserProfile() {
     await window.CloudSync.saveUserProfile({ display_name: displayName });
     // 任务书 #21 WP1-④：改名后右上角立即生效，不依赖重新登录
     updateCloudUI();
-    alert('资料已保存');
+    // 任务书 #22 WP3-④：同步本人所有公会 guild_members.display_name 快照（他人视角显示新名）
+    let syncWarn = '';
+    try {
+      await window.CloudSync.syncMyGuildDisplayName(displayName);
+      claimerNames.guildId = null; // 认领人名单缓存失效，下次渲染重取
+      renderMembers();
+    } catch (e2) {
+      console.error('公会快照同步失败:', e2);
+      syncWarn = '（但公会内名字快照同步失败：' + (e2.message || '未知错误') + '）';
+    }
+    alert('资料已保存' + syncWarn);
   } catch (e) {
     alert('保存失败：' + e.message);
   }
@@ -1348,6 +1358,20 @@ async function openGuildSettings() {
   document.getElementById('guildProfileOwnerHint').style.display = profileOwner ? 'none' : '';
   toggleGuildProfileCustomHint();
 
+  // 任务书 #22 WP3-③：底部保存栏未保存提示——弹窗内任何字段变动即按未保存判定显隐（幂等绑定）
+  const dirtyHintEl = document.getElementById('guildSettingsDirtyHint');
+  const settingsModalEl = document.getElementById('guildSettingsModal');
+  const refreshDirtyHint = () => {
+    if (!dirtyHintEl) return;
+    const dirty = profileOwner && modalDirtyChecks.guildSettingsModal && modalDirtyChecks.guildSettingsModal();
+    dirtyHintEl.style.display = dirty ? '' : 'none';
+  };
+  if (settingsModalEl) {
+    settingsModalEl.oninput = refreshDirtyHint;
+    settingsModalEl.onchange = refreshDirtyHint;
+  }
+  refreshDirtyHint();
+
   openModal('guildSettingsModal');
   await loadGuildMembers();
 }
@@ -1380,6 +1404,9 @@ async function saveGuildProfile() {
       claim_mode: document.getElementById('guildClaimMode') ? document.getElementById('guildClaimMode').value : 'free'
     });
     showToast('公会资料已保存', 'success');
+    // 任务书 #22 WP3-③：保存成功隐藏底部未保存提示
+    const dirtyHintEl = document.getElementById('guildSettingsDirtyHint');
+    if (dirtyHintEl) dirtyHintEl.style.display = 'none';
     // 认领方式变更影响成员列表认领入口与审核区块，即时重渲染
     renderMembers();
     renderClaimReviewBlock();
@@ -6290,6 +6317,45 @@ function lootFillAssignedTo(name) {
 // ==================== 初始化 ====================
 // ==================== 更新日志 ====================
 const changelogData = [
+  {
+    id: 'v3.2.0-task22-wp3-fix2',
+    version: 'v3.2.0',
+    date: '2026-08-05',
+    type: 'fix',
+    typeLabel: '修复BUG',
+    title: '改名后公会内名字快照不同步',
+    summary: '用户中心改名后，公会成员列表、认领审核区块、「认领人：XXX」标签里他人看到的仍是旧名字。',
+    details: [
+      '改名保存成功后，本人所有公会的名字快照即时同步为新名，他人视角立刻显示新名',
+      '服务端同步加护栏：任何人只能改自己的快照字段，代他人改、夹带其他字段一律拒绝'
+    ]
+  },
+  {
+    id: 'v3.2.0-task22-wp3-fix1',
+    version: 'v3.2.0',
+    date: '2026-08-05',
+    type: 'fix',
+    typeLabel: '修复BUG',
+    title: '部署后用户端跑到旧版脚本',
+    summary: '页面引用的 js/css 无版本标识，CDN 与浏览器双重缓存会导致界面是新的、交互是旧的。',
+    details: [
+      'index.html 全部本地 js/css 引用加版本查询串，发版递增即破缓存',
+      '版本号统一写在 index.html 顶部注释，递增纪律已写入开发规范'
+    ]
+  },
+  {
+    id: 'v3.2.0-task22-wp3-improve',
+    version: 'v3.2.0',
+    date: '2026-08-05',
+    type: 'improve',
+    typeLabel: '功能优化',
+    title: '公会设置：保存栏吸附底部 + 认领方式说明分段',
+    summary: '公会设置弹窗底部新增常驻保存栏，滚动到任何位置都能保存；认领方式三档说明改为一行一个模式。',
+    details: [
+      '底部保存栏左侧在有改动时提示「有未保存的修改」，右侧保存按钮与原按钮同逻辑',
+      '认领方式说明四行分排：自由认领 / 认领需审核 / 仅管理者分配 / 切换不影响已存在的认领'
+    ]
+  },
   {
     id: 'v3.2.0-task22-wp2-feature',
     version: 'v3.2.0',
