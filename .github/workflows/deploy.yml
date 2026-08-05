@@ -14,39 +14,6 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  deploy:
-    name: Deploy ddctl.com (US)
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-
-    steps:
-      - name: Configure SSH
-        env:
-          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
-          DEPLOY_HOST_KEY: ${{ secrets.DEPLOY_HOST_KEY }}
-        run: |
-          set -euo pipefail
-          umask 077
-          mkdir -p "$HOME/.ssh"
-          printf '%s\n' "$DEPLOY_SSH_KEY" > "$HOME/.ssh/deploy_key"
-          printf 'wow-production %s\n' "$DEPLOY_HOST_KEY" \
-            > "$HOME/.ssh/known_hosts"
-
-      - name: Deploy
-        env:
-          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
-          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
-          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
-        run: |
-          set -euo pipefail
-          ssh \
-            -i "$HOME/.ssh/deploy_key" \
-            -o IdentitiesOnly=yes \
-            -o StrictHostKeyChecking=yes \
-            -o HostKeyAlias=wow-production \
-            -p "$DEPLOY_PORT" \
-            "$DEPLOY_USER@$DEPLOY_HOST"
-
   deploy-cn:
     name: Deploy wow.ddctl.com (CN)
     runs-on: ubuntu-latest
