@@ -4250,3 +4250,34 @@ img.class-icon[src$=".png"] { border-radius: 3px; }
   font-size: 12px;
   color: var(--warning);
 }
+
+/* ==================== 任务书 #22-补丁：换装补漏与操作列版式 ==================== */
+/* 修正项④：专精 tag 行——主/副专精 chip 同行依次排列不折行（沿用 20px 徽标规范） */
+.spec-chip-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: nowrap;
+  white-space: nowrap;
+}
+.wow-class-chip.chip-off { opacity: 0.72; font-weight: 500; }
+
+/* 修正项⑤：成员管理操作列——图标组+认领区压缩进同一行，不换行；
+   列宽不足优先压缩其他列，操作列保最小宽度，极端窄屏走既有横滚兜底（BUG-040 机制） */
+.op-cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  flex-wrap: nowrap;
+  white-space: nowrap;
+}
+.op-cell .action-btns { gap: 4px; }
+.op-cell .claim-btns { margin-top: 0; min-height: 0; }
+.op-cell .claim-btns > div { white-space: nowrap; }
+#page-members .data-table td:last-child,
+#page-members .data-table th:last-child { white-space: nowrap; min-width: 168px; }
+
+/* 修正项⑤：出勤率列——数字与表头文字左对齐（现状偏中悬空），列内对齐基准一致 */
+#page-members .data-table td:nth-child(9),
+#page-members .data-table th:nth-child(9) { text-align: left; }

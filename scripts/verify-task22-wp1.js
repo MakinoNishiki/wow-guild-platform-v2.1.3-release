@@ -92,12 +92,12 @@ async function setup() {
     if (r.status !== 201) throw new Error('建装备失败: ' + JSON.stringify(r.body));
   }
 
-  // 心愿单：猎大两条
+  // 心愿单：猎大两条（带主专精标记，验证补丁修正项②专精图标）
   const w = await svc('POST', '/rest/v1/wishlists', {
     guild_id: guildId, member_id: memberIds.hunter,
     items: [
-      { id: 'w22a', memberId: memberIds.hunter, itemName: '虚影统领的威严头盔', raid: '虚影尖塔', boss: '虚影统领', category: '护甲', slot: '头部', priority: 'P1', obtained: false },
-      { id: 'w22b', memberId: memberIds.hunter, itemName: '孢陨之怒长弓', raid: '孢陨幽境', boss: '孢陨之王', category: '武器', slot: '远程武器', priority: 'P2', obtained: false },
+      { id: 'w22a', memberId: memberIds.hunter, itemName: '虚影统领的威严头盔', raid: '虚影尖塔', boss: '虚影统领', category: '护甲', slot: '头部', priority: 'P1', spec: 'main', specName: '射击', obtained: false },
+      { id: 'w22b', memberId: memberIds.hunter, itemName: '孢陨之怒长弓', raid: '孢陨幽境', boss: '孢陨之王', category: '武器', slot: '远程武器', priority: 'P2', spec: 'main', specName: '射击', obtained: false },
     ],
   });
   if (w.status !== 201) throw new Error('建心愿单失败: ' + JSON.stringify(w.body));
@@ -150,6 +150,37 @@ async function cleanup() {
       await sleep(1500);
       const rowCount = await page.evaluate(() => document.querySelectorAll('#membersTableBody tr').length);
       check(`[${vp.tag}] 成员表渲染（5 行含离队隐藏→4 行）`, rowCount >= 4, `行数=${rowCount}`);
+
+      // ===== 任务书 #22-补丁专项断言 =====
+      const patchChecks = await page.evaluate(() => {
+        const rows = [...document.querySelectorAll('#membersTableBody tr')];
+        const rowLong = rows.find(r => r.textContent.includes('长名字测试角色'));
+        const out = {};
+        // ④ 专精职业色 tag：主专精+2 副专精=3 枚 chip（含图标），chip 顶部一致=同行不折行
+        const specCell = rowLong && rowLong.querySelector('td:nth-child(5)');
+        const chips = specCell ? [...specCell.querySelectorAll('.wow-class-chip')] : [];
+        out.specChips = chips.length;
+        out.specChipSrcs = chips.map(c => (c.querySelector('img') || {}).src || '').map(s => s.split('/').pop());
+        const chipTops = chips.map(c => Math.round(c.getBoundingClientRect().top));
+        out.specChipsOneLine = chipTops.length > 0 && chipTops.every(t => Math.abs(t - chipTops[0]) <= 1);
+        // ① 职责图标为新 PNG（roles/tank.png + roles/dps.png）
+        out.roleSrcs = rowLong ? [...rowLong.querySelectorAll('td:nth-child(6) img')].map(i => i.src.split('/').slice(-2).join('/')) : [];
+        // ⑤ 操作列单行：action-btns 与 claim-btns 在同一 .op-cell 且水平并排（claim 在图标组右侧，非堆叠）
+        const opCell = rowLong && rowLong.querySelector('.op-cell');
+        const ab = opCell && opCell.querySelector('.action-btns');
+        const cb = opCell && opCell.querySelector('.claim-btns');
+        out.opCell = !!opCell;
+        out.sameLine = ab && cb ? cb.getBoundingClientRect().left >= ab.getBoundingClientRect().right - 1 : null;
+        // ⑤ 出勤率列表头+单元格左对齐
+        out.rateThAlign = getComputedStyle(document.querySelector('#page-members .data-table th:nth-child(9)')).textAlign;
+        out.rateTdAlign = rowLong ? getComputedStyle(rowLong.querySelector('td:nth-child(9)')).textAlign : null;
+        return out;
+      });
+      check(`[${vp.tag}] 补丁④ 专精职业色 tag×3（主+2 副，含图标）`, patchChecks.specChips === 3 && patchChecks.specChipSrcs.every(s => s.endsWith('.png')), JSON.stringify(patchChecks.specChipSrcs));
+      check(`[${vp.tag}] 补丁① 职责图标为新圆形 PNG`, patchChecks.roleSrcs.includes('roles/tank.png') && patchChecks.roleSrcs.includes('roles/dps.png'), JSON.stringify(patchChecks.roleSrcs));
+      check(`[${vp.tag}] 补丁⑤ 操作列单行（claim 区在图标组右侧并排，非堆叠）`, patchChecks.opCell && patchChecks.sameLine === true, `sameLine=${patchChecks.sameLine}`);
+      check(`[${vp.tag}] 补丁⑤ 出勤率列左对齐（表头+单元格）`, patchChecks.rateThAlign === 'left' && patchChecks.rateTdAlign === 'left', `${patchChecks.rateThAlign}/${patchChecks.rateTdAlign}`);
+      check(`[${vp.tag}] 极端行专精 chip 不折行（3 枚 chip 顶线一致）`, patchChecks.specChipsOneLine === true);
       await page.screenshot({ path: path.join(SHOT_DIR, `${vp.tag}-members.png`) });
 
       // 已离队视图
@@ -162,11 +193,34 @@ async function cleanup() {
       await sleep(1500);
       const lootRows = await page.evaluate(() => document.querySelectorAll('#page-loot .data-table tbody tr').length);
       check(`[${vp.tag}] 装备分配渲染（2 行）`, lootRows >= 2, `行数=${lootRows}`);
+      // 补丁③：分配给列为成员职业色 tag（图标+名字，职业色）
+      const lootChip = await page.evaluate(() => {
+        const chip = document.querySelector('#page-loot .data-table tbody .wow-class-chip');
+        const img = chip && chip.querySelector('img');
+        return chip ? { text: chip.textContent.trim(), src: img ? img.src.split('/').pop() : null, cc: chip.style.getPropertyValue('--cc') } : null;
+      });
+      check(`[${vp.tag}] 补丁③ 装备分配「分配给」成员职业 tag（猎大+hunter.png+#ABD473）`,
+        lootChip && lootChip.text === '猎大' && lootChip.src === 'hunter.png' && lootChip.cc.toUpperCase() === '#ABD473', JSON.stringify(lootChip));
       await page.screenshot({ path: path.join(SHOT_DIR, `${vp.tag}-loot.png`) });
 
       // 心愿单（切到「竞争概览」外的成员列表视图即可，默认渲染即含表格）
       await page.click('.nav-item[data-page="wishlist"]');
       await sleep(1500);
+      // 补丁②：需求成员列职业 tag + 专精列专精图标 chip
+      const wishChips = await page.evaluate(() => {
+        const row = document.querySelector('#wishlistTableBody tr');
+        if (!row) return null;
+        const memberChip = row.querySelector('td:nth-child(6) .wow-class-chip');
+        const memberImg = memberChip && memberChip.querySelector('img');
+        const specChip = row.querySelector('td:nth-child(8) .wow-class-chip');
+        const specImg = specChip && specChip.querySelector('img');
+        return {
+          member: memberChip ? { text: memberChip.textContent.trim(), src: memberImg ? memberImg.src.split('/').pop() : null } : null,
+          spec: specChip ? { text: specChip.textContent.trim(), src: specImg ? specImg.src.split('/').pop() : null } : null,
+        };
+      });
+      check(`[${vp.tag}] 补丁② 心愿单需求成员职业 tag（猎大+hunter.png）`, wishChips && wishChips.member && wishChips.member.text === '猎大' && wishChips.member.src === 'hunter.png', JSON.stringify(wishChips && wishChips.member));
+      check(`[${vp.tag}] 补丁② 心愿单专精列图标（射击=hunter_marksmanship.png）`, wishChips && wishChips.spec && wishChips.spec.text === '射击' && wishChips.spec.src === 'hunter_marksmanship.png', JSON.stringify(wishChips && wishChips.spec));
       await page.screenshot({ path: path.join(SHOT_DIR, `${vp.tag}-wishlist.png`) });
 
       await ctx.close();

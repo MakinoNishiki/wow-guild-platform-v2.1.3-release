@@ -183,13 +183,31 @@ function specIconHtml(cnClass, cnSpec) {
 }
 // 任务书 #22 WP2：职业徽标换装——图标+文字+职业色点缀（底色/描边，非整片色块）；
 // IconMap 未加载时回退旧 class-bg 色块徽标
+// 任务书 #22-补丁：wowChipHtml 上升为全站统一职业色 tag 渲染组件
+// （成员管理职业列/专精列、心愿单、装备分配共用，禁止各写一份；色值一律取 IconMap 官方色）
+function wowChipHtml(color, iconHtml, text, extraClass) {
+  if (!color) return `<span>${text}</span>`;
+  return `<span class="wow-class-chip${extraClass ? ' ' + extraClass : ''}" style="--cc:${color}">${iconHtml || ''}${text}</span>`;
+}
 function classChipHtml(cnClass) {
   const cls = classMap[cnClass] || '';
   const cc = window.IconMap && window.IconMap.classColor(cnClass);
   if (cc && window.IconMap.classIcon(cnClass)) {
-    return `<span class="wow-class-chip" style="--cc:${cc}">${classIconHtml(cnClass)}${cnClass}</span>`;
+    return wowChipHtml(cc, classIconHtml(cnClass), cnClass);
   }
   return `<span class="badge class-bg-${cls}" style="color:var(--${cls === 'priest' ? 'text-primary' : cls})">${classIconHtml(cnClass)}${cnClass}</span>`;
+}
+// 任务书 #22-补丁 修正项④：专精职业色 tag（tag 底色/描边取职业官方色 + 专精图标 + 专精文字，与职业列视觉同源）
+function specChipHtml(cnClass, cnSpec, extraClass) {
+  const cc = window.IconMap && window.IconMap.classColor(cnClass);
+  return wowChipHtml(cc, specIconHtml(cnClass, cnSpec), cnSpec, extraClass);
+}
+// 任务书 #22-补丁 修正项②③：成员职业色 tag（tag 内仅职业图标+成员名；
+// 「未认领/认领人」小字不进 tag，由调用方在 tag 外拼接）
+function memberChipHtml(member, fallbackName) {
+  if (!member) return `<span>${fallbackName || '-'}</span>`;
+  const cc = window.IconMap && window.IconMap.classColor(member.class);
+  return wowChipHtml(cc, classIconHtml(member.class), member.name);
 }
 
 // REQ-009：专精 → 职责推导表（未列出的专精一律视为输出）
@@ -2350,9 +2368,10 @@ function renderMembers() {
       ? derivedRoles.map(r => `<span class="badge badge-role-${roleTypeMap[r] || 'dps'}">${roleIconHtml(r)}${r}</span>`).join(' ')
       : '<span style="color:var(--text-muted)">—</span>';
     
-    // 专精显示（任务书 #22 WP2：主专精带专精图标，缺图仅文字）
+    // 专精显示（任务书 #22-补丁 修正项④：职业色 tag 底 + 专精图标 + 专精文字；
+    // 副专精多个同行依次排列不折行，与职业 tag 风格统一）
     const specHtml = mainSpec 
-      ? `<span>${specIconHtml(m.class, mainSpec)}${mainSpec}</span>${offSpecText ? `<span class="off-spec-text">（副：${offSpecText}）</span>` : ''}` 
+      ? `<span class="spec-chip-row">${specChipHtml(m.class, mainSpec)}${offSpecs.map(s => specChipHtml(m.class, s, 'chip-off')).join('')}</span>` 
       : '-';
     
     return `
@@ -2369,23 +2388,26 @@ function renderMembers() {
         <td style="color:var(--text-secondary)">${m.join_date || '-'}</td>
         <td class="num"><span style="color:${rate >= 80 ? 'var(--success)' : rate >= 60 ? 'var(--warning)' : 'var(--danger)'};font-weight:600">${rate}%</span></td>
         <td class="center">
-          <div class="action-btns">
-            <button class="icon-btn" onclick="editMember('${m.id}')" title="编辑">✏️</button>
-            ${m.status === '离队'
-              ? `<button class="icon-btn" onclick="restoreMember('${m.id}', this)" title="恢复">♻️</button>`
-              : `<button class="icon-btn" onclick="deleteMember('${m.id}')" title="离队">🚪</button>`}
-            <button class="icon-btn danger" onclick="hardDeleteMember('${m.id}')" title="彻底删除（仅零历史成员）">🗑</button>
-          </div>
-          <div class="claim-btns">
-            ${!m.user_id
-              ? (claimMode === 'approval' && myClaimRequests.memberIds.has(m.id)
-                ? '<span class="tag tag-yellow">认领审核中</span>'
-                : (claimMode === 'assign' && !canEditMembers
-                  ? '<span class="tag tag-grey" title="本公会由管理者统一分配认领">待认领</span>'
-                  : `<button class="tag tag-grey claim-pending-btn" onclick="claimMember('${m.id}')">待认领</button>`))
-              : (currentUserId && m.user_id === currentUserId
-                ? `<button class="icon-btn" onclick="unclaimMember('${m.id}')" title="解除认领">🔓</button>`
-                : claimerLabelHtml(m))}
+          <!-- 任务书 #22-补丁 修正项⑤：操作列整行元素压缩进同一行（.op-cell 不换行，窄屏走横滚兜底） -->
+          <div class="op-cell">
+            <div class="action-btns">
+              <button class="icon-btn" onclick="editMember('${m.id}')" title="编辑">✏️</button>
+              ${m.status === '离队'
+                ? `<button class="icon-btn" onclick="restoreMember('${m.id}', this)" title="恢复">♻️</button>`
+                : `<button class="icon-btn" onclick="deleteMember('${m.id}')" title="离队">🚪</button>`}
+              <button class="icon-btn danger" onclick="hardDeleteMember('${m.id}')" title="彻底删除（仅零历史成员）">🗑</button>
+            </div>
+            <div class="claim-btns">
+              ${!m.user_id
+                ? (claimMode === 'approval' && myClaimRequests.memberIds.has(m.id)
+                  ? '<span class="tag tag-yellow">认领审核中</span>'
+                  : (claimMode === 'assign' && !canEditMembers
+                    ? '<span class="tag tag-grey" title="本公会由管理者统一分配认领">待认领</span>'
+                    : `<button class="tag tag-grey claim-pending-btn" onclick="claimMember('${m.id}')">待认领</button>`))
+                : (currentUserId && m.user_id === currentUserId
+                  ? `<button class="icon-btn" onclick="unclaimMember('${m.id}')" title="解除认领">🔓</button>`
+                  : claimerLabelHtml(m))}
+            </div>
           </div>
         </td>
       </tr>
@@ -5123,11 +5145,12 @@ function lootRender() {
     const wishlistBadge = loot.is_wishlist ? '<span class="badge" style="background:#f0c060;color:#0d1117">心愿</span>' : '<span style="color:var(--text-muted)">—</span>';
     // REQ-042（软删除）：assignedTo 为名字快照；按名字找到成员后看其 status，
     // 离队（或软删除前的历史硬删，名字已找不到）→ 灰色「名字（已离队）」
+    // 任务书 #22-补丁 修正项③：在职成员走统一成员职业色 tag（图标+名字），认领小字保持 tag 外
     const assignedMember = loot.assignedTo ? appData.members.find(m => m.name === loot.assignedTo) : null;
     const assignedToHtml = !loot.assignedTo
       ? '-'
       : (assignedMember && assignedMember.status !== '离队')
-        ? loot.assignedTo
+        ? memberChipHtml(assignedMember)
         : `<span class="member-departed">${loot.assignedTo}（已离队）</span>`;
     
     return `
@@ -5747,7 +5770,6 @@ function wishlistRender() {
     const specText = wishlistSpecTextMap[w.spec] || w.spec;
     const member = appData.members.find(m => m.id === w.memberId);
     const memberName = member ? member.name : w.memberName;
-    const cls = member ? classMap[member.class] || '' : '';
 
     return `
       <tr>
@@ -5756,9 +5778,9 @@ function wishlistRender() {
         <td><span class="wishlist-raid-tag">${w.raid || '-'}</span></td>
         <td>${w.boss || '-'}</td>
         <td>${w.slot || '-'}</td>
-        <td class="${cls ? 'class-' + cls : ''}" style="font-weight:500">${memberName}${claimerLabelHtml(member)}</td>
+        <td>${memberChipHtml(member, memberName)}${claimerLabelHtml(member)}</td>
         <td class="center"><span class="badge ${priorityBadge}">${w.priority || 'P2'}</span></td>
-        <td><span class="badge ${specBadge}">${specText}</span>${w.specName ? ` <span style="color:var(--text-muted);font-size:11px">(${w.specName})</span>` : ''}</td>
+        <td><span class="badge ${specBadge}">${specText}</span>${w.specName ? ` ${specChipHtml(member ? member.class : '', w.specName)}` : ''}</td>
         <td class="center">
           <span class="badge ${statusBadge}">${statusText}</span>
           ${w.obtained && w.obtainedDate ? `<div style="font-size:10px;color:var(--text-muted);margin-top:2px">${w.obtainedDate}</div>` : ''}
@@ -6317,6 +6339,21 @@ function lootFillAssignedTo(name) {
 // ==================== 初始化 ====================
 // ==================== 更新日志 ====================
 const changelogData = [
+  {
+    id: 'v3.2.0-task22-patch-improve',
+    version: 'v3.2.0',
+    date: '2026-08-05',
+    type: 'improve',
+    typeLabel: '功能优化',
+    title: '职责图标修正与换装补漏（REQ-071）',
+    summary: '职责图标换为完整圆形官方图；心愿单/装备分配补上职业图标与职业色 tag；成员管理专精列与操作列版式统一。',
+    details: [
+      '坦克/治疗/输出图标换新：蓝盾/绿十字/红剑完整圆形官方图，成员职责列、编辑弹窗等全站生效',
+      '心愿单：需求成员列改职业图标+职业色 tag，专精列补专精图标；装备分配「分配给」列同款成员职业 tag（「未认领」小字保持在 tag 外）',
+      '成员管理：专精列改职业色 tag（主/副专精同行排列不折行），操作列图标与认领区压缩进同一行不换行，出勤率列对齐修正',
+      '三处职业色 tag 共用同一套渲染组件，色值统一取官方职业色'
+    ]
+  },
   {
     id: 'v3.2.0-task22-wp3-fix2',
     version: 'v3.2.0',
