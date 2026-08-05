@@ -7,11 +7,12 @@
 (function () {
   'use strict';
 
-  const TABLES = ['game_patches', 'game_seasons', 'game_raids', 'game_bosses', 'boss_loot', 'tier_sets', 'game_dungeons', 'game_classes', 'game_specs'];
+  // 任务书 #23 WP1：dungeon_loot（大秘境掉落池）随 9 表并行加载
+  const TABLES = ['game_patches', 'game_seasons', 'game_raids', 'game_bosses', 'boss_loot', 'dungeon_loot', 'tier_sets', 'game_dungeons', 'game_classes', 'game_specs'];
   const LOAD_TIMEOUT_MS = 5000;
 
   const state = {
-    patches: [], seasons: [], raids: [], bosses: [], loot: [], tierSets: [], dungeons: [], classes: [], specs: [],
+    patches: [], seasons: [], raids: [], bosses: [], loot: [], dungeonLoot: [], tierSets: [], dungeons: [], classes: [], specs: [],
     loaded: false, snapshotMode: false, loading: null
   };
 
@@ -26,6 +27,7 @@
     state.raids = s.raids || [];
     state.bosses = s.bosses || [];
     state.loot = s.loot || [];
+    state.dungeonLoot = s.dungeonLoot || [];
     state.tierSets = s.tierSets || [];
     state.dungeons = s.dungeons || [];
     state.classes = s.classes || [];
@@ -55,11 +57,11 @@
       const c = client();
       if (!c) { applySnapshot(); return state; }
       try {
-        const [patches, seasons, raids, bosses, loot, tierSets, dungeons, classes, specs] = await withTimeout(
+        const [patches, seasons, raids, bosses, loot, dungeonLoot, tierSets, dungeons, classes, specs] = await withTimeout(
           Promise.all(TABLES.map(t => fetchTable(c, t))), LOAD_TIMEOUT_MS
         );
         state.patches = patches; state.seasons = seasons; state.raids = raids;
-        state.bosses = bosses; state.loot = loot; state.tierSets = tierSets;
+        state.bosses = bosses; state.loot = loot; state.dungeonLoot = dungeonLoot; state.tierSets = tierSets;
         state.dungeons = dungeons; state.classes = classes; state.specs = specs;
         state.snapshotMode = false;
         state.loaded = true;
@@ -85,7 +87,7 @@
     const rows = await fetchTable(c, table);
     const key = {
       game_patches: 'patches', game_seasons: 'seasons', game_raids: 'raids',
-      game_bosses: 'bosses', boss_loot: 'loot', tier_sets: 'tierSets',
+      game_bosses: 'bosses', boss_loot: 'loot', dungeon_loot: 'dungeonLoot', tier_sets: 'tierSets',
       game_dungeons: 'dungeons', game_classes: 'classes', game_specs: 'specs'
     }[table];
     if (key) state[key] = rows;
@@ -102,7 +104,15 @@
   };
   const getRaidByName = (name) => state.raids.find(r => r.name === name) || null;
   const getBosses = (raidId) => state.bosses.filter(b => b.raid_id === raidId).sort((a, b) => (a.boss_order || 0) - (b.boss_order || 0));
+  // 任务书 #23 WP1：副本归属 BOSS（dungeon_id 维度）
+  const getDungeonBosses = (dungeonId) => state.bosses.filter(b => b.dungeon_id === dungeonId).sort((a, b) => (a.boss_order || 0) - (b.boss_order || 0));
   const getLoot = (bossId) => state.loot.filter(l => l.boss_id === bossId);
+  // 任务书 #23 WP1：大秘境掉落（bossId 省略=整副本，null 归组=整体池条目）
+  const getDungeonLoot = (dungeonId, bossId) => {
+    let list = state.dungeonLoot.filter(l => l.dungeon_id === dungeonId);
+    if (bossId !== undefined) list = list.filter(l => l.boss_id === bossId);
+    return list;
+  };
   const getTierSets = (seasonId) => state.tierSets.filter(t => t.season_id === seasonId);
   const getDungeons = (seasonId) => {
     let list = [...state.dungeons];
@@ -180,7 +190,7 @@
   window.MasterData = {
     init, refresh,
     getPatches, getSeasons, getCurrentSeason,
-    getRaids, getRaidByName, getBosses, getLoot, getTierSets, getDungeons,
+    getRaids, getRaidByName, getBosses, getDungeonBosses, getLoot, getDungeonLoot, getTierSets, getDungeons,
     getClasses, getSpecs, getSpecsByClassName,
     isLoaded, isSnapshotMode, isSuperadmin,
     mdInsert, mdUpdate, mdDelete, mdUpsert

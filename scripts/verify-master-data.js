@@ -296,6 +296,18 @@ async function proxy(token, method, table, body, query) {
     check('6a. 内置快照可解析', !!snap && Array.isArray(snap.classes), snap && `classes=${snap.classes.length}`);
     check('6b. 快照含 13 职业 40 专精 5 团本', snap.classes.length === 13 && snap.specs.length === 40 && snap.raids.length === 5,
       `${snap.classes.length}/${snap.specs.length}/${snap.raids.length}`);
+
+    // 10. 任务书 #23 WP1：dungeon_loot 结构 + game_bosses 副本归属 + 匿名读开放
+    const dl = await svcRest('GET', '/rest/v1/dungeon_loot?select=id&limit=1');
+    check('10a. dungeon_loot 表可达（sql/16）', dl.status === 200 && Array.isArray(dl.body), `HTTP ${dl.status}`);
+    const gb = await svcRest('GET', '/rest/v1/game_bosses?select=id,dungeon_id&limit=1');
+    check('10b. game_bosses 带 dungeon_id 列', gb.status === 200 && Array.isArray(gb.body) && gb.body.length > 0 && 'dungeon_id' in gb.body[0], `HTTP ${gb.status}`);
+    const anonH = { apikey: ANON, Authorization: `Bearer ${ANON}` };
+    const anonDl = await fetch(`${SB}/rest/v1/dungeon_loot?select=id&limit=1`, { headers: anonH });
+    check('10c. 匿名读 dungeon_loot → 200', anonDl.status === 200, `HTTP ${anonDl.status}`);
+    const anonGuilds = await fetch(`${SB}/rest/v1/guilds?select=*&limit=1`, { headers: anonH });
+    const anonGuildsBody = await anonGuilds.json().catch(() => null);
+    check('10d. 匿名读业务表 guilds → 403/空集（边界抽测）', anonGuilds.status !== 200 || (Array.isArray(anonGuildsBody) && anonGuildsBody.length === 0), `HTTP ${anonGuilds.status}`);
   } finally {
     srv.kill();
     console.log('\n===== 清理测试数据 =====');

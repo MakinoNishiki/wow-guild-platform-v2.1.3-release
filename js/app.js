@@ -6340,6 +6340,20 @@ function lootFillAssignedTo(name) {
 // ==================== 更新日志 ====================
 const changelogData = [
   {
+    id: 'v3.2.0-task23-wp1-feature',
+    version: 'v3.2.0',
+    date: '2026-08-05',
+    type: 'feature',
+    typeLabel: '新增功能',
+    title: '大秘境掉落池主数据（REQ-072）',
+    summary: '数据中心新增「大秘境掉落」区块：副本 → BOSS 分组维护掉落，支持无法归属 BOSS 的整体池条目。',
+    details: [
+      'BOSS 管理支持挂副本（与挂团本二选一，数据库约束保证），大秘境掉落按副本 → BOSS 分组增删改',
+      '批量录入格式：副本名,BOSS名（可留空=整体池）,装备名,部位,类型,主属性,副属性,特效，非法行报行号跳过',
+      '同一副本内整体池同名装备自动去重；数据仅产品超管可维护'
+    ]
+  },
+  {
     id: 'v3.2.0-task22-patch-improve',
     version: 'v3.2.0',
     date: '2026-08-05',
@@ -10764,7 +10778,7 @@ async function renderDatacenter() {
   if (!panel) return;
   const renderers = {
     patches: mdRenderPatches, seasons: mdRenderSeasons, raids: mdRenderRaids,
-    bosses: mdRenderBosses, loot: mdRenderLoot, tiersets: mdRenderTierSets,
+    bosses: mdRenderBosses, loot: mdRenderLoot, dungeonloot: mdRenderDungeonLoot, tiersets: mdRenderTierSets,
     dungeons: mdRenderDungeons, classes: mdRenderClasses, specs: mdRenderSpecs
   };
   (renderers[mdCurrentTab] || mdRenderPatches)(panel);
@@ -11029,11 +11043,16 @@ function mdFindBoss(id) {
     const f = MasterData.getBosses(r.id).find(b => b.id === id);
     if (f) return f;
   }
+  // 任务书 #23 WP1：副本归属 BOSS 同表，查找时一并覆盖
+  for (const d of MasterData.getDungeons()) {
+    const f = MasterData.getDungeonBosses(d.id).find(b => b.id === id);
+    if (f) return f;
+  }
   return null;
 }
 function mdRenderBosses(panel) {
   const raids = MasterData.getRaids();
-  panel.innerHTML = raids.map(raid => {
+  const raidSections = raids.map(raid => {
     const bosses = MasterData.getBosses(raid.id);
     return `<div style="margin-bottom:16px">
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
@@ -11048,6 +11067,43 @@ function mdRenderBosses(panel) {
         </tr>`).join(''))}
     </div>`;
   }).join('') || '<div style="color:var(--text-muted)">请先在「团本」区新增团本</div>';
+  // 任务书 #23 WP1：BOSS 区块支持挂副本（dungeon_id，与 raid_id 二选一，DB CHECK 约束）
+  const dungeons = MasterData.getDungeons();
+  const dungeonSections = dungeons.length ? `
+    <div style="margin:20px 0 10px;padding-top:12px;border-top:1px solid var(--border-color);font-weight:600;color:var(--text-secondary)">大秘境副本 BOSS（用于大秘境掉落按 BOSS 归属）</div>
+    ${dungeons.map(d => {
+      const bosses = MasterData.getDungeonBosses(d.id);
+      return `<div style="margin-bottom:16px">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+          <span style="font-weight:600;color:var(--info)">${d.name}</span>
+          <button class="btn btn-ghost btn-sm" onclick="mdEditDungeonBoss(null,'${d.id}')">+ 新增 BOSS</button>
+        </div>
+        ${mdTable('<th class="num" style="width:60px">序号</th><th>BOSS 名</th><th class="center" style="width:100px">操作</th>',
+          bosses.map(b => `<tr>
+            <td class="num">${b.boss_order}</td>
+            <td style="font-weight:500">${b.name}</td>
+            ${mdActionBtns(`mdEditDungeonBoss('${b.id}')`, `mdDeleteRow('game_bosses','${b.id}','${b.name}','将同时删除其大秘境掉落归属（掉落行本身保留并落回整体池）')`)}
+          </tr>`).join(''))}
+      </div>`;
+    }).join('')}` : '';
+  panel.innerHTML = raidSections + dungeonSections;
+}
+// 任务书 #23 WP1：副本 BOSS 编辑（dungeon_id 归属；boss_order 按副本内递增）
+function mdEditDungeonBoss(id, dungeonId) {
+  const boss = id ? mdFindBoss(id) : null;
+  const did = boss ? boss.dungeon_id : dungeonId;
+  if (!did) { showToast('缺少目标副本', 'error'); return; }
+  const nextOrder = boss ? boss.boss_order : (MasterData.getDungeonBosses(did).reduce((m, b) => Math.max(m, b.boss_order || 0), 0) + 1);
+  mdOpenEditor(boss ? '编辑副本 BOSS' : '新增副本 BOSS', [
+    { key: 'name', label: 'BOSS 名', required: true },
+    { key: 'boss_order', label: '序号（第几号）', type: 'number', default: nextOrder, required: true }
+  ], boss, async (out) => {
+    if (boss) await MasterData.mdUpdate('game_bosses', { name: out.name, boss_order: out.boss_order }, `id=eq.${boss.id}`);
+    else await MasterData.mdInsert('game_bosses', { dungeon_id: did, name: out.name, boss_order: out.boss_order });
+    await MasterData.refresh('game_bosses');
+    renderDatacenter();
+    showToast('已保存', 'success');
+  });
 }
 function mdEditBoss(id, raidId) {
   const boss = id ? mdFindBoss(id) : null;
@@ -11230,6 +11286,157 @@ async function mdLootBatchConfirm() {
     closeModal('mdEditorModal');
     renderDatacenter();
     showToast(`已批量入库 ${count} 条掉落`, 'success');
+  } catch (e) {
+    showToast('批量入库失败：' + (e.message || '未知错误'), 'error');
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+// ---------- 5b. 大秘境掉落（任务书 #23 WP1：副本 → BOSS 分组 CRUD，BOSS 可空 = 整体池） ----------
+let mdDungeonLootNav = { dungeonId: '', bossId: '' }; // bossId='' 整体池，'__all__' 全部
+function mdRenderDungeonLoot(panel) {
+  const dungeons = MasterData.getDungeons();
+  if (!dungeons.length) { panel.innerHTML = '<div style="color:var(--text-muted)">请先在「大秘境」区新增副本</div>'; return; }
+  if (!mdDungeonLootNav.dungeonId || !dungeons.find(d => d.id === mdDungeonLootNav.dungeonId)) mdDungeonLootNav.dungeonId = dungeons[0].id;
+  const dungeon = dungeons.find(d => d.id === mdDungeonLootNav.dungeonId);
+  const bosses = MasterData.getDungeonBosses(dungeon.id);
+  const navBoss = mdDungeonLootNav.bossId;
+  const loot = navBoss === '__all__'
+    ? MasterData.getDungeonLoot(dungeon.id)
+    : MasterData.getDungeonLoot(dungeon.id, navBoss === '' ? null : navBoss);
+  const bossName = id => id ? ((bosses.find(b => b.id === id) || {}).name || '（BOSS 已删除）') : '整体池';
+  panel.innerHTML = `
+    <div style="display:flex;gap:12px;margin-bottom:12px;flex-wrap:wrap;align-items:center">
+      <select class="form-select" style="width:200px" onchange="mdDungeonLootNav.dungeonId=this.value;mdDungeonLootNav.bossId='';renderDatacenter()">
+        ${dungeons.map(d => `<option value="${d.id}" ${d.id === dungeon.id ? 'selected' : ''}>${d.name}</option>`).join('')}
+      </select>
+      <select class="form-select" style="width:200px" onchange="mdDungeonLootNav.bossId=this.value;renderDatacenter()">
+        <option value="" ${navBoss === '' ? 'selected' : ''}>整体池（无 BOSS 归属）</option>
+        ${bosses.map(b => `<option value="${b.id}" ${b.id === navBoss ? 'selected' : ''}>${b.boss_order}号 ${b.name}</option>`).join('')}
+        <option value="__all__" ${navBoss === '__all__' ? 'selected' : ''}>全部（含整体池）</option>
+      </select>
+      ${navBoss !== '__all__' ? `<button class="btn btn-primary btn-sm" onclick="mdEditDungeonLootItem(null)">+ 新增掉落</button>` : ''}
+      <button class="btn btn-sm" onclick="mdOpenDungeonLootBatch()">📋 批量录入</button>
+    </div>
+    ${mdTable('<th>装备名</th><th>BOSS 归属</th><th>部位</th><th>类型</th><th>主属性</th><th>副属性</th><th>特效</th><th class="center">操作</th>',
+      loot.map(l => `<tr>
+        <td style="font-weight:500">${l.item_name}</td>
+        <td>${bossName(l.boss_id)}</td>
+        <td>${l.slot || '-'}</td>
+        <td>${l.item_type || '-'}</td>
+        <td>${(l.primary_stats || []).join('、') || '-'}</td>
+        <td>${(l.secondary_stats || []).join('、') || '-'}</td>
+        <td style="font-size:12px;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${(l.effect || '').replace(/"/g, '&quot;')}">${l.effect ? `<span class="loot-effect-green">${l.effect}</span>` : '-'}</td>
+        ${mdActionBtns(`mdEditDungeonLootItem('${l.id}')`, `mdDeleteRow('dungeon_loot','${l.id}','${l.item_name}','')`)}
+      </tr>`).join(''))}`;
+}
+function mdEditDungeonLootItem(id) {
+  const row = id ? MasterData.getDungeonLoot(mdDungeonLootNav.dungeonId).find(l => l.id === id) : null;
+  mdOpenEditor(id ? '编辑大秘境掉落' : '新增大秘境掉落', [
+    { key: 'item_name', label: '装备名', required: true },
+    { key: 'slot', label: '部位', type: 'selectCustom', options: MD_LOOT_SLOTS, onchange: 'mdLootSlotChanged()' },
+    { key: 'item_type', label: '类型', type: 'selectCustom', options: MD_LOOT_TYPES },
+    { key: 'primary_stats', label: '主属性（可多选）', type: 'tags', options: MD_PRIMARY_STATS },
+    { key: 'secondary_stats', label: '副属性（可多选）', type: 'tags', options: MD_SECONDARY_STATS },
+    { key: 'effect', label: '特效', type: 'textarea', placeholder: '装备：……（可空，多行）' }
+  ], row, async (out) => {
+    if (out.slot && out.item_type && MD_SLOT_TYPE_MAP[out.slot] && !MD_SLOT_TYPE_MAP[out.slot].includes(out.item_type)) {
+      if (!confirm(`部位「${out.slot}」与类型「${out.item_type}」不是常见组合，仍要保存吗？`)) {
+        throw new Error('已取消保存');
+      }
+    }
+    const payload = { item_name: out.item_name, slot: out.slot, item_type: out.item_type, effect: out.effect, primary_stats: out.primary_stats, secondary_stats: out.secondary_stats };
+    if (id) await MasterData.mdUpdate('dungeon_loot', payload, `id=eq.${id}`);
+    else await MasterData.mdInsert('dungeon_loot', {
+      dungeon_id: mdDungeonLootNav.dungeonId,
+      boss_id: mdDungeonLootNav.bossId === '' ? null : mdDungeonLootNav.bossId,
+      ...payload
+    });
+    await MasterData.refresh('dungeon_loot');
+    renderDatacenter();
+    showToast('已保存', 'success');
+  });
+  mdLootSlotChanged();
+  if (row && row.item_type) {
+    const typeEl = document.getElementById('mdField_item_type');
+    const opts = [...typeEl.options].map(o => o.value);
+    if (opts.includes(row.item_type)) typeEl.value = row.item_type;
+    else { typeEl.value = '__custom__'; mdSelectCustomToggle('item_type'); const c = document.getElementById('mdField_item_type_custom'); if (c) c.value = row.item_type; }
+  }
+}
+// 批量录入（任务书 #23 WP1：首两列副本名/BOSS 名，BOSS 可留空 = 整体池；其余列格式与校验同 boss_loot）
+let mdDungeonLootBatchRows = null;
+function mdOpenDungeonLootBatch() {
+  mdEditorCtx = { fields: [], row: {}, onSave: async () => {} };
+  document.getElementById('mdEditorTitle').textContent = '批量录入大秘境掉落（每行：副本名,BOSS名,装备名,部位,类型,主属性,副属性,特效）';
+  document.getElementById('mdEditorBody').innerHTML = `
+    <div class="form-group">
+      <label class="form-label">掉落清单（BOSS 名可留空 = 整体池；后三列可空，主/副属性多值用「、」分隔）</label>
+      <textarea class="form-textarea" id="mdField__batch" style="height:160px" placeholder="毒牙祭坛,毒牙之王,烈毒巨剑,武器,单手剑,力量,暴击、急速,装备：攻击附带剧毒&#10;毒牙祭坛,,毒牙项坠,颈部,项链,智力,,"></textarea>
+    </div>
+    <div id="mdLootBatchPreview"></div>`;
+  const btn = document.getElementById('mdEditorSaveBtn');
+  btn.textContent = '解析预览';
+  btn.onclick = mdDungeonLootBatchParse;
+  openModal('mdEditorModal');
+}
+function mdDungeonLootBatchParse() {
+  const text = document.getElementById('mdField__batch').value;
+  const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+  const dungeons = MasterData.getDungeons();
+  const rows = [];
+  const bad = [];
+  lines.forEach((l, i) => {
+    const parts = l.split(/[,，]/).map(s => s.trim());
+    const dungeon = dungeons.find(d => d.name === parts[0]);
+    if (!dungeon) { bad.push(`${i + 1}（副本「${parts[0] || '空'}」不存在）`); return; }
+    if (!parts[2]) { bad.push(`${i + 1}（无装备名）`); return; }
+    let bossId = null;
+    if (parts[1]) {
+      const boss = MasterData.getDungeonBosses(dungeon.id).find(b => b.name === parts[1]);
+      if (!boss) { bad.push(`${i + 1}（副本「${parts[0]}」下无 BOSS「${parts[1]}」）`); return; }
+      bossId = boss.id;
+    }
+    if (parts[3] && parts[4] && MD_SLOT_TYPE_MAP[parts[3]] && !MD_SLOT_TYPE_MAP[parts[3]].includes(parts[4])) {
+      bad.push(`${i + 1}（部位「${parts[3]}」与类型「${parts[4]}」不匹配）`);
+      return;
+    }
+    rows.push({
+      dungeon_id: dungeon.id,
+      boss_id: bossId,
+      item_name: parts[2],
+      slot: parts[3] || '',
+      item_type: parts[4] || '',
+      primary_stats: (parts[5] || '').split('、').map(s => s.trim()).filter(Boolean),
+      secondary_stats: (parts[6] || '').split('、').map(s => s.trim()).filter(Boolean),
+      effect: parts[7] || ''
+    });
+  });
+  if (!rows.length) { showToast('没有可解析的有效行', 'error'); return; }
+  mdDungeonLootBatchRows = rows;
+  const dungeonName = id => (dungeons.find(d => d.id === id) || {}).name || id;
+  document.getElementById('mdLootBatchPreview').innerHTML =
+    `<div style="margin-top:12px;max-height:200px;overflow-y:auto">${mdTable('<th>副本</th><th>BOSS 归属</th><th>装备名</th><th>部位</th><th>类型</th><th>主属性</th><th>副属性</th>',
+      rows.map(r => `<tr><td>${dungeonName(r.dungeon_id)}</td><td>${r.boss_id ? 'BOSS' : '整体池'}</td><td>${r.item_name}</td><td>${r.slot || '-'}</td><td>${r.item_type || '-'}</td><td>${r.primary_stats.join('、') || '-'}</td><td>${r.secondary_stats.join('、') || '-'}</td></tr>`).join(''))}</div>
+    ${bad.length ? `<div style="color:var(--warning);font-size:12px;margin-top:6px">第 ${bad.join('、')} 行无法识别，已跳过</div>` : ''}`;
+  const btn = document.getElementById('mdEditorSaveBtn');
+  btn.textContent = `确认入库（${rows.length} 条）`;
+  btn.onclick = mdDungeonLootBatchConfirm;
+}
+async function mdDungeonLootBatchConfirm() {
+  if (!mdDungeonLootBatchRows || !mdDungeonLootBatchRows.length) return;
+  const count = mdDungeonLootBatchRows.length;
+  const btn = document.getElementById('mdEditorSaveBtn');
+  btn.disabled = true; btn.textContent = '入库中...';
+  try {
+    // 规范 1.2.2 批处理例外：一次数组 POST 批量插入，完成后统一 refresh 一次
+    await MasterData.mdInsert('dungeon_loot', mdDungeonLootBatchRows);
+    await MasterData.refresh('dungeon_loot');
+    mdDungeonLootBatchRows = null;
+    closeModal('mdEditorModal');
+    renderDatacenter();
+    showToast(`已批量入库 ${count} 条大秘境掉落`, 'success');
   } catch (e) {
     showToast('批量入库失败：' + (e.message || '未知错误'), 'error');
   } finally {
