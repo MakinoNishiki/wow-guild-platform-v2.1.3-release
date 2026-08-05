@@ -4173,3 +4173,39 @@ body.viewer-mode #memberSelectAll {
   color: var(--text-muted);
   opacity: 0.6;
 }
+
+/* ==================== 任务书 #22 WP1：表格行内对齐收口（成员/装备/心愿/统计同款表格） ==================== */
+/* 1. 全表单元格垂直居中 */
+.data-table td { vertical-align: middle; }
+
+/* 2. 表格内徽标统一几何：20px 高、行高 1、不换行，与同行文字基线对齐；
+      不因文字多少撑出不一致行高（修复状态「正式」/职业「恶魔猎手」徽标折行撑高行） */
+.data-table .badge,
+.data-table .tag {
+  height: 20px;
+  padding-top: 0;
+  padding-bottom: 0;
+  line-height: 1;
+  box-sizing: border-box;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+/* 3. 操作列：图标组统一尺寸与间距，整组在行内水平+垂直居中 */
+.data-table td.center .action-btns {
+  justify-content: center;
+  align-items: center;
+  gap: 6px;
+}
+/* 认领区（待认领标签/认领人小字/解除按钮）与图标组对齐、间距统一 */
+.claim-btns {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 22px;
+  margin-top: 4px;
+}
+.claim-btns > div { margin-top: 0 !important; }
+
+/* 4. 成员表加入日期列不换行（日期折行会撑高行、破坏行内对齐） */
+#page-members .data-table td:nth-child(8) { white-space: nowrap; }
