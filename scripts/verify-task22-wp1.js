@@ -181,6 +181,23 @@ async function cleanup() {
       check(`[${vp.tag}] 补丁⑤ 操作列单行（claim 区在图标组右侧并排，非堆叠）`, patchChecks.opCell && patchChecks.sameLine === true, `sameLine=${patchChecks.sameLine}`);
       check(`[${vp.tag}] 补丁⑤ 出勤率列左对齐（表头+单元格）`, patchChecks.rateThAlign === 'left' && patchChecks.rateTdAlign === 'left', `${patchChecks.rateThAlign}/${patchChecks.rateTdAlign}`);
       check(`[${vp.tag}] 极端行专精 chip 不折行（3 枚 chip 顶线一致）`, patchChecks.specChipsOneLine === true);
+      // ===== 任务书 #21-补丁 B：认领人移至角色名第二行 =====
+      const bChecks = await page.evaluate(() => {
+        const rows = [...document.querySelectorAll('#membersTableBody tr')];
+        const rowHunter = rows.find(r => r.textContent.includes('猎大'));
+        if (!rowHunter) return null;
+        const nameCell = rowHunter.querySelector('td:nth-child(3)');
+        const opCell = rowHunter.querySelector('.op-cell');
+        const claimerDiv = nameCell && [...nameCell.querySelectorAll('div')].find(d => d.textContent.includes('认领人：'));
+        return {
+          nameHasClaimer: nameCell ? nameCell.innerText.includes('认领人：') : null,
+          opNoClaimer: opCell ? !opCell.innerText.includes('认领人：') : null,
+          nowrap: claimerDiv ? getComputedStyle(claimerDiv).whiteSpace : null,
+        };
+      });
+      check(`[${vp.tag}] 补丁B 认领人显示在角色名第二行`, bChecks && bChecks.nameHasClaimer === true, JSON.stringify(bChecks));
+      check(`[${vp.tag}] 补丁B 操作列不再显示认领人`, bChecks && bChecks.opNoClaimer === true);
+      check(`[${vp.tag}] 补丁B 认领人小字不折行`, bChecks && bChecks.nowrap === 'nowrap', bChecks && bChecks.nowrap);
       await page.screenshot({ path: path.join(SHOT_DIR, `${vp.tag}-members.png`) });
 
       // 已离队视图

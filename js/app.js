@@ -2298,8 +2298,9 @@ function claimerLabelHtml(member) {
   if (!g || g.show_claimer_label === false) return '';
   ensureClaimerNames();
   const uid = member.user_id;
+  // 任务书 #21-补丁 B：认领人灰色小字第二行不折行（成员管理名称单元格/心愿单/装备分配共用）
   const text = uid ? `认领人：${(claimerNames.map && claimerNames.map.get(uid)) || '（已退会用户）'}` : '未认领';
-  return `<div style="font-size:11px;color:var(--text-muted);margin-top:2px">${text}</div>`;
+  return `<div style="font-size:11px;color:var(--text-muted);margin-top:2px;white-space:nowrap">${text}</div>`;
 }
 
 
@@ -2378,7 +2379,10 @@ function renderMembers() {
       <tr${m.status === '离队' ? ' class="member-row-departed"' : ''}>
         <td><input type="checkbox" class="member-row-checkbox" value="${m.id}" ${memberSelectedIds.has(m.id) ? 'checked' : ''} onchange="memberToggleSelect('${m.id}', this.checked)"></td>
         <td class="num">${i + 1}</td>
-        <td class="class-${cls}" style="font-weight:500">${m.name}</td>
+        <td class="class-${cls}">
+          <div style="font-weight:500">${m.name}</div>
+          ${m.user_id ? claimerLabelHtml(m) : ''}
+        </td>
         <td>
           ${classChipHtml(m.class)}
         </td>
@@ -2406,7 +2410,7 @@ function renderMembers() {
                     : `<button class="tag tag-grey claim-pending-btn" onclick="claimMember('${m.id}')">待认领</button>`))
                 : (currentUserId && m.user_id === currentUserId
                   ? `<button class="icon-btn" onclick="unclaimMember('${m.id}')" title="解除认领">🔓</button>`
-                  : claimerLabelHtml(m))}
+                  : '')}
             </div>
           </div>
         </td>
@@ -6340,6 +6344,19 @@ function lootFillAssignedTo(name) {
 // ==================== 初始化 ====================
 // ==================== 更新日志 ====================
 const changelogData = [
+  {
+    id: 'v3.2.0-task21-patchB-improve',
+    version: 'v3.2.0',
+    date: '2026-08-05',
+    type: 'improve',
+    typeLabel: '功能优化',
+    title: '「认领人：XXX」移至角色名下方第二行',
+    summary: '成员管理列表的认领人从操作列移到角色名单元格第二行，灰色小字不折行，操作列更清爽。',
+    details: [
+      '已认领行：角色名正下方第二行显示认领人（可见性仍受公会「认领人标签」开关控制）',
+      '操作列只保留「待认领」「认领审核中」等交互标签与操作按钮，已离队视图同标准'
+    ]
+  },
   {
     id: 'v3.2.0-task21-patchA-fix',
     version: 'v3.2.0',
