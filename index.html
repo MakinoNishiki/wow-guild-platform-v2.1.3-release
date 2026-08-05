@@ -727,14 +727,39 @@
         <textarea class="form-textarea" id="memberNotes" placeholder="可选"></textarea>
       </div>
       <!-- 任务书 #18 WP2：认领人指定/调整（仅编辑已有成员且 owner/editor 时由 showMemberModal 显示） -->
+      <!-- 任务书 #21 WP1-③：代派入口强化——分组内补说明文字，解决入口太深不易发现 -->
       <div class="form-group" id="memberClaimGroup" style="display:none">
         <label class="form-label">认领人</label>
         <select class="form-select" id="memberClaimUser"></select>
+        <div style="font-size:12px;color:var(--text-muted);margin-top:4px">管理者可在此直接为成员指定、调整或解除认领人。</div>
       </div>
     </div>
     <div class="modal-footer">
       <button class="btn" onclick="closeModal('memberModal')">取消</button>
       <button id="memberSaveBtn" class="btn btn-primary" onclick="saveMember()">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 弹窗：认领角色二次确认（任务书 #21 WP1-①）===== -->
+<div class="modal-overlay" id="claimConfirmModal">
+  <div class="modal" style="max-width:460px">
+    <div class="modal-header">
+      <div class="modal-title">认领角色确认</div>
+      <div class="modal-close" onclick="closeModal('claimConfirmModal')">×</div>
+    </div>
+    <div class="modal-body">
+      <p style="margin:0 0 12px;color:var(--text-primary)">确定将「<span id="claimConfirmName" style="color:var(--gold);font-weight:600"></span>」认领为我的角色吗？</p>
+      <div style="font-size:13px;color:var(--text-secondary);line-height:1.9">
+        <p style="margin:0">· 认领 = 把这个角色绑定到你的账号，先到先得，绑定后他人不可抢；</p>
+        <p style="margin:0">· 绑定后，该角色的出勤率、装备、心愿会聚合到「用户中心 → 我的认领」；</p>
+        <p style="margin:0">· 会长/管理（owner/editor）可以随时调整或解除认领；</p>
+        <p style="margin:0">· 领错了可以自己「解除认领」，或找管理处理。</p>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('claimConfirmModal')">取消</button>
+      <button id="claimConfirmBtn" class="btn btn-primary" onclick="confirmClaimMember()">确认认领</button>
     </div>
   </div>
 </div>
@@ -1491,6 +1516,8 @@
           <!-- 任务书 #18 WP2 R4：认领人标签公会级开关（仅 owner 可改，默认开） -->
           <div class="form-group" style="margin-top:12px;margin-bottom:0">
             <label class="att-filter-toggle"><input type="checkbox" id="guildShowClaimerLabel"> 显示角色认领人标签（心愿单/装备分配列表）</label>
+            <!-- 任务书 #21 WP1-③：开关用途说明 -->
+            <div style="font-size:12px;color:var(--text-muted);margin-top:4px">控制心愿单与装备分配列表里是否显示每个角色背后的认领人；关闭后仅管理者在成员管理中可见认领状态。</div>
           </div>
           <div id="guildProfileOwnerHint" style="font-size:12px;color:var(--text-muted);display:none;margin-top:8px">仅会长可编辑公会资料</div>
         </div>

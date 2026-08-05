@@ -156,7 +156,7 @@ async function cleanup() {
   // X 当前 user_id=甲（第6步改派）；先 service 置空，让 UI 走完整认领
   await svc('PATCH', `/rest/v1/raid_members?id=eq.${memberXId}`, { user_id: null, name: 'WP19成员X' });
 
-  const browser = await chromium.launch({ headless: true, channel: 'chromium' });
+  const browser = await chromium.launch({ headless: true, channel: process.env.PW_CHANNEL || 'chromium' });
   const pageErrors = [];
   try {
     const ctx = await browser.newContext({ viewport: { width: 1366, height: 768 } });
@@ -183,16 +183,20 @@ async function cleanup() {
     });
     check('7a. viewer 界面：管理按钮隐藏、认领按钮可见', vis.viewerMode && vis.actionVisible === 0 && vis.claimVisible >= 1, JSON.stringify(vis));
 
-    // UI 认领 X
+    // UI 认领 X（任务书 #21 WP1：认领需二次确认——点「待认领」弹确认框，点「确认认领」才生效）
     const clicked = await page.evaluate(() => {
       const rows = [...document.querySelectorAll('#membersTableBody tr')];
       const row = rows.find(r => r.textContent.includes('WP19成员X'));
-      const btn = row && [...row.querySelectorAll('.claim-btns button')].find(b => b.title === '认领为我的角色');
+      const btn = row && [...row.querySelectorAll('.claim-btns button')].find(b => b.textContent.trim() === '待认领');
       if (!btn) return false;
       btn.click();
       return true;
     });
-    check('7b. viewer UI 点击认领 X', clicked === true);
+    check('7b. viewer UI 点击「待认领」标签', clicked === true);
+    await page.waitForSelector('#claimConfirmModal.show', { timeout: 5000 }).catch(() => {});
+    const modalVisible = await page.evaluate(() => document.getElementById('claimConfirmModal').classList.contains('show'));
+    check('7b2. 认领二次确认弹窗出现', modalVisible === true);
+    await page.click('#claimConfirmBtn');
     await page.waitForSelector('.toast', { timeout: 15000 }).catch(() => {});
     await sleep(2000);
     const claimed = await svc('GET', `/rest/v1/raid_members?id=eq.${memberXId}&select=user_id`);

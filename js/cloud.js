@@ -1252,23 +1252,19 @@
   }
 
   // 保存用户资料
+  // 任务书 #21 WP1-④：账号显示名唯一真源 = auth user_metadata.display_name，禁止第二写入点——
+  // 不再写 user_profiles.display_name；保存后立即更新本地缓存用户，右上角等读取处即时生效。
   async function saveUserProfile(profileData) {
     if (!isCloudMode || !currentUser) return null;
     try {
-      const { data, error } = await supabaseClient
-        .from('user_profiles')
-        .upsert({
-          user_id: currentUser.id,
-          ...profileData,
-          updated_at: new Date().toISOString()
-        })
-        .select()
-        .single();
+      const displayName = ((profileData && profileData.display_name) || '').trim();
+      const { data, error } = await supabaseClient.auth.updateUser({ data: { display_name: displayName } });
       if (error) throw error;
-      return data;
+      if (data && data.user) currentUser = data.user;
+      return currentUser;
     } catch (e) {
       console.error('保存用户资料失败:', e);
-      return null;
+      throw e;
     }
   }
 

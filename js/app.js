@@ -524,7 +524,7 @@ async function loadMyClaims() {
   }
   if (!rows || rows.length === 0) {
     if (sumEl) sumEl.textContent = '';
-    listEl.innerHTML = '<p class="uc-empty">暂无认领的角色（认领入口：成员管理 → 成员行 🤝）</p>';
+    listEl.innerHTML = '<p class="uc-empty">暂无认领的角色（认领入口：成员管理 → 成员行「待认领」）</p>';
     return;
   }
 
@@ -610,11 +610,10 @@ async function loadUserProfile() {
     document.getElementById('ucEmail').value = user.email || '';
     
     const profile = await window.CloudSync.getUserProfile();
-    if (profile) {
-      document.getElementById('ucDisplayName').value = profile.display_name || '';
-    } else {
-      document.getElementById('ucDisplayName').value = '';
-    }
+    // 任务书 #21 WP1-④：显示名唯一真源 = user_metadata.display_name；
+    // user_profiles.display_name 仅为存量数据回退展示（不再写入）
+    const metaName = user.user_metadata && user.user_metadata.display_name;
+    document.getElementById('ucDisplayName').value = metaName || (profile && profile.display_name) || '';
   } catch (e) {
     console.error('加载用户资料失败:', e);
   }
@@ -625,6 +624,8 @@ async function saveUserProfile() {
   const displayName = document.getElementById('ucDisplayName').value.trim();
   try {
     await window.CloudSync.saveUserProfile({ display_name: displayName });
+    // 任务书 #21 WP1-④：改名后右上角立即生效，不依赖重新登录
+    updateCloudUI();
     alert('资料已保存');
   } catch (e) {
     alert('保存失败：' + e.message);
@@ -2168,7 +2169,7 @@ function renderMembers() {
           </div>
           <div class="claim-btns">
             ${!m.user_id
-              ? `<button class="icon-btn" onclick="claimMember('${m.id}')" title="认领为我的角色">🤝</button>`
+              ? `<button class="tag tag-grey claim-pending-btn" onclick="claimMember('${m.id}')">待认领</button>`
               : (currentUserId && m.user_id === currentUserId
                 ? `<button class="icon-btn" onclick="unclaimMember('${m.id}')" title="解除认领">🔓</button>`
                 : claimerLabelHtml(m))}
@@ -2634,20 +2635,39 @@ async function restoreMember(id, btn) {
 
 // 任务书 #18 WP2 R1：认领为我的角色（先到先得；每个成员仍只能被一个用户认领）
 // 任务书 #19 WP1：改走窄通道（PATCH 体只含 user_id），viewer 亦可自助认领
-async function claimMember(id) {
+// 任务书 #21 WP1-①：点击「待认领」不再立即生效，先弹二次确认弹窗（含用途说明），确认才提交
+let pendingClaimMemberId = null;
+
+function claimMember(id) {
   const member = appData.members.find(m => m.id === id);
   const me = window.CloudSync.getCachedUser();
   if (!member || !me) return;
   if (member.user_id) { showToast('该角色已被认领', 'error'); return; }
+  pendingClaimMemberId = id;
+  document.getElementById('claimConfirmName').textContent = member.name;
+  openModal('claimConfirmModal');
+}
+
+// 认领确认弹窗「确认认领」：执行实际认领写入
+async function confirmClaimMember() {
+  const id = pendingClaimMemberId;
+  const member = appData.members.find(m => m.id === id);
+  const me = window.CloudSync.getCachedUser();
+  if (!member || !me) { closeModal('claimConfirmModal'); return; }
+  const btn = document.getElementById('claimConfirmBtn');
+  if (btn) btn.disabled = true;
   try {
     await window.CloudSync.setRaidMemberClaim(id, me.id);
     await window.CloudSync.reloadData('members');
     saveData();
     renderMembers();
+    closeModal('claimConfirmModal');
     showToast(`已认领：${member.name}`, 'success');
   } catch (e) {
     // 任务书 #19 WP2：失败透传后端具体原因（被抢/无权限等）
     showToast('认领失败: ' + (e.message || '未知错误'), 'error');
+  } finally {
+    if (btn) btn.disabled = false;
   }
 }
 
@@ -6065,6 +6085,47 @@ function lootFillAssignedTo(name) {
 // ==================== 初始化 ====================
 // ==================== 更新日志 ====================
 const changelogData = [
+  {
+    id: 'v3.2.0-task21-wp1-fix',
+    version: 'v3.2.0',
+    date: '2026-08-05',
+    type: 'fix',
+    typeLabel: '修复BUG',
+    title: '账号显示名两处不一致（BUG-052）',
+    summary: '用户中心改的显示名与右上角显示的不是同一个字段，改名后右上角不生效。',
+    details: [
+      '统一为唯一真源：账号显示名只存 auth user_metadata.display_name，用户中心保存直接写它',
+      '改名后右上角立即显示新名字，不用重新登录；刷新、换设备登录后依旧一致',
+      '旧的 user_profiles.display_name 字段不再写入，仅作老数据回退展示'
+    ]
+  },
+  {
+    id: 'v3.2.0-task21-wp1-improve',
+    version: 'v3.2.0',
+    date: '2026-08-05',
+    type: 'improve',
+    typeLabel: '功能优化',
+    title: '认领相关说明文案补齐',
+    summary: '公会设置「认领人标签」开关补用途说明；成员编辑弹窗的认领人指派入口补提示，不再难找。',
+    details: [
+      '开关下方新增灰色小字：控制心愿单与装备分配列表是否显示每个角色背后的认领人，关闭后仅管理者在成员管理中可见认领状态',
+      '成员编辑弹窗「认领人」分组新增说明：管理者可在此直接为成员指定、调整或解除认领人'
+    ]
+  },
+  {
+    id: 'v3.2.0-task21-wp1-feature',
+    version: 'v3.2.0',
+    date: '2026-08-05',
+    type: 'feature',
+    typeLabel: '新增功能',
+    title: '认领二次确认 + 「待认领」明示（REQ-066）',
+    summary: '认领不再一键即中：先弹确认框讲清用途再生效；未认领的行显示明确的「待认领」标签。',
+    details: [
+      '确认弹窗说明认领含义：绑定账号先到先得、数据聚合到「我的认领」、管理可调整、领错可自行解除',
+      '未认领的成员行从单个金锁图标改为灰字描边的「待认领」可点击标签，点击即弹确认框',
+      '已认领行显示不变：他人认领显示「认领人：XXX」（受公会开关控制），本人认领保留解除入口'
+    ]
+  },
   {
     id: 'v3.2.0-task16-refactor',
     version: 'v3.2.0',

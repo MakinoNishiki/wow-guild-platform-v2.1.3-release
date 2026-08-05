@@ -3928,6 +3928,19 @@ body.viewer-mode #memberSelectAll {
 .tag-blue { background: rgba(88, 166, 255, 0.15); color: var(--info); }
 .tag-green { background: rgba(63, 185, 80, 0.15); color: var(--success); }
 
+/* 任务书 #21 WP1-②：未认领明示——「待认领」可点击标签（灰字描边，点击弹认领确认弹窗） */
+.claim-pending-btn {
+  cursor: pointer;
+  border: 1px dashed var(--text-muted);
+  background: transparent;
+  font-family: inherit;
+}
+.claim-pending-btn:hover {
+  color: var(--gold);
+  border-color: var(--gold);
+  background: rgba(240, 192, 96, 0.08);
+}
+
 /* 既有 .badge 统一到标签规范尺寸（圆角 10px→5px，inline-flex 对齐图标） */
 .badge {
   display: inline-flex;
