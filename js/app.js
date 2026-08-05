@@ -740,19 +740,116 @@ function openAddCharacterModal() {
   document.getElementById('charItemLevel').value = '';
   document.getElementById('charRace').value = '';
   document.getElementById('charGuild').value = '';
+  lastArmoryWarnValue = '';
+  updateCharArmoryClearBtn();
+  onCharClassChange(); // 重置专精候选为空
   openModal('addCharacterModal');
 }
 
+// 任务书 #24-补丁①：英雄榜 slug → 国服中文服务器名映射（保守收录常见服务器；
+// 清单权威源为 cloud.js WOW_SERVERS，映射不到时保留原值并提示可手改）
+const ARMORY_SERVER_SLUGS = {
+  'the-golden-plains': '金色平原',
+  'silver-hand': '白银之手',
+  'deathwing': '死亡之翼',
+  'burning-blade': '燃烧之刃',
+  'ronin': '罗宁',
+  'arthas': '阿尔萨斯',
+  'illidan': '伊利丹',
+  'khadgar': '卡德加',
+  'proudmoore': '普罗德摩',
+  'frostmourne': '霜之哀伤',
+  'tyrande': '泰兰德',
+  'draenor': '德拉诺',
+  'stormscale': '风暴之鳞',
+  'howling-fjord': '嚎风峡湾',
+  'valley-of-kings': '国王之谷',
+  'doomhammer': '毁灭之锤',
+  'shadow-moon': '暗影之月'
+};
+
+// 服务器名归一化：已是中文且在国服清单内→原样；英文 slug 命中映射→中文；否则保留原值
+function mapArmoryServerName(serverName) {
+  if (!serverName) return { name: '', known: false };
+  const all = (window.CloudSync && window.CloudSync.getAllWowServers) ? window.CloudSync.getAllWowServers() : [];
+  if (all.some(s => s.server === serverName)) return { name: serverName, known: true };
+  const mapped = ARMORY_SERVER_SLUGS[serverName.toLowerCase()];
+  if (mapped) return { name: mapped, known: true };
+  return { name: serverName, known: false };
+}
+
+// 解析成功后字段短暂高亮
+function flashParsedFields(ids) {
+  ids.forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.classList.remove('uc-flash');
+    void el.offsetWidth; // 重启动画
+    el.classList.add('uc-flash');
+    setTimeout(() => el.classList.remove('uc-flash'), 900);
+  });
+}
+
+// 英雄榜输入框清空按钮显隐
+function updateCharArmoryClearBtn() {
+  const input = document.getElementById('charArmoryUrl');
+  const btn = document.getElementById('charArmoryUrlClear');
+  if (input && btn) btn.style.display = input.value ? 'block' : 'none';
+}
+
+// 清空英雄榜链接
+function clearCharArmoryUrl() {
+  const input = document.getElementById('charArmoryUrl');
+  if (input) input.value = '';
+  updateCharArmoryClearBtn();
+}
+
+let lastArmoryWarnValue = ''; // 同一未识别值只提示一次，避免打字过程刷屏
 // 解析英雄榜 URL 输入
 function parseArmoryUrlInput() {
   const url = document.getElementById('charArmoryUrl').value.trim();
-  if (!url) return;
-  
+  updateCharArmoryClearBtn();
+  if (!url) { lastArmoryWarnValue = ''; return; }
+
   const parsed = parseArmoryUrl(url);
-  if (parsed) {
-    if (parsed.characterName) document.getElementById('charName').value = parsed.characterName;
-    if (parsed.serverName) document.getElementById('charServer').value = parsed.serverName;
-    if (parsed.region) document.getElementById('charRegion').value = parsed.region;
+  if (!parsed || !parsed.characterName) {
+    // 仅对看似完整的链接提示一次，输入中间态不打扰
+    if (url.startsWith('http') && url.length >= 25 && lastArmoryWarnValue !== url) {
+      lastArmoryWarnValue = url;
+      showToast('未识别链接格式，请手动输入', 'warning');
+    }
+    return;
+  }
+  lastArmoryWarnValue = '';
+
+  if (parsed.characterName) document.getElementById('charName').value = parsed.characterName;
+  if (parsed.region) document.getElementById('charRegion').value = parsed.region;
+  let serverDisplay = '';
+  let serverKnown = true;
+  if (parsed.serverName) {
+    const mapped = mapArmoryServerName(parsed.serverName);
+    serverDisplay = mapped.name;
+    serverKnown = mapped.known;
+    document.getElementById('charServer').value = mapped.name;
+  }
+  flashParsedFields(['charName', 'charServer']);
+  if (parsed.serverName && !serverKnown) {
+    showToast(`已解析：${parsed.characterName} · ${serverDisplay}（服务器未收录，已保留原值，请手动核对）`, 'warning');
+  } else {
+    showToast(`已解析：${parsed.characterName} · ${serverDisplay || '未知服务器'}`, 'success');
+  }
+}
+
+// 任务书 #24-补丁③：职业变更时联动专精候选（数据源复用成员管理 getGameSpecs）
+function onCharClassChange() {
+  const cls = document.getElementById('charClass').value;
+  const list = document.getElementById('charSpecOptions');
+  if (!list) return;
+  const specs = cls ? getGameSpecs(cls) : [];
+  list.innerHTML = specs.map(s => `<option value="${s}"></option>`).join('');
+  const specInput = document.getElementById('charSpec');
+  if (specInput && specInput.value && specs.length && !specs.includes(specInput.value)) {
+    specInput.value = ''; // 换职业后旧专精失效，清空避免脏数据
   }
 }
 
@@ -834,7 +931,7 @@ async function saveCharacter() {
   };
   
   if (!characterData.character_name || !characterData.server_name) {
-    alert('请填写角色名称和服务器');
+    showToast('请填写角色名称和服务器', 'warning');
     return;
   }
 
@@ -845,7 +942,7 @@ async function saveCharacter() {
       c.server_name === characterData.server_name && c.character_name === characterData.character_name
     );
     if (dup) {
-      alert(`服务器「${characterData.server_name}」已存在同名角色「${characterData.character_name}」`);
+      showToast(`服务器「${characterData.server_name}」已存在同名角色「${characterData.character_name}」`, 'warning');
       return;
     }
   } catch (e) {
@@ -6345,6 +6442,34 @@ function lootFillAssignedTo(name) {
 // ==================== 初始化 ====================
 // ==================== 更新日志 ====================
 const changelogData = [
+  {
+    id: 'v3.2.0-task24-patch-fix',
+    version: 'v3.2.0',
+    date: '2026-08-05',
+    type: 'fix',
+    typeLabel: '修复BUG',
+    title: '用户中心「添加角色」：弹窗透明修复 + 英雄榜链接解析补强（REQ-077①②）',
+    summary: '添加角色弹窗内层容器此前没有任何背景样式导致整体透明，已补齐与全站弹窗一致的视觉；英雄榜链接粘贴后服务器英文 slug 自动映射为国服中文名（如 the-golden-plains→金色平原）。',
+    details: [
+      '弹窗透明根因：.modal-content 在样式表中零定义（仅用户中心弹窗族 2 处使用），补等效样式对齐公会设置弹窗，用户中心主弹窗 700px 宽度不受影响',
+      '英雄榜链接三种格式（hash 型 / character-profile 型 / 带 cn 区域段）粘贴即解析：角色名、服务器、区域自动回填并短暂高亮，附「已解析」提示',
+      '服务器映射以国服服务器清单为权威源，未收录的 slug 保留原值并提示手动核对；无法识别的链接提示「未识别链接格式，请手动输入」'
+    ]
+  },
+  {
+    id: 'v3.2.0-task24-patch-improve',
+    version: 'v3.2.0',
+    date: '2026-08-05',
+    type: 'improve',
+    typeLabel: '功能优化',
+    title: '「添加角色」表单体验：职业→专精联动 + 链接清空钮 + 校验改站内提示（REQ-077③）',
+    summary: '专精候选随所选职业自动联动（与成员管理同一数据源），英雄榜链接输入框新增一键清空按钮，保存校验不再弹出浏览器原生对话框。',
+    details: [
+      '选择职业后专精候选自动刷新；更换职业时已填的旧专精自动清空，避免脏数据',
+      '英雄榜链接占位示例改为真实格式（https://wow.blizzard.cn/character/#/the-golden-plains/角色名），输入内容后右侧出现 ✕ 一键清空',
+      '必填校验、同服同名查重提示统一为站内顶部消息条'
+    ]
+  },
   {
     id: 'v3.2.0-task24-wp2-fix',
     version: 'v3.2.0',
