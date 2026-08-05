@@ -190,6 +190,18 @@ function verifyToken(accessToken, callback) {
     req.destroy(err);
   });
 
+  // 任务书 #24 WP2：连接阶段硬截止——req.setTimeout 只在 socket 连接建立后生效，
+  // TCP connect + TLS 握手阶段无超时覆盖；从发起即计时 6s，到点 destroy socket（走统一超时处理）
+  const hardTimer = setTimeout(() => {
+    const err = new Error("verify token connect timeout");
+    err.code = "ETIMEDOUT";
+    req.destroy(err);
+  }, 6000);
+  const clearHard = () => clearTimeout(hardTimer);
+  req.on("response", clearHard);
+  req.on("error", clearHard);
+  req.on("close", clearHard);
+
   req.on("error", () => finish(null));
   req.end();
 }
@@ -250,6 +262,21 @@ function proxyToSupabase(method, supabasePath, headers, body, callback) {
     req.destroy(err);
   });
 
+  // 任务书 #24 WP2：连接阶段（TCP connect + TLS 握手）硬截止 8s，从发起即计时——
+  // req.setTimeout 只在连接建立后生效，连接阶段此前无超时覆盖（524 系列病的根）。
+  // 到点 destroy socket 并标记 connectPhase，错误处理据此返回「上游连接超时，请重试」——
+  // 连接阶段请求从未发出，重试安全（GET 幂等重试 1 次铁律不变；写操作禁重试铁律不变）。
+  const hardTimer = setTimeout(() => {
+    const err = new Error("upstream connect timeout");
+    err.code = "ETIMEDOUT";
+    err.connectPhase = true;
+    req.destroy(err);
+  }, 8000);
+  const clearHard = () => clearTimeout(hardTimer);
+  req.on("response", clearHard); // 已收到响应头 = 连接阶段结束，转由 req.setTimeout 覆盖在途阶段
+  req.on("error", clearHard);
+  req.on("close", clearHard);
+
   req.on("error", (err) => {
     const code = err && err.code;
     // 任务书 #17 M2：超时/ECONNRESET → 504 + 中文提示（errCode 供 supabaseRestGet 重试判定，M5）
@@ -257,7 +284,11 @@ function proxyToSupabase(method, supabasePath, headers, body, callback) {
       finish({
         statusCode: 504,
         headers: {},
-        body: JSON.stringify({ message: "数据库响应超时：本次写入结果未知，请先刷新列表确认，再决定是否重试" }),
+        body: JSON.stringify({
+          message: err && err.connectPhase
+            ? "上游连接超时，请重试" // 任务书 #24 WP2：连接阶段硬截止，请求未发出，可安全重试
+            : "数据库响应超时：本次写入结果未知，请先刷新列表确认，再决定是否重试",
+        }),
         errCode: code,
       });
     } else {
@@ -766,6 +797,17 @@ function wclHttpsRequest(options, body) {
       err.code = "WCL_TIMEOUT";
       req.destroy(err);
     });
+    // 任务书 #24 WP2：连接阶段（TCP connect + TLS 握手）硬截止 10s，从发起即计时——
+    // req.setTimeout 只在连接建立后生效；到点 destroy 走既有 WCL_TIMEOUT → 504 中文映射
+    const hardTimer = setTimeout(() => {
+      const err = new Error("连接阶段超时（10s）");
+      err.code = "WCL_TIMEOUT";
+      req.destroy(err);
+    }, 10000);
+    const clearHard = () => clearTimeout(hardTimer);
+    req.on("response", clearHard);
+    req.on("error", clearHard);
+    req.on("close", clearHard);
     if (body) req.write(body);
     req.end();
   });
@@ -1251,4 +1293,6 @@ module.exports = {
   authorizeRpcPayload,
   isPublicStaticFile,
   startServer,
+  // 任务书 #24 WP2：仅供注入测试（scripts/verify-task24-wp2.js）直连上游代理验证连接阶段硬截止
+  proxyToSupabase,
 };
