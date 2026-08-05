@@ -6346,6 +6346,19 @@ function lootFillAssignedTo(name) {
 // ==================== 更新日志 ====================
 const changelogData = [
   {
+    id: 'v3.2.0-task24-wp1-fix',
+    version: 'v3.2.0',
+    date: '2026-08-05',
+    type: 'fix',
+    typeLabel: '修复BUG',
+    title: '选装备后「掉落BOSS」自动回填（装备分配与心愿单两面板，BUG-013）',
+    summary: '从装备库（主数据）选定装备后，「掉落BOSS」按 掉落→BOSS 主数据链路精确回填，取代旧的延时文本模糊匹配；缺少 BOSS 数据时留空不报错。',
+    details: [
+      '与 REQ-063 赛季回填同一条解析链路，picker 条目携带 bossId 直查，不再靠 BOSS 名模糊包含匹配',
+      '内置库/历史引用回退路径用原 BOSS 名兜底，历史保底显示不受影响；赛季回填行为不回归'
+    ]
+  },
+  {
     id: 'v3.2.0-task23-patch2-fix',
     version: 'v3.2.0',
     date: '2026-08-05',
@@ -10513,7 +10526,7 @@ function getMasterLootItems() {
         items.push({
           id: l.id, name: l.item_name,
           raid: raid.name, raidName: raid.name, raidId: raid.id,
-          boss: boss.name, bossIndex: `${boss.boss_order}号`,
+          boss: boss.name, bossId: boss.id, bossIndex: `${boss.boss_order}号`,
           armorType: l.item_type || '', slot: l.slot || '',
           icon: '📦', quality: 'epic', itemLevel: '',
           stats: { primary: (l.primary_stats || []).join('/'), secondary: l.secondary_stats || [], primaryDetail: null, secondaryDetail: null },
@@ -10689,6 +10702,23 @@ function resolveItemDbSeasonName(item, raidName) {
   }
 }
 
+// BUG-013（任务书 #24 WP1）：按 REQ-063 同一解析链路 掉落(boss_loot)→BOSS(game_bosses) 推导掉落 BOSS 名。
+// 主数据路径用 item.bossId 直查 MasterData.getBosses(raidId)；无 bossId（内置库/历史回退路径）用 item.boss 兜底；
+// 链路缺数据时返回 ''（留空），不报错。
+function resolveItemDbBossName(item) {
+  try {
+    if (item && item.bossId && typeof MasterData !== 'undefined' && MasterData.getBosses) {
+      const bosses = MasterData.getBosses(item.raidId || '') || [];
+      const boss = bosses.find(b => b.id === item.bossId);
+      if (boss) return boss.name || '';
+    }
+    return (item && item.boss) || '';
+  } catch (e) {
+    console.warn('[BUG-013] BOSS 推导失败，按留空处理:', e);
+    return '';
+  }
+}
+
 // 装备分配-从装备库填充
 function lootFillFromItemDb(item) {
   document.getElementById('lootName').value = item.name;
@@ -10699,20 +10729,9 @@ function lootFillFromItemDb(item) {
   const raidSelect = document.getElementById('lootRaid');
   if (raidSelect) {
     raidSelect.value = raidName;
-    if (typeof lootOnRaidChange === 'function') {
-      lootOnRaidChange();
-      setTimeout(() => {
-        const bossSelect = document.getElementById('lootBoss');
-        if (bossSelect && bossSelect.style.display !== 'none') {
-          for (let i = 0; i < bossSelect.options.length; i++) {
-            if (bossSelect.options[i].text.includes(item.boss)) {
-              bossSelect.selectedIndex = i;
-              break;
-            }
-          }
-        }
-      }, 50);
-    }
+    // BUG-013（任务书 #24 WP1）：掉落BOSS 按 REQ-063 同链路精确回填（取代旧 setTimeout+文本模糊匹配）；
+    // lootUpdateBossOptions(selectedBoss) 精确值选中，缺 BOSS 数据时留空不报错
+    lootUpdateBossOptions(resolveItemDbBossName(item));
   }
   
   // 装备大类和部位映射（REQ-060 新类型词汇 → 大类）
@@ -10808,19 +10827,16 @@ function wishlistFillFromItemDb(selectedDbItem) {
     raidSelect.value = raidName;
     if (typeof wishlistOnRaidChange === 'function') {
       wishlistOnRaidChange();
-      // 等BOSS选项加载后选中
-      setTimeout(() => {
-        const bossSelect = document.getElementById('wishlistBoss');
-        if (bossSelect && bossSelect.style.display !== 'none') {
-          // 尝试匹配BOSS名称
-          for (let i = 0; i < bossSelect.options.length; i++) {
-            if (bossSelect.options[i].text.includes(selectedDbItem.boss)) {
-              bossSelect.selectedIndex = i;
-              break;
-            }
-          }
-        }
-      }, 50);
+      // BUG-013（任务书 #24 WP1）：掉落BOSS 按 REQ-063 同链路精确回填（取代旧 setTimeout+文本模糊匹配）；
+      // 无匹配选项/缺 BOSS 数据时留空不报错
+      const bossName = resolveItemDbBossName(selectedDbItem);
+      const bossSelect = document.getElementById('wishlistBoss');
+      const bossText = document.getElementById('wishlistBossText');
+      if (bossSelect && bossSelect.style.display !== 'none') {
+        bossSelect.value = bossName;
+      } else if (bossText && bossText.style.display !== 'none') {
+        bossText.value = bossName;
+      }
     }
   }
   
