@@ -6345,6 +6345,45 @@ function lootFillAssignedTo(name) {
 // ==================== 更新日志 ====================
 const changelogData = [
   {
+    id: 'v3.2.0-task23-patch-feature',
+    version: 'v3.2.0',
+    date: '2026-08-05',
+    type: 'feature',
+    typeLabel: '新增功能',
+    title: '公示页筛选补全：套装三维筛选 + 掉落池主/副属性标签筛选（REQ-074）',
+    summary: '数据公示页套装一览新增「职业/职责/专精」三维筛选；团本与大秘境掉落池新增主属性、副属性多标签筛选。',
+    details: [
+      '套装区：专精选项随职业联动，职责由专精推导（选职责=过滤出该职责全部专精的套装）',
+      '掉落池：主/副属性标签数据源为掉落的主副属性数组，多标签为 AND 关系，单选/组合/清空结果集与条件严格一致',
+      '大秘境「按 BOSS / 整体池」双视图下筛选均生效；赛季切换后全部筛选自动重置为默认'
+    ]
+  },
+  {
+    id: 'v3.2.0-task23-patch-improve',
+    version: 'v3.2.0',
+    date: '2026-08-05',
+    type: 'improve',
+    typeLabel: '功能优化',
+    title: '公示页套装一览排序定稿：先按职业、再按专精',
+    summary: '套装卡片不再乱序混排——同一职业的全部专精连续排完才进入下一个职业，顺序与游戏字典的职业/专精排序全站统一。',
+    details: [
+      '职业顺序取 game_classes.class_key，专精顺序取 game_specs.spec_key，公示页不另造顺序'
+    ]
+  },
+  {
+    id: 'v3.2.0-task23-patch-fix',
+    version: 'v3.2.0',
+    date: '2026-08-05',
+    type: 'fix',
+    typeLabel: '修复BUG',
+    title: '公示页套装徽标防重叠 + 首页/公示页 HTML 缓存补洞',
+    summary: '套装卡片 2件/4件 徽标与长效果文本改为独立占位，长文本不再挤压重叠；index.html/data.html 外壳补 Cache-Control: no-cache，杜绝浏览器启发式缓存旧首页导致版本串机制失效。',
+    details: [
+      '徽标固定不压缩独立列，正文独占剩余宽度，全部套装卡片零重叠零溢出',
+      'HTML 文档每次回源校验，配合 Last-Modified 新鲜则 304 不重传；带 ?v= 的 js/css 缓存策略维持不变'
+    ]
+  },
+  {
     id: 'v3.2.0-task21-patchB-improve',
     version: 'v3.2.0',
     date: '2026-08-05',

@@ -41,6 +41,33 @@
 .dp-filterbar .search-input { flex: 1; min-width: 200px; }
 .dp-filterbar .form-select { width: 150px; }
 
+/* 任务书 #23-补丁：主/副属性标签 chips（多选 AND） */
+.dp-chip-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; width: 100%; }
+.dp-chip-label { font-size: 12px; color: var(--text-muted); flex-shrink: 0; }
+.dp-chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.dp-chip {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 10px;
+  border-radius: 11px;
+  border: 1px solid var(--border-color);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+  user-select: none;
+}
+.dp-chip.active {
+  border-color: var(--gold);
+  color: var(--gold);
+  background: rgba(240, 192, 96, 0.1);
+}
+
+/* 任务书 #23-补丁 修正项②：套装三维筛选条 */
+.dp-tier-filters { display: flex; gap: 8px; flex-wrap: wrap; }
+.dp-tier-filters .form-select { width: 130px; height: 28px; padding: 0 8px; font-size: 12px; }
+
 .dp-main {
   max-width: 1100px;
   margin: 0 auto;
@@ -166,7 +193,10 @@
 .dp-tier-icon { width: 18px; height: 18px; border-radius: 3px; }
 .dp-tier-class { font-size: 13px; font-weight: 600; color: var(--cc, var(--text-primary)); }
 .dp-tier-name { font-size: 12px; color: var(--text-secondary); }
-.dp-tier-bonus { font-size: 12px; color: var(--text-secondary); margin-top: 4px; display: flex; gap: 6px; align-items: baseline; }
+/* 修正项④（任务书 #23-补丁）：徽标固定不压缩独立占位，长文本独占剩余宽度，杜绝重叠/挤压 */
+.dp-tier-bonus { font-size: 12px; color: var(--text-secondary); margin-top: 4px; display: flex; gap: 6px; align-items: flex-start; }
+.dp-tier-bonus .dp-tag { flex-shrink: 0; margin-top: 1px; }
+.dp-tier-bonus-text { flex: 1; min-width: 0; }
 
 .dp-empty {
   text-align: center;

@@ -951,18 +951,40 @@ async function handleWclRequest(req, res, corsHeaders, withSnapshot) {
   }
 }
 
-function serveFile(res, filePath) {
+function serveFile(res, filePath, req) {
   const ext = path.extname(filePath).toLowerCase();
   const contentType = MIME[ext] || "application/octet-stream";
+  // 任务书 #23-补丁 修正项⑤：.html 文档（含 / 根路径映射的 index.html）统一加
+  // Cache-Control: no-cache——每次回源校验，配合 Last-Modified / If-Modified-Since
+  // 新鲜则 304 不重传，兼顾性能；带 ?v= 的 js/css 等静态资源维持现状不动。
+  const isHtml = ext === ".html";
 
-  fs.readFile(filePath, (err, data) => {
-    if (err) {
+  fs.stat(filePath, (serr, stats) => {
+    if (serr || !stats.isFile()) {
       res.writeHead(404, { "Content-Type": "text/plain" });
       res.end("Not Found");
       return;
     }
-    res.writeHead(200, { "Content-Type": contentType });
-    res.end(data);
+    const headers = { "Content-Type": contentType };
+    if (isHtml) {
+      headers["Cache-Control"] = "no-cache";
+      headers["Last-Modified"] = stats.mtime.toUTCString();
+      const ims = req && req.headers["if-modified-since"];
+      if (ims && !Number.isNaN(Date.parse(ims)) && Date.parse(ims) >= Math.floor(stats.mtimeMs / 1000) * 1000) {
+        res.writeHead(304, headers);
+        res.end();
+        return;
+      }
+    }
+    fs.readFile(filePath, (err, data) => {
+      if (err) {
+        res.writeHead(404, { "Content-Type": "text/plain" });
+        res.end("Not Found");
+        return;
+      }
+      res.writeHead(200, headers);
+      res.end(data);
+    });
   });
 }
 
@@ -1212,7 +1234,7 @@ const server = http.createServer(async (req, res) => {
       res.end("Not Found");
       return;
     }
-    serveFile(res, filePath);
+    serveFile(res, filePath, req);
   });
 });
 
