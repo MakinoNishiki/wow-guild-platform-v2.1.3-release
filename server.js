@@ -6,7 +6,8 @@ const path = require("path");
 const { execSync } = require("child_process");
 
 const ROOT = __dirname;
-const PUBLIC_STATIC_FILES = new Set([path.join(ROOT, "index.html")]);
+// 任务书 #23 WP2：data.html 数据公示页（免登录公开页，与 index.html 同级放行）
+const PUBLIC_STATIC_FILES = new Set([path.join(ROOT, "index.html"), path.join(ROOT, "data.html")]);
 const PUBLIC_STATIC_ROOTS = ["assets", "css", "js"].map(
   (dir) => `${path.join(ROOT, dir)}${path.sep}`
 );

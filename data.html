@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>数据公示 · 魔兽管家</title>
+<!-- 静态资源版本号与 index.html 同步递增（开发规范第五章第 6 条）：20260805.4 -->
+<link rel="icon" type="image/png" sizes="32x32" href="assets/brand/favicon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="assets/brand/favicon-16.png">
+<link rel="stylesheet" href="css/main.css?v=20260805.4">
+<link rel="stylesheet" href="css/data-public.css?v=20260805.4">
+<script src="assets/vendor/supabase-js-2.js?v=20260805.4"></script>
+<script src="js/iconMap.js?v=20260805.4"></script>
+</head>
+<body class="data-public-body">
+  <!-- 任务书 #23 WP2：数据公示页（免登录公开，anon 直连 PostgREST，只读） -->
+  <header class="dp-header">
+    <div class="dp-brand">
+      <img src="assets/brand/logo_B_64.png" alt="魔兽管家" class="dp-logo">
+      <div>
+        <div class="dp-title">数据公示</div>
+        <div class="dp-subtitle">魔兽管家 WoW Butler · 团本 / 大秘境掉落池与套装一览</div>
+      </div>
+    </div>
+    <div class="dp-season">
+      <label for="dpSeasonSelect">赛季</label>
+      <select id="dpSeasonSelect" class="form-select"></select>
+    </div>
+  </header>
+
+  <div class="dp-filterbar">
+    <input type="text" id="dpSearch" class="search-input" placeholder="搜索装备名…">
+    <select id="dpSlotFilter" class="form-select"><option value="">全部部位</option></select>
+    <select id="dpTypeFilter" class="form-select"><option value="">全部类型</option></select>
+  </div>
+
+  <main class="dp-main" id="dpMain">
+    <div class="dp-loading">数据加载中…</div>
+  </main>
+
+  <footer class="dp-footer">数据来源：魔兽管家数据中心 · 只读公示，由运营维护</footer>
+
+  <script src="js/dataPublic.js?v=20260805.4"></script>
+</body>
+</html>
