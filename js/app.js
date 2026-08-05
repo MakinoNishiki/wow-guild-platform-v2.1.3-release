@@ -1317,6 +1317,12 @@ async function openGuildSettings() {
     claimerEl.checked = guild.show_claimer_label !== false;
     claimerEl.disabled = !profileOwner;
   }
+  // 任务书 #21 WP2：认领方式三档（仅 owner 可改；列未迁移时按 free 展示）
+  const claimModeEl = document.getElementById('guildClaimMode');
+  if (claimModeEl) {
+    claimModeEl.value = guild.claim_mode || 'free';
+    claimModeEl.disabled = !profileOwner;
+  }
   document.getElementById('guildProfileSaveBtn').style.display = profileOwner ? '' : 'none';
   document.getElementById('guildProfileOwnerHint').style.display = profileOwner ? 'none' : '';
   toggleGuildProfileCustomHint();
@@ -1348,9 +1354,14 @@ async function saveGuildProfile() {
       loot_rule_type: lootRuleType || null,
       loot_rule_text: lootRuleText || null,
       // 任务书 #18 WP2 R4：认领人标签开关（列不存在时服务端会报错，由迁移 sql/14 解锁）
-      show_claimer_label: document.getElementById('guildShowClaimerLabel') ? document.getElementById('guildShowClaimerLabel').checked : true
+      show_claimer_label: document.getElementById('guildShowClaimerLabel') ? document.getElementById('guildShowClaimerLabel').checked : true,
+      // 任务书 #21 WP2：认领方式三档（列不存在时服务端会报错，由迁移 sql/15 解锁）
+      claim_mode: document.getElementById('guildClaimMode') ? document.getElementById('guildClaimMode').value : 'free'
     });
     showToast('公会资料已保存', 'success');
+    // 认领方式变更影响成员列表认领入口与审核区块，即时重渲染
+    renderMembers();
+    renderClaimReviewBlock();
   } catch (e) {
     showToast('保存失败: ' + e.message, 'error');
   }
@@ -1829,11 +1840,14 @@ const modalDirtyChecks = {
   guildSettingsModal: () => {
     const g = (window.CloudSync && window.CloudSync.getCurrentGuild()) || {};
     const claimerEl = document.getElementById('guildShowClaimerLabel');
+    const claimModeEl = document.getElementById('guildClaimMode');
     return document.getElementById('guildProfileDesc').value !== (g.description || '') ||
       document.getElementById('guildProfileLootRuleType').value !== (g.loot_rule_type || '') ||
       document.getElementById('guildProfileLootRuleText').value !== (g.loot_rule_text || '') ||
       // 任务书 #18 WP2 R4：认领人标签开关同样纳入未保存判定（默认开）
-      (claimerEl && claimerEl.checked !== (g.show_claimer_label !== false));
+      (claimerEl && claimerEl.checked !== (g.show_claimer_label !== false)) ||
+      // 任务书 #21 WP2：认领方式三档纳入未保存判定（默认 free）
+      (claimModeEl && claimModeEl.value !== (g.claim_mode || 'free'));
   }
 };
 
@@ -2070,6 +2084,146 @@ async function ensureClaimerNamesAsync() {
   }
 }
 
+// ==================== 任务书 #21 WP2：认领治理三档 ====================
+
+// 当前公会认领方式（claim_mode 列未迁移时按 free，不改变现状）
+function getClaimMode() {
+  const g = window.CloudSync.getCurrentGuild();
+  return (g && g.claim_mode) || 'free';
+}
+
+// 我的 pending 认领申请（approval 模式下成员行显示「认领审核中」）；按公会缓存
+const myClaimRequests = { guildId: null, memberIds: new Set(), loading: false };
+
+function ensureMyClaimRequests() {
+  const g = window.CloudSync.getCurrentGuild();
+  if (!g || getClaimMode() !== 'approval') return;
+  if (myClaimRequests.loading || myClaimRequests.guildId === g.id) return;
+  myClaimRequests.loading = true;
+  window.CloudSync.getMyPendingClaimRequests()
+    .then(rows => {
+      // 切公会竞态：以当前公会为准
+      const cur = window.CloudSync.getCurrentGuild();
+      if (!cur || cur.id !== g.id) return;
+      myClaimRequests.guildId = g.id;
+      myClaimRequests.memberIds = new Set((rows || []).map(r => r.member_id));
+    })
+    .catch(e => console.error('我的认领申请加载失败:', e))
+    .finally(() => {
+      myClaimRequests.loading = false;
+      renderMembers();
+    });
+}
+
+// owner/editor 审批列表缓存（approval 模式下成员管理顶部审核区块）
+const guildClaimRequests = { guildId: null, rows: null, loading: false };
+
+function ensureGuildClaimRequests() {
+  const g = window.CloudSync.getCurrentGuild();
+  if (!g || getClaimMode() !== 'approval' || !window.CloudSync.canEdit()) return;
+  if (guildClaimRequests.loading || guildClaimRequests.guildId === g.id) return;
+  guildClaimRequests.loading = true;
+  window.CloudSync.getGuildPendingClaimRequests()
+    .then(rows => {
+      const cur = window.CloudSync.getCurrentGuild();
+      if (!cur || cur.id !== g.id) return;
+      guildClaimRequests.guildId = g.id;
+      guildClaimRequests.rows = rows || [];
+    })
+    .catch(e => console.error('认领审核列表加载失败:', e))
+    .finally(() => {
+      guildClaimRequests.loading = false;
+      renderClaimReviewBlock();
+    });
+}
+
+// 审批/申请动作后统一刷新：审批列表 + 我的申请 + 成员表 + 审核区块
+async function reloadClaimGovernance() {
+  const g = window.CloudSync.getCurrentGuild();
+  if (!g) return;
+  guildClaimRequests.guildId = null;
+  myClaimRequests.guildId = null;
+  try {
+    if (window.CloudSync.canEdit()) {
+      guildClaimRequests.rows = await window.CloudSync.getGuildPendingClaimRequests();
+      guildClaimRequests.guildId = g.id;
+    }
+    const mine = await window.CloudSync.getMyPendingClaimRequests();
+    myClaimRequests.memberIds = new Set((mine || []).map(r => r.member_id));
+    myClaimRequests.guildId = g.id;
+  } catch (e) {
+    console.error('认领治理状态刷新失败:', e);
+  }
+  renderClaimReviewBlock();
+  renderMembers();
+}
+
+// 认领审核区块（仅 approval 模式 + owner/editor + 有待审申请时显示）
+function renderClaimReviewBlock() {
+  const el = document.getElementById('claimReviewBlock');
+  if (!el) return;
+  const rows = (getClaimMode() === 'approval' && window.CloudSync.canEdit() && guildClaimRequests.rows) || [];
+  if (!rows.length) { el.style.display = 'none'; el.innerHTML = ''; return; }
+  ensureClaimerNames();
+  el.style.display = '';
+  el.innerHTML = `
+    <div class="claim-review-head">认领审核 <span class="tag tag-yellow">${rows.length} 待审</span></div>
+    ${rows.map(r => {
+      const m = (appData.members || []).find(x => x.id === r.member_id);
+      const applicant = (claimerNames.map && claimerNames.map.get(r.user_id)) || '（已退会用户）';
+      return `<div class="claim-review-row">
+        <span class="claim-review-text"><b>${applicant}</b> 申请认领 <b>${m ? m.name : '（成员已删除）'}</b></span>
+        <span class="claim-review-actions">
+          <button class="btn btn-sm btn-primary" onclick="approveClaimRequest('${r.id}')">批准</button>
+          <button class="btn btn-sm btn-danger" onclick="rejectClaimRequest('${r.id}')">拒绝</button>
+        </span>
+      </div>`;
+    }).join('')}`;
+}
+
+// 批准认领：并发护栏——批准前重查成员最新认领态，已被抢则明确报错不覆盖
+async function approveClaimRequest(requestId) {
+  const r = (guildClaimRequests.rows || []).find(x => x.id === requestId);
+  if (!r) return;
+  const g = window.CloudSync.getCurrentGuild();
+  try {
+    const fresh = await window.CloudSync.getRaidMemberClaimState(r.member_id);
+    if (fresh && fresh.user_id) {
+      showToast('批准失败：该角色刚已被认领，未覆盖。请核实后处理该申请', 'error');
+      await reloadClaimGovernance();
+      return;
+    }
+    await window.CloudSync.setRaidMemberClaim(r.member_id, r.user_id);
+    await window.CloudSync.resolveClaimRequest(requestId, 'approved');
+    const m = (appData.members || []).find(x => x.id === r.member_id);
+    await window.CloudSync.createClaimResultNotification(g.id, r.user_id, m ? m.name : '该角色', true);
+    await window.CloudSync.reloadData('members');
+    saveData();
+    await reloadClaimGovernance();
+    showToast(`已批准：${m ? m.name : '该角色'} 的认领`, 'success');
+  } catch (e) {
+    console.error('批准认领失败:', e);
+    showToast('批准失败: ' + (e.message || '未知错误'), 'error');
+  }
+}
+
+// 拒绝认领申请
+async function rejectClaimRequest(requestId) {
+  const r = (guildClaimRequests.rows || []).find(x => x.id === requestId);
+  if (!r) return;
+  const g = window.CloudSync.getCurrentGuild();
+  try {
+    await window.CloudSync.resolveClaimRequest(requestId, 'rejected');
+    const m = (appData.members || []).find(x => x.id === r.member_id);
+    await window.CloudSync.createClaimResultNotification(g.id, r.user_id, m ? m.name : '该角色', false);
+    await reloadClaimGovernance();
+    showToast('已拒绝该认领申请', 'success');
+  } catch (e) {
+    console.error('拒绝认领失败:', e);
+    showToast('拒绝失败: ' + (e.message || '未知错误'), 'error');
+  }
+}
+
 // 任务书 #18 WP2 R4：认领人小字标签（公会开关 show_claimer_label 关闭时不渲染；
 // 成员找不到时不渲染——历史装备的成员可能已被彻底删除，无法判定认领态）
 function claimerLabelHtml(member) {
@@ -2088,6 +2242,13 @@ function renderMembers() {
   const classFilter = document.getElementById('classFilter').value;
   // 任务书 #18 WP2：认领/解除认领按钮按当前用户判定
   const currentUserId = (window.CloudSync.getCachedUser() || {}).id || null;
+  // 任务书 #21 WP2：认领治理三档——approval 模式加载申请状态（我的申请 + 审批列表）
+  const claimMode = getClaimMode();
+  if (claimMode === 'approval') {
+    ensureMyClaimRequests();
+    ensureGuildClaimRequests();
+  }
+  const canEditMembers = window.CloudSync.canEdit();
   
   // 职责过滤：获取所有勾选的职责
   const roleCheckboxes = document.querySelectorAll('#roleFilter input[type="checkbox"]:checked');
@@ -2169,7 +2330,11 @@ function renderMembers() {
           </div>
           <div class="claim-btns">
             ${!m.user_id
-              ? `<button class="tag tag-grey claim-pending-btn" onclick="claimMember('${m.id}')">待认领</button>`
+              ? (claimMode === 'approval' && myClaimRequests.memberIds.has(m.id)
+                ? '<span class="tag tag-yellow">认领审核中</span>'
+                : (claimMode === 'assign' && !canEditMembers
+                  ? '<span class="tag tag-grey" title="本公会由管理者统一分配认领">待认领</span>'
+                  : `<button class="tag tag-grey claim-pending-btn" onclick="claimMember('${m.id}')">待认领</button>`))
               : (currentUserId && m.user_id === currentUserId
                 ? `<button class="icon-btn" onclick="unclaimMember('${m.id}')" title="解除认领">🔓</button>`
                 : claimerLabelHtml(m))}
@@ -2643,12 +2808,22 @@ function claimMember(id) {
   const me = window.CloudSync.getCachedUser();
   if (!member || !me) return;
   if (member.user_id) { showToast('该角色已被认领', 'error'); return; }
+  // 任务书 #21 WP2：assign 模式 viewer 无认领入口（按钮已隐藏，此处为兜底守卫）
+  const mode = getClaimMode();
+  if (mode === 'assign' && !window.CloudSync.canEdit()) {
+    showToast('本公会由管理者统一分配认领', 'error');
+    return;
+  }
   pendingClaimMemberId = id;
   document.getElementById('claimConfirmName').textContent = member.name;
+  // approval 模式：确认即提交申请，按钮与说明随模式切换
+  const approvalNote = document.getElementById('claimConfirmApprovalNote');
+  if (approvalNote) approvalNote.style.display = mode === 'approval' ? '' : 'none';
+  document.getElementById('claimConfirmBtn').textContent = mode === 'approval' ? '提交认领申请' : '确认认领';
   openModal('claimConfirmModal');
 }
 
-// 认领确认弹窗「确认认领」：执行实际认领写入
+// 认领确认弹窗「确认认领/提交认领申请」：free 直接认领；approval 生成认领申请待审核
 async function confirmClaimMember() {
   const id = pendingClaimMemberId;
   const member = appData.members.find(m => m.id === id);
@@ -2657,6 +2832,15 @@ async function confirmClaimMember() {
   const btn = document.getElementById('claimConfirmBtn');
   if (btn) btn.disabled = true;
   try {
+    if (getClaimMode() === 'approval') {
+      // 任务书 #21 WP2：approval 不直写 raid_members，生成申请（server.js 窄例外）
+      const g = window.CloudSync.getCurrentGuild();
+      await window.CloudSync.insertClaimRequest(g.id, id, me.id);
+      closeModal('claimConfirmModal');
+      await reloadClaimGovernance();
+      showToast(`认领申请已提交：${member.name}，等待管理审核`, 'success');
+      return;
+    }
     await window.CloudSync.setRaidMemberClaim(id, me.id);
     await window.CloudSync.reloadData('members');
     saveData();
@@ -6085,6 +6269,22 @@ function lootFillAssignedTo(name) {
 // ==================== 初始化 ====================
 // ==================== 更新日志 ====================
 const changelogData = [
+  {
+    id: 'v3.2.0-task21-wp2-feature',
+    version: 'v3.2.0',
+    date: '2026-08-05',
+    type: 'feature',
+    typeLabel: '新增功能',
+    title: '认领治理三档公会开关（REQ-067）',
+    summary: '公会可自选认领方式：自由认领 / 认领需审核 / 仅管理者分配，仅会长可改。',
+    details: [
+      '自由认领（默认）：维持现状，成员自助认领先到先得，存量公会不受影响',
+      '认领需审核：成员提交认领申请后显示「认领审核中」，管理者在成员管理顶部审核区块批准或拒绝，审批结果通知申请人；批准瞬间若角色已被抢领会明确报错不覆盖',
+      '仅管理者分配：成员无自助认领入口（hover 可见归属说明），由管理者在编辑成员时统一指定',
+      '服务端代理同步升级：审核/分配模式下 viewer 直写认领一律拦截；认领申请仅放行本人、未认领成员、审核模式公会，同一角色仅允许一条待审申请',
+      '需先执行数据库增量迁移（sql/15）后生效'
+    ]
+  },
   {
     id: 'v3.2.0-task21-wp1-fix',
     version: 'v3.2.0',

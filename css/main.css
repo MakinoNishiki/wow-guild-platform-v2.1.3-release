@@ -3941,6 +3941,36 @@ body.viewer-mode #memberSelectAll {
   background: rgba(240, 192, 96, 0.08);
 }
 
+/* 任务书 #21 WP2：认领审核区块（approval 模式，成员管理顶部） */
+.claim-review-card {
+  margin: 0 16px 12px;
+  padding: 12px 14px;
+  border: 1px solid rgba(210, 153, 34, 0.4);
+  border-radius: 8px;
+  background: rgba(210, 153, 34, 0.06);
+}
+.claim-review-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 8px;
+}
+.claim-review-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 0;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+.claim-review-row + .claim-review-row { border-top: 1px solid rgba(139, 148, 158, 0.15); }
+.claim-review-text b { color: var(--text-primary); }
+.claim-review-actions { display: flex; gap: 8px; flex-shrink: 0; }
+
 /* 既有 .badge 统一到标签规范尺寸（圆角 10px→5px，inline-flex 对齐图标） */
 .badge {
   display: inline-flex;

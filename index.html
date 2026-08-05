@@ -227,6 +227,8 @@
               <div class="card-subtitle">管理所有团队成员信息</div>
             </div>
           </div>
+          <!-- 任务书 #21 WP2：认领审核区块（approval 模式 + owner/editor + 有待审申请时由 renderClaimReviewBlock 显示） -->
+          <div id="claimReviewBlock" class="claim-review-card" style="display:none"></div>
           <div class="toolbar">
             <div class="toolbar-left">
               <input type="text" class="search-input" placeholder="搜索角色名、职业..." id="memberSearch" oninput="renderMembers()">
@@ -755,6 +757,8 @@
         <p style="margin:0">· 绑定后，该角色的出勤率、装备、心愿会聚合到「用户中心 → 我的认领」；</p>
         <p style="margin:0">· 会长/管理（owner/editor）可以随时调整或解除认领；</p>
         <p style="margin:0">· 领错了可以自己「解除认领」，或找管理处理。</p>
+        <!-- 任务书 #21 WP2：approval 模式追加说明（claimMember 按模式显隐） -->
+        <p id="claimConfirmApprovalNote" style="margin:8px 0 0;color:var(--warning);display:none">· 本公会认领需管理审核：确认后将提交认领申请，批准后才生效。</p>
       </div>
     </div>
     <div class="modal-footer">
@@ -1518,6 +1522,16 @@
             <label class="att-filter-toggle"><input type="checkbox" id="guildShowClaimerLabel"> 显示角色认领人标签（心愿单/装备分配列表）</label>
             <!-- 任务书 #21 WP1-③：开关用途说明 -->
             <div style="font-size:12px;color:var(--text-muted);margin-top:4px">控制心愿单与装备分配列表里是否显示每个角色背后的认领人；关闭后仅管理者在成员管理中可见认领状态。</div>
+          </div>
+          <!-- 任务书 #21 WP2：认领方式三档（仅 owner 可改；存量公会默认 free） -->
+          <div class="form-group" style="margin-top:12px;margin-bottom:0">
+            <label class="form-label">认领方式</label>
+            <select class="form-select" id="guildClaimMode">
+              <option value="free">自由认领（默认）</option>
+              <option value="approval">认领需审核</option>
+              <option value="assign">仅管理者分配</option>
+            </select>
+            <div style="font-size:12px;color:var(--text-muted);margin-top:4px">自由认领：成员可自助认领未被认领的角色，先到先得；认领需审核：成员提交申请，管理者在成员管理顶部批准后生效；仅管理者分配：成员不可自助认领，由管理者在编辑成员时指定。切换不影响已存在的认领。</div>
           </div>
           <div id="guildProfileOwnerHint" style="font-size:12px;color:var(--text-muted);display:none;margin-top:8px">仅会长可编辑公会资料</div>
         </div>

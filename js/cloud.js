@@ -1025,6 +1025,83 @@
     await dbUpdate('raid_members', { user_id: null }, { id: memberId });
   }
 
+  // ==================== 任务书 #21 WP2：认领治理（approval 模式申请 / 审批） ====================
+
+  // viewer 提交认领申请（server.js 窄例外：单行、字段 ⊆ 三件套、本人、成员未认领、公会 approval 才放行）
+  async function insertClaimRequest(guildId, memberId, userId) {
+    await dbInsert('claim_requests', { guild_id: guildId, member_id: memberId, user_id: userId });
+  }
+
+  // 我在当前公会的 pending 申请（成员行「认领审核中」用；RLS：申请人读自己的）
+  async function getMyPendingClaimRequests() {
+    if (!supabaseClient || !currentGuild || !currentUser) return [];
+    const { data, error } = await supabaseClient
+      .from('claim_requests')
+      .select('id, member_id')
+      .eq('guild_id', currentGuild.id)
+      .eq('user_id', currentUser.id)
+      .eq('status', 'pending');
+    if (error) throw error;
+    return data || [];
+  }
+
+  // 本公会全部 pending 申请（owner/editor 审批区块用；RLS：owner/editor 读本公会）
+  async function getGuildPendingClaimRequests() {
+    if (!supabaseClient || !currentGuild) return [];
+    const { data, error } = await supabaseClient
+      .from('claim_requests')
+      .select('id, member_id, user_id, created_at')
+      .eq('guild_id', currentGuild.id)
+      .eq('status', 'pending')
+      .order('created_at', { ascending: true });
+    if (error) throw error;
+    return data || [];
+  }
+
+  // 批准/拒绝申请（owner/editor，走代理通用业务分支）
+  async function resolveClaimRequest(id, status) {
+    await dbUpdate('claim_requests', {
+      status: status,
+      resolved_by: currentUser.id,
+      resolved_at: new Date().toISOString(),
+    }, { id });
+  }
+
+  // viewer 撤回自己 pending 的申请（server.js 窄例外：单行、本人、pending）
+  async function deleteClaimRequest(id) {
+    await dbDelete('claim_requests', { id });
+  }
+
+  // 批准前并发护栏：直读成员最新认领态（RLS 公会成员可读）
+  async function getRaidMemberClaimState(memberId) {
+    if (!supabaseClient) return null;
+    const { data, error } = await supabaseClient
+      .from('raid_members')
+      .select('id, user_id')
+      .eq('id', memberId)
+      .maybeSingle();
+    if (error) throw error;
+    return data;
+  }
+
+  // 审批结果通知申请人（复用 notifications 表 + 既有未读数 RPC）
+  async function createClaimResultNotification(guildId, userId, memberName, approved) {
+    try {
+      await dbInsert('notifications', {
+        user_id: userId,
+        type: 'claim_result',
+        title: approved ? '认领申请已通过' : '认领申请被拒绝',
+        message: approved
+          ? `你申请认领「${memberName}」已通过，角色已绑定到你的账号`
+          : `你申请认领「${memberName}」被管理拒绝，如有疑问请联系会长`,
+        guild_id: guildId,
+        related_user_id: currentUser.id,
+      });
+    } catch (e) {
+      console.error('创建认领结果通知失败:', e);
+    }
+  }
+
   // ---- 公会成员管理 (SELECT 走 Supabase, 写入走代理) ----
   async function getGuildMembers() {    if (!supabaseClient || !currentGuild) return [];
     const { data, error } = await supabaseClient
@@ -1459,6 +1536,14 @@
     getGuildMembers: getGuildMembers,
     setRaidMemberClaim: setRaidMemberClaim,
     unclaimRaidMember: unclaimRaidMember,
+    // 任务书 #21 WP2：认领治理（approval 模式申请/审批/通知）
+    insertClaimRequest: insertClaimRequest,
+    getMyPendingClaimRequests: getMyPendingClaimRequests,
+    getGuildPendingClaimRequests: getGuildPendingClaimRequests,
+    resolveClaimRequest: resolveClaimRequest,
+    deleteClaimRequest: deleteClaimRequest,
+    getRaidMemberClaimState: getRaidMemberClaimState,
+    createClaimResultNotification: createClaimResultNotification,
     updateMemberRole: updateMemberRole,
     removeGuildMember: removeGuildMember,
     clearCurrentGuild: clearCurrentGuild,

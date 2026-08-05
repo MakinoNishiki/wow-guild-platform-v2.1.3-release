@@ -478,7 +478,7 @@ async function resolveGuildIds(table, filters, rows) {
   }
 
   // 4. 仅按 id 过滤（PATCH/DELETE）：查行取 guild_id
-  if (filters.id && ["raid_members", "activities", "loot_records", "wishlists"].includes(table)) {
+  if (filters.id && ["raid_members", "activities", "loot_records", "wishlists", "claim_requests"].includes(table)) {
     for (const rowId of filters.id) {
       const { body } = await supabaseRestGet(`/rest/v1/${table}?id=eq.${rowId}&select=guild_id&limit=1`);
       if (Array.isArray(body) && body[0]) add(body[0].guild_id);
@@ -630,24 +630,64 @@ async function authorizeProxyRequest(user, table, method, queryString, rawBody) 
   // 放行条件（任一）：
   //   认领：user_id 改为当前用户本人 且 目标行未被认领（防抢）；
   //   解绑：user_id 清空 且 目标行当前认领人是本人（只能解自己的）。
+  // 任务书 #21 WP2：认领放行前多读一行 guilds.claim_mode——
+  //   free 走现状；assign 拒绝；approval 不直写 raid_members（转 claim_requests 申请通道）。
+  //   解绑自己已认领的角色不受模式限制。claim_mode 列未迁移时按 free（不改变现状）。
   if (table === "raid_members" && method === "PATCH") {
     const claimIds = filters.id || [];
     const onlyUserIdField =
       rows.length > 0 &&
       rows.every((r) => r && "user_id" in r && Object.keys(r).every((k) => k === "user_id"));
     if (claimIds.length === 1 && onlyUserIdField) {
-      const target = await fetchRowById("raid_members", claimIds[0], "user_id");
+      const target = await fetchRowById("raid_members", claimIds[0], "user_id,guild_id");
       if (target) {
         const newVal = rows[0].user_id;
         const isSelfClaim = newVal === uid && target.user_id === null;
         const isSelfUnclaim = newVal === null && target.user_id === uid;
-        if (isSelfClaim || isSelfUnclaim) return { ok: true };
+        if (isSelfUnclaim) return { ok: true };
+        if (isSelfClaim) {
+          const g = await fetchRowById("guilds", target.guild_id, "claim_mode");
+          const mode = (g && g.claim_mode) || "free";
+          if (mode === "assign") return deny("本公会由管理者统一分配认领");
+          if (mode === "approval") return deny("本公会认领需审核，请提交认领申请");
+          return { ok: true };
+        }
       }
     }
   }
 
-  // ---- 公会业务表：raid_members / activities / activity_attendance / loot_records / wishlists ----
-  if (["raid_members", "activities", "activity_attendance", "loot_records", "wishlists"].includes(table)) {
+  // ---- 任务书 #21 WP2：approval 模式认领申请 窄例外 ----
+  // viewer 可 INSERT claim_requests，全部满足才放行，不满足落通用分支（owner/editor 权力原样）：
+  //   单行；请求体字段 ⊆ {guild_id, member_id, user_id} 且三字段齐全；user_id=本人；
+  //   目标成员属于该公会且当前未认领；所在公会 claim_mode='approval'。
+  if (table === "claim_requests" && method === "POST") {
+    const applyKeys = ["guild_id", "member_id", "user_id"];
+    const isApplyShape =
+      rows.length === 1 && rows[0] &&
+      applyKeys.every((k) => rows[0][k]) &&
+      Object.keys(rows[0]).every((k) => applyKeys.includes(k));
+    if (isApplyShape && rows[0].user_id === uid) {
+      const member = await fetchRowById("raid_members", rows[0].member_id, "guild_id,user_id");
+      if (member && member.guild_id === rows[0].guild_id && member.user_id === null) {
+        const g = await fetchRowById("guilds", rows[0].guild_id, "claim_mode");
+        if (g && g.claim_mode === "approval") return { ok: true };
+      }
+    }
+  }
+
+  // ---- 任务书 #21 WP2：viewer 撤回自己 pending 的申请（DELETE 单行、本人、pending）----
+  if (table === "claim_requests" && method === "DELETE") {
+    const ids = filters.id || [];
+    if (ids.length === 1) {
+      const row = await fetchRowById("claim_requests", ids[0], "user_id,status");
+      if (row && row.user_id === uid && row.status === "pending") return { ok: true };
+    }
+  }
+
+  // ---- 公会业务表：raid_members / activities / activity_attendance / loot_records / wishlists / claim_requests ----
+  // claim_requests（任务书 #21 WP2）：owner/editor 审批操作（PATCH 批准/拒绝、DELETE）走本通用分支；
+  // viewer 的 INSERT/撤回已在上方窄例外处理。
+  if (["raid_members", "activities", "activity_attendance", "loot_records", "wishlists", "claim_requests"].includes(table)) {
     // REQ-020（任务书 #12）：activities.status 白名单校验，仅 normal / cancelled。
     // 仅针对 activities 表（raid_members 的 status 是中文，不受影响）；行不带 status 字段不校验。
     if (table === "activities" && (method === "POST" || method === "PATCH")) {
