@@ -1,0 +1,90 @@
+{
+  "classes": {
+    "战士": "assets/icons/classes/warrior.png",
+    "圣骑士": "assets/icons/classes/paladin.png",
+    "猎人": "assets/icons/classes/hunter.png",
+    "潜行者": "assets/icons/classes/rogue.png",
+    "牧师": "assets/icons/classes/priest.png",
+    "死亡骑士": "assets/icons/classes/deathknight.png",
+    "萨满": "assets/icons/classes/shaman.png",
+    "法师": "assets/icons/classes/mage.png",
+    "术士": "assets/icons/classes/warlock.png",
+    "武僧": "assets/icons/classes/monk.png",
+    "德鲁伊": "assets/icons/classes/druid.png",
+    "恶魔猎手": "assets/icons/classes/demonhunter.png",
+    "唤魔师": "assets/icons/classes/evoker.png"
+  },
+  "specs": {
+    "战士": {
+      "武器": "assets/icons/specs/warrior_arms.png",
+      "狂怒": "assets/icons/specs/warrior_fury.png",
+      "防护": "assets/icons/specs/warrior_protection.png"
+    },
+    "圣骑士": {
+      "神圣": "assets/icons/specs/paladin_holy.png",
+      "防护": "assets/icons/specs/paladin_protection.png",
+      "惩戒": "assets/icons/specs/paladin_retribution.png"
+    },
+    "猎人": {
+      "野兽控制": "assets/icons/specs/hunter_beastmastery.png",
+      "射击": "assets/icons/specs/hunter_marksmanship.png",
+      "生存": "assets/icons/specs/hunter_survival.png"
+    },
+    "潜行者": {
+      "奇袭": "assets/icons/specs/rogue_assassination.png",
+      "狂徒": "assets/icons/specs/rogue_outlaw.png",
+      "敏锐": "assets/icons/specs/rogue_subtlety.png"
+    },
+    "牧师": {
+      "戒律": "assets/icons/specs/priest_discipline.png",
+      "神圣": "assets/icons/specs/priest_holy.png",
+      "暗影": "assets/icons/specs/priest_shadow.png"
+    },
+    "死亡骑士": {
+      "鲜血": "assets/icons/specs/deathknight_blood.png",
+      "冰霜": "assets/icons/specs/deathknight_frost.png",
+      "邪恶": "assets/icons/specs/deathknight_unholy.png"
+    },
+    "萨满": {
+      "元素": "assets/icons/specs/shaman_elemental.png",
+      "增强": "assets/icons/specs/shaman_enhancement.png",
+      "恢复": "assets/icons/specs/shaman_restoration.png"
+    },
+    "法师": {
+      "奥术": "assets/icons/specs/mage_arcane.png",
+      "火焰": "assets/icons/specs/mage_fire.png",
+      "冰霜": "assets/icons/specs/mage_frost.png"
+    },
+    "术士": {
+      "痛苦": "assets/icons/specs/warlock_affliction.png",
+      "恶魔学识": "assets/icons/specs/warlock_demonology.png",
+      "毁灭": "assets/icons/specs/warlock_destruction.png"
+    },
+    "武僧": {
+      "酒仙": "assets/icons/specs/monk_brewmaster.png",
+      "织雾": "assets/icons/specs/monk_mistweaver.png",
+      "踏风": "assets/icons/specs/monk_windwalker.png"
+    },
+    "德鲁伊": {
+      "平衡": "assets/icons/specs/druid_balance.png",
+      "野性": "assets/icons/specs/druid_feral.png",
+      "守护": "assets/icons/specs/druid_guardian.png",
+      "恢复": "assets/icons/specs/druid_restoration.png"
+    },
+    "恶魔猎手": {
+      "浩劫": "assets/icons/specs/demonhunter_havoc.png",
+      "复仇": "assets/icons/specs/demonhunter_vengeance.png",
+      "噬灭": "assets/icons/specs/demonhunter_devourer.png"
+    },
+    "唤魔师": {
+      "湮灭": "assets/icons/specs/evoker_devastation.png",
+      "恩护": "assets/icons/specs/evoker_preservation.png",
+      "增辉": "assets/icons/specs/evoker_augmentation.png"
+    }
+  },
+  "roles": {
+    "坦克": "assets/icons/roles/tank.png",
+    "治疗": "assets/icons/roles/healer.png",
+    "输出": "assets/icons/roles/dps.png"
+  }
+}
