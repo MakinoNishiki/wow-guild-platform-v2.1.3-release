@@ -1,0 +1,12 @@
+{
+  "raids": [
+    { "id": "raid-uuid-001", "name": "虚影尖塔" }
+  ],
+  "dungeons": [
+    { "id": "dun-uuid-001", "name": "梦境裂隙" }
+  ],
+  "bosses": [
+    { "id": "boss-uuid-001", "name": "织影者瓦丝琪", "raid_name": "虚影尖塔", "dungeon_name": null },
+    { "id": "boss-uuid-002", "name": "裂隙守望者", "raid_name": null, "dungeon_name": "梦境裂隙" }
+  ]
+}

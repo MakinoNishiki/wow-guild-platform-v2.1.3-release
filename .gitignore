@@ -4,4 +4,4 @@ backup/
 node_modules/
 .s6-ssh/
 tools/
-scripts/wjdc/out/
+scripts/wjdc/out*/

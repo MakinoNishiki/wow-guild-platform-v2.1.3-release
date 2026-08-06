@@ -1,0 +1,58 @@
+{
+  "boss_loot": [
+    {
+      "boss_id": "boss-uuid-001",
+      "item_name": "织影者头冠",
+      "slot": "头部",
+      "item_type": "布甲",
+      "official_item_id": 240001,
+      "effect": "装备：你的暗影法术有几率召唤一只织影蛛为你作战。",
+      "primary_stats": ["智力"],
+      "secondary_stats": ["爆击", "急速"]
+    },
+    {
+      "boss_id": "boss-uuid-001",
+      "item_name": "瓦丝琪的低语坠饰",
+      "slot": "颈部",
+      "item_type": "项链",
+      "official_item_id": 240002,
+      "effect": "装备：旧版特效文本。",
+      "primary_stats": ["敏捷"],
+      "secondary_stats": ["全能"]
+    },
+    {
+      "boss_id": "boss-uuid-001",
+      "item_name": "旧赛季遗物",
+      "slot": "饰品",
+      "item_type": "饰品",
+      "official_item_id": 239999,
+      "effect": "使用：上个赛季的特效。",
+      "primary_stats": ["力量"],
+      "secondary_stats": ["爆击"]
+    }
+  ],
+  "dungeon_loot": [
+    {
+      "dungeon_id": "dun-uuid-001",
+      "boss_id": "boss-uuid-002",
+      "item_name": "守望者指环",
+      "slot": "手指",
+      "item_type": "戒指",
+      "official_item_id": "250001",
+      "effect": "装备：站立不动时每秒恢复 1% 生命值。",
+      "primary_stats": null,
+      "secondary_stats": ["急速", "全能"]
+    },
+    {
+      "dungeon_id": "dun-uuid-001",
+      "boss_id": null,
+      "item_name": "旧港藏宝图",
+      "slot": "饰品",
+      "item_type": "饰品",
+      "official_item_id": "250099",
+      "effect": "使用：显示一张旧藏宝图。",
+      "primary_stats": null,
+      "secondary_stats": ["急速"]
+    }
+  ]
+}
