@@ -114,5 +114,7 @@ function WJDCProbe(arg)
   else
     msg("未能从 GetLootInfoByIndex 拿到任何 itemID，单件详查跳过（=病害①现场）")
   end
+  -- 存档记录（任务书 #26-fix4）：套装专精级 API 存在性，供顾问侧 OCR 管道对照
+  msg("存档：C_Item.GetSetBonusesForSpecializationByItemID = " .. tostring(type(C_Item and C_Item.GetSetBonusesForSpecializationByItemID)))
   msg("===== probe 结束，请把聊天框完整截图反馈顾问侧 =====")
 end

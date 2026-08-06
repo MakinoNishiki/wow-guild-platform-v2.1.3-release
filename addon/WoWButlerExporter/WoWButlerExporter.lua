@@ -2,9 +2,10 @@
 -- 魔兽管家数据导出器 WoWButler Data Exporter（任务书 #26 WP1）
 -- 零外部依赖；只读副本手册（EJ）与角色信息；不访问网络、不碰账号数据
 -- 导出目标：SavedVariables 全局表 WJDCDump（/reload 或退出游戏后写盘）
--- 命令：/wjdc all | raid | mplus | tier | me
+-- 命令：/wjdc all | raid | mplus | me | probe [团本序号]
+-- （套装效果导出于 1.0.4 移除：走顾问侧文章/OCR 管道，任务书 #26-fix4）
 -- ============================================================
-local ADDON_VERSION = "1.0.3"
+local ADDON_VERSION = "1.0.4"
 
 local function msg(s) DEFAULT_CHAT_FRAME:AddMessage("|cffffd200[wjdc]|r " .. s) end
 local function err(s) DEFAULT_CHAT_FRAME:AddMessage("|cffff4040[wjdc]|r " .. s) end
@@ -42,7 +43,7 @@ local function scanLines(itemID)
   return lines
 end
 
--- ---------- 物品明细：装等 / 主副属性 / 特效 ----------
+-- ---------- 物品明细：主副属性 / 特效（tooltip 扫描；装等走 GetItemInfo 见 getItemBasics） ----------
 local PRIMARY   = { ["力量"] = 1, ["敏捷"] = 1, ["智力"] = 1 }
 local SECONDARY = { ["爆击"] = 1, ["急速"] = 1, ["精通"] = 1, ["全能"] = 1,
                     ["吸血"] = 1, ["闪避"] = 1, ["加速"] = 1 }
@@ -53,9 +54,7 @@ local function addUnique(list, v)
 end
 
 local function parseItemDetail(itemID)
-  local d = { ilvl = nil, primary = {}, secondary = {}, effect = "" }
-  local okL, lvl = pcall(GetDetailedItemLevelInfo, itemID)
-  if okL and type(lvl) == "number" and lvl > 0 then d.ilvl = lvl end
+  local d = { primary = {}, secondary = {}, effect = "" }
   local lines = scanLines(itemID)
   if not lines then return d end
   for _, t in ipairs(lines) do
@@ -73,22 +72,29 @@ local function parseItemDetail(itemID)
 end
 
 -- ---------- 副本手册遍历（团本 / 大秘境共用） ----------
--- 掉落访问兼容层（任务书 #26-fix2）：12.x 起优先 C_EncounterJournal.GetLootInfoByIndex，
--- 回退老 EJ_GetLootInfoByIndex；新函数返回结构化 itemInfo 表，老函数为多元返回值
--- （name, icon, slot, armorType, itemID, link, ...），此处归一化，导出字段结构不变
-local function getLootInfo(i)
+-- 掉落枚举（任务书 #26-fix4）：EJ_SelectEncounter 后只许单参调用（实测双参全 nil）；
+-- 12.x 返回稀疏表（仅 itemID/encounterID/稀有度标记），老函数为多元返回值
+-- （name, icon, slot, armorType, itemID, ...），归一化为只取 itemID——其余字段一律走 GetItemInfo
+local function getLootItemID(i)
   local fn = (C_EncounterJournal and C_EncounterJournal.GetLootInfoByIndex) or EJ_GetLootInfoByIndex
   if type(fn) ~= "function" then return nil end
-  local ok, a, b, c, d, e = pcall(fn, i)
+  local ok, a, _, _, _, e5 = pcall(fn, i)  -- 单参；e5 = 老 tuple 第 5 位 itemID
   if not ok or a == nil then return nil end
-  if type(a) == "table" then
-    local info = a
-    if not info.itemID then return nil end
-    return info.itemID, info.name, info.slot, info.armorType
+  if type(a) == "table" then return a.itemID end
+  return e5
+end
+
+-- 物品详情通道（任务书 #26-fix4）：名称/部位/类型/装等一律走 GetItemInfo（装等=第 4 返回值）；
+-- GetDetailedItemLevelInfo / C_EncounterJournal.GetLootInfo 已死，废弃；
+-- 未缓存先 RequestLoadItemDataByID 重试一次，仍拿不到或装等非法 → 返回 nil 走 failed（禁 ilvl=44 类错位值）
+local function getItemBasics(itemID)
+  local name, _, _, ilvl, _, _, subType, _, equipLoc = GetItemInfo(itemID)
+  if not name and C_Item and C_Item.RequestLoadItemDataByID then
+    pcall(C_Item.RequestLoadItemDataByID, itemID)
+    name, _, _, ilvl, _, _, subType, _, equipLoc = GetItemInfo(itemID)
   end
-  local name, slot, armorType, itemID = a, c, d, e  -- tuple: name, icon, slot, armorType, itemID
-  if not itemID then return nil end
-  return itemID, name, slot, armorType
+  if not name or type(ilvl) ~= "number" or ilvl <= 0 then return nil end
+  return { name = name, ilvl = ilvl, type = subType or "", slot = (equipLoc and _G[equipLoc]) or "" }
 end
 
 local function exportInstances(isRaid, label)
@@ -102,120 +108,33 @@ local function exportInstances(isRaid, label)
       local bname, _, encounterID = EJ_GetEncounterInfoByIndex(bi, instanceID)
       if not bname then break end
       EJ_SelectEncounter(encounterID)
-      -- 掉落计数不依赖 EJ_GetNumLoot（12.x 可用性未实测）：按 index 递增取到 nil 为止，500 封顶防呆
-      local loot, li = {}, 1
+      -- 掉落计数不依赖 EJ_GetNumLoot（12.x 已死）：按 index 递增取到 nil 为止，500 封顶防呆
+      local loot, failed, li = {}, {}, 1
       while li <= 500 do
-        local itemID, name, slot, itype = getLootInfo(li)
+        local itemID = getLootItemID(li)
         if not itemID then break end
-        if name then
+        local basics = getItemBasics(itemID)
+        if basics then
           local d = parseItemDetail(itemID)
-          loot[#loot + 1] = { id = itemID, name = name, slot = slot or "",
-                              type = itype or "", ilvl = d.ilvl,
+          loot[#loot + 1] = { id = itemID, name = basics.name, slot = basics.slot,
+                              type = basics.type, ilvl = basics.ilvl,
                               primary = d.primary, secondary = d.secondary,
                               effect = d.effect }
+        else
+          failed[#failed + 1] = itemID  -- 禁静默：记入 boss.failed 并红字报告
         end
         li = li + 1
       end
-      bosses[#bosses + 1] = { boss = bname, loot = loot }
+      if #failed > 0 then
+        err(string.format("%s · %s：%d 件物品未缓存记 failed（/reload 后重跑可补齐）", iname, bname, #failed))
+      end
+      bosses[#bosses + 1] = { boss = bname, loot = loot, failed = failed }
       bi = bi + 1
     end
     out[#out + 1] = { instance = iname, bosses = bosses }
     msg(string.format("%s：%s（%d 个 BOSS，%d 件掉落）", label, iname, #bosses,
       (function() local c = 0 for _, b in ipairs(bosses) do c = c + #b.loot end return c end)()))
     idx = idx + 1
-  end
-  return out
-end
-
--- ---------- 套装效果（tooltip 扫描法；失败记 failed 并聊天框报告） ----------
-local TIER_SLOTS = { ["头部"] = 1, ["肩部"] = 1, ["胸部"] = 1, ["手"] = 1, ["腿部"] = 1 }
-
-local function matchBonus(t, n)  -- 兼容半角 (2) 与全角 （2）
-  return t:match("^%(" .. n .. "%)%s*套装[：:]%s*(.+)$")
-      or t:match("^（" .. n .. "）%s*套装[：:]%s*(.+)$")
-end
-
-local function findTierItems(raids)
-  -- 从团本掉落五部位里按 tooltip「职业：」行归属各职业的套装件 itemID
-  local classItem = {}
-  for _, inst in ipairs(raids) do
-    for _, b in ipairs(inst.bosses) do
-      for _, it in ipairs(b.loot) do
-        if TIER_SLOTS[it.slot] then
-          local lines = scanLines(it.id)
-          if lines then
-            for _, t in ipairs(lines) do
-              local cl = t:match("^职业：(.+)$")
-              if cl then
-                for cn in cl:gmatch("[^，,%s、]+") do
-                  if not classItem[cn] then classItem[cn] = it.id end
-                end
-              end
-            end
-          end
-        end
-      end
-    end
-  end
-  return classItem
-end
-
-local function exportTier(raids)
-  local classItem = findTierItems(raids)
-  local out, failed = {}, {}
-  local nClass = GetNumClasses and GetNumClasses() or 0
-  for ci = 1, nClass do
-    local okC, cname, cfile, classID = pcall(GetClassInfo, ci)
-    if okC and cname and classID then
-      local itemID = classItem[cname]
-      local setName, generic = ""
-      if itemID then
-        generic = scanLines(itemID)
-        if generic then
-          for _, t in ipairs(generic) do
-            setName = setName ~= "" and setName
-              or t:match("^(.-)%s*（%d+/%d+）%s*$") or t:match("^(.-)%s*%(%d+/%d+%)%s*$") or ""
-          end
-        end
-      end
-      local specs, nSpec = {}, 0
-      if GetNumSpecializationsForClassID then nSpec = GetNumSpecializationsForClassID(classID) or 0 end
-      for si = 1, nSpec do
-        local okS, specID, specName = pcall(GetSpecializationInfoForClassID, classID, si)
-        specName = (okS and specName) or ("专精" .. si)
-        local b2, b4
-        if itemID then
-          -- 专精级效果优先走 C_Item（官方 tooltip 数据源），失败回退通用 tooltip 行
-          if okS and specID and C_Item and C_Item.GetSetBonusesForSpecializationByItemID then
-            local okB, _, blines = pcall(C_Item.GetSetBonusesForSpecializationByItemID, itemID, specID)
-            if okB and type(blines) == "table" then
-              for _, t in ipairs(blines) do
-                b2 = b2 or matchBonus(t, "2"); b4 = b4 or matchBonus(t, "4")
-              end
-            end
-          end
-          if not b2 and not b4 and generic then
-            for _, t in ipairs(generic) do
-              b2 = b2 or matchBonus(t, "2"); b4 = b4 or matchBonus(t, "4")
-            end
-          end
-        end
-        local entry = { spec = specName }
-        if b2 or b4 then
-          entry.set, entry.bonus2, entry.bonus4 = setName, b2 or "", b4 or ""
-        else
-          entry.status = "failed"
-          failed[#failed + 1] = cname .. "-" .. specName
-        end
-        specs[#specs + 1] = entry
-      end
-      out[#out + 1] = { class = cname, classEn = cfile, specs = specs }
-      msg("套装：" .. cname .. "（" .. nSpec .. " 个专精）")
-    end
-  end
-  if #failed > 0 then
-    err("套装效果提取失败的专精（" .. #failed .. "）：" .. table.concat(failed, "、"))
-    err("请先 /reload 再重跑 /wjdc tier；仍失败请截图本信息反馈顾问侧")
   end
   return out
 end
@@ -251,8 +170,11 @@ end
 local function doExport(kind)
   if kind == "me" then
     WJDCDump = { meta = buildMeta(kind), me = exportMe() }
-    msg("已导出本人角色档案（" .. tostring(WJDCDump.me.name) .. "-" ..
-        tostring(WJDCDump.me.realm) .. "），请 /reload 或退出游戏写入文件")
+    msg("已导出本人角色档案（" .. tostring(WJDCDump.me.name) .. "-" .. tostring(WJDCDump.me.realm) .. "），请 /reload 或退出游戏写入文件")
+    return
+  end
+  if kind == "tier" then
+    msg("套装效果导出已于 1.0.4 移除：套装数据走顾问侧文章/OCR 管道（详见 README）")
     return
   end
   -- Blizzard_EncounterJournal 是懒加载模块：登录后未打开过手册时 EJ API 不存在，
@@ -266,20 +188,18 @@ local function doExport(kind)
     err("本插件仅支持 12.x 正式服，请确认没有误装到怀旧服/其他版本")
     return
   end
-  local tier = EJ_GetCurrentTier()
-  if tier then pcall(EJ_SelectTier, tier) end  -- 只导当前资料片，旧实例一律不导
+  local ejTier = EJ_GetCurrentTier()
+  if ejTier then pcall(EJ_SelectTier, ejTier) end  -- 只导当前资料片，旧实例一律不导
   local dump = { meta = buildMeta(kind) }
   msg("开始导出（" .. kind .. "），数据量大请稍候……")
-  local ok, e = pcall(function()
-    if kind == "all" or kind == "raid" then dump.raids = exportInstances(true, "团本") end
-    if kind == "all" or kind == "mplus" then dump.dungeons = exportInstances(false, "大秘境") end
-    if kind == "all" or kind == "tier" then
-      if not dump.raids then dump.raids = exportInstances(true, "团本") end  -- 套装件从团本掉落定位
-      dump.tier = exportTier(dump.raids)
-    end
-  end)
+  -- 分段独立 pcall（任务书 #26-fix4）：任一段失败不拖垮其他段
+  local function guard(label, fn)
+    local ok, e = pcall(fn)
+    if not ok then err(label .. "段导出中断：" .. tostring(e) .. "（其余段落不受影响，建议重跑）") end
+  end
+  if kind == "all" or kind == "raid" then guard("团本", function() dump.raids = exportInstances(true, "团本") end) end
+  if kind == "all" or kind == "mplus" then guard("大秘境", function() dump.dungeons = exportInstances(false, "大秘境") end) end
   WJDCDump = dump
-  if not ok then err("导出中断：" .. tostring(e) .. "（已写出的部分数据仍保留，建议重跑）") end
   msg("已导出，请 /reload 或退出游戏写入文件")
   msg("文件位置：WTF/Account/<你的账号名>/SavedVariables/WoWButlerExporter.lua")
 end
@@ -295,6 +215,6 @@ SlashCmdList["WJDC"] = function(input)
   if cmd == "all" or cmd == "raid" or cmd == "mplus" or cmd == "tier" or cmd == "me" then
     doExport(cmd)
   else
-    msg("用法：/wjdc all（全量）| raid（团本）| mplus（大秘境）| tier（套装）| me（本人角色档案）| probe [团本序号]（诊断）")
+    msg("用法：/wjdc all（全量）| raid（团本）| mplus（大秘境）| me（本人角色档案）| probe [团本序号]（诊断）")
   end
 end
