@@ -4,11 +4,11 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>魔兽管家</title>
-<!-- 静态资源版本号：20260805.10（任务书 #22 WP3-②：凡改动 js/css 的 commit 必须同步递增此处与所有 ?v= 查询串，见 docs/开发规范.md 第五章） -->
+<!-- 静态资源版本号：20260805.11（任务书 #22 WP3-②：凡改动 js/css 的 commit 必须同步递增此处与所有 ?v= 查询串，见 docs/开发规范.md 第五章） -->
 <link rel="icon" type="image/png" sizes="32x32" href="assets/brand/favicon-32.png">
 <link rel="icon" type="image/png" sizes="16x16" href="assets/brand/favicon-16.png">
-<link rel="stylesheet" href="css/main.css?v=20260805.10">
-<script src="assets/vendor/supabase-js-2.js?v=20260805.10"></script>
+<link rel="stylesheet" href="css/main.css?v=20260805.11">
+<script src="assets/vendor/supabase-js-2.js?v=20260805.11"></script>
 </head>
 <body>
 
@@ -1695,6 +1695,13 @@
       </div>
       <div class="modal-body">
         <div class="uc-form-group">
+          <label>插件导出文件 <span class="uc-hint">(游戏内 /wjdc me 导出的 character.json)</span></label>
+          <div class="uc-input-wrap">
+            <input type="file" id="charImportFile" accept=".json,application/json" style="display:none" onchange="importCharacterJson(this)">
+            <button type="button" class="uc-btn uc-btn-secondary" onclick="document.getElementById('charImportFile').click()">📥 从插件导出文件导入</button>
+          </div>
+        </div>
+        <div class="uc-form-group">
           <label>英雄榜链接 <span class="uc-hint">(支持国服/亚服/欧美服)</span></label>
           <div class="uc-input-wrap">
             <input type="url" id="charArmoryUrl" class="uc-input" placeholder="https://wow.blizzard.cn/character/#/the-golden-plains/角色名" oninput="parseArmoryUrlInput()">
@@ -1751,8 +1758,10 @@
           </div>
           <div class="uc-form-group">
             <label>专精</label>
-            <input type="text" id="charSpec" class="uc-input" list="charSpecOptions" placeholder="选择职业后自动联动">
-            <datalist id="charSpecOptions"></datalist>
+            <!-- 任务书 #24-补丁2①：原生 text+datalist 改站内标准下拉（浏览器过滤行为曾被误判为单选项） -->
+            <select id="charSpec" class="uc-select" disabled>
+              <option value="">请先选择职业</option>
+            </select>
           </div>
         </div>
         <div class="uc-form-row">
@@ -1796,12 +1805,12 @@
   </div>
 </div>
 
-<script src="js/cloud.js?v=20260805.10"></script>
+<script src="js/cloud.js?v=20260805.11"></script>
 <!-- 任务书 #14：主数据层（快照兜底 + 加载层），须在 app.js 之前 -->
-<script src="js/masterDataSnapshot.js?v=20260805.10"></script>
-<script src="js/masterData.js?v=20260805.10"></script>
+<script src="js/masterDataSnapshot.js?v=20260805.11"></script>
+<script src="js/masterData.js?v=20260805.11"></script>
 <!-- 任务书 #22 WP2：职业/专精/职责图标集中映射（全站唯一取图处） -->
-<script src="js/iconMap.js?v=20260805.10"></script>
-<script src="js/app.js?v=20260805.10"></script>
+<script src="js/iconMap.js?v=20260805.11"></script>
+<script src="js/app.js?v=20260805.11"></script>
 </body>
 </html>

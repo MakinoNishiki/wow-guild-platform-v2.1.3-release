@@ -840,17 +840,71 @@ function parseArmoryUrlInput() {
   }
 }
 
-// 任务书 #24-补丁③：职业变更时联动专精候选（数据源复用成员管理 getGameSpecs）
+// 任务书 #24-补丁2①：专精改站内标准下拉——未选职业禁用+占位；选职业后填充全量专精（getGameSpecs）；换职业重建即清空旧值
 function onCharClassChange() {
   const cls = document.getElementById('charClass').value;
-  const list = document.getElementById('charSpecOptions');
-  if (!list) return;
+  const specSel = document.getElementById('charSpec');
+  if (!specSel) return;
   const specs = cls ? getGameSpecs(cls) : [];
-  list.innerHTML = specs.map(s => `<option value="${s}"></option>`).join('');
-  const specInput = document.getElementById('charSpec');
-  if (specInput && specInput.value && specs.length && !specs.includes(specInput.value)) {
-    specInput.value = ''; // 换职业后旧专精失效，清空避免脏数据
-  }
+  specSel.innerHTML = cls
+    ? '<option value="">请选择专精</option>' + specs.map(s => `<option value="${s}">${s}</option>`).join('')
+    : '<option value="">请先选择职业</option>';
+  specSel.disabled = !cls;
+}
+
+// 任务书 #24-补丁2②：从插件导出文件（游戏内 /wjdc me → character.json）导入角色档案
+// 字段口径以 scripts/wjdc_convert.py 的 character.json 产物为准，禁止自造字段名；只填表单不写库，保存链路不变
+function importCharacterJson(input) {
+  const file = input.files && input.files[0];
+  input.value = ''; // 复位，允许重复选择同一文件
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    let data;
+    try {
+      data = JSON.parse(reader.result);
+    } catch (e) {
+      showToast('文件不是有效的 JSON，请使用插件 /wjdc me 导出的 character.json', 'error');
+      return;
+    }
+    if (!data || typeof data !== 'object' || !data.character_name || !data.server_name) {
+      showToast('文件格式不正确：缺少 character_name / server_name 字段（应为 /wjdc me 导出的 character.json），可手动填写', 'error');
+      return;
+    }
+    // 区域：插件导出 CN/US/EU/KR/TW → 表单三档
+    const regionMap = { CN: 'CN', KR: 'Asia', TW: 'Asia', Asia: 'Asia', US: 'US-EU', EU: 'US-EU', 'US-EU': 'US-EU' };
+    // 阵营：插件导出本地化「联盟/部落」→ 表单 Alliance/Horde
+    const factionMap = { '联盟': 'Alliance', '部落': 'Horde', Alliance: 'Alliance', Horde: 'Horde' };
+    document.getElementById('charArmoryUrl').value = ''; // armory_url 恒空（#26 约定），清空防误带旧链接
+    updateCharArmoryClearBtn();
+    document.getElementById('charName').value = data.character_name || '';
+    document.getElementById('charServer').value = data.server_name || '';
+    document.getElementById('charRegion').value = regionMap[data.server_region] || 'CN';
+    document.getElementById('charFaction').value = factionMap[data.faction] || '';
+    // 职业：命中下拉选项才带入，否则留空手选
+    const classSel = document.getElementById('charClass');
+    const classOk = [...classSel.options].some(o => o.value && o.value === data.class);
+    classSel.value = classOk ? data.class : '';
+    onCharClassChange(); // 重建专精下拉（含清空）
+    // 专精：合法值带入，非法值清空并提示（提示延后到成功 toast 之后，避免被覆盖）
+    let specWarn = '';
+    if (classOk && data.spec) {
+      if (getGameSpecs(data.class).includes(data.spec)) {
+        document.getElementById('charSpec').value = data.spec;
+      } else {
+        specWarn = `专精「${data.spec}」不在「${data.class}」专精列表中，已清空请手选`;
+      }
+    }
+    document.getElementById('charLevel').value = data.level || '';
+    document.getElementById('charItemLevel').value = data.item_level || '';
+    document.getElementById('charRace').value = data.race || '';
+    document.getElementById('charGuild').value = data.guild_name || '';
+    flashParsedFields(['charName', 'charServer', 'charRegion', 'charFaction', 'charClass', 'charSpec', 'charLevel', 'charItemLevel', 'charRace', 'charGuild']);
+    showToast(`已导入：${data.character_name} · ${data.server_name}`, 'success');
+    if (specWarn) showToast(specWarn, 'warning');
+  };
+  reader.onerror = () => showToast('文件读取失败，请重试', 'error');
+  reader.readAsText(file, 'utf-8');
 }
 
 // 解析英雄榜 URL
@@ -6442,6 +6496,33 @@ function lootFillAssignedTo(name) {
 // ==================== 初始化 ====================
 // ==================== 更新日志 ====================
 const changelogData = [
+  {
+    id: 'v3.2.0-task24-patch2-feature',
+    version: 'v3.2.0',
+    date: '2026-08-06',
+    type: 'feature',
+    typeLabel: '新增功能',
+    title: '「添加角色」支持从插件导出文件一键导入（任务书 #24-补丁2②）',
+    summary: '游戏内运行 /wjdc me 导出角色档案后，在添加角色弹窗选择导出的 character.json 即可一键填充全部字段：名称/服务器/区域/阵营/种族/职业/专精/等级/装等/所属公会。',
+    details: [
+      '字段格式与数据导出插件（任务书 #26）严格对齐；阵营、区域自动换算为表单选项',
+      '职业/专精带入后与下拉联动一致：专精非法值自动清空并提示手选',
+      '文件格式错误给出中文提示且不阻断手动填写；导入只填充表单，保存仍需点击「保存角色」，同服查重等校验不变'
+    ]
+  },
+  {
+    id: 'v3.2.0-task24-patch2-fix',
+    version: 'v3.2.0',
+    date: '2026-08-06',
+    type: 'fix',
+    typeLabel: '修复BUG',
+    title: '「添加角色」专精输入改站内标准下拉（任务书 #24-补丁2①）',
+    summary: '原专精输入框在输入文字后下拉只剩匹配项，易被误判为「只有一个选项」；已改为与「职业」「区域」一致的标准下拉：未选职业时禁用并提示，选定职业后列出该职业全部专精。',
+    details: [
+      '更换职业时旧专精自动清空，避免脏数据',
+      '专精数据源与成员管理一致（主数据优先、常量兜底）'
+    ]
+  },
   {
     id: 'v3.2.0-task24-patch-fix',
     version: 'v3.2.0',
