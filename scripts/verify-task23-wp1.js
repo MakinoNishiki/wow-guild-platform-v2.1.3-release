@@ -245,7 +245,7 @@ async function proxy(token, method, restPath, bodyObj) {
     await page.evaluate(() => mdOpenDungeonLootBatch());
     await page.waitForSelector('#mdEditorModal.show', { timeout: 5000 });
     await page.fill('#mdField__batch',
-      `${DUNGEON_NAME},T23验收王,T23批量剑,武器,单手剑,力量,暴击、急速,装备：测试特效\n` +
+      `${DUNGEON_NAME},T23验收王,T23批量剑,武器,单手剑,力量,爆击、急速,装备：测试特效\n` +
       `${DUNGEON_NAME},,T23批量坠,颈部,项链,智力,,\n` +
       `${DUNGEON_NAME},不存在王,T23坏行A,武器,单手剑,,,\n` +
       `${DUNGEON_NAME},,T23坏行B,头部,单手剑,,,`);

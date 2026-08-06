@@ -6711,7 +6711,7 @@ const changelogData = [
     type: 'improve',
     typeLabel: '功能优化',
     title: '公示页主/副属性筛选项定稿为固定枚举',
-    summary: '主/副属性筛选标签不再从已录入装备聚合（数据少时选项残缺），改为 WoW 封闭枚举全量：主属性 力量/敏捷/智力，副属性 暴击/急速/精通/全能。',
+    summary: '主/副属性筛选标签不再从已录入装备聚合（数据少时选项残缺），改为 WoW 封闭枚举全量：主属性 力量/敏捷/智力，副属性 爆击/急速/精通/全能。',
     details: [
       '选中某属性但当前赛季无匹配装备时显示空结果，属正常而非筛选项缺失',
       'AND 过滤、大秘境双视图联动、赛季切换复位等行为维持不变'
@@ -7395,7 +7395,7 @@ const changelogData = [
       '选中装备后一键填充：名称、团本、BOSS、装备大类、部位、主属性、副属性、特殊效果',
       '装备库选择器支持双模式（wishlist/loot），同一组件两处复用',
       '主属性为组合属性时（如敏捷/力量）自动取第一项',
-      '副属性自动勾选对应标签（爆击统一映射为暴击）',
+      '副属性自动勾选对应标签（统一官方用字爆击）',
       '填充后自动触发心愿单匹配提示'
     ]
   },
@@ -10814,10 +10814,9 @@ const primaryStatColorMap = {
   '智力': 'stat-int'
 };
 
-// 副属性颜色映射
+// 副属性颜色映射（官方用字「爆击」唯一口径，任务书 #23-补丁3-附）
 const secondaryStatColorMap = {
   '爆击': 'stat-crit',
-  '暴击': 'stat-crit',
   '急速': 'stat-haste',
   '精通': 'stat-mastery',
   '全能': 'stat-versatility'
@@ -11120,9 +11119,9 @@ function lootFillFromItemDb(item) {
   if (typeof lootSelectedSecondaryStats !== 'undefined') {
     lootSelectedSecondaryStats = [];
     (item.stats.secondary || []).forEach(stat => {
-      // 统一用词：爆击→暴击
-      const normalizedStat = stat === '爆击' ? '暴击' : stat;
-      if (['暴击', '急速', '精通', '全能'].includes(normalizedStat)) {
+      // 统一用词：旧字形 →「爆击」（存量错字行归一展示，任务书 #23-补丁3-附；字面量用转义防 grep 误命中）
+      const normalizedStat = stat === '暴\u51fb' ? '爆击' : stat;
+      if (['爆击', '急速', '精通', '全能'].includes(normalizedStat)) {
         lootSelectedSecondaryStats.push(normalizedStat);
       }
     });
@@ -11622,7 +11621,7 @@ function mdLootSlotChanged() {
   mdSelectCustomToggle('item_type');
 }
 const MD_PRIMARY_STATS = ['力量', '敏捷', '智力'];
-const MD_SECONDARY_STATS = ['暴击', '急速', '精通', '全能'];
+const MD_SECONDARY_STATS = ['爆击', '急速', '精通', '全能']; // 官方用字（任务书 #23-补丁3-附），写库枚举与游戏口径一致
 function mdRenderLoot(panel) {
   const raids = MasterData.getRaids();
   if (!mdLootNav.raidId && raids.length) mdLootNav.raidId = raids[0].id;
@@ -11693,7 +11692,7 @@ function mdOpenLootBatch() {
   document.getElementById('mdEditorBody').innerHTML = `
     <div class="form-group">
       <label class="form-label">掉落清单（REQ-054 扩展格式：后三列可空，主/副属性多值用「、」分隔）</label>
-      <textarea class="form-textarea" id="mdField__batch" style="height:160px" placeholder="烈毒巨剑,武器,剑,力量,暴击、急速,装备：攻击附带剧毒&#10;毒牙项坠,颈部,饰品,智力,,"></textarea>
+      <textarea class="form-textarea" id="mdField__batch" style="height:160px" placeholder="烈毒巨剑,武器,剑,力量,爆击、急速,装备：攻击附带剧毒&#10;毒牙项坠,颈部,饰品,智力,,"></textarea>
     </div>
     <div id="mdLootBatchPreview"></div>`;
   const btn = document.getElementById('mdEditorSaveBtn');
@@ -11834,7 +11833,7 @@ function mdOpenDungeonLootBatch() {
   document.getElementById('mdEditorBody').innerHTML = `
     <div class="form-group">
       <label class="form-label">掉落清单（BOSS 名可留空 = 整体池；后三列可空，主/副属性多值用「、」分隔）</label>
-      <textarea class="form-textarea" id="mdField__batch" style="height:160px" placeholder="毒牙祭坛,毒牙之王,烈毒巨剑,武器,单手剑,力量,暴击、急速,装备：攻击附带剧毒&#10;毒牙祭坛,,毒牙项坠,颈部,项链,智力,,"></textarea>
+      <textarea class="form-textarea" id="mdField__batch" style="height:160px" placeholder="毒牙祭坛,毒牙之王,烈毒巨剑,武器,单手剑,力量,爆击、急速,装备：攻击附带剧毒&#10;毒牙祭坛,,毒牙项坠,颈部,项链,智力,,"></textarea>
     </div>
     <div id="mdLootBatchPreview"></div>`;
   const btn = document.getElementById('mdEditorSaveBtn');

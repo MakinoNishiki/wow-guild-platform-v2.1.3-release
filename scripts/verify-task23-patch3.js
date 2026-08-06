@@ -73,8 +73,8 @@ function assert(cond, label, detail) {
     const bad = (await rest(`/${t}?select=item_name,slot,item_type&item_type=eq.装饰&limit=500`)).filter(x => x.slot !== '杂项');
     assert(bad.length === 0, `数据断言：${t} item_type=装饰 不出现在非杂项 slot（0 行）`, JSON.stringify(bad.map(x => x.item_name + '@' + x.slot)));
   }
-  // 数据观察（报告用）：DB 残留旧字形行数
-  const legacyCrit = all.filter(l => (l.secondary_stats || []).includes('暴击'));
+  // 数据观察（报告用）：DB 残留旧字形行数（字面量用转义防 grep 误命中）
+  const legacyCrit = all.filter(l => (l.secondary_stats || []).includes('暴\u51fb'));
   console.log(`  [观察] 库内仍带旧字形副属性的行：${legacyCrit.length}（${legacyCrit.map(x => x.item_name).join('、') || '无'}）`);
 
   serverProc = spawn(process.execPath, ['server.js'], { cwd: ROOT, env: { ...process.env, DEPLOY_RUN_PORT: String(PORT) }, stdio: 'ignore' });

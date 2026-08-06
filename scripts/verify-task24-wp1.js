@@ -52,7 +52,7 @@ async function setup() {
   const b = await svc('POST', '/rest/v1/game_bosses', { raid_id: testRaidId, name: 'T24A一号王', boss_order: 1 });
   if (b.status !== 201) throw new Error('建测试 BOSS 失败: ' + JSON.stringify(b.body));
   testBossId = b.body[0].id;
-  const l = await svc('POST', '/rest/v1/boss_loot', { boss_id: testBossId, item_name: 'T24A测试之刃', slot: '武器', item_type: '单手剑', primary_stats: ['力量'], secondary_stats: ['暴击'] });
+  const l = await svc('POST', '/rest/v1/boss_loot', { boss_id: testBossId, item_name: 'T24A测试之刃', slot: '武器', item_type: '单手剑', primary_stats: ['力量'], secondary_stats: ['爆击'] });
   if (l.status !== 201) throw new Error('建测试掉落失败: ' + JSON.stringify(l.body));
 
   let res = await fetch(`${SB}/auth/v1/signup`, { method: 'POST', headers: { apikey: ANON, 'Content-Type': 'application/json' }, body: JSON.stringify({ email: EMAIL, password: PWD, data: { display_name: 'T24A会长' } }) });

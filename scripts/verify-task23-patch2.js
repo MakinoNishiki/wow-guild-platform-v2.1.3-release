@@ -3,7 +3,7 @@
 //   ②职责多选 AND——成员职责按主/副专精推导（deriveMemberRoles），职责集合 ⊇ 选中集合才命中：
 //     双职责成员（织雾=治疗+踏风=输出，存档 role 仅 ['治疗']）勾「治疗+输出」必须命中（BUG 实证复现）；
 //     单职责成员不误中；单选回归；与职业下拉/搜索组合各一例；显示已离队联动；清空还原。
-//   ③chips 固定枚举：主 3（力量/敏捷/智力）+ 副 4（暴击/急速/精通/全能）全量渲染不随数据增减；
+//   ③chips 固定枚举：主 3（力量/敏捷/智力）+ 副 4（爆击/急速/精通/全能）全量渲染不随数据增减；
 //     每个属性单选结果集 = 服务端参照集精确匹配；空结果属性空态正常；AND/双视图/赛季复位不回归。
 //   ①成员管理筛选条「全部职业」select 截图取证（两档）。
 // 测试数据（T23Y 前缀）自清理并复核为零。用法: node scripts/verify-task23-patch2.js（PW_CHANNEL=chrome 可选）
@@ -249,7 +249,7 @@ const memberNames = () => {
         s: [...document.querySelectorAll('#dpSecondaryChips .dp-chip')].map(c => c.dataset.v),
       }));
       check(`[${vp.tag}] ③chips 固定枚举全量渲染（主 3 + 副 4，不随数据增减）`,
-        eqSet(chipVals.p, ['力量', '敏捷', '智力']) && eqSet(chipVals.s, ['暴击', '急速', '精通', '全能']),
+        eqSet(chipVals.p, ['力量', '敏捷', '智力']) && eqSet(chipVals.s, ['爆击', '急速', '精通', '全能']),
         `主=[${chipVals.p}] 副=[${chipVals.s}]`);
       await page2.locator('.dp-filterbar').screenshot({ path: path.join(SHOT_DIR, `${vp.tag}-chips-all.png`) });
 
@@ -259,7 +259,7 @@ const memberNames = () => {
       }, [row, v]);
       let emptyEnum = null;
       for (const [row, v] of [['#dpPrimaryChips', '力量'], ['#dpPrimaryChips', '敏捷'], ['#dpPrimaryChips', '智力'],
-        ['#dpSecondaryChips', '暴击'], ['#dpSecondaryChips', '急速'], ['#dpSecondaryChips', '精通'], ['#dpSecondaryChips', '全能']]) {
+        ['#dpSecondaryChips', '爆击'], ['#dpSecondaryChips', '急速'], ['#dpSecondaryChips', '精通'], ['#dpSecondaryChips', '全能']]) {
         const isPrimary = row === '#dpPrimaryChips';
         const exp = refItems(l => ((isPrimary ? l.primary_stats : l.secondary_stats) || []).includes(v));
         await clickChip2(row, v);
@@ -278,14 +278,14 @@ const memberNames = () => {
 
       // 不回归：AND + 双视图 + 赛季复位
       await clickChip2('#dpPrimaryChips', '智力');
-      await clickChip2('#dpSecondaryChips', '暴击');
+      await clickChip2('#dpSecondaryChips', '爆击');
       await sleep(500);
-      const expAnd = refItems(l => (l.primary_stats || []).includes('智力') && (l.secondary_stats || []).includes('暴击'));
+      const expAnd = refItems(l => (l.primary_stats || []).includes('智力') && (l.secondary_stats || []).includes('爆击'));
       const gotAnd = await page2.evaluate(displayedItems);
       await page2.evaluate(() => { [...document.querySelectorAll('.dp-toggle')].find(b => b.dataset.view === 'pool').click(); });
       await sleep(500);
       const gotPool = await page2.evaluate(displayedItems);
-      check(`[${vp.tag}] ③不回归：AND「智力+暴击」+ 整体池视图结果一致`, eqSet(gotAnd, expAnd) && eqSet(gotPool, expAnd),
+      check(`[${vp.tag}] ③不回归：AND「智力+爆击」+ 整体池视图结果一致`, eqSet(gotAnd, expAnd) && eqSet(gotPool, expAnd),
         `boss ${gotAnd.length} / pool ${gotPool.length} / 参照 ${expAnd.length}`);
       await page2.evaluate(() => { [...document.querySelectorAll('.dp-toggle')].find(b => b.dataset.view === 'boss').click(); });
       await sleep(400);

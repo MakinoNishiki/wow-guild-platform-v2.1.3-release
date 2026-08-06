@@ -88,8 +88,8 @@ async function setup() {
   testBossId = b.body[0].id;
   const lootRows = [
     { dungeon_id: dungeonId, boss_id: testBossId, item_name: 'T23X力量战斧', slot: '武器', item_type: '双手斧', primary_stats: ['力量'], secondary_stats: ['急速'] },
-    { dungeon_id: dungeonId, boss_id: testBossId, item_name: 'T23X智力法杖', slot: '武器', item_type: '法杖', primary_stats: ['智力'], secondary_stats: ['暴击'] },
-    { dungeon_id: dungeonId, boss_id: null, item_name: 'T23X全能项坠', slot: '颈部', item_type: '项链', primary_stats: ['力量'], secondary_stats: ['暴击', '全能'] },
+    { dungeon_id: dungeonId, boss_id: testBossId, item_name: 'T23X智力法杖', slot: '武器', item_type: '法杖', primary_stats: ['智力'], secondary_stats: ['爆击'] },
+    { dungeon_id: dungeonId, boss_id: null, item_name: 'T23X全能项坠', slot: '颈部', item_type: '项链', primary_stats: ['力量'], secondary_stats: ['爆击', '全能'] },
   ];
   const l = await svc('POST', '/rest/v1/dungeon_loot', lootRows);
   if (l.status !== 201) throw new Error('建测试掉落失败: ' + JSON.stringify(l.body));
@@ -241,20 +241,20 @@ const eqSet = (a, b) => a.length === b.length && a.every((v, i) => v === b[i]);
       let got = await page.evaluate(displayedItems);
       check(`[${vp.tag}] ③主属性单选「力量」：结果集精确匹配（无智力装备混入）`, eqSet(got, exp), `${got.length}/${exp.length} 件`);
 
-      // 副属性单选一例：暴击（先撤力量）
+      // 副属性单选一例：爆击（先撤力量）
       await clickChip('#dpPrimaryChips', '力量');
-      await clickChip('#dpSecondaryChips', '暴击');
+      await clickChip('#dpSecondaryChips', '爆击');
       await sleep(600);
-      exp = refItems(l => (l.secondary_stats || []).includes('暴击'));
+      exp = refItems(l => (l.secondary_stats || []).includes('爆击'));
       got = await page.evaluate(displayedItems);
-      check(`[${vp.tag}] ③副属性单选「暴击」：结果集精确匹配`, eqSet(got, exp), `${got.length}/${exp.length} 件`);
+      check(`[${vp.tag}] ③副属性单选「爆击」：结果集精确匹配`, eqSet(got, exp), `${got.length}/${exp.length} 件`);
 
-      // 组合一例：主=力量 AND 副=暴击
+      // 组合一例：主=力量 AND 副=爆击
       await clickChip('#dpPrimaryChips', '力量');
       await sleep(600);
-      exp = refItems(l => (l.primary_stats || []).includes('力量') && (l.secondary_stats || []).includes('暴击'));
+      exp = refItems(l => (l.primary_stats || []).includes('力量') && (l.secondary_stats || []).includes('爆击'));
       got = await page.evaluate(displayedItems);
-      check(`[${vp.tag}] ③组合「力量 AND 暴击」：结果集精确匹配（AND 语义）`, eqSet(got, exp), `${got.length}/${exp.length} 件=${got.join(',')}`);
+      check(`[${vp.tag}] ③组合「力量 AND 爆击」：结果集精确匹配（AND 语义）`, eqSet(got, exp), `${got.length}/${exp.length} 件=${got.join(',')}`);
 
       // 双视图筛选生效：按 BOSS 视图截图 → 切整体池视图再核对+截图
       await page.evaluate(() => {
@@ -280,7 +280,7 @@ const eqSet = (a, b) => a.length === b.length && a.every((v, i) => v === b[i]);
 
       // 清空还原一例：撤掉全部 chips → 回到全集
       await clickChip('#dpPrimaryChips', '力量');
-      await clickChip('#dpSecondaryChips', '暴击');
+      await clickChip('#dpSecondaryChips', '爆击');
       await sleep(600);
       exp = refItems();
       got = await page.evaluate(displayedItems);

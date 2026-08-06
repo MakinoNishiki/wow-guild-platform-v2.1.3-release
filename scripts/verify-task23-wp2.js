@@ -56,7 +56,7 @@ async function setup() {
   if (b.status !== 201) throw new Error('建测试 BOSS 失败');
   testBossId = b.body[0].id;
   const lootRows = [
-    { dungeon_id: dungeonId, boss_id: testBossId, item_name: 'T23P毒牙之刃', slot: '武器', item_type: '单手剑', primary_stats: ['力量'], secondary_stats: ['暴击', '急速'], effect: '装备：攻击附带剧毒' },
+    { dungeon_id: dungeonId, boss_id: testBossId, item_name: 'T23P毒牙之刃', slot: '武器', item_type: '单手剑', primary_stats: ['力量'], secondary_stats: ['爆击', '急速'], effect: '装备：攻击附带剧毒' },
     { dungeon_id: dungeonId, boss_id: testBossId, item_name: 'T23P毒牙头盔', slot: '头部', item_type: '板甲', primary_stats: ['力量'], secondary_stats: ['全能'], effect: null },
     { dungeon_id: dungeonId, boss_id: null, item_name: 'T23P整体池项坠', slot: '颈部', item_type: '项链', primary_stats: ['智力'], secondary_stats: [], effect: null },
   ];

@@ -274,7 +274,7 @@ async function proxy(token, method, table, body, query) {
             const boss11 = await proxy(admin.token, 'POST', 'game_bosses', { raid_id: raid11Row.id, name: 'sql11BOSS', boss_order: 1 });
             const boss11Row = Array.isArray(boss11.body) && boss11.body[0];
             if (boss11Row) {
-              const loot11 = await proxy(admin.token, 'POST', 'boss_loot', { boss_id: boss11Row.id, item_name: 'sql11装备', effect: '装备：测试特效', primary_stats: ['力量'], secondary_stats: ['暴击', '急速'] });
+              const loot11 = await proxy(admin.token, 'POST', 'boss_loot', { boss_id: boss11Row.id, item_name: 'sql11装备', effect: '装备：测试特效', primary_stats: ['力量'], secondary_stats: ['爆击', '急速'] });
               const lootRow = Array.isArray(loot11.body) && loot11.body[0];
               check('9b. boss_loot effect/primary_stats/secondary_stats 可写读',
                 loot11.status === 201 && lootRow && lootRow.effect === '装备：测试特效' && Array.isArray(lootRow.primary_stats) && lootRow.secondary_stats.length === 2,
