@@ -4,21 +4,20 @@
 -- 导出目标：SavedVariables 全局表 WJDCDump（/reload 或退出游戏后写盘）
 -- 命令：/wjdc all | raid | mplus | tier | me
 -- ============================================================
-local ADDON_VERSION = "1.0.2"
+local ADDON_VERSION = "1.0.3"
 
 local function msg(s) DEFAULT_CHAT_FRAME:AddMessage("|cffffd200[wjdc]|r " .. s) end
 local function err(s) DEFAULT_CHAT_FRAME:AddMessage("|cffff4040[wjdc]|r " .. s) end
 
 local function ejAvailable()
-  -- 掉落兼容位（任务书 #26-fix2）：12.x 起 EJ_GetLootInfoByIndex 移除，
-  -- 迁移至 C_EncounterJournal.GetLootInfoByIndex，两者居其一即可
-  local lootFn = EJ_GetLootInfoByIndex
-    or (C_EncounterJournal and C_EncounterJournal.GetLootInfoByIndex)
-  return type(EJ_GetCurrentTier) == "function"
-     and type(EJ_GetInstanceByIndex) == "function"
-     and type(EJ_GetEncounterInfoByIndex) == "function"
-     and type(lootFn) == "function"
+  -- 掉落兼容位（任务书 #26-fix2）：12.x 起 EJ_GetLootInfoByIndex 移除，迁移至 C_EncounterJournal.GetLootInfoByIndex，居其一即可
+  local lootFn = EJ_GetLootInfoByIndex or (C_EncounterJournal and C_EncounterJournal.GetLootInfoByIndex)
+  return type(EJ_GetCurrentTier) == "function" and type(EJ_GetInstanceByIndex) == "function"
+     and type(EJ_GetEncounterInfoByIndex) == "function" and type(lootFn) == "function"
 end
+
+-- 诊断模块共享（/wjdc probe，任务书 #26-fix3，实现见 WoWButlerExporter_Probe.lua）
+WJDCShared = { msg = msg, err = err, ejAvailable = ejAvailable }
 
 local function buildMeta(kind)
   local ver, build, _, iface = GetBuildInfo()
@@ -288,9 +287,14 @@ end
 SLASH_WJDC1 = "/wjdc"
 SlashCmdList["WJDC"] = function(input)
   local cmd = (input or ""):gsub("^%s+", ""):gsub("%s+$", ""):lower()
+  local probeArg = cmd:match("^probe%s*(%d*)$")
+  if probeArg then
+    if WJDCProbe then WJDCProbe(probeArg) else err("诊断模块 WoWButlerExporter_Probe.lua 未加载") end
+    return
+  end
   if cmd == "all" or cmd == "raid" or cmd == "mplus" or cmd == "tier" or cmd == "me" then
     doExport(cmd)
   else
-    msg("用法：/wjdc all（全量）| raid（团本）| mplus（大秘境）| tier（套装）| me（本人角色档案）")
+    msg("用法：/wjdc all（全量）| raid（团本）| mplus（大秘境）| tier（套装）| me（本人角色档案）| probe [团本序号]（诊断）")
   end
 end
