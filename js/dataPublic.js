@@ -30,8 +30,7 @@
     { label: '套装兑换物', values: ['套装兑换物'] },
     { label: '杂项', values: ['杂项'] },
   ];
-  // 类型：甲型 → 武器（含副手物品）→ 首饰 → 饰品（独立）→ 套装兑换物（独立）→ 其它/杂项
-  // 类型：甲型 → 武器（远程武器三连：弓/枪械/弩）→ 首饰 → 饰品（独立）→ 套装兑换物（独立）→ 其它/杂项
+  // 类型：甲型 → 武器（远程武器三连：弓/枪械/弩）→ 首饰 → 饰品（独立）→ 套装兑换物（独立）→ 其它·杂项
   const TYPE_GROUPS = [
     { label: '护甲', values: ['板甲', '锁甲', '皮甲', '布甲', '盾牌'] },
     { label: '武器', values: ['单手锤', '单手斧', '单手剑', '匕首', '拳套', '战刃', '长柄武器', '法杖', '弓', '枪械', '弩', '双手锤', '双手斧', '双手剑', '魔杖', '副手物品'] },
@@ -39,7 +38,7 @@
     { label: '饰品', values: ['饰品'] },
     { label: '套装兑换物', values: ['套装兑换物'] },
   ];
-  // 选项集合从数据动态聚合，但按模板分组排序；模板外新值归「其它」组保留，禁止丢弃
+  // 选项集合从数据动态聚合，但按模板分组排序；模板外新值归「其它·杂项」组保留，禁止丢弃（筛选规范 §4）
   function groupOrder(values, template) {
     const pool = new Set(values);
     const out = [];
@@ -48,7 +47,7 @@
       items.forEach(v => pool.delete(v));
       if (items.length) out.push({ label: g.label, items });
     }
-    if (pool.size) out.push({ label: '其它', items: [...pool].sort((a, b) => a.localeCompare(b, 'zh')) });
+    if (pool.size) out.push({ label: '其它·杂项', items: [...pool].sort((a, b) => a.localeCompare(b, 'zh')) });
     return out;
   }
 
@@ -63,7 +62,7 @@
       || String(a.item_name || '').localeCompare(String(b.item_name || ''), 'zh'));
   }
 
-  // 修正项⑤：折叠状态页内记忆（sessionStorage，不持久）
+  // 折叠状态页内记忆（sessionStorage，不持久；三级折叠共用同一键集）
   const COLLAPSE_KEY = 'dp23:collapsed';
   function getCollapsed() {
     try { return new Set(JSON.parse(sessionStorage.getItem(COLLAPSE_KEY) || '[]')); } catch { return new Set(); }
@@ -74,6 +73,9 @@
     try { sessionStorage.setItem(COLLAPSE_KEY, JSON.stringify([...s])); } catch {}
     render();
   }
+
+  // 修正项②（任务书 #23-补丁4）：三级折叠同规格控件——24×24 热区 + 2px 描边箭头（CSS 控制旋转）
+  const CARET_BTN = '<span class="dp-collapse-btn" aria-hidden="true"><svg viewBox="0 0 12 12" width="12" height="12"><path d="M2 4l4 4 4-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>';
 
   function esc(s) {
     return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -137,57 +139,80 @@
       `<option value="${s.id}" ${s.id === state.seasonId ? 'selected' : ''}>${esc(s.name)}${s.is_current ? '（当前）' : ''}</option>`).join('');
     $('dpSeasonSelect').onchange = e => { state.seasonId = e.target.value; resetFilters(); render(); };
 
-    // 修正项②⑦（任务书 #23-补丁3）：部位/类型 chips 从全部掉落数据动态聚合，按运营定稿模板分组排序
+    // 筛选条（结构 = 筛选规范 §2 唯一合法布局：四组各行 → 排除杂项行 → 搜索框独立行）
     const allLoot = [...state.loot, ...state.dungeonLoot];
     buildGroupedChips($('dpSlotChips'), groupOrder(allLoot.map(l => l.slot).filter(Boolean), SLOT_GROUPS), state.slots);
     buildGroupedChips($('dpTypeChips'), groupOrder(allLoot.map(l => l.item_type).filter(Boolean), TYPE_GROUPS), state.types);
     $('dpSearch').oninput = e => { state.search = e.target.value.trim().toLowerCase(); render(); };
-    // 修正项⑥：排除杂项开关（默认关）+ 问号说明（悬浮/点击）
+    // 排除杂项开关（默认关）+ 问号说明（悬浮/点击）
     $('dpExcludeMisc').onchange = e => { state.excludeMisc = e.target.checked; render(); };
     $('dpMiscHelp').onclick = e => { e.preventDefault(); e.stopPropagation(); $('dpMiscHelp').classList.toggle('open'); };
     document.addEventListener('click', () => $('dpMiscHelp').classList.remove('open'));
+    // 移动端（≤768px）筛选条整体折叠为「筛选 ▾」按钮（筛选规范 §6）
+    $('dpFilterToggle').onclick = () => {
+      const bar = $('dpFilterBar');
+      const open = bar.classList.toggle('filters-open');
+      $('dpFilterToggle').textContent = open ? '筛选 ▴' : '筛选 ▾';
+    };
 
     // 主/副属性多标签筛选（任务书 #23-补丁 修正项③：多标签 AND；
     // #23-补丁2 修正项③：筛选项为 WoW 封闭枚举固定全量——主：力量/敏捷/智力，副：爆击/急速/精通/全能，
-    // 不再从已录入数据聚合；选中无匹配装备时显示空结果属正常）
-    // 修正项①（任务书 #23-补丁3）：副属性枚举官方用字「爆击」（#23-补丁2 固定枚举曾误用字形，DB 值已是「爆击」不动）
+    // 不再从已录入数据聚合；选中无匹配装备时显示空结果属正常；
+    // 筛选规范 §2 布局：主/副属性行无「全部」chip（未选中即不过滤））
     buildChips($('dpPrimaryChips'), ['力量', '敏捷', '智力'], state.primaryStats);
     buildChips($('dpSecondaryChips'), ['爆击', '急速', '精通', '全能'], state.secondaryStats);
 
     render();
   }
 
+  // chip 行选中态同步（值 chip 按 stateSet、全部 chip 仅当集合为空）
+  function syncChipRow(container, stateSet) {
+    container.querySelectorAll('.dp-chip').forEach(ch => {
+      if (ch.classList.contains('dp-chip-all')) ch.classList.toggle('active', stateSet.size === 0);
+      else ch.classList.toggle('active', stateSet.has(ch.dataset.v));
+    });
+  }
+
   function buildChips(container, values, stateSet) {
     if (!container) return;
-    container.innerHTML = values.map(v => `<span class="dp-chip" data-v="${esc(v)}">${esc(v)}</span>`).join('');
+    container.innerHTML = `<span class="dp-chip-sub">` +
+      values.map(v => `<span class="dp-chip" data-v="${esc(v)}">${esc(v)}</span>`).join('') + `</span>`;
     container.querySelectorAll('.dp-chip').forEach(ch => {
       ch.onclick = () => {
         const v = ch.dataset.v;
-        if (stateSet.has(v)) { stateSet.delete(v); ch.classList.remove('active'); }
-        else { stateSet.add(v); ch.classList.add('active'); }
+        if (stateSet.has(v)) stateSet.delete(v); else stateSet.add(v);
+        syncChipRow(container, stateSet);
         render();
       };
     });
   }
 
-  // 修正项⑦：分组 chips（组头小字分隔，组内按模板顺序）
+  // 分组 chips（筛选规范 §3/§4：「全部」chip 恒为组内第一个、选中 = 该组不过滤；
+  // 子类组按模板排序、组间 1px 竖分隔线）
   function buildGroupedChips(container, groups, stateSet) {
     if (!container) return;
-    container.innerHTML = groups.map(g =>
-      `<span class="dp-chip-group-label">${esc(g.label)}</span>` +
-      g.items.map(v => `<span class="dp-chip" data-v="${esc(v)}">${esc(v)}</span>`).join('')
-    ).join('');
-    container.querySelectorAll('.dp-chip').forEach(ch => {
+    container.innerHTML = `<span class="dp-chip dp-chip-all${stateSet.size === 0 ? ' active' : ''}" data-v="">全部</span>` +
+      groups.map(g =>
+        `<span class="dp-chip-sub"><span class="dp-chip-group-label">${esc(g.label)}</span>` +
+        g.items.map(v => `<span class="dp-chip" data-v="${esc(v)}">${esc(v)}</span>`).join('') + '</span>'
+      ).join('<span class="dp-chip-divider"></span>');
+    container.querySelector('.dp-chip-all').onclick = () => {
+      if (!stateSet.size) return;
+      stateSet.clear();
+      syncChipRow(container, stateSet);
+      render();
+    };
+    container.querySelectorAll('.dp-chip:not(.dp-chip-all)').forEach(ch => {
       ch.onclick = () => {
         const v = ch.dataset.v;
-        if (stateSet.has(v)) { stateSet.delete(v); ch.classList.remove('active'); }
-        else { stateSet.add(v); ch.classList.add('active'); }
+        if (stateSet.has(v)) stateSet.delete(v); else stateSet.add(v);
+        syncChipRow(container, stateSet);
         render();
       };
     });
   }
 
-  // 赛季切换后全部筛选重置为默认（修正项③）
+  // 赛季切换后全部筛选重置为默认（修正项③；筛选规范 §5：每组回「全部」、开关关、搜索清空）
   function resetFilters() {
     state.search = '';
     state.slots.clear(); state.types.clear();
@@ -195,7 +220,10 @@
     state.excludeMisc = false;
     state.tierClassId = ''; state.tierRole = ''; state.tierSpecId = '';
     $('dpSearch').value = ''; $('dpExcludeMisc').checked = false;
-    document.querySelectorAll('.dp-filterbar .dp-chip.active').forEach(c => c.classList.remove('active'));
+    syncChipRow($('dpSlotChips'), state.slots);
+    syncChipRow($('dpTypeChips'), state.types);
+    syncChipRow($('dpPrimaryChips'), state.primaryStats);
+    syncChipRow($('dpSecondaryChips'), state.secondaryStats);
   }
 
   const hasLootFilter = () => !!(state.search || state.slots.size || state.types.size
@@ -215,7 +243,9 @@
 
   // ---- 装备卡片（REQ-054 体系：部位/类型/特效游戏绿/主副属性标签） ----
   // 修正项③（任务书 #23-补丁3）：全部卡片默认统一尺寸——特效预览恒占一行（无特效为空行）；
-  // 有特效卡边框高亮引导，悬浮（移动端点击 .expanded）平滑展开覆盖层显示完整特效，不挤压网格
+  // 有特效卡边框高亮引导，悬浮（移动端点击 .expanded）平滑展开覆盖层，不挤压网格。
+  // 修正项①（任务书 #23-补丁4）：展开即全文替换——预览行与覆盖层渲染同一份文本，
+  // 折叠态 CSS 截断（单行省略号）、展开态覆盖层上移覆盖预览行显示完整全文，状态类切换，不做任何拼接。
   function itemCard(l) {
     const hasEffect = !!l.effect;
     return `<div class="dp-item${hasEffect ? ' has-effect' : ''}">
@@ -234,11 +264,12 @@
   const emptyText = t => `<div class="dp-empty">${esc(t)}</div>`;
 
   // ---- 团本掉落池 ----
-  // 修正项⑤：BOSS 级折叠（标题行 + 件数徽标，默认展开，sessionStorage 记忆）
+  // 折叠三级（任务书 #23-补丁4 修正项②）：区块（render()）→ 副本（本函数）→ BOSS（bossBlockHtml），
+  // 各自独立、默认全展开、sessionStorage 记忆全覆盖；副本级折叠头 = 副本名 + 徽标 + 件数徽标 + 折叠控件
   function bossBlockHtml(collapseId, title, items) {
     const collapsed = getCollapsed().has(collapseId);
     return `<div class="dp-boss${collapsed ? ' collapsed' : ''}">
-      <div class="dp-boss-name" data-collapse="${esc(collapseId)}"><span class="dp-caret"></span>${title}<span class="dp-count">${items.length}</span></div>
+      <div class="dp-boss-name" data-collapse="${esc(collapseId)}">${CARET_BTN}${title}<span class="dp-count">${items.length}</span></div>
       <div class="dp-items">${sortLoot(items).map(itemCard).join('')}</div>
     </div>`;
   }
@@ -249,20 +280,24 @@
     if (!raids.length) return emptyText('该赛季团本数据维护中');
     return raids.map(raid => {
       const bosses = state.bosses.filter(b => b.raid_id === raid.id).sort((a, b) => (a.boss_order || 0) - (b.boss_order || 0));
+      let raidCount = 0;
       const bossHtml = bosses.map(boss => {
         const items = state.loot.filter(l => l.boss_id === boss.id && matchItem(l));
         if (!items.length) return '';
+        raidCount += items.length;
         return bossBlockHtml('boss:' + boss.id, `${boss.boss_order}号 · ${esc(boss.name)}`, items);
       }).join('');
       if (!bossHtml) return '';
-      return `<div class="dp-raid">
-        <div class="dp-raid-name">${esc(raid.name)}${raid.type === 'lair' ? '<span class="dp-badge dp-badge-lair">巢穴</span>' : ''}</div>
-        ${bossHtml}
+      const rid = 'raid:' + raid.id;
+      const collapsed = getCollapsed().has(rid);
+      return `<div class="dp-raid${collapsed ? ' collapsed' : ''}">
+        <div class="dp-raid-name" data-collapse="${esc(rid)}">${CARET_BTN}${esc(raid.name)}${raid.type === 'lair' ? '<span class="dp-badge dp-badge-lair">巢穴</span>' : ''}<span class="dp-count">${raidCount}</span></div>
+        <div class="dp-raid-body">${bossHtml}</div>
       </div>`;
     }).join('') || emptyText(hasLootFilter() ? '没有符合筛选条件的团本装备' : '该赛季团本数据维护中');
   }
 
-  // ---- 大秘境掉落池（区块头在 render()，此处仅内容体） ----
+  // ---- 大秘境掉落池（区块头在 render()，此处仅内容体；副本级折叠两种视图均生效） ----
   function renderDungeons() {
     const dungeons = state.dungeons.filter(d => d.season_id === state.seasonId)
       .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
@@ -270,28 +305,28 @@
 
     const body = dungeons.map(d => {
       const all = state.dungeonLoot.filter(l => l.dungeon_id === d.id && matchItem(l));
-      const dName = `${esc(d.name)}${d.is_new ? '<span class="dp-badge dp-badge-new">新本</span>' : ''}`;
+      if (!all.length) return '';
+      const did = 'dungeon:' + d.id;
+      const collapsed = getCollapsed().has(did);
+      const head = `<div class="dp-raid-name" data-collapse="${esc(did)}">${CARET_BTN}${esc(d.name)}${d.is_new ? '<span class="dp-badge dp-badge-new">新本</span>' : ''}<span class="dp-count">${all.length}</span></div>`;
+      let inner;
       if (state.dungeonView === 'pool') {
-        if (!all.length) return '';
-        return `<div class="dp-raid">
-          <div class="dp-raid-name">${dName}<span class="dp-count">${all.length}</span></div>
-          <div class="dp-items">${sortLoot(all).map(itemCard).join('')}</div>
-        </div>`;
+        inner = `<div class="dp-items">${sortLoot(all).map(itemCard).join('')}</div>`;
+      } else {
+        // 按 BOSS：BOSS 分组 + 未归属条目归「整体池」组
+        const bosses = state.bosses.filter(b => b.dungeon_id === d.id).sort((a, b) => (a.boss_order || 0) - (b.boss_order || 0));
+        const groups = bosses.map(boss => {
+          const items = all.filter(l => l.boss_id === boss.id);
+          if (!items.length) return '';
+          return bossBlockHtml('boss:' + boss.id, `${boss.boss_order}号 · ${esc(boss.name)}`, items);
+        });
+        const poolItems = all.filter(l => !l.boss_id);
+        if (poolItems.length) {
+          groups.push(bossBlockHtml('pool:' + d.id, '整体池', poolItems));
+        }
+        inner = groups.join('');
       }
-      // 按 BOSS：BOSS 分组 + 未归属条目归「整体池」组
-      const bosses = state.bosses.filter(b => b.dungeon_id === d.id).sort((a, b) => (a.boss_order || 0) - (b.boss_order || 0));
-      const groups = bosses.map(boss => {
-        const items = all.filter(l => l.boss_id === boss.id);
-        if (!items.length) return '';
-        return bossBlockHtml('boss:' + boss.id, `${boss.boss_order}号 · ${esc(boss.name)}`, items);
-      });
-      const poolItems = all.filter(l => !l.boss_id);
-      if (poolItems.length) {
-        groups.push(bossBlockHtml('pool:' + d.id, '整体池', poolItems));
-      }
-      const gHtml = groups.join('');
-      if (!gHtml) return '';
-      return `<div class="dp-raid"><div class="dp-raid-name">${dName}</div>${gHtml}</div>`;
+      return `<div class="dp-raid${collapsed ? ' collapsed' : ''}">${head}<div class="dp-raid-body">${inner}</div></div>`;
     }).join('') || emptyText(hasLootFilter() ? '没有符合筛选条件的大秘境装备' : '该赛季大秘境数据维护中');
 
     return body;
@@ -360,10 +395,10 @@
   }
 
   function render() {
-    // 修正项⑤：一级区块级折叠（团本/大秘境两大区块，默认展开，sessionStorage 记忆）
+    // 一级区块级折叠（团本/大秘境两大区块，默认展开，sessionStorage 记忆）
     const collapsed = getCollapsed();
     const secHead = (id, title, extra) => `<div class="dp-section-head dp-section-collapser${collapsed.has(id) ? ' collapsed' : ''}" data-collapse="${id}">
-      <div class="dp-section-title"><span class="dp-caret"></span>${title}</div>${extra || ''}</div>`;
+      <div class="dp-section-title">${CARET_BTN}${title}</div>${extra || ''}</div>`;
     const raidsBody = collapsed.has('sec:raids') ? '' : renderRaids();
     const mplusToggle = `<div class="dp-view-toggle">
         <button class="dp-toggle${state.dungeonView === 'boss' ? ' active' : ''}" data-view="boss">按 BOSS</button>
@@ -394,7 +429,7 @@
     main.querySelectorAll('.dp-toggle').forEach(btn => {
       btn.onclick = () => { state.dungeonView = btn.dataset.view; render(); };
     });
-    // 折叠（BOSS 级 + 一级区块级，事件委托；视图切换按钮不触发折叠）
+    // 折叠（区块/副本/BOSS 三级，事件委托；视图切换按钮不触发折叠）
     main.querySelectorAll('[data-collapse]').forEach(el => {
       el.onclick = ev => { if (ev.target.closest('.dp-toggle')) return; toggleCollapse(el.dataset.collapse); };
     });

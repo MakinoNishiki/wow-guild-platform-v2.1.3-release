@@ -27,7 +27,7 @@
 
 .dp-filterbar {
   display: flex;
-  gap: 10px;
+  gap: 8px; /* 筛选规范 §2：组与组之间固定 8px 行距 */
   max-width: 1100px;
   margin: 0 auto;
   padding: 14px 20px;
@@ -40,21 +40,34 @@
 }
 .dp-filterbar .search-input { flex: 1; min-width: 200px; }
 .dp-filterbar .form-select { width: 150px; }
+.dp-misc-row, .dp-search-row { width: 100%; }
+.dp-search-row .search-input { width: 100%; box-sizing: border-box; }
 
-/* 任务书 #23-补丁：主/副属性标签 chips（多选 AND） */
-.dp-chip-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; width: 100%; }
-.dp-chip-label { font-size: 12px; color: var(--text-muted); flex-shrink: 0; }
-.dp-chips { display: flex; gap: 6px; flex-wrap: wrap; }
+/* 移动端（≤768px）筛选条整体折叠为「筛选 ▾」按钮（筛选规范 §6），桌面恒展开 */
+.dp-filter-toggle { display: none; }
+
+/* 筛选 chips（规范 v2 §4.3/§5 + 筛选规范 §3：24px 恒定高、12px 圆角、12px/500、深底；
+   组头 56px 右对齐 12px 次级色、与首行 chip 同基线；chip 间 6px、子类组间 8px + 1px 竖分隔线 16px 高
+   ——任务书 #23-补丁4 修正项③） */
+.dp-chip-row { display: flex; align-items: flex-start; gap: 8px; flex-wrap: wrap; width: 100%; }
+.dp-chip-label { font-size: 12px; color: var(--text-secondary); flex-shrink: 0; width: 56px; text-align: right; line-height: 24px; }
+.dp-chips { display: flex; flex-wrap: wrap; column-gap: 0; row-gap: 6px; align-items: center; flex: 1; min-width: 0; }
+.dp-chip-sub { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; row-gap: 6px; min-width: 0; }
+.dp-chip-group-label { font-size: 11px; color: var(--text-muted); user-select: none; line-height: 24px; flex: none; white-space: nowrap; }
+.dp-chip-divider { width: 1px; height: 16px; background: var(--border-color); margin: 0 8px; flex: none; align-self: center; }
 .dp-chip {
   display: inline-flex;
   align-items: center;
-  height: 22px;
+  flex: none;
+  white-space: nowrap;
+  height: 24px;
   padding: 0 10px;
-  border-radius: 11px;
+  border-radius: 12px;
   border: 1px solid var(--border-color);
-  background: transparent;
+  background: var(--bg-card);
   color: var(--text-secondary);
   font-size: 12px;
+  font-weight: 500;
   cursor: pointer;
   user-select: none;
 }
@@ -62,6 +75,13 @@
   border-color: var(--gold);
   color: var(--gold);
   background: rgba(240, 192, 96, 0.1);
+}
+
+@media (max-width: 768px) {
+  .dp-filter-toggle { display: inline-flex; align-items: center; }
+  .dp-filterbar:not(.filters-open) .dp-chip-row,
+  .dp-filterbar:not(.filters-open) .dp-misc-row,
+  .dp-filterbar:not(.filters-open) .dp-search-row { display: none; }
 }
 
 /* 任务书 #23-补丁 修正项②：套装三维筛选条 */
@@ -208,10 +228,6 @@
 }
 
 /* ==================== 任务书 #23-补丁3：公示页交互优化 ==================== */
-/* 修正项⑦：筛选 chips 组头小字 */
-.dp-chip-group-label { font-size: 11px; color: var(--text-muted); margin: 0 2px 0 6px; user-select: none; }
-.dp-chip-group-label:first-child { margin-left: 0; }
-
 /* 修正项⑥：排除杂项开关 + 问号帮助 */
 .dp-misc-toggle { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-secondary); cursor: pointer; user-select: none; }
 .dp-help {
@@ -232,12 +248,24 @@
 }
 .dp-help:hover .dp-help-pop, .dp-help:focus .dp-help-pop, .dp-help.open .dp-help-pop { opacity: 1; visibility: visible; }
 
-/* 修正项⑤：折叠（BOSS 级 + 区块级） */
-.dp-caret { display: inline-block; width: 14px; flex: none; color: var(--text-muted); font-size: 11px; }
-.dp-caret::before { content: '▾'; }
-.collapsed > .dp-boss-name .dp-caret::before, .dp-section-collapser.collapsed .dp-caret::before { content: '▸'; }
-.dp-boss-name[data-collapse], .dp-section-collapser { cursor: pointer; user-select: none; }
+/* 折叠（区块/副本/BOSS 三级，任务书 #23-补丁4 修正项②：24×24 热区 + 2px 描边箭头，
+   常态次要色、悬浮提亮，三级同规格；默认展开=向下，折叠=向右旋转 -90°） */
+.dp-collapse-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 24px; height: 24px; flex: none;
+  color: var(--text-secondary);
+  border-radius: 6px;
+}
+.dp-boss-name:hover .dp-collapse-btn,
+.dp-raid-name:hover .dp-collapse-btn,
+.dp-section-collapser:hover .dp-collapse-btn { color: var(--gold); }
+.dp-collapse-btn svg { transition: transform .2s ease; }
+.dp-boss.collapsed > .dp-boss-name .dp-collapse-btn svg,
+.dp-raid.collapsed > .dp-raid-name .dp-collapse-btn svg,
+.dp-section-collapser.collapsed .dp-collapse-btn svg { transform: rotate(-90deg); }
+.dp-boss-name[data-collapse], .dp-raid-name[data-collapse], .dp-section-collapser { cursor: pointer; user-select: none; }
 .dp-boss.collapsed > .dp-items { display: none; }
+.dp-raid.collapsed > .dp-raid-body { display: none; }
 
 /* 修正项③：卡片统一尺寸 + 特效悬浮展开 + 可展开高亮边框 */
 .dp-item { position: relative; }
@@ -254,9 +282,12 @@
   cursor: pointer;
 }
 .dp-item.has-effect:hover, .dp-item.has-effect.expanded { z-index: 30; }
-/* 展开覆盖层：默认收起，悬浮/点击平滑展开（200–300ms），绝对定位不挤压网格 */
+/* 修正项①（任务书 #23-补丁4）：展开即全文替换——展开态隐藏截断预览行（占位保卡片尺寸），
+   覆盖层上移至预览行位置渲染完整全文，杜绝「片段+全文」重复；250ms 过渡维持补丁3 现状 */
+.dp-item.has-effect:hover .dp-item-effect-preview,
+.dp-item.has-effect.expanded .dp-item-effect-preview { opacity: 0; }
 .dp-item-effect-overlay {
-  position: absolute; left: -1px; right: -1px; top: calc(100% - 6px);
+  position: absolute; left: -1px; right: -1px; top: calc(100% - 30px);
   padding: 0 12px;
   background: var(--bg-card);
   border: 1px solid rgba(240, 192, 96, 0.55); border-top: none;
@@ -282,6 +313,11 @@
   font-size: 12px;
   color: var(--text-muted);
   border-top: 1px solid var(--border-color);
+}
+
+/* 规范 v2 §6：尊重 prefers-reduced-motion（公示页全部过渡降级为瞬时） */
+@media (prefers-reduced-motion: reduce) {
+  .dp-item-effect-overlay, .dp-collapse-btn svg, .dp-help-pop { transition: none; }
 }
 
 @media (max-width: 768px) {
