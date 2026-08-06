@@ -206,6 +206,71 @@
   border: 1px dashed var(--border-color);
   border-radius: 8px;
 }
+
+/* ==================== 任务书 #23-补丁3：公示页交互优化 ==================== */
+/* 修正项⑦：筛选 chips 组头小字 */
+.dp-chip-group-label { font-size: 11px; color: var(--text-muted); margin: 0 2px 0 6px; user-select: none; }
+.dp-chip-group-label:first-child { margin-left: 0; }
+
+/* 修正项⑥：排除杂项开关 + 问号帮助 */
+.dp-misc-toggle { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-secondary); cursor: pointer; user-select: none; }
+.dp-help {
+  position: relative;
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 16px; height: 16px; border-radius: 50%;
+  border: 1px solid var(--border-color);
+  font-size: 11px; color: var(--text-muted); cursor: help;
+}
+.dp-help-pop {
+  position: absolute; left: 50%; top: calc(100% + 6px); transform: translateX(-50%);
+  width: 240px; padding: 8px 10px;
+  background: var(--bg-card); border: 1px solid var(--gold); border-radius: 6px;
+  font-size: 12px; color: var(--text-secondary); line-height: 1.6;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
+  opacity: 0; visibility: hidden; transition: opacity .2s ease;
+  z-index: 40; cursor: default;
+}
+.dp-help:hover .dp-help-pop, .dp-help:focus .dp-help-pop, .dp-help.open .dp-help-pop { opacity: 1; visibility: visible; }
+
+/* 修正项⑤：折叠（BOSS 级 + 区块级） */
+.dp-caret { display: inline-block; width: 14px; flex: none; color: var(--text-muted); font-size: 11px; }
+.dp-caret::before { content: '▾'; }
+.collapsed > .dp-boss-name .dp-caret::before, .dp-section-collapser.collapsed .dp-caret::before { content: '▸'; }
+.dp-boss-name[data-collapse], .dp-section-collapser { cursor: pointer; user-select: none; }
+.dp-boss.collapsed > .dp-items { display: none; }
+
+/* 修正项③：卡片统一尺寸 + 特效悬浮展开 + 可展开高亮边框 */
+.dp-item { position: relative; }
+.dp-item-effect-preview {
+  margin-top: 6px;
+  height: 18px; line-height: 18px;
+  font-size: 12px; color: #1eff00;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+/* 可展开卡片：边框高亮（微光引导） */
+.dp-item.has-effect {
+  border-color: rgba(240, 192, 96, 0.55);
+  box-shadow: 0 0 6px rgba(240, 192, 96, 0.12);
+  cursor: pointer;
+}
+.dp-item.has-effect:hover, .dp-item.has-effect.expanded { z-index: 30; }
+/* 展开覆盖层：默认收起，悬浮/点击平滑展开（200–300ms），绝对定位不挤压网格 */
+.dp-item-effect-overlay {
+  position: absolute; left: -1px; right: -1px; top: calc(100% - 6px);
+  padding: 0 12px;
+  background: var(--bg-card);
+  border: 1px solid rgba(240, 192, 96, 0.55); border-top: none;
+  border-radius: 0 0 8px 8px;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.55);
+  font-size: 12px; color: #1eff00; line-height: 1.6;
+  max-height: 0; opacity: 0; overflow: hidden;
+  transition: max-height .25s ease, opacity .25s ease, padding .25s ease;
+  z-index: 30; pointer-events: none;
+}
+.dp-item.has-effect:hover .dp-item-effect-overlay,
+.dp-item.has-effect.expanded .dp-item-effect-overlay {
+  max-height: 220px; opacity: 1; padding: 8px 12px 10px;
+}
 .dp-error { text-align: center; padding: 60px 0; }
 .dp-error-icon { font-size: 36px; margin-bottom: 12px; }
 .dp-error-text { color: var(--text-secondary); margin-bottom: 16px; }
