@@ -80,9 +80,8 @@ async function setup() {
     raidLoot: raidLoot.body, dungeonLoot: dungeonLoot.body, dungeonIds,
   };
 
-  // 测试数据：挂在既有副本「毒牙祭坛」下（与 WP2 同锚点）
-  const d = await svc('GET', `/rest/v1/game_dungeons?select=id&name=eq.${encodeURIComponent('毒牙祭坛')}`);
-  const dungeonId = d.body[0].id;
+  // 测试数据：挂在当前赛季第一个副本下（原锚点「毒牙祭坛」已随当前赛季切换漂移出赛季，2026-08-06 刷新）
+  const dungeonId = ref.dungeonIds[0];
   const b = await svc('POST', '/rest/v1/game_bosses', { dungeon_id: dungeonId, name: 'T23X补丁王', boss_order: 91 });
   if (b.status !== 201) throw new Error('建测试 BOSS 失败: ' + JSON.stringify(b.body));
   testBossId = b.body[0].id;
@@ -289,21 +288,19 @@ const eqSet = (a, b) => a.length === b.length && a.every((v, i) => v === b[i]);
       // 赛季切换后筛选重置（仅 1366 档）：挂上筛选 → 切空赛季 → 控件全部复位
       if (vp.tag === '1366') {
         await clickChip('#dpPrimaryChips', '力量');
-        await page.selectOption('#dpSlotFilter', '武器');
+        await clickChip('#dpSlotChips', '武器'); // 补丁3 起部位/类型为 chips（组内 OR），原 #dpSlotFilter 下拉已移除
         await page.fill('#dpSearch', 'T23X');
         await sleep(500);
         await page.selectOption('#dpSeasonSelect', emptySeasonId);
         await sleep(900);
         const resetState = await page.evaluate(() => ({
-          chips: document.querySelectorAll('.dp-filterbar .dp-chip.active').length,
-          slot: document.getElementById('dpSlotFilter').value,
-          type: document.getElementById('dpTypeFilter').value,
+          chips: document.querySelectorAll('.dp-filterbar .dp-chip.active').length, // 部位/类型/主/副属性 chips 全覆盖
           search: document.getElementById('dpSearch').value,
           tierCls: document.getElementById('dpTierClass').value,
           tierRole: document.getElementById('dpTierRole').value,
           tierSpec: document.getElementById('dpTierSpec').value,
         }));
-        const allReset = resetState.chips === 0 && !resetState.slot && !resetState.type && !resetState.search
+        const allReset = resetState.chips === 0 && !resetState.search
           && !resetState.tierCls && !resetState.tierRole && !resetState.tierSpec;
         check('[1366] ③赛季切换后全部筛选重置为默认', allReset, JSON.stringify(resetState));
         await page.screenshot({ path: path.join(SHOT_DIR, '1366-empty-season-filter-reset.png') });
