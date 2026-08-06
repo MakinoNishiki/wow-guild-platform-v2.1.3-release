@@ -4,11 +4,11 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>魔兽管家</title>
-<!-- 静态资源版本号：20260805.12（任务书 #22 WP3-②：凡改动 js/css 的 commit 必须同步递增此处与所有 ?v= 查询串，见 docs/开发规范.md 第五章） -->
+<!-- 静态资源版本号：20260805.13（任务书 #22 WP3-②：凡改动 js/css 的 commit 必须同步递增此处与所有 ?v= 查询串，见 docs/开发规范.md 第五章） -->
 <link rel="icon" type="image/png" sizes="32x32" href="assets/brand/favicon-32.png">
 <link rel="icon" type="image/png" sizes="16x16" href="assets/brand/favicon-16.png">
-<link rel="stylesheet" href="css/main.css?v=20260805.12">
-<script src="assets/vendor/supabase-js-2.js?v=20260805.12"></script>
+<link rel="stylesheet" href="css/main.css?v=20260805.13">
+<script src="assets/vendor/supabase-js-2.js?v=20260805.13"></script>
 </head>
 <body>
 
@@ -1047,6 +1047,25 @@
   </div>
 </div>
 
+<!-- ===== 弹窗：彻底删除成员确认（任务书 #27 WP2，有历史时输名确认，重复角色场景靠输名区分） ===== -->
+<div class="modal-overlay" id="memberHardDeleteModal">
+  <div class="modal" style="max-width:520px">
+    <div class="modal-header">
+      <div class="modal-title">彻底删除成员</div>
+      <div class="modal-close" onclick="requestCloseModal('memberHardDeleteModal')">×</div>
+    </div>
+    <div class="modal-body">
+      <p id="hardDeleteWarnText" style="font-size:13px;line-height:1.8;color:var(--danger);background:rgba(248,81,73,0.08);border:1px solid rgba(248,81,73,0.35);border-radius:6px;padding:10px 12px"></p>
+      <p style="font-size:13px;color:var(--text-secondary);margin:12px 0 6px">请输入成员名「<strong id="hardDeleteNameHint" style="color:var(--text-primary)"></strong>」以确认删除（同名角色必须输名区分）：</p>
+      <input type="text" id="hardDeleteConfirmName" class="form-input" style="width:100%" placeholder="输入成员全名确认" oninput="hardDeleteNameInput()">
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="requestCloseModal('memberHardDeleteModal')">取消</button>
+      <button class="btn btn-danger" id="hardDeleteConfirmBtn" disabled onclick="confirmHardDelete()">彻底删除</button>
+    </div>
+  </div>
+</div>
+
 <!-- ===== 弹窗：WCL 导入 ===== -->
 <div class="modal-overlay" id="wclImportModal">
   <div class="modal">
@@ -1805,12 +1824,12 @@
   </div>
 </div>
 
-<script src="js/cloud.js?v=20260805.12"></script>
+<script src="js/cloud.js?v=20260805.13"></script>
 <!-- 任务书 #14：主数据层（快照兜底 + 加载层），须在 app.js 之前 -->
-<script src="js/masterDataSnapshot.js?v=20260805.12"></script>
-<script src="js/masterData.js?v=20260805.12"></script>
+<script src="js/masterDataSnapshot.js?v=20260805.13"></script>
+<script src="js/masterData.js?v=20260805.13"></script>
 <!-- 任务书 #22 WP2：职业/专精/职责图标集中映射（全站唯一取图处） -->
-<script src="js/iconMap.js?v=20260805.12"></script>
-<script src="js/app.js?v=20260805.12"></script>
+<script src="js/iconMap.js?v=20260805.13"></script>
+<script src="js/app.js?v=20260805.13"></script>
 </body>
 </html>

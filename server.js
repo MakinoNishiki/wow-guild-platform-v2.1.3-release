@@ -510,7 +510,7 @@ async function resolveGuildIds(table, filters, rows) {
   }
 
   // 4. 仅按 id 过滤（PATCH/DELETE）：查行取 guild_id
-  if (filters.id && ["raid_members", "activities", "loot_records", "wishlists", "claim_requests"].includes(table)) {
+  if (filters.id && ["raid_members", "activities", "loot_records", "wishlists", "claim_requests", "deleted_raid_members"].includes(table)) {
     for (const rowId of filters.id) {
       const { body } = await supabaseRestGet(`/rest/v1/${table}?id=eq.${rowId}&select=guild_id&limit=1`);
       if (Array.isArray(body) && body[0]) add(body[0].guild_id);
@@ -732,10 +732,11 @@ async function authorizeProxyRequest(user, table, method, queryString, rawBody) 
     }
   }
 
-  // ---- 公会业务表：raid_members / activities / activity_attendance / loot_records / wishlists / claim_requests ----
+  // ---- 公会业务表：raid_members / activities / activity_attendance / loot_records / wishlists / claim_requests / deleted_raid_members ----
   // claim_requests（任务书 #21 WP2）：owner/editor 审批操作（PATCH 批准/拒绝、DELETE）走本通用分支；
   // viewer 的 INSERT/撤回已在上方窄例外处理。
-  if (["raid_members", "activities", "activity_attendance", "loot_records", "wishlists", "claim_requests"].includes(table)) {
+  // deleted_raid_members（任务书 #27 WP2）：垃圾桶表，INSERT（删除成员时写快照）走本通用分支，无新权限分支。
+  if (["raid_members", "activities", "activity_attendance", "loot_records", "wishlists", "claim_requests", "deleted_raid_members"].includes(table)) {
     // REQ-020（任务书 #12）：activities.status 白名单校验，仅 normal / cancelled。
     // 仅针对 activities 表（raid_members 的 status 是中文，不受影响）；行不带 status 字段不校验。
     if (table === "activities" && (method === "POST" || method === "PATCH")) {

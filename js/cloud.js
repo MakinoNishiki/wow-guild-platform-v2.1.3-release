@@ -591,6 +591,20 @@
 
     if (error) throw error;
 
+    // 任务书 #27 WP2：垃圾桶名单——装备/考勤灰色「已删除」判定的权威来源
+    // （同名成员场景：名在垃圾桶 → 已删除；否则按成员 status 判已离队）。表不存在（未迁移）时容忍为空集
+    let deletedNames = new Set();
+    try {
+      const { data: delRows } = await supabaseClient
+        .from('deleted_raid_members')
+        .select('name')
+        .eq('guild_id', guildId);
+      deletedNames = new Set((delRows || []).map(r => r.name));
+    } catch (e) { /* 迁移前容错 */ }
+    if (typeof window.appData !== 'undefined') {
+      window.appData.deletedMemberNames = deletedNames;
+    }
+
     const loots = (data || []).map(l => ({
       id: l.id,
       name: l.item_name,
@@ -605,7 +619,7 @@
       specialEffect: l.item_stats ? l.item_stats.specialEffect : '',
       // REQ-054：主数据掉落新字段展示侧（有则显示，无则隐藏）
       effect: l.item_stats ? (l.item_stats.effect || '') : '',
-      assignedTo: l.item_stats ? l.item_stats.assignedTo : '',
+      assignedTo: l.member_name || (l.item_stats ? l.item_stats.assignedTo : ''), // 任务书 #27 WP2：member_name 快照优先，assignedTo 回退
       status: l.item_stats ? l.item_stats.status : '待分配',
       priority: l.item_stats ? l.item_stats.priority : 'P2',
       date: l.obtained_date || '',
@@ -674,6 +688,7 @@
       if (!attendanceMap[att.activity_id]) attendanceMap[att.activity_id] = [];
       attendanceMap[att.activity_id].push({
         member_id: att.member_id,
+        member_name: att.member_name || '', // 任务书 #27 WP2：成员名快照（彻底删除后 member_id 置空，展示用）
         status: mapStatusFromDb(att.status),
         notes: att.notes || ''
       });
@@ -825,9 +840,14 @@
             await dbDelete('activity_attendance', { activity_id: item.id });
           }
           // 批量插入
+          // 任务书 #27 WP2：member_name 快照双写——优先行内携带值（含已删除成员保留行），
+          // 否则按 member_id 从当前成员名单取现名
           const attRows = item.attendees.map(att => ({
             activity_id: item.id,
             member_id: att.member_id,
+            member_name: att.member_name
+              || (typeof window !== 'undefined' && window.appData && (window.appData.members.find(m => m.id === att.member_id) || {}).name)
+              || '',
             status: mapStatusToDb(att.status),
           }));
           if (attRows.length > 0) {
@@ -878,6 +898,7 @@
     const row = {
       guild_id: guildId,
       character_id: item.character_id || null,
+      member_name: item.assignedTo || '', // 任务书 #27 WP2：成员名快照双写（删除后展示与统计用）
       assigned_by: currentUser ? currentUser.id : null,
       item_name: item.name,
       item_category: item.category || null,
@@ -1497,6 +1518,32 @@
     }
   }
 
+  // 任务书 #27 WP2：彻底删除成员——先写垃圾桶快照（含 history_counts），再删原行。
+  // 删除后由 DB 外键接管：activity_attendance.member_id → SET NULL（member_name 快照保留），
+  // loot_records.character_id → SET NULL（item_stats->>assignedTo 快照保留），wishlists → 级联删除。
+  async function hardDeleteRaidMember(member, historyCounts) {
+    if (!supabaseClient || !currentGuild) {
+      throw new Error('云端连接未就绪（会话或公会上下文丢失），请刷新页面重试');
+    }
+    const row = {
+      guild_id: currentGuild.id,
+      name: member.name,
+      class: member.class || '',
+      spec: member.spec || member.main_spec || '',
+      off_spec: member.off_spec || '',
+      off_specs: member.off_specs || [],
+      role: Array.isArray(member.role) ? member.role.join('、') : (member.role || ''),
+      status: member.status || '',
+      join_date: member.join_date || null,
+      notes: member.notes || '',
+      user_id: member.user_id || null,
+      deleted_by: currentUser ? currentUser.id : null,
+      history_counts: historyCounts || {},
+    };
+    await dbInsert('deleted_raid_members', row);
+    await dbDelete('raid_members', { id: member.id });
+  }
+
   // 解析英雄榜 URL
   function parseArmoryUrl(url) {
     if (!url) return null;
@@ -1549,6 +1596,7 @@
     loadCloudData: loadCloudData,
     saveCloudData: saveCloudData,
     reloadData: reloadData,
+    hardDeleteRaidMember: hardDeleteRaidMember,
     getGuildMembers: getGuildMembers,
     setRaidMemberClaim: setRaidMemberClaim,
     unclaimRaidMember: unclaimRaidMember,

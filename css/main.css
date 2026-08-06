@@ -1406,6 +1406,10 @@ body {
 .attend-member-row:last-child { border-bottom: none; }
 .attend-member-row:hover { background: var(--bg-tertiary); }
 
+/* 任务书 #27 WP2：已删除成员考勤行（只读灰显）——占位对齐两列勾选框，状态文本右置 */
+.attend-deleted-spacer { width: 14px; flex: none; }
+.attend-status-readonly { margin-left: auto; font-size: 13px; color: var(--text-muted); }
+
 /* REQ-033：WCL 同步考勤预览三分区（绿=自动出席 / 黄=部分参战 / 红=未匹配） */
 .wcl-sync-zone {
   border: 1px solid var(--border-color);

@@ -2051,6 +2051,8 @@ const modalDirtyChecks = {
   // REQ-033：同步预览弹窗内改过状态/忽略过角色即视为有未确认数据
   wclSyncModal: () => wclSyncDirty || isModalFormDirty('wclSyncModal'),
   memberModal: () => isModalFormDirty('memberModal'),
+  // 任务书 #27 WP2：彻底删除确认弹窗——输名输入框有内容即算未保存
+  memberHardDeleteModal: () => isModalFormDirty('memberHardDeleteModal'),
   activityModal: () => isModalFormDirty('activityModal'),
   lootModal: () => isModalFormDirty('lootModal'),
   // 公会设置：成员角色变更即时保存不算未保存内容，只跟踪公会资料三字段
@@ -2192,11 +2194,11 @@ function renderDashboard() {
 //   请假 / 缺席：计入应到，不计入出勤
 // REQ-020：已取消活动（status === 'cancelled'）的考勤不计入应到与出勤；
 // 只过滤统计不过滤数据，DB 记录保留，活动恢复正常即重新计入。
-function getAttendanceStats(memberId, activities) {
+function getAttendanceStatsCore(activities, matchFn) {
   let present = 0, absent = 0, late = 0, sub = 0, leave = 0, total = 0;
   (activities || []).forEach(act => {
     if (act.status === 'cancelled') return; // REQ-020：已取消活动不参与统计
-    const attendee = (act.attendees || []).find(a => a.member_id === memberId);
+    const attendee = (act.attendees || []).find(matchFn);
     if (!attendee) return; // 未标记：不计入应到
     total++;
     switch (attendee.status) {
@@ -2209,6 +2211,23 @@ function getAttendanceStats(memberId, activities) {
   });
   const rate = total > 0 ? Math.round((present / total) * 100) : 0;
   return { present, absent, late, sub, leave, total, rate };
+}
+
+function getAttendanceStats(memberId, activities) {
+  return getAttendanceStatsCore(activities, a => a.member_id === memberId);
+}
+
+// 任务书 #27 WP2：已删除成员的考勤仍计入历史出勤率（统计口径硬指标）——
+// member_id 为空的考勤行按 member_name 快照聚合成伪成员，报表中灰色「已删除」展示
+function getDeletedMemberStats(activities) {
+  const names = new Set();
+  (activities || []).forEach(act => (act.attendees || []).forEach(a => {
+    if (!a.member_id && a.member_name) names.add(a.member_name);
+  }));
+  return [...names].map(name => ({
+    member: { id: 'deleted:' + name, name, class: '', deleted: true },
+    ...getAttendanceStatsCore(activities, a => !a.member_id && a.member_name === name),
+  }));
 }
 
 function calculateAvgAttendanceRate(activities) {
@@ -2236,13 +2255,16 @@ function renderRankList(containerId, limit, activities) {
 
 // BUG-014：活动集由调用方显式传入（仪表盘 Top5 传全量；统计报表传用户自选范围），
 // 不再隐式依赖报表页的 reportRange，算法统一走 getAttendanceStats。
-function getAttendanceRankings(activities) {
+function getAttendanceRankings(activities, includeDeleted) {
   const members = appData.members.filter(m => m.status !== '离队');
 
-  return members.map(member => {
+  const rows = members.map(member => {
     const stats = getAttendanceStats(member.id, activities);
     return { member, ...stats };
-  }).sort((a, b) => b.rate - a.rate || b.present - a.present);
+  });
+  // 任务书 #27 WP2：报表口径含已删除成员伪行（仪表盘 Top5 不传 includeDeleted，与离队同规则不含）
+  if (includeDeleted) rows.push(...getDeletedMemberStats(activities));
+  return rows.sort((a, b) => b.rate - a.rate || b.present - a.present);
 }
 
 function getFilteredActivities() {
@@ -2551,7 +2573,7 @@ function renderMembers() {
               ${m.status === '离队'
                 ? `<button class="icon-btn" onclick="restoreMember('${m.id}', this)" title="恢复">♻️</button>`
                 : `<button class="icon-btn" onclick="deleteMember('${m.id}')" title="离队">🚪</button>`}
-              <button class="icon-btn danger" onclick="hardDeleteMember('${m.id}')" title="彻底删除（仅零历史成员）">🗑</button>
+              <button class="icon-btn danger" onclick="hardDeleteMember('${m.id}')" title="彻底删除（历史保全，进垃圾桶）">🗑</button>
             </div>
             <div class="claim-btns">
               ${!m.user_id
@@ -2959,11 +2981,10 @@ async function deleteMember(id) {
   }
 }
 
-// 任务书 #18 WP1：「删除」与「离队」分离——真删除 raid_members 行，带历史计数护栏。
-// 先并行计数该成员的 考勤(activity_attendance.member_id) / 心愿单(wishlists.member_id) /
-// 装备记录(loot_records.character_id=成员 id；由于该列历史上恒为 NULL，实际关联靠
-// item_stats->>assignedTo=成员名，两种口径一并计入，宁可多拦不可漏拦)。
-// 三项全 0 才允许删；任一 >0 只提示拦截，不提供强删入口。
+// 任务书 #27 WP2：彻底删除放开——删除就是删除，不再受历史有无限制，历史保全：
+// 考勤/装备 member_id 由 DB 置 NULL（member_name / assignedTo 快照保留，灰色「已删除」展示，
+// 统计口径不变）；心愿单为成员私有随人走（DB 级联删除）；原行进垃圾桶 deleted_raid_members（含 history_counts）。
+// 有历史时需输入成员名确认（重复角色场景下必须输名才能区分）。
 async function hardDeleteMember(id) {
   const member = appData.members.find(m => m.id === id);
   if (!member) return;
@@ -2971,7 +2992,8 @@ async function hardDeleteMember(id) {
   const client = window.CloudSync.getClient();
   if (!client) { showToast('云端未连接，无法校验历史记录', 'error'); return; }
 
-  let attCount = 0, wishCount = 0, lootCount = 0;
+  // 历史计数（沿用原护栏口径：考勤按 member_id；装备按 character_id 或 item_stats->>assignedTo 名字；心愿按 member_id）
+  let counts;
   try {
     const nameFilter = String(member.name || '').replace(/"/g, '\\"');
     const [att, wish, loot] = await Promise.all([
@@ -2980,33 +3002,73 @@ async function hardDeleteMember(id) {
       client.from('loot_records').select('id', { count: 'exact', head: true })
         .or(`character_id.eq.${id},item_stats->>assignedTo.eq."${nameFilter}"`),
     ]);
-    if (att.error || wish.error || loot.error) {
-      throw (att.error || wish.error || loot.error);
-    }
-    attCount = att.count || 0;
-    wishCount = wish.count || 0;
-    lootCount = loot.count || 0;
+    if (att.error || wish.error || loot.error) throw (att.error || wish.error || loot.error);
+    counts = { attendance: att.count || 0, wishlist: wish.count || 0, loot: loot.count || 0 };
   } catch (e) {
     console.error('成员历史计数失败:', e);
     showToast('历史记录校验失败，已取消删除（安全起见请稍后重试）', 'error');
     return;
   }
 
-  // 任一 >0 → 拦截，只提示，不提供强删入口
-  if (attCount > 0 || wishCount > 0 || lootCount > 0) {
-    document.getElementById('memberDeleteBlockText').textContent =
-      `该成员有 ${attCount} 条考勤 / ${wishCount} 条心愿单 / ${lootCount} 条装备记录，删除会将这些历史一并清空且不可恢复。若该成员确实退会，请使用「离队」。`;
-    openModal('memberDeleteBlockModal');
+  if (counts.attendance + counts.wishlist + counts.loot === 0) {
+    // 0 历史：现文案不变
+    if (!confirm(`将彻底删除成员「${member.name}」，不可恢复。确定删除吗？`)) return;
+    await execHardDelete(member, counts);
     return;
   }
+  openHardDeleteModal(member, counts);
+}
 
-  // 三项全 0 → 二次确认后真删
-  if (!confirm(`将彻底删除成员「${member.name}」，不可恢复。确定删除吗？`)) return;
+let pendingHardDelete = null;
+
+function openHardDeleteModal(member, counts) {
+  pendingHardDelete = { memberId: member.id, counts };
+  document.getElementById('hardDeleteWarnText').textContent =
+    `该成员有考勤 ${counts.attendance} 条 / 装备记录 ${counts.loot} 条 / 心愿 ${counts.wishlist} 条。` +
+    '彻底删除后：考勤与装备记录将保留并灰色显示「已删除」，心愿单将一并删除，成员数据进入垃圾桶可查。';
+  document.getElementById('hardDeleteNameHint').textContent = member.name;
+  const input = document.getElementById('hardDeleteConfirmName');
+  input.value = '';
+  document.getElementById('hardDeleteConfirmBtn').disabled = true;
+  openModal('memberHardDeleteModal');
+}
+
+function hardDeleteNameInput() {
+  const member = appData.members.find(m => m.id === (pendingHardDelete || {}).memberId);
+  const input = document.getElementById('hardDeleteConfirmName');
+  document.getElementById('hardDeleteConfirmBtn').disabled = !member || input.value.trim() !== member.name;
+}
+
+async function confirmHardDelete() {
+  if (!pendingHardDelete) return;
+  const member = appData.members.find(m => m.id === pendingHardDelete.memberId);
+  const input = document.getElementById('hardDeleteConfirmName');
+  if (!member || input.value.trim() !== member.name) return;
+  const btn = document.getElementById('hardDeleteConfirmBtn');
+  btn.disabled = true; btn.textContent = '删除中...';
   try {
-    await cloudCrud('members', 'delete', { ...member, id: member.id }, { renderFn: renderMembers });
-    showToast(`成员「${member.name}」已彻底删除`, 'success');
+    await execHardDelete(member, pendingHardDelete.counts);
+    closeModal('memberHardDeleteModal');
+    pendingHardDelete = null;
+  } finally {
+    btn.disabled = false; btn.textContent = '彻底删除';
+  }
+}
+
+async function execHardDelete(member, counts) {
+  // 顺序（任务书 #27 WP2）：写垃圾桶行 → 删 raid_members 行（wishlists 级联自动；
+  // 考勤/装备 member_id 被 SET NULL，member_name / assignedTo 快照保留）
+  try {
+    await window.CloudSync.hardDeleteRaidMember(member, counts);
+    await window.CloudSync.reloadData('members');
+    await window.CloudSync.reloadData('activities');
+    await window.CloudSync.reloadData('wishlists');
+    await window.CloudSync.reloadData('loots');
+    renderMembers();
+    showToast(`成员「${member.name}」已彻底删除，历史记录已保全`, 'success');
   } catch (e) {
-    // 错误已在 cloudCrud 中提示
+    console.error('彻底删除失败:', e);
+    showToast('彻底删除失败：' + (e.message || '未知错误'), 'error');
   }
 }
 
@@ -4025,7 +4087,7 @@ function renderAttendanceMembers(activity) {
   const container = document.getElementById('attendanceMembersList');
   const isCancelled = activity.status === 'cancelled'; // REQ-020：已取消活动禁用状态标记控件
 
-  container.innerHTML = members.map(m => {
+  const membersHtml = members.map(m => {
     const attendee = activity.attendees.find(a => a.member_id === m.id);
     const status = attendee ? attendee.status : '缺席';
     const cls = classMap[m.class] || '';
@@ -4061,6 +4123,20 @@ function renderAttendanceMembers(activity) {
       </div>
     `;
   }).join('');
+
+  // 任务书 #27 WP2：已删除成员的考勤行（member_id 为空）按 member_name 快照展示——
+  // 灰色黯淡 + 「已删除」徽标，状态只读（不再可编辑）；saveAttendance 整表收集时按原状保留
+  const deletedHtml = (activity.attendees || []).filter(a => !a.member_id && a.member_name).map(a => `
+    <div class="attend-member-row member-row-departed">
+      <span class="attend-deleted-spacer"></span>
+      <span class="attend-deleted-spacer"></span>
+      <div class="attend-name">
+        <span class="member-departed" style="font-weight:500">${a.member_name}</span> <span class="tag tag-grey">已删除</span>
+      </div>
+      <span class="attend-status-readonly">${a.status}</span>
+    </div>
+  `).join('');
+  container.innerHTML = membersHtml + deletedHtml;
 
   // REQ-017-A：重绘后剔除已不在名单中的勾选（如 WCL 同步刷新），并同步批量条显隐
   const renderedIds = new Set(members.map(m => m.id));
@@ -4170,7 +4246,8 @@ async function saveAttendance() {
   const collectedIds = new Set(attendees.map(a => a.member_id));
   (activity.attendees || []).forEach(a => {
     if (!collectedIds.has(a.member_id)) {
-      attendees.push({ member_id: a.member_id, status: a.status, notes: a.notes || '' });
+      // 任务书 #27 WP2：member_name 快照随保留行原样携带（含已删除成员的 member_id 空行）
+      attendees.push({ member_id: a.member_id, member_name: a.member_name || '', status: a.status, notes: a.notes || '' });
     }
   });
   
@@ -4605,7 +4682,8 @@ function setReportRange(days) {
 
 function renderReports() {
   // BUG-014：报表页尊重用户自选时间范围，算法与仪表盘/成员列表同源
-  const rankings = getAttendanceRankings(getFilteredActivities());
+  // 任务书 #27 WP2：报表含已删除成员伪行（灰色「已删除」，其历史考勤仍计入）
+  const rankings = getAttendanceRankings(getFilteredActivities(), true);
   
   // 排名表格
   const tbody = document.getElementById('rankTableBody');
@@ -4614,11 +4692,15 @@ function renderReports() {
   } else {
     tbody.innerHTML = rankings.map((item, i) => {
       const cls = classMap[item.member.class] || '';
+      // 已删除伪成员：名字灰色黯淡 + 「已删除」小徽标，职业列无数据
+      const nameHtml = item.member.deleted
+        ? `<span class="member-departed" style="font-weight:500">${item.member.name}</span> <span class="tag tag-grey">已删除</span>`
+        : `<span style="font-weight:500">${item.member.name}</span>`;
       return `
         <tr>
           <td><div class="rank-num" style="margin:auto">${i + 1}</div></td>
-          <td class="class-${cls}" style="font-weight:500">${item.member.name}</td>
-          <td>${item.member.class}</td>
+          <td class="class-${cls}">${nameHtml}</td>
+          <td>${item.member.class || '—'}</td>
           <td style="color:var(--success)">${item.present}</td>
           <td style="color:var(--info)">${item.sub}</td>
           <td style="color:var(--danger)">${item.absent}</td>
@@ -4635,7 +4717,7 @@ function renderReports() {
   const absentHtml = absentRank.filter(r => r.absent > 0).map((item, i) => `
     <div class="rank-item">
       <div class="rank-num" style="background:rgba(248,81,73,0.3);color:var(--danger)">${i + 1}</div>
-      <div class="rank-name class-${classMap[item.member.class] || ''}">${item.member.name}</div>
+      <div class="rank-name class-${classMap[item.member.class] || ''}">${item.member.name}${item.member.deleted ? ' <span class="tag tag-grey">已删除</span>' : ''}</div>
       <div class="rank-rate" style="color:var(--danger)">${item.absent} 次</div>
     </div>
   `).join('');
@@ -5300,15 +5382,18 @@ function lootRender() {
       : '-';
     // REQ-008："心愿"独立成列，非心愿装备显示 —
     const wishlistBadge = loot.is_wishlist ? '<span class="badge" style="background:#f0c060;color:#0d1117">心愿</span>' : '<span style="color:var(--text-muted)">—</span>';
-    // REQ-042（软删除）：assignedTo 为名字快照；按名字找到成员后看其 status，
-    // 离队（或软删除前的历史硬删，名字已找不到）→ 灰色「名字（已离队）」
-    // 任务书 #22-补丁 修正项③：在职成员走统一成员职业色 tag（图标+名字），认领小字保持 tag 外
-    const assignedMember = loot.assignedTo ? appData.members.find(m => m.name === loot.assignedTo) : null;
+    // REQ-042（软删除）+ 任务书 #27 WP2：assignedTo 为名字快照（member_name 优先）——
+    // 活跃成员 → 职业色 chip；名在垃圾桶（deletedMemberNames）→ 灰色（已删除）；
+    // 其余（离队成员或找不到）→ 灰色（已离队）。同名成员场景以垃圾桶名单为权威判定
+    const assignedMember = loot.assignedTo ? appData.members.find(m => m.name === loot.assignedTo && m.status !== '离队') : null;
+    const deletedNames = appData.deletedMemberNames || new Set();
     const assignedToHtml = !loot.assignedTo
       ? '-'
-      : (assignedMember && assignedMember.status !== '离队')
+      : assignedMember
         ? memberChipHtml(assignedMember)
-        : `<span class="member-departed">${loot.assignedTo}（已离队）</span>`;
+        : deletedNames.has(loot.assignedTo)
+          ? `<span class="member-departed">${loot.assignedTo}（已删除）</span>`
+          : `<span class="member-departed">${loot.assignedTo}（已离队）</span>`;
     
     return `
       <tr>
@@ -6496,6 +6581,20 @@ function lootFillAssignedTo(name) {
 // ==================== 初始化 ====================
 // ==================== 更新日志 ====================
 const changelogData = [
+  {
+    id: 'v3.2.0-task27-wp2-feature',
+    version: 'v3.2.0',
+    date: '2026-08-06',
+    type: 'feature',
+    typeLabel: '新增功能',
+    title: '成员彻底删除放开：历史保全 + 垃圾桶（任务书 #27 WP2）',
+    summary: '任何成员现在都可以彻底删除，不再受历史记录有无限制。删除后其考勤与装备记录保留并灰色显示「已删除」，出勤率统计口径不变；被删成员进入「垃圾桶」表留存快照（含当时考勤/装备/心愿条数）可审计。',
+    details: [
+      '有历史成员删除需输入成员全名确认（同名角色场景靠输名区分，防误删）；零历史成员维持原确认文案',
+      '心愿单为成员私有数据，随删除一并移除（确认弹窗内明示条数）',
+      '考勤详情、装备分配、统计报表中已删除成员以灰色黯淡 + 「已删除」徽标展示，历史出勤率仍计入'
+    ]
+  },
   {
     id: 'v3.2.0-task27-wp1-improve',
     version: 'v3.2.0',
