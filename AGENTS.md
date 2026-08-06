@@ -9,6 +9,7 @@
 1. **验证纪律**：修改报告声称"真浏览器实测"必须写明具体页面/按钮/交互；主链路（CRUD/保存）未实测视为交付未完成。
 2. **git 纪律**：运营验收通过前一律不提交 git。
 3. **编号纪律**：新需求/BUG 必须登记台账（REQ/BUG/FIXED 编号），changelog 按「新增功能/功能优化/修复BUG/模块调整」四维补录。
+4. **UI 审计前置**：UI 类任务书（新增/改版/打磨界面）开工前，先用 `.agents/skills/` 下的 `improve-ui`（或 `web-design-guidelines`）审计目标页面，产出问题清单并附进任务书/修改报告；开发中打磨参考 `better-ui`/`better-typography`/`better-colors`（涉框架/Tailwind 的章节跳过，本项目纯 CSS 零构建），验收前可用 `baseline-ui`/`fixing-accessibility`/`fixing-motion-performance` 收尾；skill 建议与 DESIGN.md/开发规范冲突时以项目规范为准。
 
 ## 项目概览
 魔兽管家（WoW Butler）——面向 WoW 公会的团本考勤管理平台，暗色史诗奇幻风格（WoW 主题），基于 Supabase 云端协作。Supabase 是唯一主数据源（本地模式与飞书同步已移除）。
