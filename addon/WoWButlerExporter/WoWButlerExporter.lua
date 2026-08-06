@@ -4,7 +4,7 @@
 -- 导出目标：SavedVariables 全局表 WJDCDump（/reload 或退出游戏后写盘）
 -- 命令：/wjdc all | raid | mplus | tier | me
 -- ============================================================
-local ADDON_VERSION = "1.0.0"
+local ADDON_VERSION = "1.0.1"
 
 local function msg(s) DEFAULT_CHAT_FRAME:AddMessage("|cffffd200[wjdc]|r " .. s) end
 local function err(s) DEFAULT_CHAT_FRAME:AddMessage("|cffff4040[wjdc]|r " .. s) end
@@ -240,6 +240,12 @@ local function doExport(kind)
     msg("已导出本人角色档案（" .. tostring(WJDCDump.me.name) .. "-" ..
         tostring(WJDCDump.me.realm) .. "），请 /reload 或退出游戏写入文件")
     return
+  end
+  -- Blizzard_EncounterJournal 是懒加载模块：登录后未打开过手册时 EJ API 不存在，
+  -- 必须在 ejAvailable 检测之前显式加载；加载失败则走原有中文报错退出（提示语不变）
+  if C_AddOns and C_AddOns.IsAddOnLoaded and C_AddOns.LoadAddOn
+     and not C_AddOns.IsAddOnLoaded("Blizzard_EncounterJournal") then
+    pcall(C_AddOns.LoadAddOn, "Blizzard_EncounterJournal")
   end
   if not ejAvailable() then
     err("当前客户端不支持副本手册接口（EJ），无法导出")
