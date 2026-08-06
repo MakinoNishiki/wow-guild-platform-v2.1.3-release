@@ -6497,6 +6497,19 @@ function lootFillAssignedTo(name) {
 // ==================== 更新日志 ====================
 const changelogData = [
   {
+    id: 'v3.2.0-task27-wp1-improve',
+    version: 'v3.2.0',
+    date: '2026-08-06',
+    type: 'improve',
+    typeLabel: '功能优化',
+    title: '成员管理操作列垂直居中对齐（REQ-079）',
+    summary: '已认领成员的角色名含认领人第二行撑大行高后，操作列图标组不再贴顶，与未认领行齐平居中。',
+    details: [
+      '已认领/未认领/已离队三种行态在 1366×768 与 1920×1080 两档宽度下对齐一致',
+      '纯样式修复，零逻辑改动'
+    ]
+  },
+  {
     id: 'v3.2.0-task24-patch2-feature',
     version: 'v3.2.0',
     date: '2026-08-06',

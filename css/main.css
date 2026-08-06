@@ -4324,7 +4324,9 @@ img.class-icon[src$=".png"] { border-radius: 3px; }
   flex-wrap: nowrap;
   white-space: nowrap;
 }
-.op-cell .action-btns { gap: 4px; }
+/* 任务书 #27-WP1：行高被认领人第二行撑大时，固定高图标按钮在 .action-btns 内回落 flex-start 贴顶，
+   补 align-items:center 使图标组整组垂直居中（与未认领行齐平），纯样式零逻辑改动 */
+.op-cell .action-btns { gap: 4px; align-items: center; }
 .op-cell .claim-btns { margin-top: 0; min-height: 0; }
 .op-cell .claim-btns > div { white-space: nowrap; }
 #page-members .data-table td:last-child,
