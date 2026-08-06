@@ -4,16 +4,20 @@
 -- 导出目标：SavedVariables 全局表 WJDCDump（/reload 或退出游戏后写盘）
 -- 命令：/wjdc all | raid | mplus | tier | me
 -- ============================================================
-local ADDON_VERSION = "1.0.1"
+local ADDON_VERSION = "1.0.2"
 
 local function msg(s) DEFAULT_CHAT_FRAME:AddMessage("|cffffd200[wjdc]|r " .. s) end
 local function err(s) DEFAULT_CHAT_FRAME:AddMessage("|cffff4040[wjdc]|r " .. s) end
 
 local function ejAvailable()
+  -- 掉落兼容位（任务书 #26-fix2）：12.x 起 EJ_GetLootInfoByIndex 移除，
+  -- 迁移至 C_EncounterJournal.GetLootInfoByIndex，两者居其一即可
+  local lootFn = EJ_GetLootInfoByIndex
+    or (C_EncounterJournal and C_EncounterJournal.GetLootInfoByIndex)
   return type(EJ_GetCurrentTier) == "function"
      and type(EJ_GetInstanceByIndex) == "function"
      and type(EJ_GetEncounterInfoByIndex) == "function"
-     and type(EJ_GetLootInfoByIndex) == "function"
+     and type(lootFn) == "function"
 end
 
 local function buildMeta(kind)
@@ -70,13 +74,21 @@ local function parseItemDetail(itemID)
 end
 
 -- ---------- 副本手册遍历（团本 / 大秘境共用） ----------
+-- 掉落访问兼容层（任务书 #26-fix2）：12.x 起优先 C_EncounterJournal.GetLootInfoByIndex，
+-- 回退老 EJ_GetLootInfoByIndex；新函数返回结构化 itemInfo 表，老函数为多元返回值
+-- （name, icon, slot, armorType, itemID, link, ...），此处归一化，导出字段结构不变
 local function getLootInfo(i)
-  -- 10.x 起返回 table；保留旧版多返回值兼容
-  local info = EJ_GetLootInfoByIndex(i)
-  if type(info) == "table" then
+  local fn = (C_EncounterJournal and C_EncounterJournal.GetLootInfoByIndex) or EJ_GetLootInfoByIndex
+  if type(fn) ~= "function" then return nil end
+  local ok, a, b, c, d, e = pcall(fn, i)
+  if not ok or a == nil then return nil end
+  if type(a) == "table" then
+    local info = a
+    if not info.itemID then return nil end
     return info.itemID, info.name, info.slot, info.armorType
   end
-  local name, _, slot, armorType, itemID = EJ_GetLootInfoByIndex(i)
+  local name, slot, armorType, itemID = a, c, d, e  -- tuple: name, icon, slot, armorType, itemID
+  if not itemID then return nil end
   return itemID, name, slot, armorType
 end
 
@@ -91,16 +103,19 @@ local function exportInstances(isRaid, label)
       local bname, _, encounterID = EJ_GetEncounterInfoByIndex(bi, instanceID)
       if not bname then break end
       EJ_SelectEncounter(encounterID)
-      local loot, n = {}, EJ_GetNumLoot() or 0
-      for li = 1, n do
+      -- 掉落计数不依赖 EJ_GetNumLoot（12.x 可用性未实测）：按 index 递增取到 nil 为止，500 封顶防呆
+      local loot, li = {}, 1
+      while li <= 500 do
         local itemID, name, slot, itype = getLootInfo(li)
-        if itemID and name then
+        if not itemID then break end
+        if name then
           local d = parseItemDetail(itemID)
           loot[#loot + 1] = { id = itemID, name = name, slot = slot or "",
                               type = itype or "", ilvl = d.ilvl,
                               primary = d.primary, secondary = d.secondary,
                               effect = d.effect }
         end
+        li = li + 1
       end
       bosses[#bosses + 1] = { boss = bname, loot = loot }
       bi = bi + 1
