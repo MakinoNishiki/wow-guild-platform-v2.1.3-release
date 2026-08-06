@@ -154,12 +154,16 @@ function assert(cond, label, detail) {
     return seq;
   });
   const armorIdx = ['板甲', '锁甲', '皮甲', '布甲', '盾牌'].map(v => typeSeq.indexOf(v)).filter(i => i >= 0);
-  const weaponIdx = ['单手锤', '单手斧', '单手剑', '匕首', '拳套', '战刃', '长柄武器', '法杖', '弓', '枪械', '双手锤', '双手斧', '双手剑', '魔杖'].map(v => typeSeq.indexOf(v)).filter(i => i >= 0);
+  const weaponIdx = ['单手锤', '单手斧', '单手剑', '匕首', '拳套', '战刃', '长柄武器', '法杖', '弓', '枪械', '弩', '双手锤', '双手斧', '双手剑', '魔杖'].map(v => typeSeq.indexOf(v)).filter(i => i >= 0);
   const otherIdx = typeSeq.indexOf('#其它');
   assert(Math.max(...armorIdx) < Math.min(...weaponIdx) && (otherIdx === -1 || Math.max(...weaponIdx) < otherIdx),
     '类型组：甲型 → 武器 → … → 其它 有序');
   if (typeSeq.includes('弩')) {
-    assert(typeSeq.indexOf('弩') > otherIdx && otherIdx !== -1, '模板外新值「弩」归「其它」组保留（未丢弃）');
+    // 弩为模板内正式成员（远程武器三连：弓/枪械/弩相邻，#23-补丁3 模板补充）
+    const bowI = typeSeq.indexOf('弓'), gunI = typeSeq.indexOf('枪械'), crossI = typeSeq.indexOf('弩');
+    assert(bowI !== -1 && gunI === bowI + 1 && crossI === gunI + 1 && (otherIdx === -1 || crossI < otherIdx),
+      '弩在武器组内与弓/枪械相邻（远程三连），不入「其它」组');
+    assert(typeSeq.indexOf('装饰') > otherIdx && otherIdx !== -1, '模板外值（装饰等）仍归「其它」组保留');
   } else {
     console.log('  [跳过] 当前数据无「弩」值，模板外归组由「装饰/附魔」等代验');
     assert(otherIdx !== -1 && typeSeq.indexOf('装饰') > otherIdx, '模板外值（装饰等）归「其它」组保留');
