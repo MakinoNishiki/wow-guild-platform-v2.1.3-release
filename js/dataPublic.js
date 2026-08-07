@@ -411,7 +411,7 @@
         ${raidsBody}
       </section>
       <section class="dp-section">
-        ${secHead('sec:dungeons', '大秘境掉落池 <span class="dp-badge dp-badge-mplus">大秘境</span>', mplusToggle)}
+        ${secHead('sec:dungeons', '大秘境掉落池', mplusToggle)}
         ${mplusBody}
       </section>
       <section class="dp-section">

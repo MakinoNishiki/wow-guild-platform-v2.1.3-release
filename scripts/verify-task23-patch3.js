@@ -138,7 +138,7 @@ function assert(cond, label, detail) {
 
   // ================= ⑦ 分组排序（先断言顺序，趁无筛选） =================
   console.log('—— ⑦ 筛选选项分组排序 ——');
-  const slotOrder = await page.evaluate(() => [...document.querySelectorAll('#dpSlotChips .dp-chip')].map(c => c.dataset.v));
+  const slotOrder = await page.evaluate(() => [...document.querySelectorAll('#dpSlotChips .dp-chip:not(.dp-chip-all)')].map(c => c.dataset.v)); // 「全部」chip（data-v=""）不参与排序断言
   const expectSlots = ['头部', '肩部', '胸部', '腕部', '手部', '腰部', '腿部', '脚部', '背部',
     '单手', '双手', '主手', '副手', '副手物品', '远程', '颈部', '手指', '饰品', '套装兑换物', '杂项']
     .filter(v => slotOrder.includes(v));
@@ -166,7 +166,11 @@ function assert(cond, label, detail) {
     assert(typeSeq.indexOf('装饰') > otherIdx && otherIdx !== -1, '模板外值（装饰等）仍归「其它」组保留');
   } else {
     console.log('  [跳过] 当前数据无「弩」值，模板外归组由「装饰/附魔」等代验');
-    assert(otherIdx !== -1 && typeSeq.indexOf('装饰') > otherIdx, '模板外值（装饰等）归「其它」组保留');
+    if (typeSeq.includes('装饰')) {
+      assert(otherIdx !== -1 && typeSeq.indexOf('装饰') > otherIdx, '模板外值（装饰等）归「其它」组保留');
+    } else {
+      console.log('  [跳过] 当前数据无「装饰」等模板外值（库内数据漂移），归组断言无样本可验');
+    }
   }
 
   // ================= ③ 卡片同尺寸 + 展开 =================

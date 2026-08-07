@@ -21,7 +21,7 @@
 .dp-brand { display: flex; align-items: center; gap: 12px; }
 .dp-logo { width: 48px; height: 48px; border-radius: 8px; }
 .dp-title { font-size: 22px; font-weight: 700; color: var(--gold); }
-.dp-subtitle { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+.dp-subtitle { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
 .dp-season { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-secondary); }
 .dp-season .form-select { width: 200px; }
 
@@ -104,23 +104,28 @@
   margin-bottom: 12px;
   flex-wrap: wrap;
 }
+/* 任务书 #23-补丁5 字级回归：对齐规范 v2 §3 注册尺度（标题 18/600） */
 .dp-section-title {
-  font-size: 17px;
-  font-weight: 700;
+  font-size: 18px;
+  font-weight: 600;
   color: var(--gold);
   display: flex;
   align-items: center;
   gap: 8px;
 }
 
+/* 任务书 #23-补丁5 徽标并轨：三套徽标几何规格对齐全站 .tag 体系（main.css:3962，#22-WP1 定稿
+   高 20px / 字重 600 / 圆角 5px / padding 0 8px / line-height 1 / 不换行），类名保留作断言钩子 */
 .dp-badge {
   display: inline-flex;
   align-items: center;
-  height: 18px;
-  padding: 0 7px;
+  height: 20px;
+  padding: 0 8px;
   border-radius: 5px;
   font-size: 11px;
   font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
   vertical-align: middle;
 }
 .dp-badge-mplus { background: rgba(88, 166, 255, 0.15); color: var(--info); }
@@ -166,12 +171,19 @@
   align-items: center;
   gap: 6px;
 }
+/* 件数徽标同并轨：几何同 .tag，语义色同 .tag-grey（弱化灰） */
 .dp-count {
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 8px;
   font-size: 11px;
-  color: var(--text-muted);
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+  color: var(--text-secondary);
   background: rgba(139, 148, 158, 0.15);
-  border-radius: 8px;
-  padding: 1px 7px;
+  border-radius: 5px;
 }
 
 .dp-items {
@@ -187,13 +199,18 @@
 }
 .dp-item-name { font-size: 13px; font-weight: 600; color: var(--gold); margin-bottom: 6px; }
 .dp-item-meta { display: flex; flex-wrap: wrap; gap: 4px; }
+/* 装备/套装 meta 标签同并轨：几何同 .tag（字重 400→600、圆角 4→5、高 18→20），
+   语义色与 main.css .tag-grey/.tag-blue/.tag-green 同值 */
 .dp-tag {
   display: inline-flex;
   align-items: center;
-  height: 18px;
-  padding: 0 6px;
-  border-radius: 4px;
+  height: 20px;
+  padding: 0 8px;
+  border-radius: 5px;
   font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
   background: rgba(139, 148, 158, 0.15);
   color: var(--text-secondary);
 }

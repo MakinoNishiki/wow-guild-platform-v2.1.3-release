@@ -294,7 +294,7 @@ const eqSet = (a, b) => a.length === b.length && a.every((v, i) => v === b[i]);
         await page.selectOption('#dpSeasonSelect', emptySeasonId);
         await sleep(900);
         const resetState = await page.evaluate(() => ({
-          chips: document.querySelectorAll('.dp-filterbar .dp-chip.active').length, // 部位/类型/主/副属性 chips 全覆盖
+          chips: document.querySelectorAll('.dp-filterbar .dp-chip.active:not(.dp-chip-all)').length, // 值 chips 全覆盖；「全部」chip 空选即 active=默认态（筛选规范 §3），不计入
           search: document.getElementById('dpSearch').value,
           tierCls: document.getElementById('dpTierClass').value,
           tierRole: document.getElementById('dpTierRole').value,
