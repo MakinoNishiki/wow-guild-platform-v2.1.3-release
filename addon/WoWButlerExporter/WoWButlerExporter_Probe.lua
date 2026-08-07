@@ -1,5 +1,6 @@
 -- ============================================================
 -- 诊断模块（任务书 #26-fix3）：/wjdc probe [团本序号，默认 1]
+-- 1.0.6 新增物品级诊断：/wjdc probe <物品ID>（数值采集链核验，任务书 #28 WP1-fix）
 -- 只读诊断，不改导出逻辑；输出全部走聊天框，请完整截图反馈顾问侧
 -- ============================================================
 local msg = WJDCShared.msg
@@ -46,7 +47,75 @@ local function probeLoot(label, encounterID)
   end
 end
 
+-- 物品级诊断（1.0.6，任务书 #28 WP1-fix）：/wjdc probe <物品ID>
+-- 验证数值采集链：GetItemStats 原始返回 + 通道判定 + tooltip 原行 + 解析结果
+local function probeItem(itemID)
+  msg("===== probe 物品：" .. tostring(itemID) .. " =====")
+  local name, _, _, ilvl = GetItemInfo(itemID)
+  if not name and C_Item and C_Item.RequestLoadItemDataByID then
+    pcall(C_Item.RequestLoadItemDataByID, itemID)
+    name, _, _, ilvl = GetItemInfo(itemID)
+  end
+  msg("GetItemInfo：name=" .. tostring(name) .. " ilvl=" .. tostring(ilvl))
+  -- ① API 通道原始返回（key / 原始值 / _G 解析名）
+  if type(GetItemStats) == "function" then
+    local ok, stats = pcall(GetItemStats, "item:" .. itemID)
+    if not ok then
+      msg("GetItemStats 调用报错：" .. tostring(stats))
+    elseif type(stats) ~= "table" then
+      msg("GetItemStats 返回非表：" .. tostring(stats))
+    else
+      local n = 0
+      for _ in pairs(stats) do n = n + 1 end
+      msg("GetItemStats 返回表，共 " .. n .. " 项：")
+      local keys = {}
+      for k in pairs(stats) do keys[#keys + 1] = k end
+      table.sort(keys, function(x, y) return tostring(x) < tostring(y) end)
+      for _, k in ipairs(keys) do
+        msg("  " .. tostring(k) .. " = " .. tostring(stats[k]) .. "（_G 解析名：" .. tostring(_G[k]) .. "）")
+      end
+    end
+  else
+    msg("GetItemStats：函数不存在（API 通道不可用）")
+  end
+  -- ② 通道判定（与导出同函数）
+  local pv, sv = WJDCShared.statValuesFromApi(itemID)
+  if pv then
+    msg("通道判定：GetItemStats 命中")
+  else
+    msg("通道判定：GetItemStats 未命中（不存在/报错/空表），导出将回退 tooltip 解析")
+  end
+  -- ③ tooltip 原行（仅属性相关行，原样输出——含前导 + 有无，供主属性行格式核对）
+  local lines = WJDCShared.scanLines(itemID)
+  if lines then
+    msg("tooltip 属性相关原行：")
+    for _, t in ipairs(lines) do
+      if t:match("力量") or t:match("敏捷") or t:match("智力")
+         or t:match("爆击") or t:match("急速") or t:match("精通") or t:match("全能") then
+        msg("  | " .. t)
+      end
+    end
+  else
+    msg("tooltip 扫描失败（物品未缓存？/reload 后重试）")
+  end
+  -- ④ 解析结果（与导出同函数）
+  local d = WJDCShared.parseItemDetail(itemID)
+  local function kv(t)
+    local o = {}
+    for k, v in pairs(t) do o[#o + 1] = tostring(k) .. "=" .. tostring(v) end
+    table.sort(o)
+    return "{" .. table.concat(o, ", ") .. "}"
+  end
+  msg("parseItemDetail：primary=" .. retstr(d.primary) .. " ｜ secondary=" .. retstr(d.secondary))
+  msg("  tooltip 数值：primary_values=" .. kv(d.primary_values) .. " secondary_values=" .. kv(d.secondary_values))
+  msg("  API 数值：primary_values=" .. kv(pv or {}) .. " secondary_values=" .. kv(sv or {}))
+  msg("===== probe 物品结束，请把聊天框完整截图反馈顾问侧 =====")
+end
+
 function WJDCProbe(arg)
+  -- 物品级诊断分支（1.0.6）：纯数字且 ≥100000 视为物品 ID（实例序号两位数量级，不会撞号）
+  local asItem = tonumber(arg)
+  if asItem and asItem >= 100000 then probeItem(asItem) return end
   if C_AddOns and C_AddOns.IsAddOnLoaded and C_AddOns.LoadAddOn
      and not C_AddOns.IsAddOnLoaded("Blizzard_EncounterJournal") then
     pcall(C_AddOns.LoadAddOn, "Blizzard_EncounterJournal")

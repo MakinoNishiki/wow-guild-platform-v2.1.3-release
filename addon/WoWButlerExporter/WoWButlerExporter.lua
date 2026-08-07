@@ -7,8 +7,10 @@
 -- （1.0.5：掉落新增主/副属性数值字段 primary_values/secondary_values，
 --   优先 GetItemStats，不可用回退 tooltip 解析——任务书 #28 WP1 星标数据链；
 --   原有字段格式不变，向后兼容）
+-- （1.0.6：修复 gsub 次返回值误入 tonumber base 致数值行必炸（bad argument #2）；
+--   probe 新增物品级诊断 /wjdc probe <物品ID>）
 -- ============================================================
-local ADDON_VERSION = "1.0.5"
+local ADDON_VERSION = "1.0.6"
 
 local function msg(s) DEFAULT_CHAT_FRAME:AddMessage("|cffffd200[wjdc]|r " .. s) end
 local function err(s) DEFAULT_CHAT_FRAME:AddMessage("|cffff4040[wjdc]|r " .. s) end
@@ -65,7 +67,7 @@ local function parseItemDetail(itemID)
     local num, stat = t:match("^%+([%d,]+)%s*(.+)$")
     if stat then
       stat = stat:gsub("%s", "")
-      local v = num and tonumber(num:gsub(",", "")) or nil
+      local v = num and tonumber((num:gsub(",", ""))) or nil  -- 括号截断 gsub 多返回值（1.0.6 修复：次返回值曾被当作 tonumber 的 base）
       if PRIMARY[stat] then
         addUnique(d.primary, stat)
         if v then d.primary_values[stat] = v end
@@ -100,6 +102,11 @@ local function statValuesFromApi(itemID)
   if n == 0 then return nil end
   return pv, sv
 end
+
+-- 诊断模块共享（1.0.6，/wjdc probe <物品ID> 物品级诊断用，任务书 #28 WP1-fix）
+WJDCShared.scanLines = scanLines
+WJDCShared.parseItemDetail = parseItemDetail
+WJDCShared.statValuesFromApi = statValuesFromApi
 
 -- ---------- 副本手册遍历（团本 / 大秘境共用） ----------
 -- 掉落枚举（任务书 #26-fix4）：EJ_SelectEncounter 后只许单参调用（实测双参全 nil）；
@@ -249,6 +256,6 @@ SlashCmdList["WJDC"] = function(input)
   if cmd == "all" or cmd == "raid" or cmd == "mplus" or cmd == "tier" or cmd == "me" then
     doExport(cmd)
   else
-    msg("用法：/wjdc all（全量）| raid（团本）| mplus（大秘境）| me（本人角色档案）| probe [团本序号]（诊断）")
+    msg("用法：/wjdc all（全量）| raid（团本）| mplus（大秘境）| me（本人角色档案）| probe [团本序号|物品ID]（诊断）")
   end
 end
