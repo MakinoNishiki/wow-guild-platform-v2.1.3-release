@@ -143,7 +143,15 @@
     const allLoot = [...state.loot, ...state.dungeonLoot];
     buildGroupedChips($('dpSlotChips'), groupOrder(allLoot.map(l => l.slot).filter(Boolean), SLOT_GROUPS), state.slots);
     buildGroupedChips($('dpTypeChips'), groupOrder(allLoot.map(l => l.item_type).filter(Boolean), TYPE_GROUPS), state.types);
-    $('dpSearch').oninput = e => { state.search = e.target.value.trim().toLowerCase(); render(); };
+    // REQ-084（任务书 #23-补丁6）：搜索框清除钮——有内容才显示、点击/Esc 清空还原全集、焦点留输入框
+    const searchInput = $('dpSearch'), searchClear = $('dpSearchClear');
+    const syncSearchClear = () => { searchClear.style.display = searchInput.value ? 'block' : 'none'; };
+    const clearSearch = () => {
+      searchInput.value = ''; state.search = ''; syncSearchClear(); searchInput.focus(); render();
+    };
+    searchInput.oninput = e => { state.search = e.target.value.trim().toLowerCase(); syncSearchClear(); render(); };
+    searchInput.onkeydown = e => { if (e.key === 'Escape' && searchInput.value) clearSearch(); };
+    searchClear.onclick = clearSearch;
     // 排除杂项开关（默认关）+ 问号说明（悬浮/点击）
     $('dpExcludeMisc').onchange = e => { state.excludeMisc = e.target.checked; render(); };
     $('dpMiscHelp').onclick = e => { e.preventDefault(); e.stopPropagation(); $('dpMiscHelp').classList.toggle('open'); };
@@ -219,7 +227,7 @@
     state.primaryStats.clear(); state.secondaryStats.clear();
     state.excludeMisc = false;
     state.tierClassId = ''; state.tierRole = ''; state.tierSpecId = '';
-    $('dpSearch').value = ''; $('dpExcludeMisc').checked = false;
+    $('dpSearch').value = ''; $('dpSearchClear').style.display = 'none'; $('dpExcludeMisc').checked = false;
     syncChipRow($('dpSlotChips'), state.slots);
     syncChipRow($('dpTypeChips'), state.types);
     syncChipRow($('dpPrimaryChips'), state.primaryStats);
@@ -405,6 +413,14 @@
         <button class="dp-toggle${state.dungeonView === 'pool' ? ' active' : ''}" data-view="pool">整体池</button>
       </div>`;
     const mplusBody = collapsed.has('sec:dungeons') ? '' : renderDungeons();
+    // REQ-085（任务书 #23-补丁6）：套装一览升级同构折叠头（sec:tiers，区块级，记忆同补丁4 口径）；
+    // 三维筛选留在头内常驻，折叠时筛选状态保留、展开结果不变
+    const tiersBody = collapsed.has('sec:tiers') ? '' : `<div class="dp-tiers">${renderTierSets()}</div>`;
+    const tierFiltersHtml = `<div class="dp-tier-filters">
+            <select id="dpTierClass" class="form-select"></select>
+            <select id="dpTierRole" class="form-select"></select>
+            <select id="dpTierSpec" class="form-select"></select>
+          </div>`;
     main.innerHTML = `
       <section class="dp-section">
         ${secHead('sec:raids', '团本掉落池')}
@@ -415,23 +431,16 @@
         ${mplusBody}
       </section>
       <section class="dp-section">
-        <div class="dp-section-head">
-          <div class="dp-section-title">套装一览</div>
-          <div class="dp-tier-filters">
-            <select id="dpTierClass" class="form-select"></select>
-            <select id="dpTierRole" class="form-select"></select>
-            <select id="dpTierSpec" class="form-select"></select>
-          </div>
-        </div>
-        <div class="dp-tiers">${renderTierSets()}</div>
+        ${secHead('sec:tiers', '套装一览', tierFiltersHtml)}
+        ${tiersBody}
       </section>`;
     // 大秘境视图切换（事件委托，渲染后重绑）
     main.querySelectorAll('.dp-toggle').forEach(btn => {
       btn.onclick = () => { state.dungeonView = btn.dataset.view; render(); };
     });
-    // 折叠（区块/副本/BOSS 三级，事件委托；视图切换按钮不触发折叠）
+    // 折叠（区块/副本/BOSS 三级，事件委托；视图切换按钮与套装三维筛选下拉不触发折叠）
     main.querySelectorAll('[data-collapse]').forEach(el => {
-      el.onclick = ev => { if (ev.target.closest('.dp-toggle')) return; toggleCollapse(el.dataset.collapse); };
+      el.onclick = ev => { if (ev.target.closest('.dp-toggle') || ev.target.closest('.dp-tier-filters')) return; toggleCollapse(el.dataset.collapse); };
     });
     // 修正项③：移动端/触屏点击特效卡展开收起（桌面悬浮由 CSS :hover 覆盖）
     main.querySelectorAll('.dp-item.has-effect').forEach(card => {

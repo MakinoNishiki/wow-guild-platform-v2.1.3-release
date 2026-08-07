@@ -4,13 +4,13 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>数据公示 · 魔兽管家</title>
-<!-- 静态资源版本号与 index.html 同步递增（开发规范第五章第 6 条）：20260807.19 -->
+<!-- 静态资源版本号与 index.html 同步递增（开发规范第五章第 6 条）：20260807.20 -->
 <link rel="icon" type="image/png" sizes="32x32" href="assets/brand/favicon-32.png">
 <link rel="icon" type="image/png" sizes="16x16" href="assets/brand/favicon-16.png">
-<link rel="stylesheet" href="css/main.css?v=20260807.19">
-<link rel="stylesheet" href="css/data-public.css?v=20260807.19">
-<script src="assets/vendor/supabase-js-2.js?v=20260807.19"></script>
-<script src="js/iconMap.js?v=20260807.19"></script>
+<link rel="stylesheet" href="css/main.css?v=20260807.20">
+<link rel="stylesheet" href="css/data-public.css?v=20260807.20">
+<script src="assets/vendor/supabase-js-2.js?v=20260807.20"></script>
+<script src="js/iconMap.js?v=20260807.20"></script>
 </head>
 <body class="data-public-body">
   <!-- 任务书 #23 WP2：数据公示页（免登录公开，anon 直连 PostgREST，只读） -->
@@ -44,7 +44,8 @@
         </span>
       </label>
     </div>
-    <div class="dp-search-row"><input type="text" id="dpSearch" class="search-input" placeholder="搜索装备名…"></div>
+    <!-- REQ-084（任务书 #23-补丁6）：搜索框清除钮，复用 REQ-077 模式（uc-input-wrap/uc-clear-btn 主应用同款，main.css 已加载） -->
+    <div class="dp-search-row"><div class="uc-input-wrap"><input type="text" id="dpSearch" class="search-input" placeholder="搜索装备名…"><button type="button" id="dpSearchClear" class="uc-clear-btn" aria-label="清除搜索" title="清空" style="display:none">&times;</button></div></div>
   </div>
 
   <main class="dp-main" id="dpMain">
@@ -53,6 +54,6 @@
 
   <footer class="dp-footer">数据来源：魔兽管家数据中心 · 只读公示，由运营维护</footer>
 
-  <script src="js/dataPublic.js?v=20260807.19"></script>
+  <script src="js/dataPublic.js?v=20260807.20"></script>
 </body>
 </html>

@@ -41,7 +41,10 @@
 .dp-filterbar .search-input { flex: 1; min-width: 200px; }
 .dp-filterbar .form-select { width: 150px; }
 .dp-misc-row, .dp-search-row { width: 100%; }
-.dp-search-row .search-input { width: 100%; box-sizing: border-box; }
+/* BUG-055（任务书 #23-补丁6）：misc 行内容整体缩进 64px（=组头列宽 56 + 组间 8），
+   内容左缘与 chip 列起点对齐（1366 档实测基线 217） */
+.dp-misc-row { padding-left: 64px; box-sizing: border-box; }
+.dp-search-row .search-input { width: 100%; box-sizing: border-box; padding-right: 36px; /* REQ-084：清除钮让位 */ }
 
 /* 移动端（≤768px）筛选条整体折叠为「筛选 ▾」按钮（筛选规范 §6），桌面恒展开 */
 .dp-filter-toggle { display: none; }
@@ -68,6 +71,7 @@
   color: var(--text-secondary);
   font-size: 12px;
   font-weight: 500;
+  line-height: 1; /* BUG-054（任务书 #23-补丁6）：中文无西文降部，normal 行盒内字形偏上；line-height:1 光学居中 */
   cursor: pointer;
   user-select: none;
 }
