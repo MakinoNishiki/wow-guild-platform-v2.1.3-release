@@ -41,19 +41,19 @@
 .dp-filterbar .search-input { flex: 1; min-width: 200px; }
 .dp-filterbar .form-select { width: 150px; }
 .dp-misc-row, .dp-search-row { width: 100%; }
-/* BUG-055（任务书 #23-补丁6）：misc 行内容整体缩进 64px（=组头列宽 56 + 组间 8），
-   内容左缘与 chip 列起点对齐（1366 档实测基线 217） */
-.dp-misc-row { padding-left: 64px; box-sizing: border-box; }
+/* BUG-055（任务书 #23-补丁7 修法变更，补丁6 的 64px 缩进撤销）：misc 行不缩进，
+   勾选框左缘与组头盒/搜索框行左缘同一条竖线（左缘对齐定稿） */
 .dp-search-row .search-input { width: 100%; box-sizing: border-box; padding-right: 36px; /* REQ-084：清除钮让位 */ }
 
 /* 移动端（≤768px）筛选条整体折叠为「筛选 ▾」按钮（筛选规范 §6），桌面恒展开 */
 .dp-filter-toggle { display: none; }
 
 /* 筛选 chips（规范 v2 §4.3/§5 + 筛选规范 §3：24px 恒定高、12px 圆角、12px/500、深底；
-   组头 56px 右对齐 12px 次级色、与首行 chip 同基线；chip 间 6px、子类组间 8px + 1px 竖分隔线 16px 高
+   组头 56px 左对齐 12px 次级色、与首行 chip 同基线，组头/misc 行/搜索框行左缘同一条竖线
+   （任务书 #23-补丁7 BUG-055 定稿）；chip 间 6px、子类组间 8px + 1px 竖分隔线 16px 高
    ——任务书 #23-补丁4 修正项③） */
 .dp-chip-row { display: flex; align-items: flex-start; gap: 8px; flex-wrap: wrap; width: 100%; }
-.dp-chip-label { font-size: 12px; color: var(--text-secondary); flex-shrink: 0; width: 56px; text-align: right; line-height: 24px; }
+.dp-chip-label { font-size: 12px; color: var(--text-secondary); flex-shrink: 0; width: 56px; text-align: left; line-height: 24px; }
 .dp-chips { display: flex; flex-wrap: wrap; column-gap: 0; row-gap: 6px; align-items: center; flex: 1; min-width: 0; }
 .dp-chip-sub { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; row-gap: 6px; min-width: 0; }
 .dp-chip-group-label { font-size: 11px; color: var(--text-muted); user-select: none; line-height: 24px; flex: none; white-space: nowrap; }

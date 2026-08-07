@@ -107,7 +107,8 @@ function assert(cond, label, detail) {
     assert(chipCss.h === '24px' && chipCss.r === '12px' && chipCss.fs === '12px' && chipCss.fw === '500',
       '§3 chip 24px 高 / 12px 圆角 / 12px / 500', JSON.stringify(chipCss));
     assert(chipCss.bg === 'rgb(30, 37, 46)', '§3 chip 默认态深底（--bg-card）', chipCss.bg);
-    // §3 组头 56px 右对齐 12px 次级色，与首行 chip 同基线（§6 折行也对齐首行）
+    // §3 组头 56px 左对齐 12px 次级色，与首行 chip 同基线（§6 折行也对齐首行）
+    // （任务书 #23-补丁7 BUG-055 修法变更：右对齐→左对齐，组头/misc 行/搜索框行左缘同一条竖线）
     const labelCss = await page.evaluate(() => {
       const l = document.querySelector('.dp-chip-row .dp-chip-label');
       const s = getComputedStyle(l);
@@ -115,9 +116,23 @@ function assert(cond, label, detail) {
       return { w: s.width, ta: s.textAlign, fs: s.fontSize, lh: s.lineHeight, color: s.color,
         topDiff: Math.abs(l.getBoundingClientRect().top - chip.getBoundingClientRect().top) };
     });
-    assert(labelCss.w === '56px' && labelCss.ta === 'right' && labelCss.fs === '12px' && labelCss.color === 'rgb(139, 148, 158)',
-      '§3 组头 56px 右对齐 12px 次级色', JSON.stringify(labelCss));
+    assert(labelCss.w === '56px' && labelCss.ta === 'left' && labelCss.fs === '12px' && labelCss.color === 'rgb(139, 148, 158)',
+      '§3 组头 56px 左对齐 12px 次级色', JSON.stringify(labelCss));
     assert(labelCss.lh === '24px' && labelCss.topDiff <= 1, '§2/§6 组头与首行 chip 同基线（顶对齐+24px 行高）', `lineHeight=${labelCss.lh} topDiff=${labelCss.topDiff}`);
+    // §3 左缘一条竖线（补丁7 定稿）：组头四标签/misc 勾选框/搜索框左缘同线，chip 列基线（1366 档 217）不动
+    const align = await page.evaluate(() => {
+      const labelLefts = [...document.querySelectorAll('.dp-chip-label')].map(l => l.getBoundingClientRect().left);
+      const chipL = document.querySelector('#dpSlotChips .dp-chip').getBoundingClientRect().left;
+      const miscRow = document.querySelector('.dp-misc-row');
+      const miscBoxL = document.getElementById('dpExcludeMisc').getBoundingClientRect().left;
+      const searchL = document.querySelector('.dp-search-row .search-input').getBoundingClientRect().left;
+      return { labelLefts, chipL, miscPadL: getComputedStyle(miscRow).paddingLeft, miscBoxL, searchL };
+    });
+    assert(align.labelLefts.length === 4 && align.labelLefts.every(x => Math.abs(x - align.labelLefts[0]) <= 1),
+      '§3 组头四标签左缘同一条竖线', JSON.stringify(align.labelLefts));
+    assert(align.miscPadL === '0px' && Math.abs(align.miscBoxL - align.labelLefts[0]) <= 1 && Math.abs(align.searchL - align.labelLefts[0]) <= 1,
+      '§3 misc 勾选框/搜索框左缘与组头盒同线（misc 行零缩进）', JSON.stringify(align));
+    assert(Math.abs(align.chipL - 217) <= 1, '§3 chip 列 217 基线不动（1366 档）', `实测 ${align.chipL}`);
     // §2 chip 间距 6px、组间 8px + 1px 竖分隔线 16px
     const gaps = await page.evaluate(() => {
       const sub = document.querySelector('#dpSlotChips .dp-chip-sub');
