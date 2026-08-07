@@ -176,6 +176,27 @@ def str_list(v):
     return []
 
 
+def stat_map(v):
+    """属性数值表（属性名→数值）规整（任务书 #28 WP1）；缺字段/空表 → None（数值列留空）"""
+    if not isinstance(v, dict):
+        return None
+    out = {}
+    for k, val in v.items():
+        if not s(k) or not isinstance(val, (int, float)):
+            continue
+        out[s(k)] = int(val) if float(val).is_integer() else val
+    return out or None
+
+
+def stat_cell(names, values):
+    """核对表属性列：有数值时带值渲染（爆击(300)、急速(100)），无数值保持原名表（向后兼容）"""
+    if not names:
+        return "—"
+    if values:
+        return "、".join("%s(%s)" % (n, values[n]) if n in values else n for n in names)
+    return "、".join(names)
+
+
 def norm_items(dump, section):
     """把 raids/dungeons 段拍平成统一行：instance/boss/item 字段"""
     rows = []
@@ -194,6 +215,8 @@ def norm_items(dump, section):
                     "ilvl": it.get("ilvl"),
                     "primary": str_list(it.get("primary")),
                     "secondary": str_list(it.get("secondary")),
+                    "primary_values": stat_map(it.get("primary_values")),
+                    "secondary_values": stat_map(it.get("secondary_values")),
                     "effect": s(it.get("effect")),
                 })
     return rows
@@ -294,8 +317,8 @@ def write_checklist(path, dump, raid_rows, dungeon_rows):
                 cell(r["slot"], "缺部位" in iss),
                 cell(r["type"], "缺类型" in iss),
                 s(r["ilvl"]) or "—",
-                "、".join(r["primary"]) or "—",
-                "、".join(r["secondary"]) or "—",
+                stat_cell(r["primary"], r["primary_values"]),
+                stat_cell(r["secondary"], r["secondary_values"]),
                 cell(r["effect"], "特效为空" in iss),
             ))
         L.append("")
@@ -345,6 +368,9 @@ def build_load_rows(rows, matcher):
             "effect": r["effect"] or None,
             "primary_stats": r["primary"] or None,
             "secondary_stats": r["secondary"] or None,
+            # 任务书 #28 WP1：数值透传（jsonb 列，sql/19）；旧格式导出无数值 → None 留空
+            "primary_values": r["primary_values"],
+            "secondary_values": r["secondary_values"],
         }
         key = (entry.get("id"), r["name"])
         if key in seen:  # 同 BOSS 同名去重（与 dungeon_loot 唯一约束同口径）

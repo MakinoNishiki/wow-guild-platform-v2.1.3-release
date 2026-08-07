@@ -4,8 +4,11 @@
 -- 导出目标：SavedVariables 全局表 WJDCDump（/reload 或退出游戏后写盘）
 -- 命令：/wjdc all | raid | mplus | me | probe [团本序号]
 -- （套装效果导出于 1.0.4 移除：走顾问侧文章/OCR 管道，任务书 #26-fix4）
+-- （1.0.5：掉落新增主/副属性数值字段 primary_values/secondary_values，
+--   优先 GetItemStats，不可用回退 tooltip 解析——任务书 #28 WP1 星标数据链；
+--   原有字段格式不变，向后兼容）
 -- ============================================================
-local ADDON_VERSION = "1.0.4"
+local ADDON_VERSION = "1.0.5"
 
 local function msg(s) DEFAULT_CHAT_FRAME:AddMessage("|cffffd200[wjdc]|r " .. s) end
 local function err(s) DEFAULT_CHAT_FRAME:AddMessage("|cffff4040[wjdc]|r " .. s) end
@@ -54,21 +57,48 @@ local function addUnique(list, v)
 end
 
 local function parseItemDetail(itemID)
-  local d = { primary = {}, secondary = {}, effect = "" }
+  local d = { primary = {}, secondary = {}, effect = "", primary_values = {}, secondary_values = {} }
   local lines = scanLines(itemID)
   if not lines then return d end
   for _, t in ipairs(lines) do
-    local stat = t:match("^%+[%d,]+%s*(.+)$")
+    -- 数值一并采集（任务书 #28 WP1）："+1,234 爆击" → 名 + 数值（千分位逗号剥离）
+    local num, stat = t:match("^%+([%d,]+)%s*(.+)$")
     if stat then
       stat = stat:gsub("%s", "")
-      if PRIMARY[stat] then addUnique(d.primary, stat)
-      elseif SECONDARY[stat] then addUnique(d.secondary, stat) end
+      local v = num and tonumber(num:gsub(",", "")) or nil
+      if PRIMARY[stat] then
+        addUnique(d.primary, stat)
+        if v then d.primary_values[stat] = v end
+      elseif SECONDARY[stat] then
+        addUnique(d.secondary, stat)
+        if v then d.secondary_values[stat] = v end
+      end
     end
     if d.effect == "" then
       d.effect = t:match("^(装备：.+)$") or t:match("^(使用：.+)$") or ""
     end
   end
   return d
+end
+
+-- ---------- 属性数值 API 通道（任务书 #28 WP1，优先于 tooltip 解析） ----------
+-- GetItemStats 返回 { [属性常量 key] = 数值 }，key 经 _G 解析为本地化短名后与 PRIMARY/SECONDARY 对照；
+-- API 不存在 / 返回空表 → 返回 nil，由调用方回退 tooltip 解析值
+local function statValuesFromApi(itemID)
+  if type(GetItemStats) ~= "function" then return nil end
+  local ok, stats = pcall(GetItemStats, "item:" .. itemID)
+  if not ok or type(stats) ~= "table" then return nil end
+  local pv, sv, n = {}, {}, 0
+  for key, val in pairs(stats) do
+    local name = type(key) == "string" and _G[key] or nil
+    if type(name) == "string" and type(val) == "number" and val > 0 then
+      name = name:gsub("%s", "")
+      if PRIMARY[name] then pv[name] = val; n = n + 1
+      elseif SECONDARY[name] then sv[name] = val; n = n + 1 end
+    end
+  end
+  if n == 0 then return nil end
+  return pv, sv
 end
 
 -- ---------- 副本手册遍历（团本 / 大秘境共用） ----------
@@ -116,9 +146,13 @@ local function exportInstances(isRaid, label)
         local basics = getItemBasics(itemID)
         if basics then
           local d = parseItemDetail(itemID)
+          -- 数值：API 通道优先（整表采用），不可用/空表回退 tooltip 解析值（任务书 #28 WP1）
+          local pv, sv = statValuesFromApi(itemID)
+          if not pv then pv, sv = d.primary_values, d.secondary_values end
           loot[#loot + 1] = { id = itemID, name = basics.name, slot = basics.slot,
                               type = basics.type, ilvl = basics.ilvl,
                               primary = d.primary, secondary = d.secondary,
+                              primary_values = pv, secondary_values = sv,
                               effect = d.effect }
         else
           failed[#failed + 1] = itemID  -- 禁静默：记入 boss.failed 并红字报告
