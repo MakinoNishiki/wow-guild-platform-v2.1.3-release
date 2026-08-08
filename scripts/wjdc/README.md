@@ -31,7 +31,7 @@ python scripts/wjdc_convert.py \
 ```json
 // dict.json
 {
-  "raids":    [{ "id": "uuid", "name": "虚影尖塔" }],
+  "raids":    [{ "id": "uuid", "name": "虚影尖塔", "type": "raid" }],
   "dungeons": [{ "id": "uuid", "name": "梦境裂隙" }],
   "bosses":   [{ "id": "uuid", "name": "织影者瓦丝琪", "raid_name": "虚影尖塔", "dungeon_name": null }]
 }
@@ -43,6 +43,8 @@ python scripts/wjdc_convert.py \
 ```
 
 参考导出命令（anon key 即可，9 张字典表 anon 可读）：
+
+- `raids[].type`（R13 / BUG-062，2026-08-08）：透传 `game_raids.type`——`raid` 固定团本 / `lair` 巢穴（归团本口径保留展示）/ `world` 世界BOSS（不属任何副本场景，公示页剔除、**数据保留入库**）。核对表团本段按此分型标注（统计行含巢穴/世界BOSS 小计、BOSS 头带口径注记）；load JSON 照常产出（world 掉落匹配 boss_id 入库）。旧形状 dict.json（无 type 字段）不标注，行为同旧版。导出时 `game_raids` 查询带 `select=id,name,type`。
 
 ```bash
 curl -s "$SUPABASE_URL/rest/v1/game_bosses?select=id,name,raid:game_raids(name),dungeon:game_dungeons(name)" \

@@ -1,12 +1,16 @@
 {
   "raids": [
-    { "id": "raid-uuid-001", "name": "虚影尖塔" }
+    { "id": "raid-uuid-001", "name": "虚影尖塔", "type": "raid" },
+    { "id": "raid-uuid-002", "name": "至暗之夜", "type": "world" },
+    { "id": "raid-uuid-003", "name": "孢陨幽境", "type": "lair" }
   ],
   "dungeons": [
     { "id": "dun-uuid-001", "name": "梦境裂隙" }
   ],
   "bosses": [
     { "id": "boss-uuid-001", "name": "织影者瓦丝琪", "raid_name": "虚影尖塔", "dungeon_name": null },
-    { "id": "boss-uuid-002", "name": "裂隙守望者", "raid_name": null, "dungeon_name": "梦境裂隙" }
+    { "id": "boss-uuid-002", "name": "裂隙守望者", "raid_name": null, "dungeon_name": "梦境裂隙" },
+    { "id": "boss-uuid-003", "name": "鲁阿夏尔", "raid_name": "至暗之夜", "dungeon_name": null },
+    { "id": "boss-uuid-004", "name": "腐沼之王", "raid_name": "孢陨幽境", "dungeon_name": null }
   ]
 }

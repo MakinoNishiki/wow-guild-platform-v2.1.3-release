@@ -6,7 +6,11 @@
 // hover 全文替换 → 续文展开（R4：预览截…、展开层仅续文、前缀+续文===全文；R7：未溢出卡无 … 无 hover 无展开层）；
 // R5 来源组 chip 同包 .dp-chip-sub（6px 同距）；R6 来源单选联动折叠对应掉落池整段（含分组标题）；
 // R1 星标边界盒断言；R2 锚点卡（永恒虚空之歌/圣光纽带/上古饥渴之心）+ 零空 stats 行；
-// R9 期望值增排 item_type IN('装饰品','幻化')（sql/22 服务端口径，S1 基线 340=团本 136+大秘境 204）。
+// R9 期望值增排 item_type IN('装饰品','幻化')（sql/22 服务端口径）。
+// 适配任务书 #28 WP3-v4（R11–R13，2026-08-08）：R11 来源行锚底（margin-top:auto，WP3-13 全页贴底 ±1px + 分叉指环锚点）；
+// R12 hover 续文自然接续（隐藏前缀占位：展开态省略号消失、续文内联接续同线/自然换行，①块几何断言）；
+// R13 世界BOSS剔除（BUG-062，sql/24：至暗之夜 type='world'、RPC 黑名单 is distinct from 'world'，lair 保留；
+// S1 基线 308=团本 104+大秘境 204；WP3-14 零 world 行断言）。
 // 公示页为免登录只读页（live 数据），本脚本不创建任何测试数据，收尾复核 T23X 遗留为零。
 // 用法: node scripts/verify-task23-patch4.js（PW_CHANNEL=chrome 可选）截图输出 backup/2026-08-07-task23-patch4/
 const fs = require('fs');
@@ -64,7 +68,8 @@ function assert(cond, label, detail) {
   // ---- node 侧：当前赛季参照数据（按行计，不按名去重——同名跨 BOSS 重复掉落是合法重复行） ----
   const seasons = await rest('/game_seasons?select=*');
   const cur = seasons.find(s => s.is_current) || seasons.sort((a, b) => String(a.start_date).localeCompare(String(b.start_date))).pop();
-  const raids = await rest(`/game_raids?select=*&season_id=eq.${cur.id}`);
+  const raids = (await rest(`/game_raids?select=*&season_id=eq.${cur.id}`))
+    .filter(r => r.type !== 'world'); // R13（WP3-v4 / BUG-062）：世界BOSS 公示页剔除，期望值同口径；lair 巢穴归团本口径保留
   const dungeons = await rest(`/game_dungeons?select=*&season_id=eq.${cur.id}`);
   const bossRows = await rest('/game_bosses?select=id,raid_id,dungeon_id&limit=1000');
   const bossIdsInSeason = new Set(bossRows.filter(b => raids.some(r => r.id === b.raid_id)).map(b => b.id));
@@ -84,7 +89,7 @@ function assert(cond, label, detail) {
   const nStr = all.filter(l => (l.primary_stats || []).includes('力量')).length;
   const nCombo = all.filter(l => (l.primary_stats || []).includes('力量') && (l.secondary_stats || []).includes('爆击')).length;
   console.log(`  [数据] 当前赛季「${cur.name}」：全集 ${all.length} 行（团本 ${nRaid} + 大秘境 ${nDun}，已排除杂项 ${nMisc} 行 + 装饰品/幻化 ${nExcl} 行）｜爆击 ${nCrit}｜力量 ${nStr}｜力量AND爆击 ${nCombo}（按行计）`);
-  console.log(`  [基准] v3 口径参照（R9 后）：S1 全集 340（团本 136 + 大秘境 204）→ ${all.length === 340 && nRaid === 136 && nDun === 204 ? '与库内一致' : '库内已变动，以库内实测为准'}`);
+  console.log(`  [基准] v4 口径参照（R13 后）：S1 全集 308（团本 104 + 大秘境 204，世界BOSS 32 件剔除、lair 巢穴保留）→ ${all.length === 308 && nRaid === 104 && nDun === 204 ? '与库内一致' : '库内已变动，以库内实测为准'}`);
   // ① 用 3 张最长特效卡
   const effectCards = all.filter(l => l.effect && l.effect.length >= 30).sort((a, b) => b.effect.length - a.effect.length);
   const picked = [];
@@ -316,7 +321,6 @@ function assert(cond, label, detail) {
           previewText: preview.textContent,
           endsEllipsis: preview.textContent.endsWith('…'),
           overlayHidden: overlay ? getComputedStyle(overlay).opacity === '0' : null,
-          joined: overlay ? preview.textContent.slice(0, -1) + overlay.textContent : null,
         } };
       }, item);
       let after = null;
@@ -328,10 +332,24 @@ function assert(cond, label, detail) {
           const card = document.querySelector('[data-t4-hover]');
           const preview = card.querySelector('.dp-item-effect-preview');
           const overlay = card.querySelector('.dp-item-effect-overlay');
+          const hid = overlay.querySelector('.dp-fx-hidden');
+          const prefix = hid ? hid.textContent : null;
+          const remainder = overlay.textContent.slice(prefix ? prefix.length : 0);
+          // R12 内联接续几何：续文首字 top 相对预览 top 的偏移 ≈ 1×行高（与预览末字同线续接）
+          // 或 ≈ 2×行高（前缀恰好装满第二行、自然换行）——两种都是连续文本流，不得更大（另起块级行/空白行）
+          let topOffset = null, lh = null;
+          const tn = [...overlay.childNodes].find(n => n.nodeType === Node.TEXT_NODE && n.textContent.length);
+          if (tn) {
+            const range = document.createRange();
+            range.setStart(tn, 0); range.setEnd(tn, Math.min(1, tn.textContent.length));
+            lh = parseFloat(getComputedStyle(preview).lineHeight);
+            topOffset = Math.round((range.getBoundingClientRect().top - preview.getBoundingClientRect().top) * 10) / 10;
+          }
           const out = {
             previewOpacity: getComputedStyle(preview).opacity,
             overlayOpacity: getComputedStyle(overlay).opacity,
-            overlayText: overlay.textContent,
+            overlayHasEllipsis: overlay.textContent.includes('…'),
+            prefix, remainder, topOffset, lh,
           };
           card.removeAttribute('data-t4-hover'); // 避免下一张定位到旧卡
           return out;
@@ -341,17 +359,21 @@ function assert(cond, label, detail) {
       } else if (pre.found) {
         await page.evaluate(() => document.querySelector('[data-t4-hover]').removeAttribute('data-t4-hover'));
       }
+      const inlineOk = after && after.topOffset != null
+        && (Math.abs(after.topOffset - after.lh) <= 2 || Math.abs(after.topOffset - 2 * after.lh) <= 2);
       const ok = pre.found && (pre.overflow
         ? (after
-          && pre.before.endsEllipsis                        // 预览被 … 截断
-          && pre.before.joined === item.effect              // 前缀+续文 === 数据源全文（逐字接续，无重复/缺字）
-          && pre.before.overlayHidden                       // 折叠态展开层不渲染
-          && after.previewOpacity === '1'                   // hover 后预览行保持可见（续接而非全文替换）
+          && pre.before.endsEllipsis                              // 折叠态预览被 … 截断
+          && pre.before.overlayHidden                             // 折叠态展开层不渲染
+          && after.previewOpacity === '1'
           && after.overlayOpacity === '1'
-          && after.overlayText === item.effect.slice(pre.before.previewText.length - 1)) // 展开层 = 被截续文
+          && !after.overlayHasEllipsis                            // R12①：展开态省略号消失
+          && after.prefix === pre.before.previewText.slice(0, -1) // R12②：隐藏前缀=折叠态可见前缀（续文接在预览末字之后）
+          && after.prefix + after.remainder === item.effect       // 前缀+续文 === 数据源全文（逐字）
+          && inlineOk)                                            // R12②：续文内联接续（同线或自然换行，无空白行）
         : (!pre.before.endsEllipsis && pre.before.previewText === item.effect && pre.before.overlayHidden === null)); // R7：未溢出整行直显
-      assert(ok, `①卡${i + 1}「${item.item_name}」${pre.found && pre.overflow ? 'hover 续文展开：预览截…、展开层仅续文、前缀+续文逐字=全文' : '未溢出：整行直显无 … 无展开层（R7）'}`,
-        pre.found ? `溢出=${pre.overflow} 预览尾=${pre.before.previewText.slice(-8)}` : '卡片未找到');
+      assert(ok, `①卡${i + 1}「${item.item_name}」${pre.found && pre.overflow ? 'hover 续文自然接续（R12）：折叠截…、展开无省略号、续文内联接续逐字=全文' : '未溢出：整行直显无 … 无展开层（R7）'}`,
+        pre.found && after ? `topOffset=${after.topOffset} lh=${after.lh} 省略号残留=${after.overlayHasEllipsis}` : (pre.found ? `溢出=${pre.overflow}` : '卡片未找到'));
     }
     assert(overflowSeen >= 1, '①备料：3 张长特效卡中至少 1 张实测溢出（has-effect，续文路径被真实覆盖）', `溢出 ${overflowSeen}/3`);
     // R7 专项（全页不变量）：未溢出卡 = 无 has-effect/无展开层/无 …/预览=全文；溢出卡 = 截…+展开层续文且 前缀+续文===全文
@@ -367,7 +389,10 @@ function assert(cond, label, detail) {
         const ellipsis = p.textContent.endsWith('…');
         if (has) {
           longSeen++;
-          if (!ellipsis || !ov || (p.textContent.slice(0, -1) + ov.textContent) !== p.dataset.full) bad.push('溢出卡异常:' + name);
+          const hid = ov && ov.querySelector('.dp-fx-hidden');
+          const rem = ov ? ov.textContent.slice(hid ? hid.textContent.length : 0) : '';
+          if (!ellipsis || !ov || !hid || ov.textContent.includes('…')
+            || (p.textContent.slice(0, -1) + rem) !== p.dataset.full) bad.push('溢出卡异常:' + name);
         } else {
           shortSeen++;
           if (ellipsis || ov || p.textContent !== p.dataset.full) bad.push('未溢出卡异常:' + name);
@@ -507,6 +532,21 @@ function assert(cond, label, detail) {
         [...document.querySelectorAll('.dp-item')].filter(c => c.textContent.includes('掉落难度')).length);
       assert(tiersAllNull && diffText === 0, 'WP3-5 掉落难度不显（库内 tiers 全 null，DOM 零「掉落难度」）',
         `tiersNull=${tiersAllNull} dom=${diffText}`);
+      // WP3-14（R13 / BUG-062）世界BOSS剔除：RPC 零 instance_type='world' 行（黑名单写法）、页面零「至暗之夜」；
+      // lair 巢穴（孢陨幽境）归团本口径保留展示
+      const rpcRows = await fetch(`${SB}/rest/v1/rpc/get_public_loot_detail`,
+        { method: 'POST', headers: { ...H, 'Content-Type': 'application/json' }, body: '{}' }).then(r => r.json());
+      const worldRows = rpcRows.filter(x => x.instance_type === 'world').length;
+      const lairRows = rpcRows.filter(x => x.instance_type === 'lair').length;
+      const worldDom = await page.evaluate(() => ({
+        // 精确口径：来源行以「至暗之夜 ·」开头（实例名）才算世界BOSS行——BOSS 名「至暗之夜降临」（进军奎尔丹纳斯）是合法团本内容
+        srcHits: [...document.querySelectorAll('.dp-item-src')].filter(e => e.textContent.startsWith('至暗之夜 ·')).length,
+        headHits: [...document.querySelectorAll('.dp-raid-name')].filter(e => e.textContent.replace(/[\d\s]/g, '') === '至暗之夜').length,
+        lairKept: [...document.querySelectorAll('.dp-raid-name')].some(e => e.textContent.includes('孢陨幽境')),
+      }));
+      assert(worldRows === 0 && lairRows > 0 && worldDom.srcHits === 0 && worldDom.headHits === 0 && worldDom.lairKept,
+        'WP3-14 R13 世界BOSS剔除（BUG-062）：RPC 零 world 行、页面零至暗之夜实例行（BOSS「至暗之夜降临」为合法团本内容不误伤）、lair 巢穴保留',
+        JSON.stringify({ worldRows, lairRows, ...worldDom }));
       // WP3-6 副属性降序+星标（裁定 H）：星标卡首 tag=唯一最大者带⭐+SVG，其余无星；单副值卡无星
       const starExp = Object.entries(starItem.secondary_values).map(([k, v]) => ({ k, v: Number(v) }))
         .sort((a, b) => b.v - a.v).map(e => `${e.k} +${e.v}`);
@@ -651,6 +691,36 @@ function assert(cond, label, detail) {
       assert(anchors.heart && seqOk(anchors.heart, 'stats', 'effect-wrap'),
         'WP3-12b R2 锚点：无副属性卡（上古饥渴之心）特效行紧跟主属性行上提', JSON.stringify(anchors.heart));
       assert(anchors.emptyStats === 0, 'WP3-12c 全页零空属性占位行（R2 占位行废止）', `空行=${anchors.emptyStats}`);
+      // WP3-13（R11）来源行锚底：全页卡片 来源行下缘 == 卡片内容盒下缘（±1px，margin-top:auto 吸收短卡空白）；
+      // 锚点卡「分叉指环」（魔导师平台·吉美尔鲁斯）在页且来源行与上行间距 ≥6px（空白留在来源行之上、不上移）
+      const srcAnchor = await page.evaluate(() => {
+        const bad = [];
+        let checked = 0;
+        document.querySelectorAll('.dp-item').forEach(c => {
+          const src = c.querySelector('.dp-item-src');
+          if (!src) return;
+          checked++;
+          const cb = c.getBoundingClientRect(), sb = src.getBoundingClientRect();
+          const padBottom = parseFloat(getComputedStyle(c).paddingBottom);
+          if (Math.abs((cb.bottom - padBottom) - sb.bottom) > 1)
+            bad.push(c.querySelector('.dp-item-name').textContent);
+        });
+        const anchor = [...document.querySelectorAll('.dp-item')].find(c =>
+          c.querySelector('.dp-item-name').textContent.includes('分叉指环'));
+        let gap = null, srcIn = null;
+        if (anchor) {
+          const src = anchor.querySelector('.dp-item-src');
+          gap = Math.round(src.getBoundingClientRect().top - src.previousElementSibling.getBoundingClientRect().bottom);
+          srcIn = src.textContent;
+        }
+        return { bad, checked, anchorFound: !!anchor, gap, srcIn };
+      });
+      assert(srcAnchor.checked > 0 && srcAnchor.bad.length === 0,
+        `WP3-13 R11 来源行锚底：全页 ${srcAnchor.checked} 张卡片来源行贴卡片底部（±1px）`,
+        srcAnchor.bad.slice(0, 3).join(' | ') || '无漂移');
+      assert(srcAnchor.anchorFound && srcAnchor.gap >= 6 && srcAnchor.srcIn.includes('魔导师平台'),
+        'WP3-13b R11 锚点卡「分叉指环」：来源行（魔导师平台 · 吉美尔鲁斯）锚底不上移、与上行间距 ≥6px',
+        JSON.stringify({ found: srcAnchor.anchorFound, gap: srcAnchor.gap, src: srcAnchor.srcIn }));
       // WP3-9 特效覆盖层动画回归 §6 白名单：200ms ease-out 只动 opacity/transform；实底（alpha=1）；reduced-motion 瞬时
       const animSpec = await page.evaluate(() => {
         const cs = getComputedStyle(document.querySelector('.dp-item-effect-overlay'));
@@ -842,12 +912,15 @@ function assert(cond, label, detail) {
         const card = document.querySelector('[data-t4-1920]');
         const preview = card.querySelector('.dp-item-effect-preview');
         const overlay = card.querySelector('.dp-item-effect-overlay');
+        const hid = overlay.querySelector('.dp-fx-hidden');
+        const rem = overlay.textContent.slice(hid ? hid.textContent.length : 0);
         return { po: getComputedStyle(preview).opacity, oo: getComputedStyle(overlay).opacity,
-          joined: preview.textContent.slice(0, -1) + overlay.textContent };
+          noEll: !overlay.textContent.includes('…'),
+          joined: preview.textContent.slice(0, -1) + rem };
       });
     }
-    assert(r1920 && r1920.po === '1' && r1920.oo === '1' && r1920.joined === picked[0].effect,
-      '①[1920] hover 续文展开：预览保持可见 + 展开层仅续文，前缀+续文逐字=数据源全文');
+    assert(r1920 && r1920.po === '1' && r1920.oo === '1' && r1920.noEll && r1920.joined === picked[0].effect,
+      '①[1920] hover 续文自然接续（R12）：展开无省略号、隐藏前缀占位、前缀+续文逐字=数据源全文');
     await page2.screenshot({ path: path.join(SHOT_DIR, '1920-expand-after.png') });
     await ctx2.close();
 

@@ -62,13 +62,14 @@ async function setup() {
   const s1 = cs.body.find(s => s.name === 'S1');
 
   const [raids, dungeons, classes, specs, tierSets] = await Promise.all([
-    svc('GET', `/rest/v1/game_raids?select=id,name&season_id=eq.${seasonId}`),
+    svc('GET', `/rest/v1/game_raids?select=id,name,type&season_id=eq.${seasonId}`),
     svc('GET', `/rest/v1/game_dungeons?select=id,name&season_id=eq.${seasonId}`),
     svc('GET', '/rest/v1/game_classes?select=id,name_zh,class_key'),
     svc('GET', '/rest/v1/game_specs?select=id,class_id,name_zh,spec_key,role'),
     svc('GET', `/rest/v1/tier_sets?select=id,class_id,spec_id,set_name,bonus_2,bonus_4&season_id=eq.${seasonId}`),
   ]);
-  const raidIds = raids.body.map(r => r.id);
+  // R13（WP3-v4 / BUG-062）：世界BOSS（type='world'）不属副本场景，公示页剔除——参照集同口径排除；lair 巢穴归团本口径保留
+  const raidIds = raids.body.filter(r => r.type !== 'world').map(r => r.id);
   const dungeonIds = dungeons.body.map(d => d.id);
   const inList = ids => ids.length ? `in.(${ids.join(',')})` : 'in.(00000000-0000-0000-0000-000000000000)';
   const [bosses, raidLoot, dungeonLoot] = await Promise.all([

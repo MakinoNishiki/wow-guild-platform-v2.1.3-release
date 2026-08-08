@@ -208,6 +208,9 @@
   border: 1px solid var(--border-color);
   border-radius: 8px;
   padding: 10px 12px;
+  /* WP3-v4 R11：flex 列布局——内容行顶部堆叠，来源行 margin-top:auto 锚定卡片底部不动 */
+  display: flex;
+  flex-direction: column;
 }
 /* 任务书 #28 WP3-v3（R3）：名称行单行截断、内容驱动（废恒占行高） */
 .dp-item-name { font-size: 13px; font-weight: 600; color: var(--gold); margin-bottom: 6px; line-height: 18px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -241,8 +244,8 @@
 /* 金星变体（§4.2 已注册）：副属性唯一最大者——右上角金色五角星 SVG + 金色描边（裁定 H） */
 .dp-tag-star { position: relative; border: 1px solid var(--gold); padding-right: 12px; }
 .dp-tag-star svg { position: absolute; top: -5px; right: -4px; width: 10px; height: 10px; }
-/* 来源行（单行截断，内容驱动）：实例 · BOSS（· 可兑换本赛季套装） */
-.dp-item-src { margin-top: 6px; line-height: 16px; font-size: 11px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* 来源行（单行截断）：R11（WP3-v4）锚定卡片底部——margin-top:auto 吸收短卡空白，padding-top 保底 6px 间距 */
+.dp-item-src { margin-top: auto; padding-top: 6px; line-height: 16px; font-size: 11px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .dp-item-effect { margin-top: 6px; font-size: 12px; color: #1eff00; }
 
 .dp-tiers { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 10px; }
@@ -295,7 +298,7 @@
 
 /* 修正项③：特效悬浮展开 + 可展开高亮边框（WP3-v2 起卡片零点击；WP3-v3 R4/R7 续文展开） */
 .dp-item { position: relative; }
-/* 特效容器（R4）：相对定位锚点——展开层从预览行正下缘续接，absolute 不推挤布局 */
+/* 特效容器（R4/R12）：相对定位锚点——展开层与预览行同位覆盖（top:0），absolute 不推挤布局 */
 .dp-item-effect-wrap { position: relative; margin-top: 6px; }
 /* 特效预览：内容驱动（R3 废恒占 2 行）；line-clamp:2 仅作兜底，截断由 JS 镜像实测切分（含 … 恰好 2 行） */
 .dp-item-effect-preview {
@@ -310,14 +313,15 @@
   box-shadow: 0 0 6px rgba(240, 192, 96, 0.12);
 }
 .dp-item.has-effect:hover { z-index: 30; }
-/* R4 hover 续文展开层：只放被 … 截掉的剩余文本（预览行保持可见、逐字接续，不再全文替换）；
-   卡宽下展、实底（--bg-card 实色）遮严邻卡；200ms ease-out 只动 transform/opacity（§6 白名单），
-   reduced-motion 瞬时（见文件尾部媒体查询） */
+/* R4 hover 续文展开层（R12 WP3-v4 改为自然接续）：展开层与预览行同宽同字体、top:0 原位覆盖——
+   内部 = 隐藏前缀（.dp-fx-hidden 占位，与预览可见文本逐字相同）+ 可见续文，同一文本流内联接续：
+   省略号只存在于折叠态，展开态消失（预览行被实底遮住）；续文从省略号原位置接着预览末字生长、
+   自然换行，不另起块级行、无空白行；absolute 不推挤布局；实底遮严邻卡；
+   200ms ease-out 只动 transform/opacity（§6 白名单），reduced-motion 瞬时（见文件尾部媒体查询） */
 .dp-item-effect-overlay {
-  position: absolute; left: -13px; right: -13px; top: 100%;
-  padding: 8px 12px 10px;
+  position: absolute; left: 0; right: 0; top: 0;
+  padding: 0 0 8px;
   background: var(--bg-card);
-  border: 1px solid rgba(240, 192, 96, 0.55); border-top: 1px dashed var(--border-color);
   border-radius: 0 0 8px 8px;
   box-shadow: 0 10px 24px rgba(0, 0, 0, 0.55);
   font-size: 12px; color: #1eff00; line-height: 17px;
@@ -326,6 +330,8 @@
   transition: opacity .2s ease-out, transform .2s ease-out;
   z-index: 30;
 }
+/* R12：隐藏前缀——占位使续文内联接续在预览末字之后（visibility 保留布局，不可见不删字） */
+.dp-item-effect-overlay .dp-fx-hidden { visibility: hidden; }
 .dp-item.has-effect:hover .dp-item-effect-overlay { opacity: 1; transform: translateY(0); }
 
 /* ==================== 任务书 #28 WP3-v2/v3：全信息装备卡（方向修正版 + 体验修订） ====================

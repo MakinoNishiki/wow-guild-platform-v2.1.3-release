@@ -282,6 +282,10 @@ class Dict:
             if b.get("dungeon_name"):
                 self.boss_by_dungeon[(s(b["dungeon_name"]), s(b.get("name")))] = b
 
+    def raid_type(self, inst):
+        """R13（WP3-v4）：字典 game_raids.type 透传——raid/lair/world；旧形状 dict.json 无 type 字段时返回 ''（不标注，行为同旧版）"""
+        return s((self.raids.get(inst) or {}).get("type"))
+
     def match_raid_boss(self, inst, boss):
         if inst not in self.raids:
             return None, "未知团本「%s」" % inst
@@ -311,7 +315,7 @@ def cell(v, bad):
     return mark(s(v)) if bad else (s(v) or "—")
 
 
-def write_checklist(path, dump, raid_rows, dungeon_rows):
+def write_checklist(path, dump, raid_rows, dungeon_rows, dictionary=None):
     L = []
     meta = dump.get("meta") or {}
     L.append("# WJDC 导出核对表")
@@ -321,7 +325,18 @@ def write_checklist(path, dump, raid_rows, dungeon_rows):
     L.append("- 异常行以 <mark>黄色高亮</mark> 标出（缺部位 / 缺类型 / 特效为空），多为游戏内物品缓存未就绪，可让运营 /reload 后重跑补齐。")
     L.append("")
 
-    def section(title, rows, inst_label):
+    # R13（WP3-v4 / BUG-062）： raids 段实例按字典 game_raids.type 分类标注——
+    # 世界BOSS（world）：不属任何副本场景，公示页剔除、数据保留入库；巢穴（lair）：归团本口径保留展示。
+    # dict.json 旧形状（无 type 字段）时 inst_note 恒空，行为与旧版一致。
+    def inst_note(inst):
+        t = dictionary.raid_type(inst) if dictionary else ""
+        if t == "world":
+            return "世界BOSS（公示页剔除，数据保留入库）"
+        if t == "lair":
+            return "巢穴（归团本口径）"
+        return ""
+
+    def section(title, rows, inst_label, note_of=None):
         L.append("## %s" % title)
         L.append("")
         insts = []
@@ -329,7 +344,19 @@ def write_checklist(path, dump, raid_rows, dungeon_rows):
             if r["instance"] not in insts:
                 insts.append(r["instance"])
         bosses = {(r["instance"], r["boss"]) for r in rows}
-        L.append("**统计：%d %s / %d BOSS / %d 件**" % (len(insts), inst_label, len(bosses), len(rows)))
+        stat = "**统计：%d %s / %d BOSS / %d 件**" % (len(insts), inst_label, len(bosses), len(rows))
+        if note_of:  # R13：分型小计（世界BOSS / 巢穴）
+            w = [i for i in insts if note_of(i).startswith("世界BOSS")]
+            lair = [i for i in insts if note_of(i).startswith("巢穴")]
+            parts = []
+            if lair:
+                parts.append("巢穴 %d 实例（归团本口径）" % len(lair))
+            if w:
+                parts.append("世界BOSS %d 实例 / %d 件（公示页剔除，数据保留入库）" % (
+                    len(w), sum(1 for r in rows if r["instance"] in w)))
+            if parts:
+                stat += "——" + "；".join(parts)
+        L.append(stat)
         L.append("")
         cur = (None, None)
         for r in rows:
@@ -338,7 +365,11 @@ def write_checklist(path, dump, raid_rows, dungeon_rows):
                 if cur != (None, None):
                     L.append("")
                 cur = key
-                L.append("### %s · %s" % (r["instance"], r["boss"]))
+                head = "### %s · %s" % (r["instance"], r["boss"])
+                note = note_of(r["instance"]) if note_of else ""
+                if note:
+                    head += " ｜ " + note
+                L.append(head)
                 L.append("")
                 L.append("| 装备 | 部位 | 类型 | 装等 | 主属性 | 副属性 | 特效 |")
                 L.append("|---|---|---|---|---|---|---|")
@@ -354,7 +385,7 @@ def write_checklist(path, dump, raid_rows, dungeon_rows):
             ))
         L.append("")
 
-    section("团本掉落", raid_rows, "团本")
+    section("团本掉落", raid_rows, "团本", inst_note)
     section("大秘境掉落", dungeon_rows, "副本")
 
     # 套装段（附审）
@@ -529,7 +560,7 @@ def main():
     raid_rows = norm_items(dump, "raids")
     dungeon_rows = norm_items(dump, "dungeons")
 
-    write_checklist(out("核对表.md"), dump, raid_rows, dungeon_rows)
+    write_checklist(out("核对表.md"), dump, raid_rows, dungeon_rows, dictionary)
 
     boss_matched, boss_unmatched = build_load_rows(raid_rows, dictionary.match_raid_boss)
     dun_matched, dun_unmatched = build_load_rows(dungeon_rows, dictionary.match_dungeon_boss)

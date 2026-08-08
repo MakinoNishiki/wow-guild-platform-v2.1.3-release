@@ -6582,6 +6582,33 @@ function lootFillAssignedTo(name) {
 // ==================== 更新日志 ====================
 const changelogData = [
   {
+    id: 'v3.2.0-task28-wp3v4-improve',
+    version: 'v3.2.0',
+    date: '2026-08-08',
+    type: 'improve',
+    typeLabel: '功能优化',
+    title: '公示页装备卡：来源行锚底 + 特效续文自然接续（任务书 #28 WP3-v4 R11/R12）',
+    summary: '装备卡来源行（实例 · BOSS · 套装归属）锚定卡片底部不动，短卡空白留在内容与来源行之间；超长特效悬浮展开改为自然接续——省略号只在折叠态出现，展开时续文从截断处接着预览末字内联生长、自然换行，不再另起面板块。',
+    details: [
+      '来源行 margin-top:auto 锚底，全页卡片贴底误差 ≤1px（分叉指环等短卡来源行不再随内容上移）',
+      '特效展开层与预览行同宽同字体原位覆盖：隐藏前缀占位 + 可见续文同一文本流，视觉 = 一段连续文本从截断处继续生长'
+    ]
+  },
+  {
+    id: 'v3.2.0-task28-wp3v4-fix',
+    version: 'v3.2.0',
+    date: '2026-08-08',
+    type: 'fix',
+    typeLabel: '修复BUG',
+    title: '世界BOSS实例类型误标修正：至暗之夜剔出公示页（BUG-062，任务书 #28 WP3-v4 R13）',
+    summary: '至暗之夜（鲁阿夏尔/索姆贝兰/普雷达萨斯/克拉格平，32 件）为世界BOSS，不属任何副本场景，此前 instance_type 误标「团本」混入公示页。已修正为 world 并从公示页剔除（数据保留）；巢穴（孢陨幽境/潮缚石窟）按裁定归团队副本口径保留展示。',
+    details: [
+      'game_raids.type 值域扩为 raid/lair/world；公开 RPC 以黑名单写法剔除 world（不误杀巢穴）',
+      'wjdc 转换器分类修复：dict.json 透传实例类型，核对表对世界BOSS/巢穴分型标注——S2 翻牌作战清单前置项',
+      '公示基线变更：S1 全部 308 = 团本 104 + 大秘境 204'
+    ]
+  },
+  {
     id: 'v3.2.0-task28-wp3v3-improve',
     version: 'v3.2.0',
     date: '2026-08-08',
@@ -11500,7 +11527,7 @@ function mdRenderRaids(panel) {
   const rows = MasterData.getRaids();
   const seasons = MasterData.getSeasons();
   const seasonName = (sid) => (seasons.find(s => s.id === sid) || {}).name || '-';
-  const typeLabel = { raid: '固定团本', lair: '巢穴弹性' };
+  const typeLabel = { raid: '固定团本', lair: '巢穴弹性', world: '世界BOSS' };
   panel.innerHTML = `
     <div style="margin-bottom:12px"><button class="btn btn-primary btn-sm" onclick="mdEditRaid()">+ 新增团本</button></div>
     ${mdTable('<th>名称</th><th>赛季</th><th>类型</th><th class="num">人数</th><th>最高难度</th><th>开放日</th><th class="num">排序</th><th class="center">操作</th>',
@@ -11521,7 +11548,7 @@ function mdEditRaid(id) {
   mdOpenEditor(id ? '编辑团本' : '新增团本', [
     { key: 'name', label: '名称', required: true, placeholder: '如 烈毒之渊' },
     { key: 'season_id', label: '归属赛季', type: 'select', options: seasonOpts },
-    { key: 'type', label: '类型', type: 'select', options: [{ value: 'raid', label: '固定团本（20 人）' }, { value: 'lair', label: '巢穴弹性（15-25 人）' }], default: row ? row.type : 'raid' },
+    { key: 'type', label: '类型', type: 'select', options: [{ value: 'raid', label: '固定团本（20 人）' }, { value: 'lair', label: '巢穴弹性（15-25 人）' }, { value: 'world', label: '世界BOSS（非副本，公示页剔除）' }], default: row ? row.type : 'raid' },
     { key: 'min_players', label: '人数下限', type: 'number', default: row ? row.min_players : 20, required: true },
     { key: 'max_players', label: '人数上限', type: 'number', default: row ? row.max_players : 20, required: true },
     { key: 'max_difficulty', label: '最高难度', placeholder: '如 史诗' },

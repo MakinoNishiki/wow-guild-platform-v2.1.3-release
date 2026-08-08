@@ -7,7 +7,10 @@
 // 来源行「实例 · BOSS（· 可兑换本赛季套装）」；卡片零点击交互（v1 点击详情层已整族拆除）。
 // 任务书 #28 WP3-v3（体验修订 R1–R7）：星标裁切修复（行容器 overflow 放开）；
 // R2 占位行废止——只渲染有数据的行；R3 内容驱动行内等高（grid 原生 stretch，删全部固定/占位行高）；
-// R4/R7 特效 hover 续文展开——未溢出卡无 … 无 hover 无展开层，溢出卡展开层只放被截续文（镜像实测切分、resize 重算）；
+// R4/R7 特效 hover 续文展开——未溢出卡无 … 无 hover 无展开层，溢出卡展开层续文（镜像实测切分、resize 重算）；
+// R12（WP3-v4）续文自然接续——展开层 = 隐藏前缀占位 + 可见续文同一文本流，省略号只在折叠态；
+// R11（WP3-v4）来源行 margin-top:auto 锚定卡片底部（内容行顶部堆叠，短卡空白留在来源行之上）；
+// R13（WP3-v4 / BUG-062）世界BOSS剔除——至暗之夜 type='world'（sql/24），RPC 黑名单排除（lair 巢穴归团本口径保留）。
 // R5 来源组 chip 间距复用 .dp-chip-sub；R6 来源单选联动折叠对应掉落池整段。
 // boss_loot/dungeon_loot 读取收口公开 RPC（sql/21，杂项服务端排除；sql/22 增排装饰品/幻化），难度行继续不显（tiers 无数据）。
 // 读取通道：anon key 直连 PostgREST（字典表匿名读 sql/16 + 公开 RPC sql/21），不登录、不走 server.js 写代理。
@@ -323,7 +326,8 @@
 
   // R4/R7 特效行实测切分（渲染后 + resize 重算）：
   // 隐藏镜像同宽同字体测 2 行可容纳字符数；未溢出 = 无 … 无 hover 无展开层（R7）；
-  // 溢出 = 预览「前缀+…」、展开层只放续文（前缀+续文 === 全文，逐字接续，视觉接在截断处之后）
+  // 溢出 = 预览「前缀+…」；展开层 = 隐藏前缀占位 + 可见续文，hover 时同一文本流内联接续（R12：
+  // 省略号只在折叠态，展开态消失；续文从省略号原位置接着预览末字生长、自然换行，不另起块级行）
   let fxMirror = null;
   function measureEffectOverlays() {
     const wraps = main.querySelectorAll('.dp-item-effect-wrap');
@@ -367,7 +371,13 @@
         overlay.className = 'dp-item-effect-overlay';
         wrap.appendChild(overlay);
       }
-      overlay.textContent = full.slice(lo);
+      // R12（WP3-v4）：展开层 = 隐藏前缀（.dp-fx-hidden 占位，与预览可见文本逐字相同）+ 可见续文——
+      // 同一文本流内联接续：hover 时省略号随预览行被实底遮住而消失，续文从省略号原位置接着
+      // 预览末字生长、自然换行，不另起块级行、无空白行
+      const hid = document.createElement('span');
+      hid.className = 'dp-fx-hidden';
+      hid.textContent = full.slice(0, lo);
+      overlay.replaceChildren(hid, document.createTextNode(full.slice(lo)));
       card.classList.add('has-effect');
     });
   }

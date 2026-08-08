@@ -44,7 +44,8 @@ function assert(cond, label, detail) {
   // ---- node 侧：当前赛季掉落全集 + 各断言基准 ----
   const seasons = await rest('/game_seasons?select=*');
   const cur = seasons.find(s => s.is_current) || seasons.sort((a, b) => String(a.start_date).localeCompare(String(b.start_date))).pop();
-  const raids = await rest(`/game_raids?select=*&season_id=eq.${cur.id}`);
+  const raids = (await rest(`/game_raids?select=*&season_id=eq.${cur.id}`))
+    .filter(r => r.type !== 'world'); // R13（WP3-v4 / BUG-062）：世界BOSS 公示页剔除，参照集同口径；lair 巢穴归团本口径保留
   const dungeons = await rest(`/game_dungeons?select=*&season_id=eq.${cur.id}`);
   const bossRows = await rest(`/game_bosses?select=id,raid_id,dungeon_id&limit=1000`);
   const bossIdsInSeason = new Set(bossRows.filter(b => raids.some(r => r.id === b.raid_id)).map(b => b.id));
