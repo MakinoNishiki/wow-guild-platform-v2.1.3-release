@@ -69,13 +69,16 @@
   // 部位 = slot 判定；武器/护甲 = item_type 白名单制；副手 = slot'副手物品'（真副手饰物，
   // slot='副手' 全为盾牌归护甲，零重叠）；主手全库 0 命中——定义保留、当季无数据 chip 不渲染，有数据自动出现；
   // 饰品/套装兑换物无归属（选分类自然不命中，预期行为）。
+  // P2（WP6 补丁）：二级 tab 增设「全部」（默认选中 = 未启用分类过滤，三级区不渲染 chips）
   const CAT_TABS = [
+    { key: '', label: '全部' },
     { key: 'slot', label: '部位' },
     { key: 'weapon', label: '武器' },
     { key: 'armor', label: '护甲' },
   ];
   const CAT_CHIPS = {
-    slot: ['头部', '肩部', '胸部', '腕部', '手部', '腰部', '腿部', '脚部', '背部', '颈部', '手指']
+    // P3（WP6 补丁）：部位增设「饰品」（slot 判定，S1 40 件）；套装兑换物维持无归属（预期行为）
+    slot: ['头部', '肩部', '胸部', '腕部', '手部', '腰部', '腿部', '脚部', '背部', '颈部', '手指', '饰品']
       .map(s => ({ key: s, match: l => l.slot === s })),
     weapon: [
       { key: '单手', match: l => ['单手剑', '单手锤', '单手斧', '匕首', '拳套', '战刃', '魔杖'].includes(l.item_type) }, // 魔杖按单手归口（法系魔杖+副手物品组合等效法杖）
@@ -227,11 +230,11 @@
     buildChips($('dpPrimaryChips'), ['力量', '敏捷', '智力'], state.primaryStats);
     buildChips($('dpSecondaryChips'), ['爆击', '急速', '精通', '全能'], state.secondaryStats);
 
-    // R4（WP3-v3）：resize（含浏览器缩放）防抖重算特效截断切分点
+    // P1（WP6 补丁）：resize（含浏览器缩放）防抖重算特效溢出标记与折叠态占位高
     let fxResizeTimer = null;
     window.addEventListener('resize', () => {
       clearTimeout(fxResizeTimer);
-      fxResizeTimer = setTimeout(() => measureEffectOverlays(), 150);
+      fxResizeTimer = setTimeout(() => measureEffectCards(), 150);
     });
 
     render();
@@ -251,6 +254,7 @@
       values.map(v => `<span class="dp-chip" data-v="${esc(v)}">${esc(v)}</span>`).join('') + `</span>`;
     container.querySelectorAll('.dp-chip').forEach(ch => {
       ch.onclick = () => {
+        if (ch.classList.contains('dp-chip-disabled')) return; // P4：置灰不可点
         const v = ch.dataset.v;
         if (stateSet.has(v)) stateSet.delete(v); else stateSet.add(v);
         syncChipRow(container, stateSet);
@@ -265,7 +269,7 @@
     const tabs = $('dpCatTabs'), chipsBox = $('dpCatChips');
     if (!tabs || !chipsBox) return;
     tabs.innerHTML = CAT_TABS.map(t =>
-      `<span class="dp-chip dp-cat-tab${state.catL2 === t.key ? ' active' : ''}" data-v="${t.key}">${t.label}</span>`).join('');
+      `<span class="dp-chip dp-cat-tab${t.key === '' ? ' dp-chip-all' : ''}${state.catL2 === t.key ? ' active' : ''}" data-v="${t.key}">${t.label}</span>`).join('');
     tabs.querySelectorAll('.dp-cat-tab').forEach(tab => {
       tab.onclick = () => {
         state.catL2 = (state.catL2 === tab.dataset.v) ? '' : tab.dataset.v; // 切换/收起
@@ -284,6 +288,7 @@
       `<span class="dp-chip${state.catSel.has(d.key) ? ' active' : ''}" data-v="${esc(d.key)}">${esc(d.key)}</span>`).join('') + `</span>`;
     chipsBox.querySelectorAll('.dp-chip').forEach(ch => {
       ch.onclick = () => {
+        if (ch.classList.contains('dp-chip-disabled')) return; // P4：置灰不可点
         const v = ch.dataset.v;
         if (state.catSel.has(v)) state.catSel.delete(v); else state.catSel.add(v);
         ch.classList.toggle('active', state.catSel.has(v));
@@ -316,6 +321,7 @@
       `<span class="dp-chip dp-chip-inst${state.sourceInstance === x.id ? ' active' : ''}" data-v="${x.id}">${esc(x.name)}<span class="dp-count">${x.count}</span></span>`).join('') + `</span>`;
     box.querySelectorAll('.dp-chip-inst').forEach(ch => {
       ch.onclick = () => {
+        if (ch.classList.contains('dp-chip-disabled')) return; // P4：置灰不可点
         state.sourceInstance = (state.sourceInstance === ch.dataset.v) ? '' : ch.dataset.v;
         renderInstanceChips();
         render(true);
@@ -370,18 +376,50 @@
   const isFlatMode = () => !!(state.search || state.primaryStats.size || state.secondaryStats.size || state.catSel.size);
 
   // ---- 筛选（搜索 AND；分类三级 OR（组内）AND（跨组）；主/副属性标签 AND；来源单选+实例级等值） ----
-  function matchItem(l) {
-    if (state.source && l._src !== state.source) return false; // quest/profession 无行带此 _src，选中即空结果（当前值域不含这两值）
-    if (state.sourceInstance && l.instance_id !== state.sourceInstance) return false; // WP6 F2
-    if (state.catSel.size) { // WP6 F1：当前二级类目下已选 chips 取并集
+  // P4（WP6 补丁）：matchExcept(l, skip) 供联动置灰计算「除本组外」的命中数；skip=null 即全条件
+  function matchExcept(l, skip) {
+    if (skip !== 'source') {
+      if (state.source && l._src !== state.source) return false; // quest/profession 无行带此 _src，选中即空结果（当前值域不含这两值）
+      if (state.sourceInstance && l.instance_id !== state.sourceInstance) return false; // WP6 F2
+    }
+    if (skip !== 'cat' && state.catSel.size) { // WP6 F1：当前二级类目下已选 chips 取并集
       const defs = (CAT_CHIPS[state.catL2] || []).filter(d => state.catSel.has(d.key));
       if (defs.length && !defs.some(d => d.match(l))) return false;
     }
     if (state.search && !String(l.item_name || '').toLowerCase().includes(state.search)) return false;
     // 主/副属性：多标签 AND（选中标签必须全部出现在该装备对应数组中）
-    if (state.primaryStats.size && ![...state.primaryStats].every(s => (l.primary_stats || []).includes(s))) return false;
-    if (state.secondaryStats.size && ![...state.secondaryStats].every(s => (l.secondary_stats || []).includes(s))) return false;
+    if (skip !== 'primary' && state.primaryStats.size && ![...state.primaryStats].every(s => (l.primary_stats || []).includes(s))) return false;
+    if (skip !== 'secondary' && state.secondaryStats.size && ![...state.secondaryStats].every(s => (l.secondary_stats || []).includes(s))) return false;
     return true;
+  }
+  function matchItem(l) { return matchExcept(l, null); }
+
+  // P4（WP6 补丁）：筛选联动置灰——未选 chip 在「其他组条件 + 搜索」下 0 命中即置灰不可点
+  // （视觉降级 + 悬浮原因提示）；已选 chip 恒不置灰；禁止自动清除已选；条件变化经 render() 实时刷新。
+  // 纯前端内存计算（seasonLoot 308 行），不新增接口；来源一级 chips 不做（单选 + 全部锚点语义）。
+  function refreshChipAvailability() {
+    const pool = seasonLoot();
+    const apply = (container, skip, predOf) => {
+      if (!container) return;
+      container.querySelectorAll('.dp-chip').forEach(ch => {
+        if (ch.classList.contains('dp-chip-all') || ch.classList.contains('dp-cat-tab')) return;
+        const hit = ch.classList.contains('active') || pool.some(l => matchExcept(l, skip) && predOf(ch)(l));
+        const label = ch.childNodes[0] ? ch.childNodes[0].textContent : ch.dataset.v;
+        ch.classList.toggle('dp-chip-disabled', !hit);
+        ch.setAttribute('aria-disabled', hit ? 'false' : 'true');
+        ch.title = hit ? '' : `当前筛选组合下「${label}」无命中装备`;
+      });
+    };
+    apply($('dpPrimaryChips'), 'primary', ch => l => (l.primary_stats || []).includes(ch.dataset.v));
+    apply($('dpSecondaryChips'), 'secondary', ch => l => (l.secondary_stats || []).includes(ch.dataset.v));
+    if (state.catL2) {
+      const defs = CAT_CHIPS[state.catL2] || [];
+      apply($('dpCatChips'), 'cat', ch => {
+        const d = defs.find(x => x.key === ch.dataset.v);
+        return d ? d.match : () => true;
+      });
+    }
+    apply($('dpInstanceChips'), 'source', ch => l => l.instance_id === ch.dataset.v);
   }
 
   // ---- 装备卡片（任务书 #28 WP3-v3 体验修订 R1–R7） ----
@@ -389,8 +427,8 @@
   // 卡片高度内容驱动、同一 grid 行内原生 stretch 等高、行间允许不同高（R3，零 JS 测高）。
   // 主属性：库内原序，§4.11 色板；缺数值只显属性名（裁定 E 不变）。
   // 副属性（裁定 H 不变）：数值降序，唯一最大者⭐排第一；同值并列/缺数值保原序不加星。
-  // 特效（R4/R7）：空间够用（≤2 行）整行直显——无 …、无 hover、无展开层；
-  // 溢出卡 hover 展开层显示特效全文（镜像实测切分预览截断点，resize 重算；R12-v5 完整连续可见）。
+  // 特效（P1 WP6 补丁 / R7）：空间够用（≤2 行）整行直显——无 …、无 hover；
+  // 溢出卡预览 CSS line-clamp:2 视觉截断（…），hover 整卡向下生长显示特效全文（镜像实测溢出，resize 重算）。
   // 卡片零点击交互（运营 2026-08-08 方向修正）。
   // 主属性色板类映射（§4.11；未收录属性名回退 dp-tag-primary 蓝）
   const PRIMARY_TAG_CLASS = { '力量': 'dp-tag-p1', '敏捷': 'dp-tag-p2', '智力': 'dp-tag-p3' };
@@ -424,7 +462,9 @@
     // 来源行：实例 · BOSS（空=整体池）· 套装归属并入同行末尾（确认点 C）
     const srcParts = [l.instance_name, l.boss_name || '整体池'];
     if (l.slot === '套装兑换物') srcParts.push('可兑换本赛季套装');
-    return `<div class="dp-item">
+    // P1（WP6 补丁）：卡盒样式挂 .dp-item-inner——hover 时 inner 转 absolute 向下生长，
+    // 外层 .dp-item 由 JS 预设折叠态 minHeight 占位（仅溢出卡），网格不塌、生长部分覆盖下方卡片
+    return `<div class="dp-item"><div class="dp-item-inner">
       <div class="dp-item-name">${esc(l.item_name)}</div>
       <div class="dp-item-meta">
         ${l.slot ? `<span class="dp-tag">${esc(l.slot)}</span>` : ''}
@@ -434,15 +474,20 @@
       ${secHtml ? `<div class="dp-item-stats">${secHtml}</div>` : ''}
       ${l.effect ? `<div class="dp-item-effect-wrap"><div class="dp-item-effect-preview">${esc(l.effect)}</div></div>` : ''}
       <div class="dp-item-src">${esc(srcParts.filter(Boolean).join(' · '))}</div>
-    </div>`;
+    </div></div>`;
   }
 
-  // R4/R7 特效行实测切分（渲染后 + resize 重算）：
-  // 隐藏镜像同宽同字体测 2 行可容纳字符数；未溢出 = 无 … 无 hover 无展开层（R7）；
-  // 溢出 = 预览「前缀+…」；展开层 = 特效全文可见、top:0 实底覆盖预览（R12 WP3-v5：
-  // 隐藏前缀占位废止；省略号只在折叠态，展开态从第一个字起连续可读、续文自断点自然生长、无占位无空白行）
+  // P1（WP6 补丁，运营 2026-08-09 体验终审）：hover 形态重构——废弃独立浮层遮盖，改为卡片本体
+  // 经 max-height 动画向下生长（§6 白名单例外已注册）：特效全文在框内展开、来源行随 flex 锚至新底部
+  // 全程可见；生长部分 z-index 提升覆盖下方卡片、不推挤网格；离开动画收回。
+  // 预览恒为特效全文（CSS line-clamp:2 负责折叠态视觉截断带 …）；镜像只测溢出：
+  // 未溢出 = 无 has-effect、无 hover、无生长（R7 不变量）；resize 防抖重算。
   let fxMirror = null;
-  function measureEffectOverlays() {
+  function measureEffectCards() {
+    const cards = main.querySelectorAll('.dp-item');
+    if (!cards.length) return;
+    // 第一趟：清除上轮占位 minHeight，避免残留撑高污染本轮测量
+    cards.forEach(c => { c.style.minHeight = ''; });
     const wraps = main.querySelectorAll('.dp-item-effect-wrap');
     if (!wraps.length) return;
     if (!fxMirror) {
@@ -451,11 +496,13 @@
       document.body.appendChild(fxMirror);
     }
     const m = fxMirror;
+    const grow = [];
     wraps.forEach(wrap => {
       const card = wrap.closest('.dp-item');
       const preview = wrap.querySelector('.dp-item-effect-preview');
       const full = preview.dataset.full || preview.textContent;
       preview.dataset.full = full;
+      if (preview.textContent !== full) preview.textContent = full; // 预览恒为全文
       const cs = getComputedStyle(preview);
       m.style.cssText = 'position:absolute;visibility:hidden;left:-99999px;top:0;white-space:normal;'
         + `width:${preview.clientWidth}px;font-size:${cs.fontSize};font-family:${cs.fontFamily};font-weight:${cs.fontWeight};`
@@ -463,34 +510,12 @@
       const maxH = parseFloat(cs.lineHeight) * 2 + 0.5;
       m.textContent = full;
       const overflow = m.offsetHeight > maxH;
-      let overlay = wrap.querySelector('.dp-item-effect-overlay');
-      if (!overflow) { // R7：未溢出——整行直显，无 … 无 hover 无展开层
-        if (preview.textContent !== full) preview.textContent = full;
-        card.classList.remove('has-effect');
-        if (overlay) overlay.remove();
-        return;
-      }
-      // 二分：连 … 一起恰好装满 2 行的最长前缀
-      let lo = 0, hi = full.length;
-      while (lo < hi) {
-        const mid = Math.ceil((lo + hi) / 2);
-        m.textContent = full.slice(0, mid) + '…';
-        if (m.offsetHeight <= maxH) lo = mid; else hi = mid - 1;
-      }
-      m.textContent = '';
-      preview.textContent = full.slice(0, lo) + '…';
-      if (!overlay) {
-        overlay = document.createElement('div');
-        overlay.className = 'dp-item-effect-overlay';
-        wrap.appendChild(overlay);
-      }
-      // R12（WP3-v5，运营 2026-08-08 返修）：展开层 = 特效全文，同一文本流全程可见——
-      // v4 的隐藏前缀占位（.dp-fx-hidden）废止：hover 后前文不可见属错误口径。
-      // 展开层 top:0 实底覆盖预览，全文前两行与预览逐字重合、续文自断点自然生长：
-      // 省略号只存在于折叠态预览；无任何不可见占位区、无空白行（视觉=特效行从截断态生长为完整态）
-      overlay.textContent = full;
-      card.classList.add('has-effect');
+      card.classList.toggle('has-effect', overflow);
+      if (overflow) grow.push(card);
     });
+    m.textContent = '';
+    // 第二趟：溢出卡预设折叠态高度——hover 时 inner 转 absolute 后卡片不失高、网格不塌
+    grow.forEach(c => { c.style.minHeight = `${c.getBoundingClientRect().height}px`; });
   }
 
   const emptyText = t => `<div class="dp-empty">${esc(t)}</div>`;
@@ -706,8 +731,11 @@
       el.onclick = ev => { if (ev.target.closest('.dp-toggle') || ev.target.closest('.dp-tier-filters')) return; toggleCollapse(el.dataset.collapse); };
     });
     bindTierFilters();
-    // R4/R7（WP3-v3）：特效行实测切分——未溢出卡无 … 无 hover 无展开层；溢出卡预览截断+展开层续文
-    measureEffectOverlays();
+    // P1（WP6 补丁）：特效行溢出实测——预览恒为全文、CSS line-clamp 视觉截断；溢出卡标 has-effect
+    // + 预设折叠态 minHeight（hover 整卡生长不塌网格）；未溢出卡无 hover（R7）
+    measureEffectCards();
+    // P4（WP6 补丁）：筛选联动置灰——未选 chip 在其他组条件+搜索下 0 命中即置灰不可点（已选恒不置灰）
+    refreshChipAvailability();
     // 任务书 #28 WP2（筛选规范 v2.0 §7）：筛选动作触发的重渲染给卡片入场 fade（0.2s ease-out，
     // 仅 opacity/transform，reduced-motion 由 CSS 降级）；视图切换/折叠/套装筛选走默认 render() 无入场动画
     if (enterAnim) main.querySelectorAll('.dp-item').forEach(c => c.classList.add('dp-enter'));

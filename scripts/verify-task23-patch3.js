@@ -1,6 +1,8 @@
 // 任务书 #23-补丁3 验证脚本：公示页交互优化（七修正项）
 // 2026-08-08 适配任务书 #28 WP2（筛选规范 v2.0）：部位/类型两维筛选与「排除杂项」开关已 abolish——
 // 四维组合改三维（来源+主+副）、部位/类型分组排序断言整段删除、杂项沉底改零渲染、开关用例改 DOM 不存在断言。
+// 2026-08-09 适配任务书 #28-WP6 补丁 P1：悬浮「覆盖层」断言改「整卡生长」（inner absolute 高度生长 + wrap max-height 过渡）；
+// 边框高亮断言改读 .dp-item-inner（卡盒样式随 P1 迁移）。
 // 公示页为免登录只读页（live 数据），本脚本不创建任何测试数据。
 // 用法：node scripts/verify-task23-patch3.js
 const fs = require('fs');
@@ -176,7 +178,7 @@ function assert(cond, label, detail) {
   });
   assert(pair && Math.abs(pair.hEff - pair.hPlain) === 0, '无特效卡同尺寸断言（同行两卡高度差=0）', JSON.stringify(pair));
   const borderDiff = await page.evaluate(() => {
-    const eff = document.querySelector('[data-t3-eff]'), plain = document.querySelector('[data-t3-plain]');
+    const eff = document.querySelector('[data-t3-eff] .dp-item-inner'), plain = document.querySelector('[data-t3-plain] .dp-item-inner');
     if (!eff || !plain) return null;
     const be = getComputedStyle(eff), bp = getComputedStyle(plain);
     return { eff: be.borderColor + '/' + be.boxShadow, plain: bp.borderColor + '/' + bp.boxShadow, diff: be.borderColor !== bp.borderColor || be.boxShadow !== bp.boxShadow };
@@ -190,13 +192,17 @@ function assert(cond, label, detail) {
   });
   await page.hover('[data-t3-eff]');
   await sleep(450);
-  const overlay = await page.evaluate(() => {
-    const o = document.querySelector('[data-t3-eff] .dp-item-effect-overlay');
-    const cs = getComputedStyle(o);
-    return { opacity: parseFloat(cs.opacity), maxH: parseFloat(cs.maxHeight), transition: cs.transitionDuration };
+  // P1（#28-WP6 补丁）：浮层遮盖废止——hover 整卡生长（inner absolute + wrap max-height 展开）
+  const grow = await page.evaluate(() => {
+    const card = document.querySelector('[data-t3-eff]');
+    const inner = card.querySelector('.dp-item-inner');
+    const wrap = card.querySelector('.dp-item-effect-wrap');
+    const cs = getComputedStyle(inner), wcs = getComputedStyle(wrap);
+    return { pos: cs.position, maxH: parseFloat(wcs.maxHeight), transition: wcs.transitionDuration,
+      grown: inner.getBoundingClientRect().height > parseFloat(card.style.minHeight) + 10 };
   });
-  assert(overlay.opacity === 1 && overlay.maxH > 100, '悬浮展开覆盖层（opacity=1 且展开）', JSON.stringify(overlay));
-  assert(parseFloat(overlay.transition) >= 0.2 && parseFloat(overlay.transition) <= 0.3, '展开过渡 200–300ms', overlay.transition);
+  assert(grow.pos === 'absolute' && grow.maxH > 100 && grow.grown, '悬浮整卡生长（inner absolute 高度生长 + wrap 展开，P1）', JSON.stringify(grow));
+  assert(parseFloat(grow.transition) >= 0.2 && parseFloat(grow.transition) <= 0.3, '生长过渡 200–300ms', grow.transition);
   const neighborAfter = await page.evaluate(() => {
     const next = document.querySelector('[data-t3-next]');
     return next ? next.getBoundingClientRect().toJSON() : null;

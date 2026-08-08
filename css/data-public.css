@@ -215,6 +215,11 @@
   gap: 10px;
 }
 .dp-item {
+  position: relative; /* P1（WP6 补丁）：生长定位锚点；卡盒样式迁 .dp-item-inner */
+}
+/* P1（WP6 补丁，运营 2026-08-09 体验终审）：hover 形态重构——卡片本体（含边框）向下生长，
+   外层 .dp-item 仅作网格占位（JS 对溢出卡预设折叠态 minHeight，hover 时 inner 转 absolute 不塌网格） */
+.dp-item-inner {
   background: var(--bg-card);
   border: 1px solid var(--border-color);
   border-radius: 8px;
@@ -222,6 +227,8 @@
   /* WP3-v4 R11：flex 列布局——内容行顶部堆叠，来源行 margin-top:auto 锚定卡片底部不动 */
   display: flex;
   flex-direction: column;
+  height: 100%;
+  box-sizing: border-box;
 }
 /* 任务书 #28 WP3-v3（R3）：名称行单行截断、内容驱动（废恒占行高） */
 .dp-item-name { font-size: 13px; font-weight: 600; color: var(--gold); margin-bottom: 6px; line-height: 18px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -307,46 +314,45 @@
 .dp-boss.collapsed > .dp-items { display: none; }
 .dp-raid.collapsed > .dp-raid-body { display: none; }
 
-/* 修正项③：特效悬浮展开 + 可展开高亮边框（WP3-v2 起卡片零点击；WP3-v3 R4/R7 续文展开） */
-.dp-item { position: relative; }
-/* 特效容器（R4/R12）：相对定位锚点——展开层与预览行同位覆盖（top:0），absolute 不推挤布局 */
-.dp-item-effect-wrap { position: relative; margin-top: 6px; }
-/* 特效预览：内容驱动（R3 废恒占 2 行）；line-clamp:2 仅作兜底，截断由 JS 镜像实测切分（含 … 恰好 2 行） */
+/* 修正项③：特效悬浮展开 + 可展开高亮边框（WP3-v2 起卡片零点击）；
+   P1（WP6 补丁）：独立浮层遮盖废止——hover 时卡片本体（含边框）经 max-height 动画向下生长，
+   特效全文在框内展开，来源行随 flex 锚至新底部、全程可见不被遮盖；生长部分 z-index 提升覆盖
+   下方卡片、不推挤网格；离开动画收回（200ms ease-out；§6 白名单例外已注册，2026-08-09，
+   理由：整卡高度生长是运营终审指定形态，transform/opacity 无法实现框内全文展开） */
+/* 特效容器：折叠态 max-height=2 行（2×17px 行高）+ overflow 隐藏；hover 展开至 260px 封顶 */
+.dp-item-effect-wrap { margin-top: 6px; overflow: hidden; max-height: 34px; transition: max-height .2s ease-out; }
+/* 特效预览：恒为特效全文（JS 镜像只测溢出）；line-clamp:2 负责折叠态视觉截断（带 …） */
 .dp-item-effect-preview {
   line-height: 17px;
   font-size: 12px; color: #1eff00;
   white-space: normal; overflow: hidden;
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
 }
-/* 特效溢出卡片：边框高亮（金色微光引导「可 hover 读续文」；未溢出卡无此类——R7 无 … 无 hover） */
-.dp-item.has-effect {
+/* 特效溢出卡片：边框高亮（金色微光引导「可 hover 读全文」；未溢出卡无此类——R7 无 … 无 hover） */
+.dp-item.has-effect .dp-item-inner {
   border-color: rgba(240, 192, 96, 0.55);
   box-shadow: 0 0 6px rgba(240, 192, 96, 0.12);
 }
 .dp-item.has-effect:hover { z-index: 30; }
-/* R4 hover 特效展开层（R12 WP3-v5 返修：完整连续可见）：展开层与预览行同宽同字体、top:0 实底原位覆盖——
-   内容 = 特效全文（同一文本流全程可见；WP3-v4 的隐藏前缀 .dp-fx-hidden 占位已废止拆除）：
-   省略号只存在于折叠态预览；hover 后前两行与预览逐字重合、续文自断点自然生长——
-   从第一个字起连续可读，无任何不可见占位区、无空白行；absolute 不推挤布局；实底遮严邻卡；
-   200ms ease-out 只动 transform/opacity（§6 白名单），reduced-motion 瞬时（见文件尾部媒体查询） */
-.dp-item-effect-overlay {
-  position: absolute; left: 0; right: 0; top: 0;
-  padding: 0 0 8px;
-  background: var(--bg-card);
-  border-radius: 0 0 8px 8px;
-  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.55);
-  font-size: 12px; color: #1eff00; line-height: 17px;
-  max-height: 260px; overflow-y: auto;
-  opacity: 0; transform: translateY(-4px); pointer-events: none;
-  transition: opacity .2s ease-out, transform .2s ease-out;
+/* hover 生长：inner 转 absolute 脱离占位、高度内容驱动向下生长（min-height:100% 保底不缩短），
+   投影覆盖下方卡片；外层 .dp-item 由 JS 预设折叠态 minHeight，网格行高不变 */
+.dp-item.has-effect:hover .dp-item-inner {
+  position: absolute; top: 0; left: 0; right: 0;
+  height: auto; min-height: 100%;
   z-index: 30;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.55);
 }
-.dp-item.has-effect:hover .dp-item-effect-overlay { opacity: 1; transform: translateY(0); }
+.dp-item.has-effect:hover .dp-item-effect-wrap { max-height: 260px; overflow-y: auto; }
+.dp-item.has-effect:hover .dp-item-effect-preview { display: block; -webkit-line-clamp: unset; }
 
 /* ==================== 任务书 #28 WP3-v2/v3：全信息装备卡（方向修正版 + 体验修订） ====================
    v1 点击详情覆盖层（.dp-item-detail/.dp-detail-*/.dp-detail-open 族）已整族拆除——
-   运营 2026-08-08 方向修正：卡片零点击交互；v3（R2/R3）占位行与恒占行高废止，内容驱动行内等高
-   （规则见上方 .dp-item-stats/.dp-tag-p1~p3/.dp-tag-star/.dp-item-src 与特效预览/续文展开层段）。 */
+   运营 2026-08-08 方向修正：卡片零点击交互；v3（R2/R3）占位行与恒占行高废止，内容驱动行内等高；
+   WP3-v3~v5 的独立浮层续文展开（.dp-item-effect-overlay）经 WP6 补丁 P1 废止拆除（2026-08-09），
+   改为整卡生长（规则见上方 .dp-item-inner/.dp-item-effect-wrap/hover 生长段）。 */
+
+/* P4（WP6 补丁）：筛选联动置灰——当前筛选组合下 0 命中的未选 chip（已选恒不置灰，不自动清除） */
+.dp-chip.dp-chip-disabled { opacity: .4; cursor: not-allowed; border-style: dashed; }
 .dp-error { text-align: center; padding: 60px 0; }
 .dp-error-icon { font-size: 36px; margin-bottom: 12px; }
 .dp-error-text { color: var(--text-secondary); margin-bottom: 16px; }
@@ -362,7 +368,7 @@
 
 /* 规范 v2 §6：尊重 prefers-reduced-motion（公示页全部过渡/动画降级为瞬时） */
 @media (prefers-reduced-motion: reduce) {
-  .dp-item-effect-overlay, .dp-collapse-btn svg { transition: none; }
+  .dp-item-effect-wrap, .dp-collapse-btn svg { transition: none; }
   .dp-item.dp-enter, .dp-filterbar.filters-open .dp-filter-rows { animation: none; }
   .dp-filter-rows.closing { transition: none; }
 }

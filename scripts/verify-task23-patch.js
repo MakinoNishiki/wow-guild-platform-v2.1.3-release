@@ -258,7 +258,19 @@ const eqSet = (a, b) => a.length === b.length && a.every((v, i) => v === b[i]);
       got = await page.evaluate(displayedItems);
       check(`[${vp.tag}] ③组合「力量 AND 爆击」：结果集精确匹配（AND 语义）`, eqSet(got, exp), `${got.length}/${exp.length} 件=${got.join(',')}`);
 
-      // 双视图筛选生效：按 BOSS 视图截图 → 切整体池视图再核对+截图
+      // 清空还原一例：撤掉全部 chips → 回到全集（回浏览态）
+      await clickChip('#dpPrimaryChips', '力量');
+      await clickChip('#dpSecondaryChips', '爆击');
+      await sleep(600);
+      exp = refItems();
+      got = await page.evaluate(displayedItems);
+      check(`[${vp.tag}] ③清空还原：结果集回到未筛选全集`, eqSet(got, exp), `${got.length}/${exp.length} 件`);
+
+      // 双视图筛选生效（WP6 F3 起内容筛选触发平铺态、无视图开关——改在浏览态「来源=大秘境」下回归：
+      // 按 BOSS 视图截图 → 切整体池视图再核对+截图，参照集 = 大秘境全集）
+      await clickChip('#dpSourceChips', 'dungeon');
+      await sleep(600);
+      const expDun = ref.dungeonLoot.filter(l => l.slot !== '杂项' && !['装饰品', '幻化'].includes(l.item_type)).map(l => l.item_name).sort();
       await page.evaluate(() => {
         const s = [...document.querySelectorAll('.dp-section')].find(x => x.innerText.includes('大秘境掉落池'));
         if (s) s.scrollIntoView();
@@ -269,8 +281,8 @@ const eqSet = (a, b) => a.length === b.length && a.every((v, i) => v === b[i]);
       await page.evaluate(() => { [...document.querySelectorAll('.dp-toggle')].find(b => b.dataset.view === 'pool').click(); });
       await sleep(600);
       const gotPoolView = await page.evaluate(displayedItems);
-      check(`[${vp.tag}] ③大秘境双视图筛选均生效（按BOSS ≡ 整体池 ≡ 参照集）`,
-        eqSet(gotBossView, exp) && eqSet(gotPoolView, exp), `boss视图 ${gotBossView.length} / pool视图 ${gotPoolView.length} / 参照 ${exp.length}`);
+      check(`[${vp.tag}] ③大秘境双视图一致（浏览态来源=大秘境：按BOSS ≡ 整体池 ≡ 参照集）`,
+        eqSet(gotBossView, expDun) && eqSet(gotPoolView, expDun), `boss视图 ${gotBossView.length} / pool视图 ${gotPoolView.length} / 参照 ${expDun.length}`);
       await page.evaluate(() => {
         const s = [...document.querySelectorAll('.dp-section')].find(x => x.innerText.includes('大秘境掉落池'));
         if (s) s.scrollIntoView();
@@ -279,14 +291,8 @@ const eqSet = (a, b) => a.length === b.length && a.every((v, i) => v === b[i]);
       await page.screenshot({ path: path.join(SHOT_DIR, `${vp.tag}-mplus-filtered-pool-view.png`) });
       await page.evaluate(() => { [...document.querySelectorAll('.dp-toggle')].find(b => b.dataset.view === 'boss').click(); });
       await sleep(500);
-
-      // 清空还原一例：撤掉全部 chips → 回到全集
-      await clickChip('#dpPrimaryChips', '力量');
-      await clickChip('#dpSecondaryChips', '爆击');
+      await clickChip('#dpSourceChips', 'dungeon'); // 回「全部」还原浏览态全集
       await sleep(600);
-      exp = refItems();
-      got = await page.evaluate(displayedItems);
-      check(`[${vp.tag}] ③清空还原：结果集回到未筛选全集`, eqSet(got, exp), `${got.length}/${exp.length} 件`);
 
       // 赛季切换后筛选重置（仅 1366 档）：挂上筛选 → 切空赛季 → 控件全部复位
       if (vp.tag === '1366') {

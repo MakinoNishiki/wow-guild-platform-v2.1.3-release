@@ -17,6 +17,11 @@
 // （展开无省略号、无不可见占位、overlay 文本逐字=数据源全文、首行与预览原位对齐）；
 // R13 世界BOSS剔除（BUG-062，sql/24：至暗之夜 type='world'、RPC 黑名单 is distinct from 'world'，lair 保留；
 // S1 基线 308=团本 104+大秘境 204；WP3-14 零 world 行断言）。
+// 适配任务书 #28 WP6 补丁（P1–P4，2026-08-09）：P1 hover 形态重构——独立浮层（.dp-item-effect-overlay）废止，
+// 改整卡 max-height 生长（.dp-item>.dp-item-inner 结构、§6 白名单例外已注册 2026-08-09）、来源行跟随新底部、
+// 网格不塌（JS 对溢出卡预设折叠态 minHeight）；P2 分类二级增设「全部」默认 tab（4 tab，三级区不渲染）；
+// P3 部位增设「饰品」（12 项，S1 40 件）；P4 筛选联动置灰（未选 chip 0 命中置灰+原因提示+aria-disabled，
+// 已选恒不置灰、禁止自动清除、重置全恢复）。
 // 公示页为免登录只读页（live 数据），本脚本不创建任何测试数据，收尾复核 T23X 遗留为零。
 // 用法: node scripts/verify-task23-patch4.js（PW_CHANNEL=chrome 可选）截图输出 backup/2026-08-07-task23-patch4/
 const fs = require('fs');
@@ -315,19 +320,29 @@ function assert(cond, label, detail) {
 
     // ============ WP6（过滤器二期）：F1 分类三级 + F2 来源实例级 + F3 筛选态平铺 ============
     console.log('—— WP6 F1 分类三级 / F2 来源实例级 / F3 筛选态平铺 ——');
-    // F1 结构：二级 3 tab；未选 tab 时三级行隐藏
+    // F1 结构：二级 4 tab（P2：全部默认选中/部位/武器/护甲）；「全部」= 未启用分类过滤，三级行不渲染
     const f1Tabs = await page.evaluate(() => ({
       tabs: [...document.querySelectorAll('#dpCatTabs .dp-cat-tab')].map(t => t.dataset.v),
+      allDefault: !!document.querySelector('#dpCatTabs .dp-cat-tab[data-v=""].active.dp-chip-all'),
       chipsHidden: document.getElementById('dpCatChips').hidden,
     }));
-    assert(JSON.stringify(f1Tabs.tabs) === JSON.stringify(['slot', 'weapon', 'armor']) && f1Tabs.chipsHidden,
-      'WP6-F1 分类组结构：二级 3 tab（部位/武器/护甲），未选 tab 时三级行隐藏', JSON.stringify(f1Tabs));
-    // F1 三级 chips 数量与值域（映射终版 2026-08-09 运营定）：部位 11 / 武器 4（主手全库 0 命中定义保留不渲染）/ 护甲 5
+    assert(JSON.stringify(f1Tabs.tabs) === JSON.stringify(['', 'slot', 'weapon', 'armor']) && f1Tabs.allDefault && f1Tabs.chipsHidden,
+      'WP6-F1 分类组结构：二级 4 tab（P2 全部默认选中/部位/武器/护甲），「全部」态三级行不渲染', JSON.stringify(f1Tabs));
+    // F1 三级 chips 数量与值域（映射终版 2026-08-09 运营定 + P3 增设饰品）：部位 12 / 武器 4（主手全库 0 命中定义保留不渲染）/ 护甲 5
     await page.click('#dpCatTabs .dp-cat-tab[data-v="slot"]');
     await sleep(400);
     const f1Slot = await page.evaluate(() => [...document.querySelectorAll('#dpCatChips .dp-chip')].map(c => c.dataset.v));
-    assert(JSON.stringify(f1Slot) === JSON.stringify(['头部', '肩部', '胸部', '腕部', '手部', '腰部', '腿部', '脚部', '背部', '颈部', '手指']),
-      'WP6-F1 部位 11 chips（slot 判定）', f1Slot.join('/'));
+    assert(JSON.stringify(f1Slot) === JSON.stringify(['头部', '肩部', '胸部', '腕部', '手部', '腰部', '腿部', '脚部', '背部', '颈部', '手指', '饰品']),
+      'WP6-F1 部位 12 chips（slot 判定；P3 增设「饰品」末位）', f1Slot.join('/'));
+    // P3 饰品映射精确匹配（S1 口径 40 件）
+    await page.click('#dpCatChips .dp-chip[data-v="饰品"]');
+    await sleep(400);
+    let cntP3 = await cardCount();
+    const nTrinket = all.filter(l => l.slot === '饰品').length;
+    assert(cntP3 === nTrinket && nTrinket === 40,
+      `WP6-P3 部位「饰品」映射精确匹配（页面 ${cntP3} = 库内 ${nTrinket}，S1 口径 40）`);
+    await page.click('#dpCatChips .dp-chip[data-v="饰品"]'); // 撤选
+    await sleep(300);
     // 部位多选 OR：头部+颈部 = 库内两 slot 并集
     await page.click('#dpCatChips .dp-chip[data-v="头部"]');
     await page.click('#dpCatChips .dp-chip[data-v="颈部"]');
@@ -468,13 +483,60 @@ function assert(cond, label, detail) {
     assert(f3Reset.cards === all.length && !f3Reset.flat && f3Reset.bothPools === 2,
       'WP6-F3 空态重置：回浏览态双池全集', JSON.stringify(f3Reset));
 
-    // ============ 修正项①（WP3-v3 R4/R7 + WP3-v5 R12）：hover 特效展开——预览截…、展开层=全文可见（无省略号/无占位）；未溢出卡无 … 无 hover ============
-    console.log('—— ① hover 特效展开逐字比对（3 张长特效卡；R12-v5 全文可见/R7 未溢出零 hover） ——');
+    // ============ WP6 补丁 P4：筛选联动置灰 ============
+    console.log('—— WP6 补丁 P4 筛选联动置灰 ——');
+    // 力量+敏捷（AND）→ 部位 tab 下：库内「力量∧敏捷」装备的 slot 集之外的未选 chip 全部置灰（锚点：颈部/手指必在列）；
+    // 已选 chip 恒不置灰；置灰不可点；重置全恢复
+    await clickChip('#dpPrimaryChips', '力量');
+    await clickChip('#dpPrimaryChips', '敏捷');
+    await sleep(500);
+    await page.click('#dpCatTabs .dp-cat-tab[data-v="slot"]');
+    await sleep(500);
+    const strAgiSlots = new Set(all.filter(l => (l.primary_stats || []).includes('力量') && (l.primary_stats || []).includes('敏捷')).map(l => l.slot));
+    const p4 = await page.evaluate(() => ({
+      disabled: [...document.querySelectorAll('#dpCatChips .dp-chip.dp-chip-disabled')].map(c => c.dataset.v),
+      titles: [...document.querySelectorAll('#dpCatChips .dp-chip.dp-chip-disabled')].map(c => c.title),
+      arias: [...document.querySelectorAll('#dpCatChips .dp-chip.dp-chip-disabled')].map(c => c.getAttribute('aria-disabled')),
+      strDisabled: document.querySelector('#dpPrimaryChips .dp-chip[data-v="力量"]').classList.contains('dp-chip-disabled'),
+      agiDisabled: document.querySelector('#dpPrimaryChips .dp-chip[data-v="敏捷"]').classList.contains('dp-chip-disabled'),
+    }));
+    const SLOT_KEYS = ['头部', '肩部', '胸部', '腕部', '手部', '腰部', '腿部', '脚部', '背部', '颈部', '手指', '饰品'];
+    const expDisabled = SLOT_KEYS.filter(s => !strAgiSlots.has(s));
+    assert(JSON.stringify([...p4.disabled].sort()) === JSON.stringify([...expDisabled].sort())
+      && p4.disabled.includes('颈部') && p4.disabled.includes('手指'),
+      'WP6-P4 未选 chip 0 命中置灰（力量∧敏捷下部位 12 项置灰集=库内口径逐值一致；锚点颈部/手指在列）',
+      `页面 ${JSON.stringify(p4.disabled)} 库内 ${JSON.stringify(expDisabled)}`);
+    assert(p4.titles.length > 0 && p4.titles.every(t => t.includes('无命中')) && p4.arias.every(a => a === 'true'),
+      'WP6-P4 置灰 chip 带悬浮原因提示 + aria-disabled=true', p4.titles[0] || '无置灰');
+    assert(!p4.strDisabled && !p4.agiDisabled, 'WP6-P4 已选 chip（力量/敏捷）恒不置灰');
+    const p4Before = await cardCount();
+    await page.click('#dpCatChips .dp-chip[data-v="颈部"]', { force: true });
+    await sleep(300);
+    const p4Click = await page.evaluate(() => ({
+      active: !!document.querySelector('#dpCatChips .dp-chip[data-v="颈部"].active'),
+      cards: document.querySelectorAll('.dp-item').length,
+    }));
+    assert(!p4Click.active && p4Click.cards === p4Before,
+      'WP6-P4 置灰 chip 点击无效（不选中、结果集不变、不自动清除已选）', JSON.stringify(p4Click));
+    await page.click('#dpResetFilters');
+    await sleep(600);
+    const p4Reset = await page.evaluate(() => ({
+      disabledLeft: document.querySelectorAll('.dp-chip.dp-chip-disabled').length,
+      cards: document.querySelectorAll('.dp-item').length,
+      flat: !!document.querySelector('.dp-flat-head'),
+    }));
+    assert(p4Reset.disabledLeft === 0 && p4Reset.cards === all.length && !p4Reset.flat,
+      'WP6-P4 重置筛选：置灰全清、回浏览态全集', JSON.stringify(p4Reset));
+
+    // ============ 修正项①（WP6 补丁 P1 整卡生长，2026-08-09 运营体验终审）：废弃独立浮层遮盖——
+    // hover 卡片本体（含边框）经 max-height 动画向下生长、特效全文框内展开、来源行跟随新底部全程可见；
+    // 生长部分 z-index 提升覆盖下方卡片、不推挤网格；离开收回。R7：未溢出卡无 has-effect 无 hover 无截断 ============
+    console.log('—— ① hover 整卡生长逐字核验（3 张长特效卡；P1 生长 / R7 未溢出零 hover） ——');
     let overflowSeen = 0;
     for (let i = 0; i < picked.length; i++) {
       const item = picked[i];
       // 同名装备可能有跨 BOSS 多行（特效不同），按「名字 + 预览 dataset.full 全文」双重定位；
-      // has-effect 仅溢出卡有（measureEffectOverlays 镜像实测切分），未溢出卡走 R7 零 hover 路径
+      // has-effect 仅溢出卡有（measureEffectCards 镜像实测溢出），未溢出卡走 R7 零 hover 路径
       const pre = await page.evaluate((it) => {
         const card = [...document.querySelectorAll('.dp-item')].find(c => {
           const p = c.querySelector('.dp-item-effect-preview');
@@ -485,64 +547,73 @@ function assert(cond, label, detail) {
         card.setAttribute('data-t4-hover', '1');
         card.scrollIntoView({ block: 'center' });
         const preview = card.querySelector('.dp-item-effect-preview');
-        const overlay = card.querySelector('.dp-item-effect-overlay');
+        const inner = card.querySelector('.dp-item-inner');
+        const wrap = card.querySelector('.dp-item-effect-wrap');
+        const wcs = getComputedStyle(wrap);
         return { found: true, overflow: card.classList.contains('has-effect'), before: {
-          previewText: preview.textContent,
-          endsEllipsis: preview.textContent.endsWith('…'),
-          overlayHidden: overlay ? getComputedStyle(overlay).opacity === '0' : null,
+          previewFull: preview.textContent === it.effect,              // P1：预览恒为特效全文
+          truncated: preview.scrollHeight > preview.clientHeight + 1,  // 折叠态 CSS line-clamp 视觉截断（带 …）
+          minH: card.style.minHeight,
+          cardH: card.getBoundingClientRect().height,
+          innerPos: getComputedStyle(inner).position,
+          noOverlay: !card.querySelector('.dp-item-effect-overlay'),   // 浮层形态废止
+          wrapTrans: `${wcs.transitionProperty}|${wcs.transitionDuration}|${wcs.transitionTimingFunction}`,
         } };
       }, item);
-      let after = null;
+      let after = null, back = null;
       if (pre.found && pre.overflow) {
         overflowSeen++;
         await page.hover('[data-t4-hover]');
-        await sleep(450); // 覆盖层 200ms 过渡 + 余量
+        await sleep(450); // 200ms max-height 生长动画 + 余量
         after = await page.evaluate(() => {
           const card = document.querySelector('[data-t4-hover]');
+          const inner = card.querySelector('.dp-item-inner');
           const preview = card.querySelector('.dp-item-effect-preview');
-          const overlay = card.querySelector('.dp-item-effect-overlay');
-          // R12（WP3-v5）：展开层 = 特效全文可见（隐藏前缀占位废止）——
-          // 首字几何：展开层第一个字与预览首行原位对齐（top 偏移 ≈ 0），视觉=从截断态生长为完整态
-          let topOffset = null, lh = null;
-          const tn = [...overlay.childNodes].find(n => n.nodeType === Node.TEXT_NODE && n.textContent.length);
-          if (tn) {
-            const range = document.createRange();
-            range.setStart(tn, 0); range.setEnd(tn, 1);
-            lh = parseFloat(getComputedStyle(preview).lineHeight);
-            topOffset = Math.round((range.getBoundingClientRect().top - preview.getBoundingClientRect().top) * 10) / 10;
-          }
-          const out = {
-            previewOpacity: getComputedStyle(preview).opacity,
-            overlayOpacity: getComputedStyle(overlay).opacity,
-            overlayHasEllipsis: overlay.textContent.includes('…'),
-            hasHiddenSpan: !!overlay.querySelector('.dp-fx-hidden'),
-            overlayText: overlay.textContent, topOffset, lh,
+          const src = card.querySelector('.dp-item-src');
+          const cs = getComputedStyle(inner);
+          const cardR = card.getBoundingClientRect(), innerR = inner.getBoundingClientRect(), srcR = src.getBoundingClientRect();
+          return {
+            pos: cs.position, z: cs.zIndex,
+            grown: innerR.height > parseFloat(card.style.minHeight) + 10,               // 整卡向下生长
+            cardStable: Math.abs(cardR.height - parseFloat(card.style.minHeight)) < 1.5, // 外层占位不塌、网格不动
+            srcFollows: Math.abs(srcR.bottom - (innerR.bottom - parseFloat(cs.paddingBottom))) < 1.5, // 来源行跟随新底部
+            srcInside: srcR.bottom <= innerR.bottom + 0.5 && srcR.top >= innerR.top,     // 全程可见不被遮盖
+            textFull: preview.textContent === preview.dataset.full,                      // 特效全文框内展开
+            notClamped: getComputedStyle(preview).display === 'block',                   // line-clamp 解除
           };
+        });
+        await page.hover('.dp-footer'); // 鼠标移开（页脚）→ 离开动画收回
+        await sleep(400);
+        back = await page.evaluate(() => {
+          const card = document.querySelector('[data-t4-hover]');
+          const preview = card.querySelector('.dp-item-effect-preview');
+          const out = { pos: getComputedStyle(card.querySelector('.dp-item-inner')).position,
+            truncated: preview.scrollHeight > preview.clientHeight + 1 };
           card.removeAttribute('data-t4-hover'); // 避免下一张定位到旧卡
           return out;
         });
-        await page.hover('.dp-footer'); // 鼠标移开（页脚），避免悬浮态污染下一张
-        await sleep(200);
       } else if (pre.found) {
         await page.evaluate(() => document.querySelector('[data-t4-hover]').removeAttribute('data-t4-hover'));
       }
-      const alignOk = after && after.topOffset != null && Math.abs(after.topOffset) <= 2;
       const ok = pre.found && (pre.overflow
-        ? (after
-          && pre.before.endsEllipsis                              // 折叠态预览被 … 截断
-          && pre.before.overlayHidden                             // 折叠态展开层不渲染
-          && after.previewOpacity === '1'
-          && after.overlayOpacity === '1'
-          && !after.overlayHasEllipsis                            // R12②：展开态省略号移除
-          && !after.hasHiddenSpan                                 // R12④：无任何不可见占位区
-          && after.overlayText === item.effect                    // R12①③：展开层=全文，从第一个字起连续可见
-          && alignOk)                                             // 展开层首行与预览首行原位对齐（截断态→完整态生长）
-        : (!pre.before.endsEllipsis && pre.before.previewText === item.effect && pre.before.overlayHidden === null)); // R7：未溢出整行直显
-      assert(ok, `①卡${i + 1}「${item.item_name}」${pre.found && pre.overflow ? 'hover 展开完整连续（R12-v5）：折叠截…、展开无省略号无占位、全文从首字连续可见且首行原位对齐' : '未溢出：整行直显无 … 无展开层（R7）'}`,
-        pre.found && after ? `topOffset=${after.topOffset} lh=${after.lh} 省略号残留=${after.overlayHasEllipsis} 占位=${after.hasHiddenSpan}` : (pre.found ? `溢出=${pre.overflow}` : '卡片未找到'));
+        ? (after && back
+          && pre.before.previewFull && pre.before.truncated            // 折叠态：预览恒全文 + CSS 视觉截断
+          && pre.before.noOverlay                                      // 浮层废止：零 overlay DOM
+          && pre.before.innerPos === 'static'
+          && pre.before.minH && Math.abs(parseFloat(pre.before.minH) - pre.before.cardH) < 1.5 // 折叠态占位高 = 卡高
+          && /max-height/.test(pre.before.wrapTrans) && /0\.2s/.test(pre.before.wrapTrans) && /ease-out/.test(pre.before.wrapTrans) // §6 例外已注册
+          && after.pos === 'absolute' && after.z === '30'
+          && after.grown && after.cardStable                           // 整卡生长 + 网格不塌
+          && after.srcFollows && after.srcInside                       // 来源行跟随新底部全程可见
+          && after.textFull && after.notClamped                        // 特效全文框内展开（无截断无省略号）
+          && back.pos === 'static' && back.truncated)                  // 离开收回折叠态
+        : (pre.before.previewFull && !pre.before.truncated && pre.before.noOverlay && !pre.before.minH)); // R7：未溢出整行直显
+      assert(ok, `①卡${i + 1}「${item.item_name}」${pre.found && pre.overflow ? 'hover 整卡生长（P1）：折叠截断→框内全文展开、来源行跟随新底部、网格不塌、离开收回' : '未溢出：整行直显无截断无 hover（R7）'}`,
+        pre.found ? `before=${JSON.stringify(pre.before)} after=${JSON.stringify(after)} back=${JSON.stringify(back)}` : '卡片未找到');
     }
-    assert(overflowSeen >= 1, '①备料：3 张长特效卡中至少 1 张实测溢出（has-effect，续文路径被真实覆盖）', `溢出 ${overflowSeen}/3`);
-    // R7 专项（全页不变量）：未溢出卡 = 无 has-effect/无展开层/无 …/预览=全文；溢出卡 = 预览截…+展开层全文可见（R12-v5：无省略号、无占位、overlay 文本=数据源全文）
+    assert(overflowSeen >= 1, '①备料：3 张长特效卡中至少 1 张实测溢出（has-effect，生长路径被真实覆盖）', `溢出 ${overflowSeen}/3`);
+    // R7/P1 专项（全页不变量）：全页零 overlay DOM；预览恒=特效全文；未溢出卡 = 无 has-effect/无占位 minHeight/无视觉截断；
+    // 溢出卡 = has-effect + 折叠态视觉截断 + JS 预设折叠态 minHeight（hover 生长不塌网格）
     const r7 = await page.evaluate(() => {
       const bad = [];
       let shortSeen = 0, longSeen = 0;
@@ -551,21 +622,21 @@ function assert(cond, label, detail) {
         if (!p) return;
         const name = c.querySelector('.dp-item-name').textContent;
         const has = c.classList.contains('has-effect');
-        const ov = c.querySelector('.dp-item-effect-overlay');
-        const ellipsis = p.textContent.endsWith('…');
+        const truncated = p.scrollHeight > p.clientHeight + 1;
+        if (p.textContent !== p.dataset.full) bad.push('预览非全文:' + name);
+        if (c.querySelector('.dp-item-effect-overlay')) bad.push('overlay残留:' + name);
         if (has) {
           longSeen++;
-          if (!ellipsis || !ov || ov.querySelector('.dp-fx-hidden') || ov.textContent.includes('…')
-            || ov.textContent !== p.dataset.full) bad.push('溢出卡异常:' + name);
+          if (!truncated || !c.style.minHeight) bad.push('溢出卡异常:' + name);
         } else {
           shortSeen++;
-          if (ellipsis || ov || p.textContent !== p.dataset.full) bad.push('未溢出卡异常:' + name);
+          if (truncated || c.style.minHeight) bad.push('未溢出卡异常:' + name);
         }
       });
-      return { bad, shortSeen, longSeen };
+      return { bad, shortSeen, longSeen, overlayDom: document.querySelectorAll('.dp-item-effect-overlay').length };
     });
-    assert(r7.bad.length === 0 && r7.shortSeen > 0 && r7.longSeen > 0,
-      `①R7/R12-v5 全页不变量：未溢出卡 ${r7.shortSeen} 张零 … 零展开层零 hover、溢出卡 ${r7.longSeen} 张截…+展开层全文逐字=数据源且无占位`,
+    assert(r7.bad.length === 0 && r7.shortSeen > 0 && r7.longSeen > 0 && r7.overlayDom === 0,
+      `①R7/P1 全页不变量：未溢出卡 ${r7.shortSeen} 张零截断零 hover 零占位、溢出卡 ${r7.longSeen} 张折叠截断+占位高、全页零 overlay DOM、预览恒全文`,
       JSON.stringify(r7.bad));
     // ① 截图：特效卡 折叠态 vs 悬浮展开态
     await page.evaluate(() => {
@@ -811,7 +882,7 @@ function assert(cond, label, detail) {
         const tags = statRows.flatMap(r => [...r.querySelectorAll('.dp-tag')].map(t => ({
           text: t.textContent.trim(), star: t.classList.contains('dp-tag-star') })));
         return { tags, src: (card.querySelector('.dp-item-src') || {}).textContent || '',
-          rows: card.children.length }; // R2：只渲染有数据的行，行数=数据驱动
+          rows: card.querySelector('.dp-item-inner').children.length }; // R2：只渲染有数据的行，行数=数据驱动（P1：行容器=.dp-item-inner）
       }, noValItem);
       const nvExpTags = [...(noValItem.primary_stats || []), ...(noValItem.secondary_stats || [])];
       const nvExpRows = 2 + ((noValItem.primary_stats || []).length ? 1 : 0) + ((noValItem.secondary_stats || []).length ? 1 : 0)
@@ -839,7 +910,7 @@ function assert(cond, label, detail) {
           const card = [...document.querySelectorAll('.dp-item')].find(c =>
             c.querySelector('.dp-item-name').textContent.includes(key));
           if (!card) return null;
-          return [...card.children].map(e => e.className.split(' ')[0].replace('dp-item-', ''));
+          return [...card.querySelector('.dp-item-inner').children].map(e => e.className.split(' ')[0].replace('dp-item-', ''));
         };
         return {
           necklace: structOf('永恒虚空之歌'),
@@ -864,8 +935,9 @@ function assert(cond, label, detail) {
           const src = c.querySelector('.dp-item-src');
           if (!src) return;
           checked++;
-          const cb = c.getBoundingClientRect(), sb = src.getBoundingClientRect();
-          const padBottom = parseFloat(getComputedStyle(c).paddingBottom);
+          const inner = c.querySelector('.dp-item-inner'); // P1：卡盒=inner（margin-top:auto 锚底在 inner 内）
+          const cb = inner.getBoundingClientRect(), sb = src.getBoundingClientRect();
+          const padBottom = parseFloat(getComputedStyle(inner).paddingBottom);
           if (Math.abs((cb.bottom - padBottom) - sb.bottom) > 1)
             bad.push(c.querySelector('.dp-item-name').textContent);
         });
@@ -885,22 +957,20 @@ function assert(cond, label, detail) {
       assert(srcAnchor.anchorFound && srcAnchor.gap >= 6 && srcAnchor.srcIn.includes('魔导师平台'),
         'WP3-13b R11 锚点卡「分叉指环」：来源行（魔导师平台 · 吉美尔鲁斯）锚底不上移、与上行间距 ≥6px',
         JSON.stringify({ found: srcAnchor.anchorFound, gap: srcAnchor.gap, src: srcAnchor.srcIn }));
-      // WP3-9 特效覆盖层动画回归 §6 白名单：200ms ease-out 只动 opacity/transform；实底（alpha=1）；reduced-motion 瞬时
+      // WP3-9 特效生长动画（P1，§6 白名单例外已注册 2026-08-09）：wrap max-height 200ms ease-out；reduced-motion 瞬时
       const animSpec = await page.evaluate(() => {
-        const cs = getComputedStyle(document.querySelector('.dp-item-effect-overlay'));
-        return { dur: cs.transitionDuration, prop: cs.transitionProperty, tf: cs.transitionTimingFunction, bg: cs.backgroundColor };
+        const cs = getComputedStyle(document.querySelector('.dp-item-effect-wrap'));
+        return { dur: cs.transitionDuration, prop: cs.transitionProperty, tf: cs.transitionTimingFunction };
       });
-      const durs = animSpec.dur.split(',').map(s => s.trim());
-      const props = animSpec.prop.split(',').map(s => s.trim()).sort().join(',');
-      const bgOpaque = /rgba?\([^)]+\)/.test(animSpec.bg) && (animSpec.bg.startsWith('rgb(') || parseFloat(animSpec.bg.match(/[\d.]+\)$/)) >= 1);
-      assert(durs.length >= 2 && durs.every(d => d === '0.2s') && props === 'opacity,transform' && animSpec.tf.includes('ease-out') && bgOpaque,
-        'WP3-9 覆盖层动画 200ms ease-out 仅 opacity/transform（F1 例外废止）+ 实底遮严', JSON.stringify(animSpec));
+      assert(animSpec.dur.split(',').map(s => s.trim()).every(d => d === '0.2s')
+        && animSpec.prop.split(',').map(s => s.trim()).includes('max-height') && animSpec.tf.includes('ease-out'),
+        'WP3-9 整卡生长动画 200ms ease-out max-height（P1 §6 例外已注册 2026-08-09；浮层 opacity/transform 形态废止）', JSON.stringify(animSpec));
       await page.emulateMedia({ reducedMotion: 'reduce' });
-      const animRm = await page.evaluate(() => getComputedStyle(document.querySelector('.dp-item-effect-overlay')).transitionDuration);
+      const animRm = await page.evaluate(() => getComputedStyle(document.querySelector('.dp-item-effect-wrap')).transitionDuration);
       await page.emulateMedia({ reducedMotion: 'no-preference' });
       assert(animRm.split(',').map(s => s.trim()).every(d => d === '0s'),
-        'WP3-9b reduced-motion 覆盖层瞬时切换（transitionDuration=0s）', animRm);
-      // WP3-10 hover 展开网格零挤压（邻卡 rect 不变；覆盖层 z-index 抬升）——取首张溢出卡（has-effect）
+        'WP3-9b reduced-motion 生长瞬时切换（transitionDuration=0s）', animRm);
+      // WP3-10 hover 整卡生长网格零挤压（邻卡 rect 不变；生长部分 z-index 抬升覆盖下方卡片）——取首张溢出卡（has-effect）
       const nbBefore = await page.evaluate(() => {
         const card = document.querySelector('.dp-item.has-effect');
         if (!card) return null;
@@ -920,7 +990,7 @@ function assert(cond, label, detail) {
       await page.hover('.dp-footer');
       await sleep(300);
       assert(nbBefore && nbAfter && ['x', 'y', 'width', 'height'].every(k => nbBefore[k] === nbAfter[k]),
-        'WP3-10 hover 覆盖层展开网格零挤压（邻卡位置/尺寸不变）');
+        'WP3-10 hover 整卡生长网格零挤压（邻卡位置/尺寸不变）');
     }
 
     // ============ 修正项②：三级折叠 ============
@@ -1031,8 +1101,8 @@ function assert(cond, label, detail) {
       catChipsHidden: document.getElementById('dpCatChips').hidden, // WP6：分类三级行随重置收起
       instHidden: document.getElementById('dpInstanceChips').hidden, // WP6：实例行随来源清空收起
     }));
-    assert(reset.activeVals === 0 && reset.allChips === 1 && !reset.search && reset.catChipsHidden && reset.instHidden,
-      '③§5 赛季切换全重置（值 chip 全清、来源「全部」回选、搜索清空、分类三级与实例行收起）', JSON.stringify(reset));
+    assert(reset.activeVals === 0 && reset.allChips === 2 && !reset.search && reset.catChipsHidden && reset.instHidden,
+      '③§5 赛季切换全重置（值 chip 全清、分类/来源两枚「全部」回选、搜索清空、分类三级与实例行收起）', JSON.stringify(reset));
     await page.selectOption('#dpSeasonSelect', cur.id);
     await sleep(800);
 
@@ -1058,7 +1128,7 @@ function assert(cond, label, detail) {
       '③§6 1920×1080 桌面档：toggle 隐藏、顶行+四组各一行（组内无折行；WP6 分类组为第一组，三级行未选 tab 时隐藏）', JSON.stringify(rows1920));
     await page2.evaluate(() => window.scrollTo(0, 0));
     await page2.screenshot({ path: path.join(SHOT_DIR, '1920-filterbar.png') });
-    // 1920 悬浮特效展开逐字比对一例 + 截图（WP3-v5 R12：hover 唯一触发路径；按 名字+预览 dataset.full 双重定位）
+    // 1920 hover 整卡生长一例 + 截图（P1：按 名字+预览 dataset.full 双重定位）
     const pre1920 = await page2.evaluate((it) => {
       const card = [...document.querySelectorAll('.dp-item.has-effect')].find(c => {
         const p = c.querySelector('.dp-item-effect-preview');
@@ -1076,16 +1146,22 @@ function assert(cond, label, detail) {
       await sleep(450);
       r1920 = await page2.evaluate(() => {
         const card = document.querySelector('[data-t4-1920]');
+        const inner = card.querySelector('.dp-item-inner');
         const preview = card.querySelector('.dp-item-effect-preview');
-        const overlay = card.querySelector('.dp-item-effect-overlay');
-        return { po: getComputedStyle(preview).opacity, oo: getComputedStyle(overlay).opacity,
-          noEll: !overlay.textContent.includes('…'),
-          noHidden: !overlay.querySelector('.dp-fx-hidden'),
-          fullText: overlay.textContent };
+        const src = card.querySelector('.dp-item-src');
+        const cs = getComputedStyle(inner);
+        const innerR = inner.getBoundingClientRect(), srcR = src.getBoundingClientRect();
+        return { pos: cs.position, z: cs.zIndex,
+          grown: innerR.height > parseFloat(card.style.minHeight) + 10,
+          srcFollows: Math.abs(srcR.bottom - (innerR.bottom - parseFloat(cs.paddingBottom))) < 1.5,
+          display: getComputedStyle(preview).display,
+          fullText: preview.textContent,
+          noOverlay: !document.querySelector('.dp-item-effect-overlay') };
       });
     }
-    assert(r1920 && r1920.po === '1' && r1920.oo === '1' && r1920.noEll && r1920.noHidden && r1920.fullText === picked[0].effect,
-      '①[1920] hover 展开完整连续（R12-v5）：展开无省略号、无隐藏占位、展开层全文逐字=数据源全文');
+    assert(r1920 && r1920.pos === 'absolute' && r1920.z === '30' && r1920.grown && r1920.srcFollows
+      && r1920.display === 'block' && r1920.fullText === picked[0].effect && r1920.noOverlay,
+      '①[1920] hover 整卡生长（P1）：inner absolute 生长、来源行跟随新底部、特效全文框内逐字=数据源、零 overlay');
     await page2.screenshot({ path: path.join(SHOT_DIR, '1920-expand-after.png') });
     await ctx2.close();
 
