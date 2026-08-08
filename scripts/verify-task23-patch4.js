@@ -1,8 +1,8 @@
 // 任务书 #23-补丁4 验证：展开文本衔接（①）+ 三级折叠（②）+ 筛选条规范核验（③）
 // ③ 已按任务书 #28 WP2（筛选规范 v2.0）重构口径改锚：v1.0 部位/类型二维与「排除杂项」已彻底取消，
 // 现覆盖 = 行序/区头层级/chip 规格、来源单选互斥、重置筛选、杂项零渲染、§7 动画、§8 移动端折叠。
-// 适配任务书 #28 WP3（装备详情展开）：①展开逐字比对走 hover 快读路径（点击已改为开详情层，裁定⑤保留 hover）；
-// 新增「①+ WP3 详情覆盖层」断言块（RPC 通道/点击展开行序/单开互斥/收起路径/难度行不显/套装关联/动画/网格零挤压）。
+// 适配任务书 #28 WP3-v2（全信息装备卡，运营 2026-08-08 方向修正+补充裁定 G/H）：v1 点击详情层断言块整体替换——
+// 现覆盖 = RPC 通道/六结构行逐行排列/恒占恒高等高/主属性色板/副属性降序+星标三态/特效 2 行截断/来源行/零点击/overlay 动画回归白名单+实底遮严。
 // 公示页为免登录只读页（live 数据），本脚本不创建任何测试数据，收尾复核 T23X 遗留为零。
 // 用法: node scripts/verify-task23-patch4.js（PW_CHANNEL=chrome 可选）截图输出 backup/2026-08-07-task23-patch4/
 const fs = require('fs');
@@ -282,7 +282,7 @@ function assert(cond, label, detail) {
     cnt = await cardCount();
     assert(cnt === all.length, `清空还原全集（页面 ${cnt} = 库内 ${all.length}）`);
 
-    // ============ 修正项①：展开即全文替换（WP3：点击已改为开详情层，特效覆盖层仅剩桌面 :hover 一条触发路径，裁定⑤） ============
+    // ============ 修正项①：展开即全文替换（WP3-v2：卡片零点击，特效覆盖层仅桌面 :hover 一条触发路径） ============
     console.log('—— ① 展开文本逐字比对（3 张长特效卡，hover 触发） ——');
     for (let i = 0; i < picked.length; i++) {
       const item = picked[i];
@@ -299,7 +299,7 @@ function assert(cond, label, detail) {
         const overlay = card.querySelector('.dp-item-effect-overlay');
         return { found: true, before: {
           previewText: preview.textContent,
-          clamped: preview.scrollWidth > preview.clientWidth + 1,
+          clamped: preview.scrollHeight > preview.clientHeight + 1, // WP3-v2：恒 2 行 line-clamp 竖向截断
           overlayHidden: getComputedStyle(overlay).opacity === '0',
         } };
       }, item);
@@ -347,116 +347,152 @@ function assert(cond, label, detail) {
     await page.hover('.dp-footer');
     await sleep(300);
 
-    // ============ ①+ 任务书 #28 WP3：装备详情覆盖层 ============
-    console.log('—— ①+ WP3 详情覆盖层 ——');
+    // ============ ①+ 任务书 #28 WP3-v2：全信息装备卡 ============
+    console.log('—— ①+ WP3-v2 全信息装备卡 ——');
     // WP3-1 RPC 通道：页面加载经公开 RPC（anon 直连 PostgREST，不走 server.js；监听器在 page.goto 前已挂）
     assert(rpcCalls.some(c => c === 'POST 200'),
       'WP3-1 RPC 通道：POST /rest/v1/rpc/get_public_loot_detail 返回 200', rpcCalls.join(' | ') || '未捕获到调用');
-    // 备料（REST 动态取，不硬编码）：有数值（主或副）的特效卡、无特效无数值卡、套装兑换物卡
-    // （库内实况：无同时具备主+副数值的特效卡，特效卡数值仅单侧——标签断言按实有侧逐字比对）
+    // 备料（REST 动态取，不硬编码）：有数值（主或副）的特效卡、套装兑换物卡、
+    // 星标卡（副属性 ≥2 值且唯一最大）、单副属性值卡、缺数值有属性名卡（裁定 E）
+    // （库内实况 2026-08-08 探针：无「无属性名纯空卡」——无特效无值卡仅 S2 两件且带属性名，缺值卡兼任空行占位断言）
     const richItem = all.find(l => l.effect && ((l.primary_values && Object.keys(l.primary_values).length)
       || (l.secondary_values && Object.keys(l.secondary_values).length)));
-    // 纯空卡（无特效/数值/难度、非兑换物）：S1 视图内不存在（S1 唯一全空卡是套装兑换物「鸣响虚空珍玩」，多一行套装关联），
-    // 放宽到跨赛季全集找（库内实况：S2「烈毒之渊」有 2 张），命中非当前赛季卡时 WP3-7 切赛季断言后切回；
-    // 注意 raidLootRaw/dunLootRaw 已按当前赛季过滤，跨赛季全集须重新直读两表
+    // 跨赛季全集（缺数值卡在 S2「烈毒之渊」），命中非当前赛季卡时切赛季断言后切回
     const allFull = [...await rest('/boss_loot?select=*&limit=2000'), ...await rest('/dungeon_loot?select=*&limit=2000')]
       .filter(l => l.slot !== '杂项');
-    const plainItem = allFull.find(l => !l.effect && l.slot !== '套装兑换物'
-      && (!l.primary_values || !Object.keys(l.primary_values).length)
-      && (!l.secondary_values || !Object.keys(l.secondary_values).length)
-      && !Object.keys(l.primary_tiers || {}).length && !Object.keys(l.secondary_tiers || {}).length);
+    const hasVals = o => o && Object.keys(o).length;
     const tierItem = all.find(l => l.slot === '套装兑换物' && String(l.item_name).includes('珍玩'));
-    assert(richItem && plainItem && tierItem, 'WP3 备料：库内找到 有数值（主或副）特效卡 / 无特效无数值卡 / 套装兑换物卡 各一',
-      `rich=${!!richItem} plain=${!!plainItem} tier=${!!tierItem}`);
-    if (richItem && plainItem && tierItem) {
+    const uniqMax = o => { const vs = Object.values(o || {}).map(Number); return vs.length >= 2 && vs.filter(v => v === Math.max(...vs)).length === 1; };
+    const starItem = all.find(l => uniqMax(l.secondary_values));
+    const oneSecItem = all.find(l => Object.keys(l.secondary_values || {}).length === 1);
+    const noValItem = allFull.find(l => ((l.primary_stats || []).length || (l.secondary_stats || []).length)
+      && !hasVals(l.primary_values) && !hasVals(l.secondary_values) && l.slot !== '套装兑换物');
+    assert(richItem && tierItem && starItem && oneSecItem && noValItem,
+      'WP3 备料：特效有值卡/套装兑换物卡/星标卡/单副值卡/缺数值卡 各一',
+      `rich=${!!richItem} tier=${!!tierItem} star=${!!starItem} one=${!!oneSecItem} noval=${!!noValItem}`);
+    if (richItem && tierItem && starItem && oneSecItem && noValItem) {
       richItem.effect = richItem.effect.replace(/\r\n?/g, '\n'); // 同 ① 的 \r 规范化（innerHTML 解析吞 \r）
-      // §4 行序：实例来源 → BOSS → 掉落难度 → 套装关联 → 主属性 → 副属性 → 特效；无数据行整体隐藏
-      const expLabels = l => {
-        const seq = ['实例来源', 'BOSS'];
-        if (Object.keys(l.primary_tiers || {}).length || Object.keys(l.secondary_tiers || {}).length) seq.push('掉落难度');
-        if (l.slot === '套装兑换物') seq.push('套装关联');
-        if (l.primary_values && Object.keys(l.primary_values).length) seq.push('主属性');
-        if (l.secondary_values && Object.keys(l.secondary_values).length) seq.push('副属性');
-        if (l.effect) seq.push('特效');
-        return seq;
-      };
-      const readDetail = mark => page.evaluate((m) => {
+      const P_CLS = { '力量': 'dp-tag-p1', '敏捷': 'dp-tag-p2', '智力': 'dp-tag-p3' }; // §4.11 色板
+      // 卡片六结构行读取器（裁定 G：名称/meta/主属性/副属性/特效/来源 各占一行）
+      const readCard = mark => page.evaluate((m) => {
         const card = document.querySelector(`[${m}]`);
         if (!card) return null;
-        const rows = [...card.querySelectorAll('.dp-detail-row')];
-        const rowOf = t => rows.find(r => r.querySelector('.dp-detail-label').textContent.trim() === t);
+        const statRows = [...card.querySelectorAll('.dp-item-stats')];
+        const rows = [card.querySelector('.dp-item-name'), card.querySelector('.dp-item-meta'),
+          statRows[0], statRows[1], card.querySelector('.dp-item-effect-preview'), card.querySelector('.dp-item-src')];
+        const tagsOf = row => row ? [...row.querySelectorAll('.dp-tag')].map(t => ({
+          text: t.textContent.trim(), cls: t.className,
+          star: t.classList.contains('dp-tag-star'), svg: !!t.querySelector('svg') })) : null;
         return {
-          open: card.classList.contains('dp-detail-open'),
-          openCount: document.querySelectorAll('.dp-item.dp-detail-open').length,
-          labels: rows.map(r => r.querySelector('.dp-detail-label').textContent.trim()),
-          effectText: (card.querySelector('.dp-detail-effect') || {}).textContent || null,
-          primTags: rowOf('主属性') ? [...rowOf('主属性').querySelectorAll('.dp-tag')].map(t => t.textContent.trim()) : [],
-          secTags: rowOf('副属性') ? [...rowOf('副属性').querySelectorAll('.dp-tag')].map(t => t.textContent.trim()) : [],
-          tierText: rowOf('套装关联') ? rowOf('套装关联').textContent : null,
+          rowCount: rows.filter(Boolean).length,
+          rowTops: rows.map(e => e ? Math.round(e.getBoundingClientRect().top) : null),
+          primTags: tagsOf(statRows[0]), secTags: tagsOf(statRows[1]),
+          previewText: (card.querySelector('.dp-item-effect-preview') || {}).textContent || null,
+          srcText: (card.querySelector('.dp-item-src') || {}).textContent || null,
+          cursor: getComputedStyle(card).cursor,
+          cardH: Math.round(card.getBoundingClientRect().height),
         };
       }, mark);
-      // WP3-2 点击展开：单开 + 行序合规 + 特效逐字 + 数值 tag 一致；同时记录邻卡位置供 WP3-9
-      const nbBefore = await page.evaluate((it) => {
+      // 定位 rich 卡（同名跨 BOSS 多行合法，按 名字+覆盖层全文 双重定位）并打标
+      const richFound = await page.evaluate((it) => {
         const card = [...document.querySelectorAll('.dp-item.has-effect')].find(c =>
           c.querySelector('.dp-item-name').textContent === it.item_name
           && c.querySelector('.dp-item-effect-overlay').textContent === it.effect);
-        if (!card) return null;
+        if (!card) return false;
         card.setAttribute('data-t4-rich', '1');
         card.scrollIntoView({ block: 'center' });
         const next = card.parentElement.querySelector('.dp-item:not([data-t4-rich])');
         if (next) next.setAttribute('data-t4-nb', '1');
-        return next ? next.getBoundingClientRect().toJSON() : null;
+        return true;
       }, richItem);
+      assert(richFound, `WP3-2 备料定位：特效有值卡「${richItem.item_name}」在页`);
+      const c1 = await readCard('data-t4-rich');
+      // WP3-2 六结构行逐行排列（裁定 G）+ 行高规格 + 主属性色板 + 数值逐字
+      const expPrim = (richItem.primary_stats || []).map(s =>
+        ({ text: `${s}${richItem.primary_values && richItem.primary_values[s] != null ? ' +' + richItem.primary_values[s] : ''}`, cls: P_CLS[s] || 'dp-tag-primary' }));
+      const primOk = JSON.stringify(c1.primTags.map(t => t.text)) === JSON.stringify(expPrim.map(t => t.text))
+        && c1.primTags.every((t, i) => t.cls.includes(expPrim[i].cls));
+      const strictlyDescending = c1.rowTops.every((t, i) => i === 0 || t > c1.rowTops[i - 1]);
+      assert(c1.rowCount === 6 && strictlyDescending && primOk && c1.cursor !== 'pointer',
+        `WP3-2 六结构行逐行排列（裁定 G）+ 主属性色板/数值逐字 + 非 pointer 光标（零点击）`,
+        `rows=${c1.rowCount} tops=${JSON.stringify(c1.rowTops)} prim=${JSON.stringify(c1.primTags.map(t => t.text + '/' + t.cls))}`);
+      // WP3-3 恒占恒高：全页卡片高度完全一致（六行恒占、缺省空行占位，零 JS 等高）
+      const heights = await page.evaluate(() =>
+        [...new Set([...document.querySelectorAll('.dp-item')].map(c => Math.round(c.getBoundingClientRect().height)))]);
+      assert(heights.length === 1, 'WP3-3 恒占恒高：全页卡片高度差=0（含无特效/缺省行占位）', `不同高度=${JSON.stringify(heights)}`);
+      // WP3-4 零点击交互（运营方向修正③）：点击/Esc 后卡片类名零变化、全页无详情层 DOM
+      const clsBefore = await page.evaluate(() => document.querySelector('[data-t4-rich]').className);
       await page.click('[data-t4-rich]');
       await sleep(300);
-      const d1 = await readDetail('data-t4-rich');
-      const expTags = o => Object.entries(o).map(([k, v]) => `${k} +${v}`).sort();
-      // 数值 tag 按实有侧逐字比对（库内特效卡数值仅单侧：主或副）；行序断言已覆盖「无数据行不显」
-      const hasVals = o => o && Object.keys(o).length;
-      const tagsMatch = d =>
-        (!hasVals(richItem.primary_values) || JSON.stringify([...d.primTags].sort()) === JSON.stringify(expTags(richItem.primary_values)))
-        && (!hasVals(richItem.secondary_values) || JSON.stringify([...d.secTags].sort()) === JSON.stringify(expTags(richItem.secondary_values)));
-      assert(d1 && d1.open && d1.openCount === 1
-        && JSON.stringify(d1.labels) === JSON.stringify(expLabels(richItem))
-        && d1.effectText === richItem.effect
-        && tagsMatch(d1),
-        `WP3-2 点击展开「${richItem.item_name}」：单开 + 行序合规 + 特效逐字 + 数值tag一致`,
-        d1 ? `labels=${JSON.stringify(d1.labels)}` : '卡片未找到');
-      // WP3-9 网格零挤压：详情层展开前后邻卡 rect 不变
-      const nbAfter = await page.evaluate(() => {
-        const n = document.querySelector('[data-t4-nb]');
-        return n ? n.getBoundingClientRect().toJSON() : null;
-      });
-      assert(nbBefore && nbAfter && ['x', 'y', 'width', 'height'].every(k => nbBefore[k] === nbAfter[k]),
-        'WP3-9 网格零挤压：详情层展开前后邻卡位置/尺寸不变');
-      // WP3-3 单开互斥：点另一张卡 → 前一张收起、仅新卡开
-      await page.evaluate(() => {
-        const other = [...document.querySelectorAll('.dp-item')]
-          .find(c => !c.hasAttribute('data-t4-rich') && !c.hasAttribute('data-t4-nb'));
-        other.setAttribute('data-t4-other', '1');
-      });
-      await page.click('[data-t4-other]');
-      await sleep(300);
-      const d2 = await readDetail('data-t4-other');
-      const richClosed = await page.evaluate(() => !document.querySelector('[data-t4-rich]').classList.contains('dp-detail-open'));
-      assert(d2 && d2.open && d2.openCount === 1 && richClosed,
-        'WP3-3 单开互斥：点开另一张卡，前一张自动收起、全页仅 1 张开');
-      // WP3-4 收起路径：Esc 收起；再点开后点卡片外（页脚）收起
       await page.keyboard.press('Escape');
       await sleep(200);
-      const openAfterEsc = await page.evaluate(() => document.querySelectorAll('.dp-item.dp-detail-open').length);
-      await page.click('[data-t4-other]');
-      await sleep(200);
-      await page.click('.dp-footer');
-      await sleep(200);
-      const openAfterFooter = await page.evaluate(() => document.querySelectorAll('.dp-item.dp-detail-open').length);
-      assert(openAfterEsc === 0 && openAfterFooter === 0,
-        'WP3-4 收起路径：Esc 收起 + 点卡片外（页脚）收起', `esc后=${openAfterEsc} 页脚后=${openAfterFooter}`);
-      // WP3-5 掉落难度行恒不显示（tiers 全 null，裁定①）
-      const diffRows = await page.evaluate(() =>
-        [...document.querySelectorAll('.dp-detail-label')].filter(e => e.textContent.trim() === '掉落难度').length);
-      assert(diffRows === 0, 'WP3-5 掉落难度行恒不显示（全卡无此标签）', `实测 ${diffRows} 处`);
-      // WP3-6 套装关联行：搜索「珍玩」→ 唯一卡点开
+      const clickRes = await page.evaluate(() => ({
+        cls: document.querySelector('[data-t4-rich]').className,
+        detailDom: document.querySelectorAll('.dp-item-detail, .dp-detail-open').length,
+      }));
+      assert(clickRes.cls === clsBefore && clickRes.detailDom === 0,
+        'WP3-4 卡片零点击：点击+Esc 后类名零变化、无 .dp-item-detail/.dp-detail-open 残留',
+        JSON.stringify(clickRes));
+      // WP3-5 掉落难度行不显（tiers 全 null，裁定①）：DOM 无「掉落难度」字样 + 数据侧 tiers 全空
+      const tiersAllNull = allFull.every(l => !Object.keys(l.primary_tiers || {}).length && !Object.keys(l.secondary_tiers || {}).length);
+      const diffText = await page.evaluate(() =>
+        [...document.querySelectorAll('.dp-item')].filter(c => c.textContent.includes('掉落难度')).length);
+      assert(tiersAllNull && diffText === 0, 'WP3-5 掉落难度不显（库内 tiers 全 null，DOM 零「掉落难度」）',
+        `tiersNull=${tiersAllNull} dom=${diffText}`);
+      // WP3-6 副属性降序+星标（裁定 H）：星标卡首 tag=唯一最大者带⭐+SVG，其余无星；单副值卡无星
+      const starExp = Object.entries(starItem.secondary_values).map(([k, v]) => ({ k, v: Number(v) }))
+        .sort((a, b) => b.v - a.v).map(e => `${e.k} +${e.v}`);
+      const starMarked = await page.evaluate((it) => {
+        const exp = Object.entries(it.secondary_values).map(([k, v]) => `${k} +${v}`);
+        const card = [...document.querySelectorAll('.dp-item')].find(c => {
+          if (c.querySelector('.dp-item-name').textContent !== it.item_name) return false;
+          const r = c.querySelectorAll('.dp-item-stats')[1];
+          if (!r) return false;
+          const have = [...r.querySelectorAll('.dp-tag')].map(t => t.textContent.trim());
+          return exp.every(e => have.includes(e));
+        });
+        if (card) card.setAttribute('data-t4-star', '1');
+        return !!card;
+      }, starItem);
+      const starTags = starMarked ? (await readCard('data-t4-star')).secTags : null;
+      const starOk = starTags
+        && JSON.stringify(starTags.map(t => t.text)) === JSON.stringify(starExp) // 降序（含最大值排第一）
+        && starTags[0].star && starTags[0].svg && starTags.slice(1).every(t => !t.star); // 唯一最大者⭐
+      assert(starOk, `WP3-6 副属性降序+唯一最大者⭐排第一（裁定 H）：「${starItem.item_name}」`,
+        starTags ? JSON.stringify(starTags.map(t => t.text + (t.star ? '⭐' : ''))) : '卡片未找到');
+      const oneMarked = await page.evaluate((it) => {
+        const card = [...document.querySelectorAll('.dp-item')].find(c =>
+          c.querySelector('.dp-item-name').textContent === it.item_name
+          && (c.querySelectorAll('.dp-item-stats')[1] || { querySelectorAll: () => [] }).querySelectorAll('.dp-tag').length === 1);
+        if (card) card.setAttribute('data-t4-one', '1');
+        return !!card;
+      }, oneSecItem);
+      const oneTags = oneMarked ? (await readCard('data-t4-one')).secTags : null;
+      assert(oneTags && oneTags.length === 1 && !oneTags[0].star,
+        `WP3-6b 单副属性值卡「${oneSecItem.item_name}」不加星（三态规则）`,
+        oneTags ? JSON.stringify(oneTags.map(t => t.text)) : '卡片未找到');
+      // 同值并列：当前赛季有实例则 DOM 断言（不加星、保持库内原序），无实例则标注跳过
+      const tieItem = all.find(l => { const vs = Object.values(l.secondary_values || {}).map(Number); return vs.length >= 2 && vs.every(v => v === vs[0]); });
+      if (tieItem) {
+        const tieTags = await page.evaluate((it) => {
+          const card = [...document.querySelectorAll('.dp-item')].find(c => {
+            if (c.querySelector('.dp-item-name').textContent !== it.item_name) return false;
+            const r = c.querySelectorAll('.dp-item-stats')[1];
+            return r && r.querySelectorAll('.dp-tag').length >= 2;
+          });
+          if (!card) return null;
+          return [...card.querySelectorAll('.dp-item-stats')[1].querySelectorAll('.dp-tag')]
+            .map(t => ({ text: t.textContent.trim(), star: t.classList.contains('dp-tag-star') }));
+        }, tieItem);
+        const expTieOrder = (tieItem.secondary_stats || []).map(s => `${s} +${tieItem.secondary_values[s]}`);
+        assert(tieTags && tieTags.every(t => !t.star)
+          && JSON.stringify(tieTags.map(t => t.text)) === JSON.stringify(expTieOrder),
+          `WP3-6c 同值并列不加星、保持库内原序：「${tieItem.item_name}」`,
+          tieTags ? JSON.stringify(tieTags) : '卡片未找到');
+      } else {
+        assert(true, 'WP3-6c 同值并列：当前赛季库内无同值实例（规则由代码路径覆盖：同值不加星、稳定排序保原序）');
+      }
+      // WP3-7 套装兑换物：来源行「实例 · BOSS · 可兑换本赛季套装」（确认点 C）+ 主/副属性空行占位
       await page.fill('#dpSearch', '珍玩');
       await sleep(400);
       const tierHit = await page.evaluate((name) => {
@@ -467,60 +503,86 @@ function assert(cond, label, detail) {
         return { count: 1, okName };
       }, tierItem.item_name);
       assert(tierHit.count === 1 && tierHit.okName,
-        `WP3-6 搜索「珍玩」命中唯一卡 = ${tierItem.item_name}`, JSON.stringify(tierHit));
+        `WP3-7 搜索「珍玩」命中唯一卡 = ${tierItem.item_name}`, JSON.stringify(tierHit));
       if (tierHit.count === 1 && tierHit.okName) {
-        await page.click('[data-t4-tier]');
-        await sleep(300);
-        const d3 = await readDetail('data-t4-tier');
-        assert(d3 && JSON.stringify(d3.labels) === JSON.stringify(expLabels(tierItem))
-          && d3.labels.includes('套装关联') && d3.tierText && d3.tierText.includes('套装一览')
-          && !d3.labels.includes('主属性') && !d3.labels.includes('副属性'),
-          'WP3-6 套装关联行：「套装一览」提示在、主/副属性行不显（库内 values 为 null）',
-          d3 ? JSON.stringify(d3.labels) : '卡片未找到');
+        const ct = await readCard('data-t4-tier');
+        assert(ct.rowCount === 6 && ct.srcText && ct.srcText.includes(' · ') && ct.srcText.endsWith('可兑换本赛季套装')
+          && ct.primTags.length === 0 && ct.secTags.length === 0,
+          'WP3-7 套装兑换物：来源行含实例·BOSS·可兑换本赛季套装，主/副属性行空行占位',
+          JSON.stringify({ src: ct.srcText, prim: ct.primTags.length, sec: ct.secTags.length }));
       }
       await page.fill('#dpSearch', '');
       await sleep(400);
-      assert(await cardCount() === all.length, 'WP3-6 清空搜索还原全集');
-      // WP3-7 无特效无值卡：详情仅 实例来源+BOSS 两行（卡属非当前赛季时先切赛季、断言后切回）
-      let plainSeasonId = null;
-      {
-        const raidsAll = await rest('/game_raids?select=id,season_id');
-        const dunsAll = await rest('/game_dungeons?select=id,season_id');
-        if (plainItem.dungeon_id) { // dungeon_loot 行
-          const d = dunsAll.find(x => x.id === plainItem.dungeon_id);
-          plainSeasonId = d ? d.season_id : null;
-        } else { // boss_loot 行：boss → 团本/大秘境 → 赛季
-          const b = bossRows.find(x => x.id === plainItem.boss_id) || {};
-          const r = b.raid_id ? raidsAll.find(x => x.id === b.raid_id) : null;
-          const d = b.dungeon_id ? dunsAll.find(x => x.id === b.dungeon_id) : null;
-          plainSeasonId = r ? r.season_id : d ? d.season_id : null;
-        }
-      }
-      const switched = plainSeasonId && plainSeasonId !== cur.id;
-      if (switched) { await page.selectOption('#dpSeasonSelect', plainSeasonId); await sleep(800); }
-      const plainOk = await page.evaluate((name) => {
-        return [...document.querySelectorAll('.dp-item')].some(c => {
-          if (c.querySelector('.dp-item-name').textContent !== name) return false;
-          const ls = [...c.querySelectorAll('.dp-detail-label')].map(e => e.textContent.trim());
-          return ls.length === 2 && ls[0] === '实例来源' && ls[1] === 'BOSS';
-        });
-      }, plainItem.item_name);
+      assert(await cardCount() === all.length, 'WP3-7 清空搜索还原全集');
+      // WP3-8 缺数值卡（裁定 E）：属性 tag 只显属性名（无 +N、不加星）；跨赛季时先切赛季、断言后切回
+      const raidsAll = await rest('/game_raids?select=id,name,season_id');
+      const dunsAll = await rest('/game_dungeons?select=id,name,season_id');
+      const bossAll = await rest('/game_bosses?select=id,name,raid_id,dungeon_id&limit=1000');
+      const seasonOf = l => {
+        if (l.dungeon_id) { const d = dunsAll.find(x => x.id === l.dungeon_id); return d ? d.season_id : null; }
+        const b = bossAll.find(x => x.id === l.boss_id) || {};
+        const r = b.raid_id ? raidsAll.find(x => x.id === b.raid_id) : null;
+        const d = b.dungeon_id ? dunsAll.find(x => x.id === b.dungeon_id) : null;
+        return r ? r.season_id : (d ? d.season_id : null);
+      };
+      const targetSeason = seasonOf(noValItem);
+      const switched = targetSeason && targetSeason !== cur.id;
+      if (switched) { await page.selectOption('#dpSeasonSelect', targetSeason); await sleep(800); }
+      const nv = await page.evaluate((it) => {
+        const card = [...document.querySelectorAll('.dp-item')].find(c =>
+          c.querySelector('.dp-item-name').textContent === it.item_name);
+        if (!card) return null;
+        const statRows = [...card.querySelectorAll('.dp-item-stats')];
+        const tags = statRows.flatMap(r => [...r.querySelectorAll('.dp-tag')].map(t => ({
+          text: t.textContent.trim(), star: t.classList.contains('dp-tag-star') })));
+        return { tags, src: (card.querySelector('.dp-item-src') || {}).textContent || '',
+          rows: [card.querySelector('.dp-item-name'), card.querySelector('.dp-item-meta'), statRows[0], statRows[1],
+            card.querySelector('.dp-item-effect-preview'), card.querySelector('.dp-item-src')].filter(Boolean).length };
+      }, noValItem);
+      const nvExpTags = [...(noValItem.primary_stats || []), ...(noValItem.secondary_stats || [])];
+      assert(nv && nv.rows === 6 && nv.tags.length === nvExpTags.length
+        && nv.tags.every(t => !t.text.includes('+') && nvExpTags.includes(t.text) && !t.star),
+        `WP3-8 缺数值卡「${noValItem.item_name}」：六行齐全、属性 tag 只显属性名（无 +N、不加星，裁定 E）`,
+        nv ? JSON.stringify(nv.tags.map(t => t.text)) : '卡片未找到');
       if (switched) { await page.selectOption('#dpSeasonSelect', cur.id); await sleep(800); }
-      assert(plainOk, `WP3-7 无特效无值卡「${plainItem.item_name}」详情仅 实例来源+BOSS 两行${switched ? '（非当前赛季视图，已切回）' : ''}`);
-      // WP3-8 详情层动画规格：200ms ease-out 只动 opacity/transform；reduced-motion 瞬时（测完恢复）
+      // WP3-9 特效覆盖层动画回归 §6 白名单：200ms ease-out 只动 opacity/transform；实底（alpha=1）；reduced-motion 瞬时
       const animSpec = await page.evaluate(() => {
-        const cs = getComputedStyle(document.querySelector('.dp-item-detail'));
-        return { dur: cs.transitionDuration, prop: cs.transitionProperty, tf: cs.transitionTimingFunction };
+        const cs = getComputedStyle(document.querySelector('.dp-item-effect-overlay'));
+        return { dur: cs.transitionDuration, prop: cs.transitionProperty, tf: cs.transitionTimingFunction, bg: cs.backgroundColor };
       });
       const durs = animSpec.dur.split(',').map(s => s.trim());
       const props = animSpec.prop.split(',').map(s => s.trim()).sort().join(',');
-      assert(durs.length >= 2 && durs.every(d => d === '0.2s') && props === 'opacity,transform',
-        'WP3-8 详情层动画 200ms、仅 opacity/transform', JSON.stringify(animSpec));
+      const bgOpaque = /rgba?\([^)]+\)/.test(animSpec.bg) && (animSpec.bg.startsWith('rgb(') || parseFloat(animSpec.bg.match(/[\d.]+\)$/)) >= 1);
+      assert(durs.length >= 2 && durs.every(d => d === '0.2s') && props === 'opacity,transform' && animSpec.tf.includes('ease-out') && bgOpaque,
+        'WP3-9 覆盖层动画 200ms ease-out 仅 opacity/transform（F1 例外废止）+ 实底遮严', JSON.stringify(animSpec));
       await page.emulateMedia({ reducedMotion: 'reduce' });
-      const animRm = await page.evaluate(() => getComputedStyle(document.querySelector('.dp-item-detail')).transitionDuration);
+      const animRm = await page.evaluate(() => getComputedStyle(document.querySelector('.dp-item-effect-overlay')).transitionDuration);
       await page.emulateMedia({ reducedMotion: 'no-preference' });
       assert(animRm.split(',').map(s => s.trim()).every(d => d === '0s'),
-        'WP3-8 reduced-motion 详情层瞬时切换（transitionDuration=0s）', animRm);
+        'WP3-9b reduced-motion 覆盖层瞬时切换（transitionDuration=0s）', animRm);
+      // WP3-10 hover 展开网格零挤压（邻卡 rect 不变；覆盖层 z-index 抬升）——搜索/赛季切换已重渲染，重新定位打标
+      const nbBefore = await page.evaluate((it) => {
+        const card = [...document.querySelectorAll('.dp-item.has-effect')].find(c =>
+          c.querySelector('.dp-item-name').textContent === it.item_name
+          && c.querySelector('.dp-item-effect-overlay').textContent === it.effect);
+        if (!card) return null;
+        card.setAttribute('data-t4-rich2', '1');
+        card.scrollIntoView({ block: 'center' });
+        const next = card.parentElement.querySelector('.dp-item:not([data-t4-rich2])');
+        if (!next) return null;
+        next.setAttribute('data-t4-nb2', '1');
+        return next.getBoundingClientRect().toJSON();
+      }, richItem);
+      await page.hover('[data-t4-rich2]');
+      await sleep(400);
+      const nbAfter = await page.evaluate(() => {
+        const n = document.querySelector('[data-t4-nb2]');
+        return n ? n.getBoundingClientRect().toJSON() : null;
+      });
+      await page.hover('.dp-footer');
+      await sleep(300);
+      assert(nbBefore && nbAfter && ['x', 'y', 'width', 'height'].every(k => nbBefore[k] === nbAfter[k]),
+        'WP3-10 hover 覆盖层展开网格零挤压（邻卡位置/尺寸不变）');
     }
 
     // ============ 修正项②：三级折叠 ============

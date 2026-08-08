@@ -209,8 +209,10 @@
   border-radius: 8px;
   padding: 10px 12px;
 }
-.dp-item-name { font-size: 13px; font-weight: 600; color: var(--gold); margin-bottom: 6px; }
-.dp-item-meta { display: flex; flex-wrap: wrap; gap: 4px; }
+/* 任务书 #28 WP3-v2：名称行恒占 18px 单行截断（六结构行等高策略行 1，裁定 G 逐行排列） */
+.dp-item-name { font-size: 13px; font-weight: 600; color: var(--gold); margin-bottom: 6px; height: 18px; line-height: 18px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* meta 行恒占 20px 单行（行 2：部位/类型，溢出隐藏不换行） */
+.dp-item-meta { display: flex; flex-wrap: nowrap; overflow: hidden; gap: 4px; height: 20px; }
 /* 装备/套装 meta 标签同并轨：几何同 .tag（字重 400→600、圆角 4→5、高 18→20），
    语义色与 main.css .tag-grey/.tag-blue/.tag-green 同值 */
 .dp-tag {
@@ -228,8 +230,18 @@
 }
 .dp-tag-primary { background: rgba(88, 166, 255, 0.15); color: var(--info); }
 .dp-tag-secondary { background: rgba(63, 185, 80, 0.15); color: var(--success); }
+/* 任务书 #28 WP3-v2：主/副属性各占一行（裁定 G 逐行排列；行 3/4 恒占 20px，缺省空行占位保等高） */
+.dp-item-stats { display: flex; flex-wrap: nowrap; overflow: hidden; gap: 4px; height: 20px; margin-top: 4px; }
+/* 主属性色板（§4.11 注册，本 WP 落地）：力量红 / 敏捷绿 / 智力蓝 */
+.dp-tag-p1 { color: #ff6b6b; background: rgba(255, 107, 107, .12); }
+.dp-tag-p2 { color: #40c057; background: rgba(64, 192, 87, .12); }
+.dp-tag-p3 { color: #4dabf7; background: rgba(77, 171, 247, .12); }
+/* 金星变体（§4.2 已注册）：副属性唯一最大者——右上角金色五角星 SVG + 金色描边（裁定 H） */
+.dp-tag-star { position: relative; border: 1px solid var(--gold); padding-right: 12px; }
+.dp-tag-star svg { position: absolute; top: -5px; right: -4px; width: 10px; height: 10px; }
+/* 来源行（行 6 恒占 16px 单行截断）：实例 · BOSS（· 可兑换本赛季套装） */
+.dp-item-src { margin-top: 4px; height: 16px; line-height: 16px; font-size: 11px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .dp-item-effect { margin-top: 6px; font-size: 12px; color: #1eff00; }
-.dp-item-note { margin-top: 4px; font-size: 11px; color: var(--text-muted); }
 
 .dp-tiers { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 10px; }
 .dp-tier {
@@ -279,70 +291,46 @@
 .dp-boss.collapsed > .dp-items { display: none; }
 .dp-raid.collapsed > .dp-raid-body { display: none; }
 
-/* 修正项③：卡片统一尺寸 + 特效悬浮展开 + 可展开高亮边框 */
+/* 修正项③：卡片统一尺寸 + 特效悬浮展开 + 可展开高亮边框（WP3-v2：卡片零点击，cursor 恢复默认） */
 .dp-item { position: relative; }
+/* 特效预览（六结构行行 5）：恒占 2 行 line-clamp 截断，无特效空行占位保等高（确认点 B） */
 .dp-item-effect-preview {
   margin-top: 6px;
-  height: 18px; line-height: 18px;
+  height: 34px; line-height: 17px;
   font-size: 12px; color: #1eff00;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  white-space: normal; overflow: hidden;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
 }
-/* 可展开卡片：边框高亮（微光引导） */
+/* 有特效卡片：边框高亮（金色微光引导「可 hover 读全文」，已验收行为延续） */
 .dp-item.has-effect {
   border-color: rgba(240, 192, 96, 0.55);
   box-shadow: 0 0 6px rgba(240, 192, 96, 0.12);
-  cursor: pointer;
 }
-.dp-item.has-effect:hover, .dp-item.has-effect.expanded { z-index: 30; }
+.dp-item.has-effect:hover { z-index: 30; }
 /* 修正项①（任务书 #23-补丁4）：展开即全文替换——展开态隐藏截断预览行（占位保卡片尺寸），
-   覆盖层上移至预览行位置渲染完整全文，杜绝「片段+全文」重复；250ms 过渡维持补丁3 现状 */
-.dp-item.has-effect:hover .dp-item-effect-preview,
-.dp-item.has-effect.expanded .dp-item-effect-preview { opacity: 0; }
+   覆盖层下展渲染完整全文，杜绝「片段+全文」重复；
+   WP3-v2：动画回归 §6 白名单——200ms ease-out 只动 transform/opacity（v1 注册的 F1 例外随之废止），
+   覆盖层实底（var(--bg-card) 实色）遮严被盖邻卡；reduced-motion 瞬时（见文件尾部媒体查询） */
+.dp-item.has-effect:hover .dp-item-effect-preview { opacity: 0; }
 .dp-item-effect-overlay {
-  position: absolute; left: -1px; right: -1px; top: calc(100% - 30px);
-  padding: 0 12px;
-  background: var(--bg-card);
-  border: 1px solid rgba(240, 192, 96, 0.55); border-top: none;
-  border-radius: 0 0 8px 8px;
-  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.55);
-  font-size: 12px; color: #1eff00; line-height: 1.6;
-  max-height: 0; opacity: 0; overflow: hidden;
-  transition: max-height .25s ease, opacity .25s ease, padding .25s ease;
-  z-index: 30; pointer-events: none;
-}
-.dp-item.has-effect:hover .dp-item-effect-overlay,
-.dp-item.has-effect.expanded .dp-item-effect-overlay {
-  max-height: 220px; opacity: 1; padding: 8px 12px 10px;
-}
-
-/* ==================== 任务书 #28 WP3：装备详情覆盖层 ==================== */
-/* UI 规范 §4.4 详情卡变体（2026-08-08 注册，评审闸 §10 过闸）：全卡可点击引导（F2 增补），
-   点击切换详情覆盖层——卡宽下拉面板、z-index 抬升不挤压网格（统一尺寸铁律不变）；
-   动画 §6 白名单：200ms ease-out 只动 transform/opacity，reduced-motion 降级（见文件尾部媒体查询）。 */
-.dp-item { cursor: pointer; }
-.dp-item.dp-detail-open {
-  z-index: 31; /* 高于特效覆盖层 30：详情层展开时压住相邻卡的 hover 特效层 */
-  border-color: rgba(240, 192, 96, 0.55);
-  box-shadow: 0 0 6px rgba(240, 192, 96, 0.12);
-}
-.dp-item-detail {
-  position: absolute; left: -1px; right: -1px; top: calc(100% - 1px);
+  position: absolute; left: -1px; right: -1px; top: calc(100% - 35px);
+  padding: 8px 12px 10px;
   background: var(--bg-card);
   border: 1px solid rgba(240, 192, 96, 0.55); border-top: 1px dashed var(--border-color);
   border-radius: 0 0 8px 8px;
   box-shadow: 0 10px 24px rgba(0, 0, 0, 0.55);
-  padding: 10px 12px 8px;
+  font-size: 12px; color: #1eff00; line-height: 1.6;
   max-height: 260px; overflow-y: auto;
   opacity: 0; transform: translateY(-4px); pointer-events: none;
   transition: opacity .2s ease-out, transform .2s ease-out;
-  z-index: 31;
+  z-index: 30;
 }
-.dp-item.dp-detail-open .dp-item-detail { opacity: 1; transform: translateY(0); pointer-events: auto; }
-.dp-detail-row { display: flex; gap: 8px; font-size: 12px; line-height: 1.7; }
-.dp-detail-label { flex: none; width: 60px; color: var(--text-muted); font-size: 11px; }
-.dp-detail-val { color: var(--text-primary); }
-.dp-detail-val .dp-tag { margin: 0 4px 4px 0; }
-.dp-detail-effect { color: #1eff00; line-height: 1.6; }
+.dp-item.has-effect:hover .dp-item-effect-overlay { opacity: 1; transform: translateY(0); }
+
+/* ==================== 任务书 #28 WP3-v2：全信息装备卡（方向修正版） ====================
+   v1 点击详情覆盖层（.dp-item-detail/.dp-detail-*/.dp-detail-open 族）已整族拆除——
+   运营 2026-08-08 方向修正：卡片零点击交互，完整信息组默认展示在卡片六结构行
+   （规则见上方 .dp-item-stats/.dp-tag-p1~p3/.dp-tag-star/.dp-item-src 与特效预览/覆盖层段）。 */
 .dp-error { text-align: center; padding: 60px 0; }
 .dp-error-icon { font-size: 36px; margin-bottom: 12px; }
 .dp-error-text { color: var(--text-secondary); margin-bottom: 16px; }
@@ -361,7 +349,6 @@
   .dp-item-effect-overlay, .dp-collapse-btn svg { transition: none; }
   .dp-item.dp-enter, .dp-filterbar.filters-open .dp-filter-rows { animation: none; }
   .dp-filter-rows.closing { transition: none; }
-  .dp-item-detail { transition: none; } /* WP3 详情层降级为瞬时切换 */
 }
 
 @media (max-width: 768px) {

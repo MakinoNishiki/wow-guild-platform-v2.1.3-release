@@ -1,9 +1,12 @@
 // 任务书 #23 WP2：数据公示页（免登录公开，REQ-073）
 // 任务书 #28 WP2：筛选条重构（筛选规范 v2.0）——首行搜索+重置、主/副属性多选、来源单选、
 // 杂项数据层排除零渲染、「排除杂项」开关整块删除、卡片入场/筛选器展开收起动画（§7）。
-// 任务书 #28 WP3：装备详情展开——boss_loot/dungeon_loot 读取收口公开 RPC（sql/21，杂项服务端排除），
-// 全卡点击切换详情覆盖层（实例来源/BOSS/掉落难度/套装关联/主副属性数值/特效全文，无数据行不显），
-// 特效卡桌面 hover 快读路径不变（裁定⑤）。
+// 任务书 #28 WP3-v2（方向修正版，运营 2026-08-08 裁定⑤撤回+补充裁定 G/H）：全信息装备卡——
+// 卡片默认展示完整信息组（名称/meta/主属性+数值/副属性+数值/特效/来源 六结构行逐行排列，裁定 G），
+// 主属性色板（§4.11）、副属性数值降序且唯一最大者⭐排第一（裁定 H；同值/缺值保持库内原序不加星）、
+// 特效恒 2 行截断、超 2 行 hover 覆盖层展全文（动画回归 §6 白名单：只动 transform/opacity）、
+// 来源行「实例 · BOSS（· 可兑换本赛季套装）」；卡片零点击交互（v1 点击详情层已整族拆除）。
+// boss_loot/dungeon_loot 读取收口公开 RPC（sql/21，杂项服务端排除），难度行继续不显（tiers 无数据）。
 // 读取通道：anon key 直连 PostgREST（字典表匿名读 sql/16 + 公开 RPC sql/21），不登录、不走 server.js 写代理。
 // 任何加载失败给友好重试界面，不白屏；全部内容只读。
 (function () {
@@ -182,11 +185,6 @@
     buildChips($('dpPrimaryChips'), ['力量', '敏捷', '智力'], state.primaryStats);
     buildChips($('dpSecondaryChips'), ['爆击', '急速', '精通', '全能'], state.secondaryStats);
 
-    // WP3 详情层全局关闭路径（document 级只挂一次；卡片点击切换见 render() 内逐卡绑定）：
-    // 点卡片外任意处收起；Esc 收起（含搜索框 Esc 清空后的第二次按键）
-    document.addEventListener('click', ev => { if (!ev.target.closest('.dp-item')) closeDetail(); });
-    document.addEventListener('keydown', ev => { if (ev.key === 'Escape') closeDetail(); });
-
     render();
   }
 
@@ -258,57 +256,60 @@
     return true;
   }
 
-  // ---- 装备卡片（REQ-054 体系：部位/类型/特效游戏绿/主副属性标签） ----
-  // 修正项③（任务书 #23-补丁3）：全部卡片默认统一尺寸——特效预览恒占一行（无特效为空行）；
-  // 有特效卡边框高亮引导，桌面悬浮平滑展开特效覆盖层（裁定⑤ hover 快读路径不变），不挤压网格。
-  // 修正项①（任务书 #23-补丁4）：展开即全文替换——预览行与覆盖层渲染同一份文本，
-  // 折叠态 CSS 截断（单行省略号）、展开态覆盖层上移覆盖预览行显示完整全文，状态类切换，不做任何拼接。
-  // 任务书 #28 WP3：全卡点击切换详情覆盖层（含特效全文），移动端原 .expanded 点击路径并入详情层。
+  // ---- 装备卡片（任务书 #28 WP3-v2：全信息卡，六结构行逐行排列——裁定 G） ----
+  // 行序：1 名称 / 2 meta（部位·类型）/ 3 主属性+数值 / 4 副属性+数值 / 5 特效（恒 2 行截断）/ 6 来源行。
+  // 六行恒占恒高（缺省=空行占位），兄弟卡天然等高、零 JS 依赖（CSS 保证，统一尺寸铁律由结构保证）。
+  // 主属性：库内原序，§4.11 色板（力量红/敏捷绿/智力蓝）；缺数值只显属性名（裁定 E）。
+  // 副属性（裁定 H）：数值降序，唯一最大者⭐星标排第一；同值并列/缺数值保持库内原序且不加星。
+  // 特效：恒 2 行 line-clamp 截断，超 2 行桌面 hover 覆盖层展全文（补丁4 模式，动画只动 transform/opacity）。
+  // 卡片零点击交互（运营 2026-08-08 方向修正：v1 点击详情层已整族拆除）。
+  // 主属性色板类映射（§4.11；未收录属性名回退 dp-tag-primary 蓝）
+  const PRIMARY_TAG_CLASS = { '力量': 'dp-tag-p1', '敏捷': 'dp-tag-p2', '智力': 'dp-tag-p3' };
+  // 金星变体 SVG（§4.2 已注册：右上角金色五角星，自绘）
+  const STAR_SVG = '<svg viewBox="0 0 10 10" aria-hidden="true"><path d="M5 0l1.4 3.1L10 3.6 7.3 6l.8 3.4L5 7.6 1.9 9.4 2.7 6 0 3.6l3.6-.5z" fill="#ffd700"/></svg>';
   function itemCard(l) {
     const hasEffect = !!l.effect;
+    const pv = l.primary_values || {};
+    const sv = l.secondary_values || {};
+    // 行 3 主属性：库内原序 + 色板；缺数值只显属性名（裁定 E）
+    const primHtml = (l.primary_stats || []).map(s => {
+      const v = pv[s];
+      return `<span class="dp-tag ${PRIMARY_TAG_CLASS[s] || 'dp-tag-primary'}">${esc(s)}${v != null ? ` +${esc(v)}` : ''}</span>`;
+    }).join('');
+    // 行 4 副属性（裁定 H）：数值降序稳定排序（同值/缺值保持库内原序，缺值沉底）；
+    // 唯一最大者加⭐，同值并列第一不加星
+    const secEntries = (l.secondary_stats || []).map(s => {
+      const raw = sv[s];
+      const num = raw != null ? Number(raw) : NaN;
+      return { name: s, value: Number.isNaN(num) ? null : num, raw };
+    });
+    const withVal = secEntries.filter(e => e.value != null);
+    const maxV = withVal.length ? Math.max(...withVal.map(e => e.value)) : null;
+    const starName = (maxV != null && withVal.length >= 2 && withVal.filter(e => e.value === maxV).length === 1)
+      ? withVal.find(e => e.value === maxV).name : '';
+    const secSorted = [...secEntries].sort((a, b) =>
+      (a.value == null) - (b.value == null) || (b.value - a.value));
+    const secHtml = secSorted.map(e => {
+      const star = e.name === starName;
+      return `<span class="dp-tag dp-tag-secondary${star ? ' dp-tag-star' : ''}">${esc(e.name)}${e.value != null ? ` +${esc(e.raw)}` : ''}${star ? STAR_SVG : ''}</span>`;
+    }).join('');
+    // 行 6 来源：实例 · BOSS（空=整体池）· 套装归属并入同行末尾（确认点 C）
+    const srcParts = [l.instance_name, l.boss_name || '整体池'];
+    if (l.slot === '套装兑换物') srcParts.push('可兑换本赛季套装');
     return `<div class="dp-item${hasEffect ? ' has-effect' : ''}">
       <div class="dp-item-name">${esc(l.item_name)}</div>
       <div class="dp-item-meta">
         ${l.slot ? `<span class="dp-tag">${esc(l.slot)}</span>` : ''}
         ${l.item_type ? `<span class="dp-tag">${esc(l.item_type)}</span>` : ''}
-        ${(l.primary_stats || []).map(s => `<span class="dp-tag dp-tag-primary">${esc(s)}</span>`).join('')}
-        ${(l.secondary_stats || []).map(s => `<span class="dp-tag dp-tag-secondary">${esc(s)}</span>`).join('')}
       </div>
+      <div class="dp-item-stats">${primHtml}</div>
+      <div class="dp-item-stats">${secHtml}</div>
       <div class="dp-item-effect-preview">${hasEffect ? esc(l.effect) : ''}</div>
+      <div class="dp-item-src">${esc(srcParts.filter(Boolean).join(' · '))}</div>
       ${hasEffect ? `<div class="dp-item-effect-overlay">${esc(l.effect)}</div>` : ''}
-      ${l.note ? `<div class="dp-item-note">${esc(l.note)}</div>` : ''}
-      ${detailHtml(l)}
     </div>`;
   }
 
-  // ---- 详情覆盖层（任务书 #28 WP3，UI 规范 §4.4 详情卡变体）----
-  // 行序：实例来源 → BOSS → 掉落难度 → 套装关联 → 主属性数值 → 副属性数值 → 特效全文；
-  // 无数据的行整体隐藏（不占行不显「—」）。
-  const INSTANCE_TYPE_LABELS = { raid: '团本', lair: '巢穴', dungeon: '大秘境' };
-  const TIER_LABELS = { lfr: '随机', normal: '普通', heroic: '英雄', mythic: '史诗' }; // 与 sql/20 枚举 key 对齐
-  function detailHtml(l) {
-    const rows = [];
-    const row = (label, valHtml) => rows.push(`<div class="dp-detail-row"><span class="dp-detail-label">${label}</span><span class="dp-detail-val">${valHtml}</span></div>`);
-    if (l.instance_name) row('实例来源', `${esc(l.instance_name)}（${INSTANCE_TYPE_LABELS[l.instance_type] || '团本'}）`);
-    row('BOSS', esc(l.boss_name || '整体池')); // 大秘境整体池条目 boss_id/boss_name 为 null
-    // 掉落难度（裁定①：tiers 无数据整行隐藏；REQ-087 通道复活录入后自动显示，代码无需改动）
-    const tierKeys = [...new Set([...Object.keys(l.primary_tiers || {}), ...Object.keys(l.secondary_tiers || {})])];
-    if (tierKeys.length) row('掉落难度', tierKeys.map(k => esc(TIER_LABELS[k] || k)).join(' / '));
-    // 套装关联（裁定②：有则显示无则不显，不建 item→tier_sets 映射）
-    if (l.slot === '套装兑换物') row('套装关联', '可兑换本赛季套装（详见套装一览）');
-    const pv = l.primary_values && Object.keys(l.primary_values).length ? l.primary_values : null;
-    if (pv) row('主属性', Object.entries(pv).map(([k, v]) => `<span class="dp-tag dp-tag-primary">${esc(k)} +${esc(v)}</span>`).join(''));
-    const sv = l.secondary_values && Object.keys(l.secondary_values).length ? l.secondary_values : null;
-    if (sv) row('副属性', Object.entries(sv).map(([k, v]) => `<span class="dp-tag dp-tag-secondary">${esc(k)} +${esc(v)}</span>`).join(''));
-    if (l.effect) row('特效', `<span class="dp-detail-effect">${esc(l.effect)}</span>`);
-    return `<div class="dp-item-detail">${rows.join('')}</div>`;
-  }
-
-  // 详情层展开状态（全页单开互斥；render() 重渲染后 DOM 重建即全收）
-  let openDetailCard = null;
-  function closeDetail() {
-    if (openDetailCard) { openDetailCard.classList.remove('dp-detail-open'); openDetailCard = null; }
-  }
   const emptyText = t => `<div class="dp-empty">${esc(t)}</div>`;
 
   // ---- 团本掉落池 ----
@@ -481,16 +482,6 @@
     // 折叠（区块/副本/BOSS 三级，事件委托；视图切换按钮与套装三维筛选下拉不触发折叠）
     main.querySelectorAll('[data-collapse]').forEach(el => {
       el.onclick = ev => { if (ev.target.closest('.dp-toggle') || ev.target.closest('.dp-tier-filters')) return; toggleCollapse(el.dataset.collapse); };
-    });
-    // 任务书 #28 WP3：全卡点击切换详情覆盖层（单开互斥；详情层内点击不冒泡收起）；
-    // 特效卡桌面 hover 快读路径不变（裁定⑤），移动端原 .expanded 点击路径并入详情层（含特效全文）
-    main.querySelectorAll('.dp-item').forEach(card => {
-      card.onclick = ev => {
-        if (ev.target.closest('.dp-item-detail')) return;
-        const isOpen = card.classList.contains('dp-detail-open');
-        closeDetail();
-        if (!isOpen) { card.classList.add('dp-detail-open'); openDetailCard = card; }
-      };
     });
     bindTierFilters();
     // 任务书 #28 WP2（筛选规范 v2.0 §7）：筛选动作触发的重渲染给卡片入场 fade（0.2s ease-out，
