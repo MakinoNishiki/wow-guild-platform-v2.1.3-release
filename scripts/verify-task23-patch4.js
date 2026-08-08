@@ -393,8 +393,10 @@ function assert(cond, label, detail) {
       })),
       flat: !!document.querySelector('.dp-flat-head'),
     }));
+    const bossRaid = new Map(bossRows.map(b => [b.id, b.raid_id]));
+    const raidNameById = new Map(raids.map(r => [r.id, r.name]));
     const raidInstExp = {};
-    all.filter(l => l.source === 'raid').forEach(l => { raidInstExp[l.instance_name] = (raidInstExp[l.instance_name] || 0) + 1; });
+    raidLoot.forEach(l => { const nm = raidNameById.get(bossRaid.get(l.boss_id)); raidInstExp[nm] = (raidInstExp[nm] || 0) + 1; });
     const f2Sum = f2.chips.reduce((a, c) => a + c.count, 0);
     assert(f2.chips.length === Object.keys(raidInstExp).length && f2Sum === nRaid && !f2.flat
       && f2.chips.every(c => raidInstExp[c.name] === c.count),
@@ -425,7 +427,7 @@ function assert(cond, label, detail) {
     await clickChip('#dpSecondaryChips', '精通');
     await sleep(500);
     const nCritMast = all.filter(l => (l.secondary_stats || []).includes('爆击') && (l.secondary_stats || []).includes('精通')).length;
-    const nCritMastRaid = all.filter(l => l.source === 'raid' && (l.secondary_stats || []).includes('爆击') && (l.secondary_stats || []).includes('精通')).length;
+    const nCritMastRaid = raidLoot.filter(l => (l.secondary_stats || []).includes('爆击') && (l.secondary_stats || []).includes('精通')).length;
     const f3 = await page.evaluate(() => ({
       flat: !!document.querySelector('.dp-flat-head'),
       head: document.querySelector('.dp-flat-head') ? document.querySelector('.dp-flat-head').textContent.trim() : '',
@@ -435,9 +437,16 @@ function assert(cond, label, detail) {
     assert(f3.flat && f3.head === `命中 ${nCritMast} 件` && f3.cards === nCritMast && f3.poolTitles.length === 0,
       `WP6-F3 平铺态：爆击+精通命中 ${f3.cards} = REST 口径 ${nCritMast}，无池标题无分组`, JSON.stringify(f3));
     assert(f3.cards === nCritMast && nCritMast > 0, 'WP6-F3 平铺命中计数与 REST 逐字一致（备料非零）', `${nCritMast}`);
-    // W5：平铺态 + 来源=团本（raid 仍选中）→ 命中仅团本装备
+    // W5：平铺态 + 来源=团本 → 命中仅团本装备（来源退化为纯过滤，不触发折叠/分组）
+    await clickChip('#dpSourceChips', 'raid');
+    await sleep(500);
     cnt = await cardCount();
-    assert(cnt === nCritMastRaid, `WP6-F3 平铺态来源退化为纯过滤（团本+爆击+精通：页面 ${cnt} = 库内 ${nCritMastRaid}）`);
+    const f3w5 = await page.evaluate(() => ({
+      flat: !!document.querySelector('.dp-flat-head'),
+      poolTitles: [...document.querySelectorAll('.dp-section-title')].filter(t => t.textContent.includes('掉落池')).length,
+    }));
+    assert(cnt === nCritMastRaid && f3w5.flat && f3w5.poolTitles === 0,
+      `WP6-F3 平铺态来源退化为纯过滤（团本+爆击+精通：页面 ${cnt} = 库内 ${nCritMastRaid}，仍平铺无分组）`);
     // W6：0 命中空态 + 重置引导（叠加搜索 zzz）
     await page.fill('#dpSearch', 'zzz');
     await sleep(500);
