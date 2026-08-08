@@ -1,7 +1,10 @@
 // 任务书 #23 WP2：数据公示页（免登录公开，REQ-073）
 // 任务书 #28 WP2：筛选条重构（筛选规范 v2.0）——首行搜索+重置、主/副属性多选、来源单选、
 // 杂项数据层排除零渲染、「排除杂项」开关整块删除、卡片入场/筛选器展开收起动画（§7）。
-// 读取通道：anon key 直连 PostgREST（字典表匿名读，sql/16），不登录、不走 server.js 写代理。
+// 任务书 #28 WP3：装备详情展开——boss_loot/dungeon_loot 读取收口公开 RPC（sql/21，杂项服务端排除），
+// 全卡点击切换详情覆盖层（实例来源/BOSS/掉落难度/套装关联/主副属性数值/特效全文，无数据行不显），
+// 特效卡桌面 hover 快读路径不变（裁定⑤）。
+// 读取通道：anon key 直连 PostgREST（字典表匿名读 sql/16 + 公开 RPC sql/21），不登录、不走 server.js 写代理。
 // 任何加载失败给友好重试界面，不白屏；全部内容只读。
 (function () {
   'use strict';
@@ -38,7 +41,7 @@
     }
     if (key === 'dungeon') {
       const dunIds = new Set(state.dungeons.filter(d => d.season_id === state.seasonId).map(d => d.id));
-      return state.dungeonLoot.some(l => dunIds.has(l.dungeon_id));
+      return state.dungeonLoot.some(l => dunIds.has(l.instance_id)); // WP3：RPC 行以 instance_id 携带 dungeon_id
     }
     return false; // quest/profession：数据模型暂无此来源，恒不渲染
   }
@@ -90,6 +93,17 @@
     return res.json();
   }
 
+  // 任务书 #28 WP3：公开 RPC 通道（sql/21 get_public_loot_detail，anon 直连 PostgREST，不走 server.js 代理）
+  async function restRpc(name) {
+    const res = await fetch(`${state.url}/rest/v1/rpc/${name}`, {
+      method: 'POST',
+      headers: { apikey: state.anon, Authorization: `Bearer ${state.anon}`, 'Content-Type': 'application/json' },
+      body: '{}',
+    });
+    if (!res.ok) throw new Error(`读取失败（HTTP ${res.status}）`);
+    return res.json();
+  }
+
   async function boot() {
     // 配置与登录页同源（/api/supabase-config 本为免登录端点）；失败给重试界面
     let cfg;
@@ -106,22 +120,21 @@
     if (!state.url || !state.anon) { showError('服务配置不完整'); return; }
 
     try {
-      const [seasons, raids, bosses, loot, tierSets, dungeons, dungeonLoot, classes, specs] = await Promise.all([
+      const [seasons, raids, bosses, lootAll, tierSets, dungeons, classes, specs] = await Promise.all([
         restGet('/game_seasons?select=*'),
         restGet('/game_raids?select=*'),
         restGet('/game_bosses?select=*'),
-        restGet('/boss_loot?select=*'),
+        restRpc('get_public_loot_detail'), // WP3：boss_loot/dungeon_loot 两表收口 RPC（合并+实例/BOSS 预联查+杂项服务端排除，裁定③）
         restGet('/tier_sets?select=*'),
         restGet('/game_dungeons?select=*'),
-        restGet('/dungeon_loot?select=*'),
         restGet('/game_classes?select=*'),
         restGet('/game_specs?select=*'),
       ]);
+      // 杂项防线（裁定③：RPC 服务端已排除，前端过滤仅作防线）；_src 取 RPC source 字段（来源单选判定依据）
+      const lootRows = lootAll.filter(l => !isMisc(l));
+      const loot = lootRows.filter(l => l.source === 'raid').map(l => ({ ...l, _src: 'raid' }));
+      const dungeonLoot = lootRows.filter(l => l.source === 'dungeon').map(l => ({ ...l, _src: 'dungeon' }));
       Object.assign(state, { seasons, raids, bosses, loot, tierSets, dungeons, dungeonLoot, classes, specs });
-      // 任务书 #28 WP2：杂项数据层排除（slot=杂项 全表过滤，页面零渲染、筛选零入口）；
-      // _src 行标记 = 来源单选判定依据（boss_loot→raid / dungeon_loot→dungeon）
-      state.loot = state.loot.filter(l => !isMisc(l)).map(l => ({ ...l, _src: 'raid' }));
-      state.dungeonLoot = state.dungeonLoot.filter(l => !isMisc(l)).map(l => ({ ...l, _src: 'dungeon' }));
     } catch (e) {
       showError(e.message || '数据加载失败');
       return;
@@ -168,6 +181,11 @@
     // 筛选规范 v2.0 §2 布局：主/副属性组无「全部」chip（未选中即不过滤））
     buildChips($('dpPrimaryChips'), ['力量', '敏捷', '智力'], state.primaryStats);
     buildChips($('dpSecondaryChips'), ['爆击', '急速', '精通', '全能'], state.secondaryStats);
+
+    // WP3 详情层全局关闭路径（document 级只挂一次；卡片点击切换见 render() 内逐卡绑定）：
+    // 点卡片外任意处收起；Esc 收起（含搜索框 Esc 清空后的第二次按键）
+    document.addEventListener('click', ev => { if (!ev.target.closest('.dp-item')) closeDetail(); });
+    document.addEventListener('keydown', ev => { if (ev.key === 'Escape') closeDetail(); });
 
     render();
   }
@@ -242,9 +260,10 @@
 
   // ---- 装备卡片（REQ-054 体系：部位/类型/特效游戏绿/主副属性标签） ----
   // 修正项③（任务书 #23-补丁3）：全部卡片默认统一尺寸——特效预览恒占一行（无特效为空行）；
-  // 有特效卡边框高亮引导，悬浮（移动端点击 .expanded）平滑展开覆盖层，不挤压网格。
+  // 有特效卡边框高亮引导，桌面悬浮平滑展开特效覆盖层（裁定⑤ hover 快读路径不变），不挤压网格。
   // 修正项①（任务书 #23-补丁4）：展开即全文替换——预览行与覆盖层渲染同一份文本，
   // 折叠态 CSS 截断（单行省略号）、展开态覆盖层上移覆盖预览行显示完整全文，状态类切换，不做任何拼接。
+  // 任务书 #28 WP3：全卡点击切换详情覆盖层（含特效全文），移动端原 .expanded 点击路径并入详情层。
   function itemCard(l) {
     const hasEffect = !!l.effect;
     return `<div class="dp-item${hasEffect ? ' has-effect' : ''}">
@@ -258,7 +277,37 @@
       <div class="dp-item-effect-preview">${hasEffect ? esc(l.effect) : ''}</div>
       ${hasEffect ? `<div class="dp-item-effect-overlay">${esc(l.effect)}</div>` : ''}
       ${l.note ? `<div class="dp-item-note">${esc(l.note)}</div>` : ''}
+      ${detailHtml(l)}
     </div>`;
+  }
+
+  // ---- 详情覆盖层（任务书 #28 WP3，UI 规范 §4.4 详情卡变体）----
+  // 行序：实例来源 → BOSS → 掉落难度 → 套装关联 → 主属性数值 → 副属性数值 → 特效全文；
+  // 无数据的行整体隐藏（不占行不显「—」）。
+  const INSTANCE_TYPE_LABELS = { raid: '团本', lair: '巢穴', dungeon: '大秘境' };
+  const TIER_LABELS = { lfr: '随机', normal: '普通', heroic: '英雄', mythic: '史诗' }; // 与 sql/20 枚举 key 对齐
+  function detailHtml(l) {
+    const rows = [];
+    const row = (label, valHtml) => rows.push(`<div class="dp-detail-row"><span class="dp-detail-label">${label}</span><span class="dp-detail-val">${valHtml}</span></div>`);
+    if (l.instance_name) row('实例来源', `${esc(l.instance_name)}（${INSTANCE_TYPE_LABELS[l.instance_type] || '团本'}）`);
+    row('BOSS', esc(l.boss_name || '整体池')); // 大秘境整体池条目 boss_id/boss_name 为 null
+    // 掉落难度（裁定①：tiers 无数据整行隐藏；REQ-087 通道复活录入后自动显示，代码无需改动）
+    const tierKeys = [...new Set([...Object.keys(l.primary_tiers || {}), ...Object.keys(l.secondary_tiers || {})])];
+    if (tierKeys.length) row('掉落难度', tierKeys.map(k => esc(TIER_LABELS[k] || k)).join(' / '));
+    // 套装关联（裁定②：有则显示无则不显，不建 item→tier_sets 映射）
+    if (l.slot === '套装兑换物') row('套装关联', '可兑换本赛季套装（详见套装一览）');
+    const pv = l.primary_values && Object.keys(l.primary_values).length ? l.primary_values : null;
+    if (pv) row('主属性', Object.entries(pv).map(([k, v]) => `<span class="dp-tag dp-tag-primary">${esc(k)} +${esc(v)}</span>`).join(''));
+    const sv = l.secondary_values && Object.keys(l.secondary_values).length ? l.secondary_values : null;
+    if (sv) row('副属性', Object.entries(sv).map(([k, v]) => `<span class="dp-tag dp-tag-secondary">${esc(k)} +${esc(v)}</span>`).join(''));
+    if (l.effect) row('特效', `<span class="dp-detail-effect">${esc(l.effect)}</span>`);
+    return `<div class="dp-item-detail">${rows.join('')}</div>`;
+  }
+
+  // 详情层展开状态（全页单开互斥；render() 重渲染后 DOM 重建即全收）
+  let openDetailCard = null;
+  function closeDetail() {
+    if (openDetailCard) { openDetailCard.classList.remove('dp-detail-open'); openDetailCard = null; }
   }
   const emptyText = t => `<div class="dp-empty">${esc(t)}</div>`;
 
@@ -303,7 +352,7 @@
     if (!dungeons.length) return emptyText('该赛季大秘境数据维护中');
 
     const body = dungeons.map(d => {
-      const all = state.dungeonLoot.filter(l => l.dungeon_id === d.id && matchItem(l));
+      const all = state.dungeonLoot.filter(l => l.instance_id === d.id && matchItem(l)); // WP3：RPC 行 instance_id = dungeon_id
       if (!all.length) return '';
       const did = 'dungeon:' + d.id;
       const collapsed = getCollapsed().has(did);
@@ -433,9 +482,15 @@
     main.querySelectorAll('[data-collapse]').forEach(el => {
       el.onclick = ev => { if (ev.target.closest('.dp-toggle') || ev.target.closest('.dp-tier-filters')) return; toggleCollapse(el.dataset.collapse); };
     });
-    // 修正项③：移动端/触屏点击特效卡展开收起（桌面悬浮由 CSS :hover 覆盖）
-    main.querySelectorAll('.dp-item.has-effect').forEach(card => {
-      card.onclick = () => card.classList.toggle('expanded');
+    // 任务书 #28 WP3：全卡点击切换详情覆盖层（单开互斥；详情层内点击不冒泡收起）；
+    // 特效卡桌面 hover 快读路径不变（裁定⑤），移动端原 .expanded 点击路径并入详情层（含特效全文）
+    main.querySelectorAll('.dp-item').forEach(card => {
+      card.onclick = ev => {
+        if (ev.target.closest('.dp-item-detail')) return;
+        const isOpen = card.classList.contains('dp-detail-open');
+        closeDetail();
+        if (!isOpen) { card.classList.add('dp-detail-open'); openDetailCard = card; }
+      };
     });
     bindTierFilters();
     // 任务书 #28 WP2（筛选规范 v2.0 §7）：筛选动作触发的重渲染给卡片入场 fade（0.2s ease-out，

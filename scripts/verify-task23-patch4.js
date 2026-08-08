@@ -1,6 +1,8 @@
 // 任务书 #23-补丁4 验证：展开文本衔接（①）+ 三级折叠（②）+ 筛选条规范核验（③）
 // ③ 已按任务书 #28 WP2（筛选规范 v2.0）重构口径改锚：v1.0 部位/类型二维与「排除杂项」已彻底取消，
 // 现覆盖 = 行序/区头层级/chip 规格、来源单选互斥、重置筛选、杂项零渲染、§7 动画、§8 移动端折叠。
+// 适配任务书 #28 WP3（装备详情展开）：①展开逐字比对走 hover 快读路径（点击已改为开详情层，裁定⑤保留 hover）；
+// 新增「①+ WP3 详情覆盖层」断言块（RPC 通道/点击展开行序/单开互斥/收起路径/难度行不显/套装关联/动画/网格零挤压）。
 // 公示页为免登录只读页（live 数据），本脚本不创建任何测试数据，收尾复核 T23X 遗留为零。
 // 用法: node scripts/verify-task23-patch4.js（PW_CHANNEL=chrome 可选）截图输出 backup/2026-08-07-task23-patch4/
 const fs = require('fs');
@@ -100,6 +102,9 @@ function assert(cond, label, detail) {
     page.on('pageerror', e => pageErrors.push('pageerror: ' + e.message));
     page.on('console', msg => { if (msg.type() === 'error') pageErrors.push('console: ' + msg.text()); });
     page.on('response', r => { if (r.status() === 404) notFounds.push(r.url()); });
+    // WP3：采集公开 RPC 通道调用（装备详情数据源 get_public_loot_detail，anon 直连 PostgREST）
+    const rpcCalls = [];
+    page.on('response', r => { if (r.url().includes('/rest/v1/rpc/get_public_loot_detail')) rpcCalls.push(`${r.request().method()} ${r.status()}`); });
     await page.goto(`${BASE}/data.html`, { waitUntil: 'networkidle' });
     await page.waitForSelector('.dp-item', { timeout: 20000 });
     await sleep(800);
@@ -277,57 +282,246 @@ function assert(cond, label, detail) {
     cnt = await cardCount();
     assert(cnt === all.length, `清空还原全集（页面 ${cnt} = 库内 ${all.length}）`);
 
-    // ============ 修正项①：展开即全文替换 ============
-    console.log('—— ① 展开文本逐字比对（3 张长特效卡） ——');
+    // ============ 修正项①：展开即全文替换（WP3：点击已改为开详情层，特效覆盖层仅剩桌面 :hover 一条触发路径，裁定⑤） ============
+    console.log('—— ① 展开文本逐字比对（3 张长特效卡，hover 触发） ——');
     for (let i = 0; i < picked.length; i++) {
       const item = picked[i];
-      const r = await page.evaluate(async (it) => {
-        // 同名装备可能有跨 BOSS 多行（特效不同），必须按「名字 + 覆盖层全文」双重定位到对应行
+      // 同名装备可能有跨 BOSS 多行（特效不同），必须按「名字 + 覆盖层全文」双重定位到对应行；
+      // 定位后打标记属性，出来用 page.hover 模拟悬浮（参照 patch3 的 data-t3-eff 做法）
+      const pre = await page.evaluate((it) => {
         const card = [...document.querySelectorAll('.dp-item.has-effect')].find(c =>
           c.querySelector('.dp-item-name').textContent === it.item_name
           && c.querySelector('.dp-item-effect-overlay').textContent === it.effect);
         if (!card) return { found: false };
+        card.setAttribute('data-t4-hover', '1');
         card.scrollIntoView({ block: 'center' });
         const preview = card.querySelector('.dp-item-effect-preview');
         const overlay = card.querySelector('.dp-item-effect-overlay');
-        const before = {
+        return { found: true, before: {
           previewText: preview.textContent,
           clamped: preview.scrollWidth > preview.clientWidth + 1,
           overlayHidden: getComputedStyle(overlay).opacity === '0',
-        };
-        card.click(); // .expanded
-        await new Promise(r => setTimeout(r, 500));
-        const after = {
-          previewOpacity: getComputedStyle(preview).opacity,
-          overlayOpacity: getComputedStyle(overlay).opacity,
-          overlayText: overlay.textContent,
-        };
-        card.click(); // 还原，避免影响下一张
-        return { found: true, before, after };
+        } };
       }, item);
-      const ok = r.found
-        && r.before.previewText === item.effect          // 折叠态 DOM 内为完整同一文本（CSS 截断）
-        && r.before.clamped                               // 折叠态确实被截断（省略号）
-        && r.before.overlayHidden                         // 折叠态覆盖层不渲染
-        && r.after.previewOpacity === '0'                 // 展开态预览行隐藏（替换而非拼接）
-        && r.after.overlayOpacity === '1'
-        && r.after.overlayText === item.effect            // 展开态覆盖层 = 数据源全文，逐字一致
-        && r.after.overlayText.indexOf(item.effect.slice(0, 20)) === r.after.overlayText.lastIndexOf(item.effect.slice(0, 20)); // 无重复片段
-      assert(ok, `①卡${i + 1}「${item.item_name}」展开逐字=数据源全文、无重复子串（折叠截断+展开替换）`,
-        r.found ? `预览opacity=${r.after.previewOpacity} 覆盖层字数=${r.after.overlayText.length}/${item.effect.length}` : '卡片未找到');
+      let after = null;
+      if (pre.found) {
+        await page.hover('[data-t4-hover]');
+        await sleep(450); // 覆盖层 250ms 过渡 + 余量
+        after = await page.evaluate(() => {
+          const card = document.querySelector('[data-t4-hover]');
+          const preview = card.querySelector('.dp-item-effect-preview');
+          const overlay = card.querySelector('.dp-item-effect-overlay');
+          const out = {
+            previewOpacity: getComputedStyle(preview).opacity,
+            overlayOpacity: getComputedStyle(overlay).opacity,
+            overlayText: overlay.textContent,
+          };
+          card.removeAttribute('data-t4-hover'); // 避免下一张定位到旧卡
+          return out;
+        });
+        await page.hover('.dp-footer'); // 鼠标移开（页脚），避免悬浮态污染下一张
+        await sleep(200);
+      }
+      const ok = pre.found && after
+        && pre.before.previewText === item.effect          // 折叠态 DOM 内为完整同一文本（CSS 截断）
+        && pre.before.clamped                               // 折叠态确实被截断（省略号）
+        && pre.before.overlayHidden                         // 折叠态覆盖层不渲染
+        && after.previewOpacity === '0'                     // 展开态预览行隐藏（替换而非拼接）
+        && after.overlayOpacity === '1'
+        && after.overlayText === item.effect                // 展开态覆盖层 = 数据源全文，逐字一致
+        && after.overlayText.indexOf(item.effect.slice(0, 20)) === after.overlayText.lastIndexOf(item.effect.slice(0, 20)); // 无重复片段
+      assert(ok, `①卡${i + 1}「${item.item_name}」悬浮展开逐字=数据源全文、无重复子串（折叠截断+展开替换）`,
+        pre.found && after ? `预览opacity=${after.previewOpacity} 覆盖层字数=${after.overlayText.length}/${item.effect.length}` : '卡片未找到');
     }
-    // ① 截图：两卡 折叠态 vs 展开态
+    // ① 截图：特效卡 折叠态 vs 悬浮展开态
     await page.evaluate(() => {
-      const cards = [...document.querySelectorAll('.dp-item.has-effect')];
-      cards[0].scrollIntoView({ block: 'center' });
+      const card = [...document.querySelectorAll('.dp-item.has-effect')][0];
+      card.setAttribute('data-t4-shot', '1');
+      card.scrollIntoView({ block: 'center' });
     });
     await sleep(300);
     await page.screenshot({ path: path.join(SHOT_DIR, '1366-expand-before.png') });
-    await page.evaluate(() => { [...document.querySelectorAll('.dp-item.has-effect')][0].click(); });
+    await page.hover('[data-t4-shot]');
     await sleep(500);
     await page.screenshot({ path: path.join(SHOT_DIR, '1366-expand-after.png') });
-    await page.evaluate(() => { [...document.querySelectorAll('.dp-item.has-effect')][0].click(); });
+    await page.hover('.dp-footer');
     await sleep(300);
+
+    // ============ ①+ 任务书 #28 WP3：装备详情覆盖层 ============
+    console.log('—— ①+ WP3 详情覆盖层 ——');
+    // WP3-1 RPC 通道：页面加载经公开 RPC（anon 直连 PostgREST，不走 server.js；监听器在 page.goto 前已挂）
+    assert(rpcCalls.some(c => c === 'POST 200'),
+      'WP3-1 RPC 通道：POST /rest/v1/rpc/get_public_loot_detail 返回 200', rpcCalls.join(' | ') || '未捕获到调用');
+    // 备料（REST 动态取，不硬编码）：有数值（主或副）的特效卡、无特效无数值卡、套装兑换物卡
+    // （库内实况：无同时具备主+副数值的特效卡，特效卡数值仅单侧——标签断言按实有侧逐字比对）
+    const richItem = all.find(l => l.effect && ((l.primary_values && Object.keys(l.primary_values).length)
+      || (l.secondary_values && Object.keys(l.secondary_values).length)));
+    // 纯空卡（无特效/数值/难度、非兑换物）：S1 视图内不存在（S1 唯一全空卡是套装兑换物「鸣响虚空珍玩」，多一行套装关联），
+    // 放宽到跨赛季全集找（库内实况：S2「烈毒之渊」有 2 张），命中非当前赛季卡时 WP3-7 切赛季断言后切回；
+    // 注意 raidLootRaw/dunLootRaw 已按当前赛季过滤，跨赛季全集须重新直读两表
+    const allFull = [...await rest('/boss_loot?select=*&limit=2000'), ...await rest('/dungeon_loot?select=*&limit=2000')]
+      .filter(l => l.slot !== '杂项');
+    const plainItem = allFull.find(l => !l.effect && l.slot !== '套装兑换物'
+      && (!l.primary_values || !Object.keys(l.primary_values).length)
+      && (!l.secondary_values || !Object.keys(l.secondary_values).length)
+      && !Object.keys(l.primary_tiers || {}).length && !Object.keys(l.secondary_tiers || {}).length);
+    const tierItem = all.find(l => l.slot === '套装兑换物' && String(l.item_name).includes('珍玩'));
+    assert(richItem && plainItem && tierItem, 'WP3 备料：库内找到 有数值（主或副）特效卡 / 无特效无数值卡 / 套装兑换物卡 各一',
+      `rich=${!!richItem} plain=${!!plainItem} tier=${!!tierItem}`);
+    if (richItem && plainItem && tierItem) {
+      richItem.effect = richItem.effect.replace(/\r\n?/g, '\n'); // 同 ① 的 \r 规范化（innerHTML 解析吞 \r）
+      // §4 行序：实例来源 → BOSS → 掉落难度 → 套装关联 → 主属性 → 副属性 → 特效；无数据行整体隐藏
+      const expLabels = l => {
+        const seq = ['实例来源', 'BOSS'];
+        if (Object.keys(l.primary_tiers || {}).length || Object.keys(l.secondary_tiers || {}).length) seq.push('掉落难度');
+        if (l.slot === '套装兑换物') seq.push('套装关联');
+        if (l.primary_values && Object.keys(l.primary_values).length) seq.push('主属性');
+        if (l.secondary_values && Object.keys(l.secondary_values).length) seq.push('副属性');
+        if (l.effect) seq.push('特效');
+        return seq;
+      };
+      const readDetail = mark => page.evaluate((m) => {
+        const card = document.querySelector(`[${m}]`);
+        if (!card) return null;
+        const rows = [...card.querySelectorAll('.dp-detail-row')];
+        const rowOf = t => rows.find(r => r.querySelector('.dp-detail-label').textContent.trim() === t);
+        return {
+          open: card.classList.contains('dp-detail-open'),
+          openCount: document.querySelectorAll('.dp-item.dp-detail-open').length,
+          labels: rows.map(r => r.querySelector('.dp-detail-label').textContent.trim()),
+          effectText: (card.querySelector('.dp-detail-effect') || {}).textContent || null,
+          primTags: rowOf('主属性') ? [...rowOf('主属性').querySelectorAll('.dp-tag')].map(t => t.textContent.trim()) : [],
+          secTags: rowOf('副属性') ? [...rowOf('副属性').querySelectorAll('.dp-tag')].map(t => t.textContent.trim()) : [],
+          tierText: rowOf('套装关联') ? rowOf('套装关联').textContent : null,
+        };
+      }, mark);
+      // WP3-2 点击展开：单开 + 行序合规 + 特效逐字 + 数值 tag 一致；同时记录邻卡位置供 WP3-9
+      const nbBefore = await page.evaluate((it) => {
+        const card = [...document.querySelectorAll('.dp-item.has-effect')].find(c =>
+          c.querySelector('.dp-item-name').textContent === it.item_name
+          && c.querySelector('.dp-item-effect-overlay').textContent === it.effect);
+        if (!card) return null;
+        card.setAttribute('data-t4-rich', '1');
+        card.scrollIntoView({ block: 'center' });
+        const next = card.parentElement.querySelector('.dp-item:not([data-t4-rich])');
+        if (next) next.setAttribute('data-t4-nb', '1');
+        return next ? next.getBoundingClientRect().toJSON() : null;
+      }, richItem);
+      await page.click('[data-t4-rich]');
+      await sleep(300);
+      const d1 = await readDetail('data-t4-rich');
+      const expTags = o => Object.entries(o).map(([k, v]) => `${k} +${v}`).sort();
+      // 数值 tag 按实有侧逐字比对（库内特效卡数值仅单侧：主或副）；行序断言已覆盖「无数据行不显」
+      const hasVals = o => o && Object.keys(o).length;
+      const tagsMatch = d =>
+        (!hasVals(richItem.primary_values) || JSON.stringify([...d.primTags].sort()) === JSON.stringify(expTags(richItem.primary_values)))
+        && (!hasVals(richItem.secondary_values) || JSON.stringify([...d.secTags].sort()) === JSON.stringify(expTags(richItem.secondary_values)));
+      assert(d1 && d1.open && d1.openCount === 1
+        && JSON.stringify(d1.labels) === JSON.stringify(expLabels(richItem))
+        && d1.effectText === richItem.effect
+        && tagsMatch(d1),
+        `WP3-2 点击展开「${richItem.item_name}」：单开 + 行序合规 + 特效逐字 + 数值tag一致`,
+        d1 ? `labels=${JSON.stringify(d1.labels)}` : '卡片未找到');
+      // WP3-9 网格零挤压：详情层展开前后邻卡 rect 不变
+      const nbAfter = await page.evaluate(() => {
+        const n = document.querySelector('[data-t4-nb]');
+        return n ? n.getBoundingClientRect().toJSON() : null;
+      });
+      assert(nbBefore && nbAfter && ['x', 'y', 'width', 'height'].every(k => nbBefore[k] === nbAfter[k]),
+        'WP3-9 网格零挤压：详情层展开前后邻卡位置/尺寸不变');
+      // WP3-3 单开互斥：点另一张卡 → 前一张收起、仅新卡开
+      await page.evaluate(() => {
+        const other = [...document.querySelectorAll('.dp-item')]
+          .find(c => !c.hasAttribute('data-t4-rich') && !c.hasAttribute('data-t4-nb'));
+        other.setAttribute('data-t4-other', '1');
+      });
+      await page.click('[data-t4-other]');
+      await sleep(300);
+      const d2 = await readDetail('data-t4-other');
+      const richClosed = await page.evaluate(() => !document.querySelector('[data-t4-rich]').classList.contains('dp-detail-open'));
+      assert(d2 && d2.open && d2.openCount === 1 && richClosed,
+        'WP3-3 单开互斥：点开另一张卡，前一张自动收起、全页仅 1 张开');
+      // WP3-4 收起路径：Esc 收起；再点开后点卡片外（页脚）收起
+      await page.keyboard.press('Escape');
+      await sleep(200);
+      const openAfterEsc = await page.evaluate(() => document.querySelectorAll('.dp-item.dp-detail-open').length);
+      await page.click('[data-t4-other]');
+      await sleep(200);
+      await page.click('.dp-footer');
+      await sleep(200);
+      const openAfterFooter = await page.evaluate(() => document.querySelectorAll('.dp-item.dp-detail-open').length);
+      assert(openAfterEsc === 0 && openAfterFooter === 0,
+        'WP3-4 收起路径：Esc 收起 + 点卡片外（页脚）收起', `esc后=${openAfterEsc} 页脚后=${openAfterFooter}`);
+      // WP3-5 掉落难度行恒不显示（tiers 全 null，裁定①）
+      const diffRows = await page.evaluate(() =>
+        [...document.querySelectorAll('.dp-detail-label')].filter(e => e.textContent.trim() === '掉落难度').length);
+      assert(diffRows === 0, 'WP3-5 掉落难度行恒不显示（全卡无此标签）', `实测 ${diffRows} 处`);
+      // WP3-6 套装关联行：搜索「珍玩」→ 唯一卡点开
+      await page.fill('#dpSearch', '珍玩');
+      await sleep(400);
+      const tierHit = await page.evaluate((name) => {
+        const cards = [...document.querySelectorAll('.dp-item')];
+        if (cards.length !== 1) return { count: cards.length, okName: false };
+        const okName = cards[0].querySelector('.dp-item-name').textContent === name;
+        cards[0].setAttribute('data-t4-tier', '1');
+        return { count: 1, okName };
+      }, tierItem.item_name);
+      assert(tierHit.count === 1 && tierHit.okName,
+        `WP3-6 搜索「珍玩」命中唯一卡 = ${tierItem.item_name}`, JSON.stringify(tierHit));
+      if (tierHit.count === 1 && tierHit.okName) {
+        await page.click('[data-t4-tier]');
+        await sleep(300);
+        const d3 = await readDetail('data-t4-tier');
+        assert(d3 && JSON.stringify(d3.labels) === JSON.stringify(expLabels(tierItem))
+          && d3.labels.includes('套装关联') && d3.tierText && d3.tierText.includes('套装一览')
+          && !d3.labels.includes('主属性') && !d3.labels.includes('副属性'),
+          'WP3-6 套装关联行：「套装一览」提示在、主/副属性行不显（库内 values 为 null）',
+          d3 ? JSON.stringify(d3.labels) : '卡片未找到');
+      }
+      await page.fill('#dpSearch', '');
+      await sleep(400);
+      assert(await cardCount() === all.length, 'WP3-6 清空搜索还原全集');
+      // WP3-7 无特效无值卡：详情仅 实例来源+BOSS 两行（卡属非当前赛季时先切赛季、断言后切回）
+      let plainSeasonId = null;
+      {
+        const raidsAll = await rest('/game_raids?select=id,season_id');
+        const dunsAll = await rest('/game_dungeons?select=id,season_id');
+        if (plainItem.dungeon_id) { // dungeon_loot 行
+          const d = dunsAll.find(x => x.id === plainItem.dungeon_id);
+          plainSeasonId = d ? d.season_id : null;
+        } else { // boss_loot 行：boss → 团本/大秘境 → 赛季
+          const b = bossRows.find(x => x.id === plainItem.boss_id) || {};
+          const r = b.raid_id ? raidsAll.find(x => x.id === b.raid_id) : null;
+          const d = b.dungeon_id ? dunsAll.find(x => x.id === b.dungeon_id) : null;
+          plainSeasonId = r ? r.season_id : d ? d.season_id : null;
+        }
+      }
+      const switched = plainSeasonId && plainSeasonId !== cur.id;
+      if (switched) { await page.selectOption('#dpSeasonSelect', plainSeasonId); await sleep(800); }
+      const plainOk = await page.evaluate((name) => {
+        return [...document.querySelectorAll('.dp-item')].some(c => {
+          if (c.querySelector('.dp-item-name').textContent !== name) return false;
+          const ls = [...c.querySelectorAll('.dp-detail-label')].map(e => e.textContent.trim());
+          return ls.length === 2 && ls[0] === '实例来源' && ls[1] === 'BOSS';
+        });
+      }, plainItem.item_name);
+      if (switched) { await page.selectOption('#dpSeasonSelect', cur.id); await sleep(800); }
+      assert(plainOk, `WP3-7 无特效无值卡「${plainItem.item_name}」详情仅 实例来源+BOSS 两行${switched ? '（非当前赛季视图，已切回）' : ''}`);
+      // WP3-8 详情层动画规格：200ms ease-out 只动 opacity/transform；reduced-motion 瞬时（测完恢复）
+      const animSpec = await page.evaluate(() => {
+        const cs = getComputedStyle(document.querySelector('.dp-item-detail'));
+        return { dur: cs.transitionDuration, prop: cs.transitionProperty, tf: cs.transitionTimingFunction };
+      });
+      const durs = animSpec.dur.split(',').map(s => s.trim());
+      const props = animSpec.prop.split(',').map(s => s.trim()).sort().join(',');
+      assert(durs.length >= 2 && durs.every(d => d === '0.2s') && props === 'opacity,transform',
+        'WP3-8 详情层动画 200ms、仅 opacity/transform', JSON.stringify(animSpec));
+      await page.emulateMedia({ reducedMotion: 'reduce' });
+      const animRm = await page.evaluate(() => getComputedStyle(document.querySelector('.dp-item-detail')).transitionDuration);
+      await page.emulateMedia({ reducedMotion: 'no-preference' });
+      assert(animRm.split(',').map(s => s.trim()).every(d => d === '0s'),
+        'WP3-8 reduced-motion 详情层瞬时切换（transitionDuration=0s）', animRm);
+    }
 
     // ============ 修正项②：三级折叠 ============
     console.log('—— ② 三级折叠 + 热区 + 记忆 ——');
@@ -462,19 +656,29 @@ function assert(cond, label, detail) {
       '③§6 1920×1080 桌面档：toggle 隐藏、顶行+三组各一行（组内无折行）', JSON.stringify(rows1920));
     await page2.evaluate(() => window.scrollTo(0, 0));
     await page2.screenshot({ path: path.join(SHOT_DIR, '1920-filterbar.png') });
-    // 1920 展开逐字比对一例 + 截图
-    const r1920 = await page2.evaluate(async (name) => {
-      const card = [...document.querySelectorAll('.dp-item.has-effect')].find(c => c.querySelector('.dp-item-name').textContent === name);
-      if (!card) return null;
+    // 1920 悬浮展开逐字比对一例 + 截图（WP3：hover 为唯一触发路径；按 名字+覆盖层全文 双重定位）
+    const pre1920 = await page2.evaluate((it) => {
+      const card = [...document.querySelectorAll('.dp-item.has-effect')].find(c =>
+        c.querySelector('.dp-item-name').textContent === it.item_name
+        && c.querySelector('.dp-item-effect-overlay').textContent === it.effect);
+      if (!card) return false;
+      card.setAttribute('data-t4-1920', '1');
       card.scrollIntoView({ block: 'center' });
-      card.click();
-      await new Promise(r => setTimeout(r, 500));
-      const preview = card.querySelector('.dp-item-effect-preview');
-      const overlay = card.querySelector('.dp-item-effect-overlay');
-      return { po: getComputedStyle(preview).opacity, oo: getComputedStyle(overlay).opacity, text: overlay.textContent };
-    }, picked[0].item_name);
+      return true;
+    }, picked[0]);
+    let r1920 = null;
+    if (pre1920) {
+      await page2.hover('[data-t4-1920]');
+      await sleep(450);
+      r1920 = await page2.evaluate(() => {
+        const card = document.querySelector('[data-t4-1920]');
+        const preview = card.querySelector('.dp-item-effect-preview');
+        const overlay = card.querySelector('.dp-item-effect-overlay');
+        return { po: getComputedStyle(preview).opacity, oo: getComputedStyle(overlay).opacity, text: overlay.textContent };
+      });
+    }
     assert(r1920 && r1920.po === '0' && r1920.oo === '1' && r1920.text === picked[0].effect,
-      '①[1920] 展开逐字=数据源全文、预览行替换隐藏');
+      '①[1920] 悬浮展开逐字=数据源全文、预览行替换隐藏');
     await page2.screenshot({ path: path.join(SHOT_DIR, '1920-expand-after.png') });
     await ctx2.close();
 

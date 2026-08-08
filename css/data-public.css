@@ -314,6 +314,35 @@
 .dp-item.has-effect.expanded .dp-item-effect-overlay {
   max-height: 220px; opacity: 1; padding: 8px 12px 10px;
 }
+
+/* ==================== 任务书 #28 WP3：装备详情覆盖层 ==================== */
+/* UI 规范 §4.4 详情卡变体（2026-08-08 注册，评审闸 §10 过闸）：全卡可点击引导（F2 增补），
+   点击切换详情覆盖层——卡宽下拉面板、z-index 抬升不挤压网格（统一尺寸铁律不变）；
+   动画 §6 白名单：200ms ease-out 只动 transform/opacity，reduced-motion 降级（见文件尾部媒体查询）。 */
+.dp-item { cursor: pointer; }
+.dp-item.dp-detail-open {
+  z-index: 31; /* 高于特效覆盖层 30：详情层展开时压住相邻卡的 hover 特效层 */
+  border-color: rgba(240, 192, 96, 0.55);
+  box-shadow: 0 0 6px rgba(240, 192, 96, 0.12);
+}
+.dp-item-detail {
+  position: absolute; left: -1px; right: -1px; top: calc(100% - 1px);
+  background: var(--bg-card);
+  border: 1px solid rgba(240, 192, 96, 0.55); border-top: 1px dashed var(--border-color);
+  border-radius: 0 0 8px 8px;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.55);
+  padding: 10px 12px 8px;
+  max-height: 260px; overflow-y: auto;
+  opacity: 0; transform: translateY(-4px); pointer-events: none;
+  transition: opacity .2s ease-out, transform .2s ease-out;
+  z-index: 31;
+}
+.dp-item.dp-detail-open .dp-item-detail { opacity: 1; transform: translateY(0); pointer-events: auto; }
+.dp-detail-row { display: flex; gap: 8px; font-size: 12px; line-height: 1.7; }
+.dp-detail-label { flex: none; width: 60px; color: var(--text-muted); font-size: 11px; }
+.dp-detail-val { color: var(--text-primary); }
+.dp-detail-val .dp-tag { margin: 0 4px 4px 0; }
+.dp-detail-effect { color: #1eff00; line-height: 1.6; }
 .dp-error { text-align: center; padding: 60px 0; }
 .dp-error-icon { font-size: 36px; margin-bottom: 12px; }
 .dp-error-text { color: var(--text-secondary); margin-bottom: 16px; }
@@ -332,6 +361,7 @@
   .dp-item-effect-overlay, .dp-collapse-btn svg { transition: none; }
   .dp-item.dp-enter, .dp-filterbar.filters-open .dp-filter-rows { animation: none; }
   .dp-filter-rows.closing { transition: none; }
+  .dp-item-detail { transition: none; } /* WP3 详情层降级为瞬时切换 */
 }
 
 @media (max-width: 768px) {
