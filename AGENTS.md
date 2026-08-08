@@ -2,31 +2,44 @@
 
 ## 开工铁律（持久生效，适用于所有后续任务）
 
-任何任务（任务书/补丁/BUG 修复）开工前，**必须先完整阅读 `docs/开发规范.md` 与 `docs/问题与需求清单.md` 最新版**——无需运营在任务指令中重复此要求。
+任何任务（任务书/补丁/BUG 修复）开工前，**必须先完整阅读 `docs/开发规范.md` 与 `docs/问题与需求清单.md` 最新版**；**界面类任务（新增/改版/打磨界面）追加阅读 `docs/UI工作方法-证据规范实现验收.md`**——无需运营在任务指令中重复此要求。
 
 核心红线摘要（防止不翻文件）：
 
 1. **验证纪律**：修改报告声称"真浏览器实测"必须写明具体页面/按钮/交互；主链路（CRUD/保存）未实测视为交付未完成。
+
 2. **git 纪律**：运营验收通过前一律不提交 git。
+
 3. **编号纪律**：新需求/BUG 必须登记台账（REQ/BUG/FIXED 编号），changelog 按「新增功能/功能优化/修复BUG/模块调整」四维补录。
+
 4. **UI 审计前置**：UI 类任务书（新增/改版/打磨界面）开工前，先用 `.agents/skills/` 下的 `improve-ui`（或 `web-design-guidelines`）审计目标页面，产出问题清单并附进任务书/修改报告；开发中打磨参考 `better-ui`/`better-typography`/`better-colors`（涉框架/Tailwind 的章节跳过，本项目纯 CSS 零构建），验收前可用 `baseline-ui`/`fixing-accessibility`/`fixing-motion-performance` 收尾；审计发现与项目已文档化取舍冲突时（桌面优先/移动端封存、禁动画库等，见 docs/魔兽管家UI设计规范v2.md §8/§9），直接引用取舍条款标注「已知取舍」，不计入问题清单；skill 建议与 DESIGN.md/开发规范冲突时以项目规范为准。
 
 ## 项目概览
+
 魔兽管家（WoW Butler）——面向 WoW 公会的团本考勤管理平台，暗色史诗奇幻风格（WoW 主题），基于 Supabase 云端协作。Supabase 是唯一主数据源（本地模式与飞书同步已移除）。
 
 ## 品牌与资源（任务书 #13）
-- 品牌名：魔兽管家 WoW Butler（侧边栏/登录页/页签/更新日志统一）
-- `assets/brand/`：logo_B_主标.png、logo_B_256.png、logo_B_64.png、favicon-32/16.png
-- `assets/icons/`：16 枚本地自绘 SVG（13 职业 + 3 职责，单色职业色，文件名用 classMap/roleTypeMap 英文 key），应用位置：成员列表、考勤名单、智能导入预览（图标+文字，不替换文字）；不使用暴雪官方素材/外链
+
+* 品牌名：魔兽管家 WoW Butler（侧边栏/登录页/页签/更新日志统一）
+
+* `assets/brand/`：logo_B_主标.png、logo_B_256.png、logo_B_64.png、favicon-32/16.png
+
+* `assets/icons/`：16 枚本地自绘 SVG（13 职业 + 3 职责，单色职业色，文件名用 classMap/roleTypeMap 英文 key），应用位置：成员列表、考勤名单、智能导入预览（图标+文字，不替换文字）；不使用暴雪官方素材/外链
 
 ## 技术栈
-- HTML5 + CSS3 + Vanilla JavaScript (ES6+)
-- Node.js 静态服务器（server.js，含 Supabase 配置 API）
-- Supabase（云端数据库 + 用户认证 + RLS 权限）
-- Supabase JS SDK（CDN 引入）
-- localStorage 仅作数据缓存
+
+* HTML5 + CSS3 + Vanilla JavaScript (ES6+)
+
+* Node.js 静态服务器（server.js，含 Supabase 配置 API）
+
+* Supabase（云端数据库 + 用户认证 + RLS 权限）
+
+* Supabase JS SDK（CDN 引入）
+
+* localStorage 仅作数据缓存
 
 ## 目录结构
+
 ```
 ├── index.html          # 入口页面（含认证界面、公会管理、主应用 DOM）
 ├── css/
@@ -50,84 +63,150 @@
 ```
 
 ## 功能模块
+
 1. **用户认证** - 邮箱注册/登录、会话管理（未登录仅见注册/登录页）
+
 2. **公会系统** - 创建公会、邀请码加入、公会切换
+
 3. **权限管理** - 三级权限（owner/editor/viewer）、成员角色变更、公会设置、公会资料（REQ-025：简介/分配制度/规则说明，仅 owner 可编辑）
+
 4. **仪表盘**（page:dashboard） - 出勤率统计、排行、活动概览
+
 5. **成员管理**（page:members） - 13个职业、专精/职责联动、职责列（按专精推导）、出勤详情、智能导入（REQ-023：双宏教程、多格式解析+时间戳清洗、名字/名字-服务器双形态查重、预览确认，专精占位"待补充"；REQ-032：「从 WCL 链接导入」标签页，复用同一预览确认链路，subType→中文职业映射、server 参与同服查重）、软删除与恢复（REQ-042：单个/批量删除 = status 置「离队」不真删行，历史考勤/心愿/装备记录全保留；列表默认隐藏离队成员，「显示已离队」开关灰显；REQ-002 查重只针对活跃成员，撞离队同名弹确认恢复优先于新建——DB 有 (guild_id,name) 唯一索引无法新建同名；装备分配/考勤详情中离队成员灰色「已离队」标记；任务书 #18：行操作拆分「离队/彻底删除」——真删除带三表历史计数护栏（考勤/心愿/装备任一 >0 只拦截不强删）；raid_members.user_id = 认领人（一用户同公会可认领多角色，先到先得，owner/editor 可指定；编辑不再覆盖认领人；用户中心「我的认领」跨公会展示+解绑；心愿单/装备列表「认领人」标签由 guilds.show_claimer_label 公会开关控制，sql/14 迁移；任务书 #21 WP1：认领需二次确认弹窗（四要点说明）、未认领行「待认领」明示标签、账号显示名唯一真源 = user_metadata.display_name；任务书 #21 WP2：认领治理三档开关 guilds.claim_mode（free 默认/approval 审核制走 claim_requests 申请+审核区块/assign 仅管理者分配，仅 owner 可改，sql/15 迁移））
+
 6. **考勤记录**（page:attendance） - 默认列表视图/日历视图（按 userId+guildId 记忆，BUG-023）、活动CRUD、BOSS选择、WCL 日志链接（REQ-014）、WCL 同步考勤（REQ-033：已挂 WCL 链接的活动可一键同步，预览三分区——全勤绿/部分参战黄默认出席/未匹配红，不覆盖手动标记，幂等，成功后写 activities.wcl_snapshot 快照）、筛选条（REQ-018：成员/状态多选/时间范围/含已取消开关+出勤率小计，本赛季=最近90天）、考勤详情勾选批量标记（REQ-017-A）、活动列表勾选批量删除（REQ-017-B）、WCL 已导入提示条（REQ-037：快照存在且非全员已标记时显示，N 取快照 imported 字段）、活动状态（REQ-020：正常/已取消，已取消灰显+徽标、考勤区禁编辑、其考勤不计入任何出勤率，可恢复；status 服务端白名单 normal/cancelled）、团队标签与冲突检测（REQ-028：同标签同日时段交叉只警告不禁止，冲突活动列表黄色高亮；REQ-064 起旧 team_tag 字段并入 team_label 并删列，冲突分组键同步切为团号）、团号徽章（REQ-062：team_label 可空，纯数字显示「N 团」、文字显示「团号：X」、空不显示）、团本下拉（REQ-029：datalist 可手输，最近 3 个按公会置顶，清单为 js 常量待 REQ-003 主数据切换）
+
 7. **装备分配**（page:loot） - 103件装备库、多维筛选、心愿独立列、Roll 点循环输入（1-100）、分配记录、从装备库选择自动带出赛季（REQ-063：按 boss_loot→game_bosses→game_raids→赛季链路回填，缺数据留空不报错）
+
 8. **心愿单**（page:wishlist） - 按成员管理、竞争概览
+
 9. **统计报表**（page:reports） - 出勤率图表、角色分布
+
 10. **数据管理**（page:data） - 设置、JSON导入导出、重置
+
 11. **更新日志**（page:changelog） - 版本历史
 
 ## 云端架构
+
 ### 数据库表（Supabase PostgreSQL）
-- `guilds` - 公会（name, owner_id, invite_code, description, loot_rule_type, loot_rule_text, show_claimer_label, claim_mode）
-- `guild_members` - 公会成员权限（user_id, guild_id, role: owner/editor/viewer）
-- `raid_members` - WoW 角色成员（guild_id, name, class, spec, role）
-- `activities` - 考勤活动（guild_id, name, activity_date, raid, boss, wcl_url, wcl_report_code, wcl_snapshot, status, team_label）
-- `activity_attendance` - 出勤记录（activity_id, member_id, status）
-- `loots` - 装备分配（guild_id, item_name, member_id, boss, raid）
-- `wishlists` - 心愿单（guild_id, member_id, items JSONB）
-- `claim_requests` - 认领申请（任务书 #21 WP2，approval 模式；guild_id, member_id, user_id, status: pending/approved/rejected，同一 member 仅一条 pending 部分唯一索引）
+
+* `guilds` - 公会（name, owner_id, invite_code, description, loot_rule_type, loot_rule_text, show_claimer_label, claim_mode）
+
+* `guild_members` - 公会成员权限（user_id, guild_id, role: owner/editor/viewer）
+
+* `raid_members` - WoW 角色成员（guild_id, name, class, spec, role）
+
+* `activities` - 考勤活动（guild_id, name, activity_date, raid, boss, wcl_url, wcl_report_code, wcl_snapshot, status, team_label）
+
+* `activity_attendance` - 出勤记录（activity_id, member_id, status）
+
+* `loots` - 装备分配（guild_id, item_name, member_id, boss, raid）
+
+* `wishlists` - 心愿单（guild_id, member_id, items JSONB）
+
+* `claim_requests` - 认领申请（任务书 #21 WP2，approval 模式；guild_id, member_id, user_id, status: pending/approved/rejected，同一 member 仅一条 pending 部分唯一索引）
 
 ### RLS 权限策略
-- 公会成员（任何角色）：可读取所属公会数据
-- owner/editor：可增删改公会数据
-- owner：可管理公会成员权限
-- 认证用户：可创建公会
+
+* 公会成员（任何角色）：可读取所属公会数据
+
+* owner/editor：可增删改公会数据
+
+* owner：可管理公会成员权限
+
+* 认证用户：可创建公会
 
 ### 数据同步机制
-- Supabase 是唯一主数据源；云端数据加载到内存（appData），同时缓存到 localStorage（仅缓存）
-- **读操作**：直接通过 Supabase REST API（anon key + JWT），RLS SELECT 策略正常工作
-- **写操作**：统一走 `cloudCrud()` 入口（Save DB → Load DB → Update State → Render），底层经 server.js 代理（`/api/db/rest/v1/*`）
-  - 代理先验证用户 JWT（调用 `/auth/v1/user`），再做公会级鉴权（owner/editor 可写业务表，viewer 只读；个人表限本人），最后用 service_role key 写入
-  - 性能缓存（任务书 #10）：JWT 按 token 缓存 60s、公会角色按 user+guild 缓存 120s；guild_members/guilds 写成功即清空角色缓存（即时生效）；行归属联查不缓存
-  - 代理鉴权逻辑集中在 server.js `authorizeProxyRequest()`；回归脚本 `scripts/verify-authz.js`
-  - viewer 窄例外（纯插入式扩展）：raid_members PATCH 体 ⊆ {user_id} 的自助认领/解绑（任务书 #19，认领放行前读 guilds.claim_mode——free 原样/approval 与 assign 拒绝，解绑不限）；claim_requests INSERT 限单行+字段⊆{guild_id,member_id,user_id}+本人+成员未认领+公会 approval，DELETE 限本人 pending 撤回（任务书 #21 WP2）；claim_requests 的 PATCH/DELETE 审批走通用业务分支（owner/editor）
-  - RPC 代理仅放行白名单函数（当前仅 `get_unread_notification_count`）
-- 批量导入/清空属规范 1.2.2 批处理例外：循环 saveCloudData 后统一 reload 一次
-- 读操作优先从云端加载，失败时回退到 localStorage 缓存
+
+* Supabase 是唯一主数据源；云端数据加载到内存（appData），同时缓存到 localStorage（仅缓存）
+
+* **读操作**：直接通过 Supabase REST API（anon key + JWT），RLS SELECT 策略正常工作
+
+* **写操作**：统一走 `cloudCrud()` 入口（Save DB → Load DB → Update State → Render），底层经 server.js 代理（`/api/db/rest/v1/*`）
+
+  * 代理先验证用户 JWT（调用 `/auth/v1/user`），再做公会级鉴权（owner/editor 可写业务表，viewer 只读；个人表限本人），最后用 service_role key 写入
+
+  * 性能缓存（任务书 #10）：JWT 按 token 缓存 60s、公会角色按 user+guild 缓存 120s；guild_members/guilds 写成功即清空角色缓存（即时生效）；行归属联查不缓存
+
+  * 代理鉴权逻辑集中在 server.js `authorizeProxyRequest()`；回归脚本 `scripts/verify-authz.js`
+
+  * viewer 窄例外（纯插入式扩展）：raid_members PATCH 体 ⊆ {user_id} 的自助认领/解绑（任务书 #19，认领放行前读 guilds.claim_mode——free 原样/approval 与 assign 拒绝，解绑不限）；claim_requests INSERT 限单行+字段⊆{guild_id,member_id,user_id}+本人+成员未认领+公会 approval，DELETE 限本人 pending 撤回（任务书 #21 WP2）；claim_requests 的 PATCH/DELETE 审批走通用业务分支（owner/editor）
+
+  * RPC 代理仅放行白名单函数（当前仅 `get_unread_notification_count`）
+
+* 批量导入/清空属规范 1.2.2 批处理例外：循环 saveCloudData 后统一 reload 一次
+
+* 读操作优先从云端加载，失败时回退到 localStorage 缓存
 
 ### WCL 集成（任务书 #11，REQ-032/033）
-- 凭证：`WCL_CLIENT_ID` / `WCL_CLIENT_SECRET` 仅存服务端环境变量（.env），前端 js/ 禁止出现
-- 端点（server.js，JWT + 公会角色鉴权，owner/editor 可用，viewer 403）：
-  - `POST /api/wcl/report-summary` `{ reportCode, guildId }` → 标题/时间/Boss 战场次/玩家列表（name/server/subType/参战场次），reportCode 支持完整 URL 或纯 code
-  - `POST /api/wcl/attendance-snapshot` `{ reportCode, activityId, guildId }` → 同上 + 已存快照状态
-- token 管理：进程内缓存 access_token，提前 60s 刷新；**报告数据本身不缓存**（用户可能刚传完 log 就要同步）
-- 速率限制：WCL V2 GraphQL 免费档 3600 points/小时，单次同步远低于额度；错误中文透传（429 超限 / 504 超时 10s / 502 报告不存在或私有或服务暂不可用）
-- 回归脚本：`scripts/verify-wcl-api.js`（API 连通性）、`scripts/verify-wcl-endpoints.js`（端点端到端冒烟，需传入 WCL 凭证环境变量）
+
+* 凭证：`WCL_CLIENT_ID` / `WCL_CLIENT_SECRET` 仅存服务端环境变量（.env），前端 js/ 禁止出现
+
+* 端点（server.js，JWT + 公会角色鉴权，owner/editor 可用，viewer 403）：
+
+  * `POST /api/wcl/report-summary` `{ reportCode, guildId }` → 标题/时间/Boss 战场次/玩家列表（name/server/subType/参战场次），reportCode 支持完整 URL 或纯 code
+
+  * `POST /api/wcl/attendance-snapshot` `{ reportCode, activityId, guildId }` → 同上 + 已存快照状态
+
+* token 管理：进程内缓存 access_token，提前 60s 刷新；**报告数据本身不缓存**（用户可能刚传完 log 就要同步）
+
+* 速率限制：WCL V2 GraphQL 免费档 3600 points/小时，单次同步远低于额度；错误中文透传（429 超限 / 504 超时 10s / 502 报告不存在或私有或服务暂不可用）
+
+* 回归脚本：`scripts/verify-wcl-api.js`（API 连通性）、`scripts/verify-wcl-endpoints.js`（端点端到端冒烟，需传入 WCL 凭证环境变量）
 
 ### 主数据层（任务书 #14，V2.2）
-- 9 张游戏字典表（sql/10）：game_patches / game_seasons（is_current 部分唯一索引=赛季口径权威源）/ game_raids（type 仅 raid|lair，巢穴 15-25）/ game_bosses / boss_loot / tier_sets / game_dungeons / game_classes / game_specs
-- 权限（运营拍板）：全产品共用一套字典，全登录用户可读（RLS select authenticated），仅产品超管可写（`app_metadata.role='superadmin'`；server.js 代理主数据分支校验，RLS 为直连最后防线）；超管设置 = 运营在 Supabase Dashboard 给本人账号写 app_metadata
-- 加载层 `js/masterData.js`（window.MasterData）：登录后并行拉 9 表 + 5s 超时 + `js/masterDataSnapshot.js` 内置快照兜底（失败 toast 不白屏）；访问函数 getRaids/getBosses/getClasses/getSpecs/getCurrentSeason/getDungeons/getLoot/getTierSets；写助手 mdInsert/mdUpdate/mdDelete/mdUpsert
-- 维护页「数据中心」（侧边栏 tab，仅超管可见 + switchPage 守卫）：9 区块 CRUD + 字典导入器（数据源=内置快照 masterDataSnapshot.js，幂等 upsert，BUG-046 起不再依赖外部文件）+ 掉落批量录入
-- 消费方统一走 app.js 访问层：getGameRaidNames/getGameBossNames/getGameSpecs/getGameRaidType/getGameCurrentSeasonStart（MasterData 优先，常量回退）；REQ-018 本赛季口径读 game_seasons.is_current
-- 回归脚本：`scripts/verify-master-data.js`（8 项，sql/10 未执行时结构类自动跳过）
+
+* 9 张游戏字典表（sql/10）：game_patches / game_seasons（is_current 部分唯一索引=赛季口径权威源）/ game_raids（type 仅 raid|lair，巢穴 15-25）/ game_bosses / boss_loot / tier_sets / game_dungeons / game_classes / game_specs
+
+* 权限（运营拍板）：全产品共用一套字典，全登录用户可读（RLS select authenticated），仅产品超管可写（`app_metadata.role='superadmin'`；server.js 代理主数据分支校验，RLS 为直连最后防线）；超管设置 = 运营在 Supabase Dashboard 给本人账号写 app_metadata
+
+* 加载层 `js/masterData.js`（window.MasterData）：登录后并行拉 9 表 + 5s 超时 + `js/masterDataSnapshot.js` 内置快照兜底（失败 toast 不白屏）；访问函数 getRaids/getBosses/getClasses/getSpecs/getCurrentSeason/getDungeons/getLoot/getTierSets；写助手 mdInsert/mdUpdate/mdDelete/mdUpsert
+
+* 维护页「数据中心」（侧边栏 tab，仅超管可见 + switchPage 守卫）：9 区块 CRUD + 字典导入器（数据源=内置快照 masterDataSnapshot.js，幂等 upsert，BUG-046 起不再依赖外部文件）+ 掉落批量录入
+
+* 消费方统一走 app.js 访问层：getGameRaidNames/getGameBossNames/getGameSpecs/getGameRaidType/getGameCurrentSeasonStart（MasterData 优先，常量回退）；REQ-018 本赛季口径读 game_seasons.is_current
+
+* 回归脚本：`scripts/verify-master-data.js`（8 项，sql/10 未执行时结构类自动跳过）
 
 ## 关键数据
-- 4个团本（12.0）：虚影尖塔、梦境裂隙、进军奎尔丹纳斯、孢陨幽境
-- 103件史诗装备，按槽位和BOSS掉落分配
-- 13个职业（含武僧、恶魔猎手、唤魔师），每职业2-4个专精
-- 3个职责：坦克、治疗、输出
+
+* 4个团本（12.0）：虚影尖塔、梦境裂隙、进军奎尔丹纳斯、孢陨幽境
+
+* 103件史诗装备，按槽位和BOSS掉落分配
+
+* 13个职业（含武僧、恶魔猎手、唤魔师），每职业2-4个专精
+
+* 3个职责：坦克、治疗、输出
 
 ## 开发命令
-- 本地预览：`node server.js`
-- 自动分配端口：通过 `DEPLOY_RUN_PORT` 环境变量
+
+* 本地预览：`node server.js`
+
+* 自动分配端口：通过 `DEPLOY_RUN_PORT` 环境变量
 
 ## 注意事项
-- 版本号单一常量：`APP_VERSION`（js/app.js 顶部），发布时只改这一处，侧边栏自动显示
-- 数据只存 Supabase；localStorage 仅缓存，JSON 导入导出仅作备份/迁移
-- 出勤率全站唯一算法源 `getAttendanceStats()`（app.js）：出勤率 = 出勤 ÷ 应到；出勤 = 出席+迟到+替补；应到 = 该成员已标记记录数；请假计入应到不计入出勤；**已取消（status='cancelled'）活动的考勤不计入应到与出勤（REQ-020，函数内统一过滤，禁止别处另写）**
-- viewer 前端权限门：`updatePermissionUI()` 给 body 加 `viewer-mode` 类隐藏/禁用编辑入口（`.edit-only` 等），服务端代理鉴权为最终防线
-- 装备分配 ↔ 心愿单联动由 `syncWishlistLinkages()` 处理（标记/取消已获取、REQ-007 自动创建心愿记录）
-- 删除活动依赖 DB 外键级联删考勤（ON DELETE CASCADE），不要再加显式考勤删除调用
-- 职业色遵循 WoW 官方配色
-- 响应式断点：768px（移动端底部Tab导航）
-- 代码为IIFE模式，所有函数全局暴露，通过 `switchPage()` 路由
-- server.js 启动时解析项目根目录 .env（手写解析，零依赖），提供 `/api/supabase-config` 返回 Supabase URL 和 Anon Key
-- server.js 提供 `/api/db/rest/v1/*` 代理写入接口（JWT 验证 + 公会级鉴权后，用 service_role key 写入）
-- cloud.js 中写入操作通过 `dbInsert/dbUpdate/dbDelete` 代理函数，读取操作直接使用 Supabase SDK
+
+* 版本号单一常量：`APP_VERSION`（js/app.js 顶部），发布时只改这一处，侧边栏自动显示
+
+* 数据只存 Supabase；localStorage 仅缓存，JSON 导入导出仅作备份/迁移
+
+* 出勤率全站唯一算法源 `getAttendanceStats()`（app.js）：出勤率 = 出勤 ÷ 应到；出勤 = 出席+迟到+替补；应到 = 该成员已标记记录数；请假计入应到不计入出勤；**已取消（status='cancelled'）活动的考勤不计入应到与出勤（REQ-020，函数内统一过滤，禁止别处另写）**
+
+* viewer 前端权限门：`updatePermissionUI()` 给 body 加 `viewer-mode` 类隐藏/禁用编辑入口（`.edit-only` 等），服务端代理鉴权为最终防线
+
+* 装备分配 ↔ 心愿单联动由 `syncWishlistLinkages()` 处理（标记/取消已获取、REQ-007 自动创建心愿记录）
+
+* 删除活动依赖 DB 外键级联删考勤（ON DELETE CASCADE），不要再加显式考勤删除调用
+
+* 职业色遵循 WoW 官方配色
+
+* 响应式断点：768px（移动端底部Tab导航）
+
+* 代码为IIFE模式，所有函数全局暴露，通过 `switchPage()` 路由
+
+* server.js 启动时解析项目根目录 .env（手写解析，零依赖），提供 `/api/supabase-config` 返回 Supabase URL 和 Anon Key
+
+* server.js 提供 `/api/db/rest/v1/*` 代理写入接口（JWT 验证 + 公会级鉴权后，用 service_role key 写入）
+
+* cloud.js 中写入操作通过 `dbInsert/dbUpdate/dbDelete` 代理函数，读取操作直接使用 Supabase SDK
+
