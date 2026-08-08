@@ -26,6 +26,13 @@
 // 抖动），特效文本恒一次性完整排版，折叠态 = 容器 2 行高 overflow 纯视口裁剪（… 观感由 ::after 伪元素+渐变遮罩
 // 承担），断言改 视口裁剪（wrap scrollHeight>clientHeight）+ 生长全程文本 top 偏移恒 0（折叠/动画中段/展开/收回
 // 四态）；P4-补 置灰点击反馈——置灰 chip 点击触发抖动 200ms + 筛选条下浮出原因提示（2s 渐隐），守卫/title/aria 不变。
+// 适配 WP6 补丁三轮（P1-再补/P4-再补①② + BUG-066，2026-08-09）：P1-再补 覆盖式生长（B2 修复）——溢出卡 inner 常驻
+// absolute（旧实现鼠标移出瞬间 inner 回文档流而 wrap 收缩动画在进行，200ms 内撑高整行），JS 先在内联流态量折叠态高
+// 写入外层 minHeight 再加 has-effect；z-index 抬升改挂外层 .dp-item；新增全页邻卡 rect 展开/收回连帧零位移断言。
+// P4-再补① 置灰提示改 fixed toast（#dpChipToast，视口底部居中、pointer-events:none；旧 absolute 贴筛选条遮挡
+// 命中计数已废）。P4-再补② 命中计数并入吸顶条末行（#dpFlatHead 常驻 DOM、浏览态 hidden，flat 判定改 hidden 口径）+
+// 吸顶条整体容器断言 + 多档滚动完整可见断言。BUG-066 省略号遮罩压字修复——wrap padding-right 18px 全态恒定
+// 占位带、渐变遮罩废除、::after 收窄带内零压字（Range 末行字形右缘 ≤ 带左缘断言）。
 // 公示页为免登录只读页（live 数据），本脚本不创建任何测试数据，收尾复核 T23X 遗留为零。
 // 用法: node scripts/verify-task23-patch4.js（PW_CHANNEL=chrome 可选）截图输出 backup/2026-08-07-task23-patch4/
 const fs = require('fs');
@@ -161,8 +168,8 @@ function assert(cond, label, detail) {
         searchPh: document.getElementById('dpSearch').placeholder,
       };
     });
-    assert(JSON.stringify(layout.barKids) === JSON.stringify(['dpFilterToggle', 'dpFilterRows']),
-      '§2 筛选条结构：折叠按钮在前、dpFilterRows 在后', layout.barKids.join('>'));
+    assert(JSON.stringify(layout.barKids) === JSON.stringify(['dpFilterToggle', 'dpFilterRows', 'dpFlatHead']),
+      '§2 筛选条结构：折叠按钮在前、dpFilterRows 居中、dpFlatHead 末行（P4-再补② 命中计数并入吸顶条，浏览态 hidden）', layout.barKids.join('>'));
     assert(JSON.stringify(layout.rowKids) === JSON.stringify(['top', '分类', '主属性', '副属性', '来源']),
       '§2 行序：顶行（搜索+重置）→ 分类组（WP6 起第一组）→ 主属性组 → 副属性组 → 来源组', layout.rowKids.join('>'));
     assert(JSON.stringify(layout.topKids) === JSON.stringify(['search', 'dpResetFilters']) && layout.searchInWrap
@@ -354,7 +361,7 @@ function assert(cond, label, detail) {
     const nHeadNeck = all.filter(l => l.slot === '头部' || l.slot === '颈部').length;
     cnt = await cardCount();
     const f1Or = await page.evaluate(() => ({
-      flat: !!document.querySelector('.dp-flat-head'),
+      flat: !document.getElementById('dpFlatHead').hidden,
       head: document.querySelector('.dp-flat-head') ? document.querySelector('.dp-flat-head').textContent.trim() : '',
     }));
     assert(cnt === nHeadNeck && f1Or.flat && f1Or.head === `命中 ${nHeadNeck} 件`,
@@ -364,7 +371,7 @@ function assert(cond, label, detail) {
     await sleep(500);
     const f1Weapon = await page.evaluate(() => ({
       chips: [...document.querySelectorAll('#dpCatChips .dp-chip')].map(c => c.dataset.v),
-      flat: !!document.querySelector('.dp-flat-head'),
+      flat: !document.getElementById('dpFlatHead').hidden,
       cards: document.querySelectorAll('.dp-item').length,
     }));
     assert(JSON.stringify(f1Weapon.chips) === JSON.stringify(['单手', '双手', '远程', '副手'])
@@ -410,7 +417,7 @@ function assert(cond, label, detail) {
       chips: [...document.querySelectorAll('#dpInstanceChips .dp-chip-inst')].map(c => ({
         name: c.childNodes[0].textContent.trim(), count: Number(c.querySelector('.dp-count').textContent),
       })),
-      flat: !!document.querySelector('.dp-flat-head'),
+      flat: !document.getElementById('dpFlatHead').hidden,
     }));
     const bossRaid = new Map(bossRows.map(b => [b.id, b.raid_id]));
     const raidNameById = new Map(raids.map(r => [r.id, r.name]));
@@ -448,7 +455,7 @@ function assert(cond, label, detail) {
     const nCritMast = all.filter(l => (l.secondary_stats || []).includes('爆击') && (l.secondary_stats || []).includes('精通')).length;
     const nCritMastRaid = raidLoot.filter(l => (l.secondary_stats || []).includes('爆击') && (l.secondary_stats || []).includes('精通')).length;
     const f3 = await page.evaluate(() => ({
-      flat: !!document.querySelector('.dp-flat-head'),
+      flat: !document.getElementById('dpFlatHead').hidden,
       head: document.querySelector('.dp-flat-head') ? document.querySelector('.dp-flat-head').textContent.trim() : '',
       cards: document.querySelectorAll('.dp-item').length,
       poolTitles: [...document.querySelectorAll('.dp-section-title')].map(t => t.textContent.trim()).filter(t => t.includes('掉落池')),
@@ -461,7 +468,7 @@ function assert(cond, label, detail) {
     await sleep(500);
     cnt = await cardCount();
     const f3w5 = await page.evaluate(() => ({
-      flat: !!document.querySelector('.dp-flat-head'),
+      flat: !document.getElementById('dpFlatHead').hidden,
       poolTitles: [...document.querySelectorAll('.dp-section-title')].filter(t => t.textContent.includes('掉落池')).length,
     }));
     assert(cnt === nCritMastRaid && f3w5.flat && f3w5.poolTitles === 0,
@@ -481,7 +488,7 @@ function assert(cond, label, detail) {
     await sleep(600);
     const f3Reset = await page.evaluate(() => ({
       cards: document.querySelectorAll('.dp-item').length,
-      flat: !!document.querySelector('.dp-flat-head'),
+      flat: !document.getElementById('dpFlatHead').hidden,
       bothPools: [...document.querySelectorAll('.dp-section-title')].filter(t => t.textContent.includes('掉落池')).length,
     }));
     assert(f3Reset.cards === all.length && !f3Reset.flat && f3Reset.bothPools === 2,
@@ -515,18 +522,25 @@ function assert(cond, label, detail) {
     assert(!p4.strDisabled && !p4.agiDisabled, 'WP6-P4 已选 chip（力量/敏捷）恒不置灰');
     const p4Before = await cardCount();
     await page.click('#dpCatChips .dp-chip[data-v="颈部"]', { force: true });
-    // P4-补（二轮）：点击置灰 chip 的即时反馈——chip 抖动类（200ms）+ 筛选条下浮出原因提示（含标签名与「无命中」）
-    const p4Fb = await page.evaluate(() => ({
-      shaking: !!document.querySelector('#dpCatChips .dp-chip[data-v="颈部"].dp-chip-shake'),
-      hintEl: !!document.getElementById('dpChipHint'),
-      hintShown: (document.getElementById('dpChipHint') || { classList: { contains: () => false } }).classList.contains('show'),
-      hintText: (document.getElementById('dpChipHint') || {}).textContent || '',
-      cursorNA: getComputedStyle(document.querySelector('#dpCatChips .dp-chip[data-v="颈部"]')).cursor === 'not-allowed',
-      titleKept: document.querySelector('#dpCatChips .dp-chip[data-v="颈部"]').title.includes('无命中'),
-    }));
-    assert(p4Fb.shaking && p4Fb.hintEl && p4Fb.hintShown && p4Fb.hintText.includes('「颈部」') && p4Fb.hintText.includes('无命中')
-      && p4Fb.cursorNA && p4Fb.titleKept,
-      'WP6-P4-补 置灰点击反馈：cursor:not-allowed + chip 抖动 200ms + 筛选条下浮出原因提示（「颈部」…无命中…）+ title 保留', JSON.stringify(p4Fb));
+    // P4-补（二轮）→ P4-再补①（三轮）：点击置灰 chip 的即时反馈——chip 抖动类（200ms）+ fixed 定位 toast
+    // 原因提示（复用主应用通知形态、pointer-events:none 不挡交互、不贴筛选条遮挡命中计数）
+    const p4Fb = await page.evaluate(() => {
+      const t = document.getElementById('dpChipToast');
+      const tcs = t ? getComputedStyle(t) : null;
+      return {
+        shaking: !!document.querySelector('#dpCatChips .dp-chip[data-v="颈部"].dp-chip-shake'),
+        toastEl: !!t,
+        toastShown: t ? t.classList.contains('show') : false,
+        toastText: t ? t.textContent : '',
+        toastFixed: tcs ? tcs.position === 'fixed' : false,
+        toastNoBlock: tcs ? tcs.pointerEvents === 'none' : false,
+        cursorNA: getComputedStyle(document.querySelector('#dpCatChips .dp-chip[data-v="颈部"]')).cursor === 'not-allowed',
+        titleKept: document.querySelector('#dpCatChips .dp-chip[data-v="颈部"]').title.includes('无命中'),
+      };
+    });
+    assert(p4Fb.shaking && p4Fb.toastEl && p4Fb.toastShown && p4Fb.toastText.includes('「颈部」') && p4Fb.toastText.includes('无命中')
+      && p4Fb.toastFixed && p4Fb.toastNoBlock && p4Fb.cursorNA && p4Fb.titleKept,
+      'WP6-P4-补/再补① 置灰点击反馈：cursor:not-allowed + chip 抖动 200ms + fixed toast 原因提示（「颈部」…无命中…、不挡交互）+ title 保留', JSON.stringify(p4Fb));
     await sleep(300);
     const p4Click = await page.evaluate(() => ({
       active: !!document.querySelector('#dpCatChips .dp-chip[data-v="颈部"].active'),
@@ -536,7 +550,7 @@ function assert(cond, label, detail) {
       'WP6-P4 置灰 chip 点击无效（不选中、结果集不变、不自动清除已选）', JSON.stringify(p4Click));
     await sleep(2100); // 提示 2s 渐隐（含已等待的 300ms）
     const p4FbGone = await page.evaluate(() => {
-      const h = document.getElementById('dpChipHint');
+      const h = document.getElementById('dpChipToast');
       return h ? !h.classList.contains('show') : true;
     });
     assert(p4FbGone, 'WP6-P4-补 原因提示 2s 后渐隐');
@@ -545,7 +559,7 @@ function assert(cond, label, detail) {
     const p4Reset = await page.evaluate(() => ({
       disabledLeft: document.querySelectorAll('.dp-chip.dp-chip-disabled').length,
       cards: document.querySelectorAll('.dp-item').length,
-      flat: !!document.querySelector('.dp-flat-head'),
+      flat: !document.getElementById('dpFlatHead').hidden,
     }));
     assert(p4Reset.disabledLeft === 0 && p4Reset.cards === all.length && !p4Reset.flat,
       'WP6-P4 重置筛选：置灰全清、回浏览态全集', JSON.stringify(p4Reset));
@@ -578,9 +592,25 @@ function assert(cond, label, detail) {
           textTop0: Math.abs(preview.getBoundingClientRect().top - wrap.getBoundingClientRect().top) <= 1, // P1-补：文本 top 偏移恒 0
           minH: card.style.minHeight,
           cardH: card.getBoundingClientRect().height,
-          innerPos: getComputedStyle(inner).position,
+          innerPos: getComputedStyle(inner).position,                  // P1-再补：溢出卡 inner 常驻 absolute（覆盖式生长）
           noOverlay: !card.querySelector('.dp-item-effect-overlay'),   // 浮层形态废止
           wrapTrans: `${wcs.transitionProperty}|${wcs.transitionDuration}|${wcs.transitionTimingFunction}`,
+          // BUG-066：省略号占位带——padding-right 全态恒定 18px、渐变遮罩废除、… 在带内零压字
+          padR: wcs.paddingRight,
+          afterGrad: getComputedStyle(wrap, '::after').backgroundImage,
+          glyphClear: (() => { // 末行最右字形右缘 ≤ 占位带左缘（省略号不压任何字形；
+            // 容差 1px：CJK 标点挤压可致字形盒亚像素越线（实测 ≤0.7px），… 字形在带内居中、墨线起点距带左缘 ≥2px，视觉零压字）
+            if (!card.classList.contains('has-effect')) return true;
+            const range = document.createRange();
+            range.selectNodeContents(preview);
+            const wrapR = wrap.getBoundingClientRect();
+            const lineH = parseFloat(getComputedStyle(preview).lineHeight);
+            const lastLine = [...range.getClientRects()].filter(r => r.bottom > wrapR.top + lineH + 1);
+            if (!lastLine.length) return true;
+            const maxRight = Math.max(...lastLine.map(r => r.right));
+            const bandLeft = wrapR.right - 1 - parseFloat(wcs.paddingRight); // 右边框 1px + 占位带
+            return maxRight <= bandLeft + 1;
+          })(),
         } };
       }, item);
       let after = null, back = null, mid = null;
@@ -605,7 +635,8 @@ function assert(cond, label, detail) {
           const cs = getComputedStyle(inner);
           const cardR = card.getBoundingClientRect(), innerR = inner.getBoundingClientRect(), srcR = src.getBoundingClientRect();
           return {
-            pos: cs.position, z: cs.zIndex,
+            pos: cs.position, z: getComputedStyle(card).zIndex, // P1-再补：z-index 抬升在外层 .dp-item（inner 常驻 absolute 无自带 z）
+            padRHover: getComputedStyle(wrap).paddingRight,          // BUG-066：hover 态占位带恒定（宽度不变零重排）
             grown: innerR.height > parseFloat(card.style.minHeight) + 10,               // 整卡向下生长
             cardStable: Math.abs(cardR.height - parseFloat(card.style.minHeight)) < 1.5, // 外层占位不塌、网格不动
             srcFollows: Math.abs(srcR.bottom - (innerR.bottom - parseFloat(cs.paddingBottom))) < 1.5, // 来源行跟随新底部
@@ -635,17 +666,19 @@ function assert(cond, label, detail) {
         ? (after && back && mid
           && pre.before.previewFull && pre.before.cropped && pre.before.textTop0 // 折叠态：预览恒全文 + 视口裁剪 + 文本零位移
           && pre.before.noOverlay                                      // 浮层废止：零 overlay DOM
-          && pre.before.innerPos === 'static'
+          && pre.before.innerPos === 'absolute'                        // P1-再补：inner 常驻 absolute（覆盖式生长，全程不入流）
           && pre.before.minH && Math.abs(parseFloat(pre.before.minH) - pre.before.cardH) < 1.5 // 折叠态占位高 = 卡高
           && /max-height/.test(pre.before.wrapTrans) && /0\.2s/.test(pre.before.wrapTrans) && /ease-out/.test(pre.before.wrapTrans) // §6 例外已注册
+          && pre.before.padR === '18px' && pre.before.afterGrad === 'none' && pre.before.glyphClear // BUG-066：占位带恒定+渐变废除+零压字
           && mid.textTop0 && mid.sameText                              // P1-补：动画中段文本 top 偏移 0、文本零变化
           && after.pos === 'absolute' && after.z === '30'
+          && after.padRHover === '18px'                                // BUG-066：hover 态占位带不变（零重排）
           && after.grown && after.cardStable                           // 整卡生长 + 网格不塌
           && after.srcFollows && after.srcInside                       // 来源行跟随新底部全程可见
           && after.textFull && after.textTop0 && after.displayBlock && after.noClampCss // 全文展开、无 clamp、零位移
-          && back.pos === 'static' && back.cropped && back.textTop0)   // 离开收回折叠态（视口裁剪恢复、零位移）
-        : (pre.before.previewFull && !pre.before.cropped && pre.before.noOverlay && !pre.before.minH && pre.before.textTop0)); // R7：未溢出整行直显
-      assert(ok, `①卡${i + 1}「${item.item_name}」${pre.found && pre.overflow ? 'hover 整卡生长（P1+P1-补）：视口裁剪→框内全文展开、全程文本 top 偏移 0、来源行跟随、网格不塌、离开收回' : '未溢出：整行直显无裁剪无 hover（R7）'}`,
+          && back.pos === 'absolute' && back.cropped && back.textTop0) // P1-再补：离开收回（inner 不回文档流、视口裁剪恢复、零位移）
+        : (pre.before.previewFull && !pre.before.cropped && pre.before.noOverlay && !pre.before.minH && pre.before.textTop0 && pre.before.padR === '18px')); // R7：未溢出整行直显
+      assert(ok, `①卡${i + 1}「${item.item_name}」${pre.found && pre.overflow ? 'hover 整卡生长（P1+P1-补+P1-再补）：覆盖式生长（inner 常驻 absolute）、全程文本 top 偏移 0、来源行跟随、网格不塌、离开收回不入流、省略号占位带零压字（BUG-066）' : '未溢出：整行直显无裁剪无 hover（R7）'}`,
         pre.found ? `before=${JSON.stringify(pre.before)} mid=${JSON.stringify(mid)} after=${JSON.stringify(after)} back=${JSON.stringify(back)}` : '卡片未找到');
     }
     assert(overflowSeen >= 1, '①备料：3 张长特效卡中至少 1 张实测溢出（has-effect，生长路径被真实覆盖）', `溢出 ${overflowSeen}/3`);
@@ -668,9 +701,12 @@ function assert(cond, label, detail) {
         if (c.querySelector('.dp-item-effect-overlay')) bad.push('overlay残留:' + name);
         if (topOff) bad.push('文本偏移:' + name);
         if (getComputedStyle(p).webkitLineClamp !== 'none') bad.push('clamp残留:' + name);
+        if (getComputedStyle(wrap).paddingRight !== '18px') bad.push('省略号占位带缺失:' + name); // BUG-066：全态恒定
+        if (getComputedStyle(wrap, '::after').backgroundImage !== 'none') bad.push('渐变遮罩残留:' + name); // BUG-066：渐变废除
         if (has) {
           longSeen++;
           if (!cropped || !c.style.minHeight || !dots) bad.push('溢出卡异常:' + name);
+          if (getComputedStyle(c.querySelector('.dp-item-inner')).position !== 'absolute') bad.push('溢出卡inner非absolute:' + name); // P1-再补：常驻 absolute
         } else {
           shortSeen++;
           if (cropped || c.style.minHeight || dots) bad.push('未溢出卡异常:' + name);
@@ -678,9 +714,72 @@ function assert(cond, label, detail) {
       });
       return { bad, shortSeen, longSeen, overlayDom: document.querySelectorAll('.dp-item-effect-overlay').length };
     });
-    assert(r7.bad.length === 0 && r7.shortSeen > 0 && r7.longSeen > 0 && r7.overlayDom === 0,
-      `①R7/P1-补 全页不变量：未溢出卡 ${r7.shortSeen} 张零裁剪零 hover 零占位零 …、溢出卡 ${r7.longSeen} 张视口裁剪+…伪元素+占位高、全页零 overlay 零 clamp、文本偏移恒 0、预览恒全文`,
+    assert(r7.bad.length === 0 && r7.longSeen > 0 && r7.overlayDom === 0,
+      `①R7/P1-补 全页不变量：未溢出卡 ${r7.shortSeen} 张零裁剪零 hover 零占位零 …（S1 库实况：占位带 18px 缩窄文本宽后特效卡全部溢出，未溢出路径本轮无样本）、溢出卡 ${r7.longSeen} 张视口裁剪+…伪元素+占位高+inner 常驻 absolute、全页零 overlay 零 clamp 零渐变、文本偏移恒 0、预览恒全文`,
       JSON.stringify(r7.bad));
+
+    // ============ P1-再补（WP6 补丁三轮，B2 修复）：覆盖式生长——全页邻卡 rect 展开/收回连帧零位移 ============
+    console.log('—— P1-再补 覆盖式生长：邻卡 rect 零位移连帧 ——');
+    await page.evaluate(() => {
+      const card = [...document.querySelectorAll('.dp-item.has-effect')].find(c => {
+        const r = c.getBoundingClientRect();
+        return r.top > 0 && r.bottom < innerHeight - 40 && c.nextElementSibling; // 视口内且有同行邻卡
+      }) || document.querySelector('.dp-item.has-effect');
+      card.setAttribute('data-t4-nb', '1');
+      card.scrollIntoView({ block: 'center' });
+    });
+    await sleep(300);
+    const rectSnap = () => page.evaluate(() =>
+      [...document.querySelectorAll('.dp-item:not([data-t4-nb])')].map(c => {
+        const r = c.getBoundingClientRect();
+        return [Math.round(r.top * 10) / 10, Math.round(r.height * 10) / 10];
+      }));
+    const nb0 = await rectSnap();
+    await page.hover('[data-t4-nb]');
+    await sleep(100);  // 展开动画中段
+    const nbMid = await rectSnap();
+    await sleep(350);  // 展开完成
+    const nbGrown = await rectSnap();
+    await page.mouse.move(8, 460); // 鼠标移到页左缘空白（不用 hover 页脚——会触发滚动污染视口相对 rect）
+    await sleep(100);  // 收回动画中段（B2 旧根因窗口：inner 回文档流 + wrap 收缩中）
+    const nbBackMid = await rectSnap();
+    await sleep(350);  // 收回完成
+    const nbBack = await rectSnap();
+    const nbSame = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+    assert(nbSame(nb0, nbMid) && nbSame(nb0, nbGrown) && nbSame(nb0, nbBackMid) && nbSame(nb0, nbBack),
+      'WP6-P1-再补 覆盖式生长：hover 展开/收回连帧，全页邻卡 rect top/height 变化 = 0（网格占位恒定，B2 修复）',
+      `mid=${!nbSame(nb0, nbMid)} grown=${!nbSame(nb0, nbGrown)} backMid=${!nbSame(nb0, nbBackMid)} back=${!nbSame(nb0, nbBack)}`);
+    await page.evaluate(() => document.querySelector('[data-t4-nb]').removeAttribute('data-t4-nb'));
+
+    // ============ P4-再补②（WP6 补丁三轮）：命中计数并入吸顶条末行——任意滚动位置完整可见、不半裁 ============
+    const stickyCk = await page.evaluate(() => {
+      const bar = document.getElementById('dpFilterBar');
+      const head = document.getElementById('dpFlatHead');
+      const bcs = getComputedStyle(bar);
+      return { sticky: bcs.position === 'sticky', inBar: !!head.closest('#dpFilterBar'),
+        bg: bcs.backgroundColor, z: bcs.zIndex };
+    });
+    assert(stickyCk.sticky && stickyCk.inBar && stickyCk.bg !== 'rgba(0, 0, 0, 0)' && Number(stickyCk.z) >= 10,
+      'WP6-P4-再补② 吸顶条整体容器：sticky + 统一不透明背景 + 统一 z-index + 命中计数在条内', JSON.stringify(stickyCk));
+    // 平铺态下滚动多档：命中计数恒完整可见（在吸顶条内随条吸顶，零半裁）
+    await clickChip('#dpSecondaryChips', '爆击');
+    await sleep(500);
+    const scrollCk = [];
+    for (const y of [300, 900, 1800]) {
+      await page.evaluate(v => window.scrollTo(0, v), y);
+      await sleep(150);
+      scrollCk.push(await page.evaluate(() => {
+        const head = document.getElementById('dpFlatHead');
+        const bar = document.getElementById('dpFilterBar');
+        const hr = head.getBoundingClientRect(), br = bar.getBoundingClientRect();
+        return !head.hidden && hr.height > 0 && hr.top >= br.top - 0.5 && hr.bottom <= br.bottom + 0.5
+          && hr.top >= 0 && hr.bottom <= innerHeight; // 完整可见（在条内、在视口内）
+      }));
+    }
+    assert(scrollCk.every(Boolean),
+      'WP6-P4-再补② 任意滚动位置命中计数完整可见（并入吸顶条末行，零半裁停留）', JSON.stringify(scrollCk));
+    await clickChip('#dpSecondaryChips', '爆击'); // 撤选回浏览态
+    await sleep(500);
     // ① 截图：特效卡 折叠态 vs 悬浮展开态
     await page.evaluate(() => {
       const card = [...document.querySelectorAll('.dp-item.has-effect')][0];
@@ -1194,7 +1293,7 @@ function assert(cond, label, detail) {
         const src = card.querySelector('.dp-item-src');
         const cs = getComputedStyle(inner);
         const innerR = inner.getBoundingClientRect(), srcR = src.getBoundingClientRect();
-        return { pos: cs.position, z: cs.zIndex,
+        return { pos: cs.position, z: getComputedStyle(card).zIndex, // P1-再补：z-index 抬升在外层 .dp-item
           grown: innerR.height > parseFloat(card.style.minHeight) + 10,
           srcFollows: Math.abs(srcR.bottom - (innerR.bottom - parseFloat(cs.paddingBottom))) < 1.5,
           textTop0: Math.abs(preview.getBoundingClientRect().top - card.querySelector('.dp-item-effect-wrap').getBoundingClientRect().top) <= 1,

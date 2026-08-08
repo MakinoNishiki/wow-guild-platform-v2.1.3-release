@@ -4,13 +4,13 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>数据公示 · 魔兽管家</title>
-<!-- 静态资源版本号与 index.html 同步递增（开发规范第五章第 6 条）：20260808.31 -->
+<!-- 静态资源版本号与 index.html 同步递增（开发规范第五章第 6 条）：20260808.32 -->
 <link rel="icon" type="image/png" sizes="32x32" href="assets/brand/favicon-32.png">
 <link rel="icon" type="image/png" sizes="16x16" href="assets/brand/favicon-16.png">
-<link rel="stylesheet" href="css/main.css?v=20260808.31">
-<link rel="stylesheet" href="css/data-public.css?v=20260808.31">
-<script src="assets/vendor/supabase-js-2.js?v=20260808.31"></script>
-<script src="js/iconMap.js?v=20260808.31"></script>
+<link rel="stylesheet" href="css/main.css?v=20260808.32">
+<link rel="stylesheet" href="css/data-public.css?v=20260808.32">
+<script src="assets/vendor/supabase-js-2.js?v=20260808.32"></script>
+<script src="js/iconMap.js?v=20260808.32"></script>
 </head>
 <body class="data-public-body">
   <!-- 任务书 #23 WP2：数据公示页（免登录公开，anon 直连 PostgREST，只读） -->
@@ -63,6 +63,9 @@
         <div class="dp-chips dp-instance-row" id="dpInstanceChips" hidden></div>
       </div>
     </div>
+    <!-- P4-再补②（WP6 补丁三轮）：平铺态「命中 N 件」并入吸顶条末行恒可见（滚动不半裁）；
+         浏览态 hidden；放 .dp-filter-rows 外，移动端折叠筛选时仍可见 -->
+    <div class="dp-flat-head" id="dpFlatHead" hidden></div>
   </div>
 
   <main class="dp-main" id="dpMain">
@@ -71,6 +74,6 @@
 
   <footer class="dp-footer">数据来源：魔兽管家数据中心 · 只读公示，由运营维护</footer>
 
-  <script src="js/dataPublic.js?v=20260808.31"></script>
+  <script src="js/dataPublic.js?v=20260808.32"></script>
 </body>
 </html>

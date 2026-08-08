@@ -91,7 +91,9 @@
 .dp-cat-tab { font-weight: 600; letter-spacing: 0.02em; }
 .dp-instance-row { margin-top: 2px; }
 .dp-chip-inst .dp-count { margin-left: 5px; }
-.dp-flat-head { font-size: 13px; color: var(--text-secondary); padding: 2px 2px 12px; user-select: none; }
+/* P4-再补②（WP6 补丁三轮，2026-08-09）：命中计数并入吸顶筛选条末行恒可见（二选一裁定取「并入」——
+   旧位置在主内容流，滚动时被吸顶区半裁遮盖并停留）；随筛选条统一背景/统一 z-index，不再半裁 */
+.dp-flat-head { font-size: 13px; color: var(--text-secondary); width: 100%; padding: 0 2px; user-select: none; }
 .dp-empty-actions { margin-top: 12px; }
 
 @media (max-width: 768px) {
@@ -321,19 +323,25 @@
    理由：整卡高度生长是运营终审指定形态，transform/opacity 无法实现框内全文展开）。
    P1-补（WP6 补丁二轮，2026-08-09 生长防抖）：废弃 line-clamp 截断（动画中 clamp 释放导致文本
    逐行重排抖动）——特效文本恒一次性完整排版、永不重排；折叠态 = 容器 2 行高 overflow:hidden
-   纯视口裁剪；hover 动画只作用于容器高度（视口扩大），文本 top 偏移恒 0 */
+   纯视口裁剪；hover 动画只作用于容器高度（视口扩大），文本 top 偏移恒 0。
+   P1-再补（WP6 补丁三轮，2026-08-09 覆盖式生长，B2 修复）：溢出卡 inner 常驻 absolute 脱离
+   文档流（不再仅 hover 才 absolute）——根因 = 旧实现鼠标移出瞬间 inner 回文档流而 wrap 收缩
+   动画仍在进行，200ms 内 in-flow inner 被撑高牵连整行、动画结束行高回落；现生长/收回全程
+   不入流，网格占位由外层 .dp-item 的 JS 预设 minHeight（= 折叠态高度）恒定承担，行高全程不变 */
 /* 特效容器：折叠态 max-height=2 行（2×17px 行高）+ overflow 纯视口裁剪；hover 展开至 260px 封顶
-   （不挂 overflow-y:auto——滚动条出现会改宽度引起重排，违背零位移口径；S1 最长特效远未及 260px） */
-.dp-item-effect-wrap { position: relative; margin-top: 6px; overflow: hidden; max-height: 34px; transition: max-height .2s ease-out; }
+   （不挂 overflow-y:auto——滚动条出现会改宽度引起重排，违背零位移口径；S1 最长特效远未及 260px）。
+   BUG-066（WP6 补丁三轮）：padding-right 18px（≈1.5em）为省略号预留占位带、全态恒定——
+   文本自然提前换行，省略号落在带内零压字；hover 展开/收回宽度不变，零重排红线不破 */
+.dp-item-effect-wrap { position: relative; margin-top: 6px; overflow: hidden; max-height: 34px; transition: max-height .2s ease-out; padding-right: 18px; box-sizing: border-box; }
 /* 特效预览：恒为特效全文、一次性完整排版（无 line-clamp、无高度约束——裁剪全部由容器视口承担） */
 .dp-item-effect-preview { line-height: 17px; font-size: 12px; color: #1eff00; white-space: normal; }
-/* 折叠态省略观感（仅溢出卡）：右下「…」伪元素 + 左向渐变遮罩，视觉对齐原 line-clamp 省略号；
-   hover 展开即隐去；未溢出卡无此层（R7：无 … 无 hover） */
+/* 折叠态省略观感（仅溢出卡）：右下「…」伪元素落在 padding 预留带内、纯色底收窄至带范围
+   （BUG-066：渐变遮罩废除——旧渐变带压盖行末字形）；hover 展开即隐去；未溢出卡无此层（R7） */
 .dp-item.has-effect .dp-item-effect-wrap::after {
   content: '…';
   position: absolute; right: 0; bottom: 0;
-  padding-left: 22px;
-  background: linear-gradient(to right, transparent, var(--bg-card) 45%);
+  width: 18px; text-align: center;
+  background: var(--bg-card);
   color: #1eff00; font-size: 12px; line-height: 17px;
   pointer-events: none;
 }
@@ -343,13 +351,17 @@
   border-color: rgba(240, 192, 96, 0.55);
   box-shadow: 0 0 6px rgba(240, 192, 96, 0.12);
 }
-.dp-item.has-effect:hover { z-index: 30; }
-/* hover 生长：inner 转 absolute 脱离占位、高度内容驱动向下生长（min-height:100% 保底不缩短），
-   投影覆盖下方卡片；外层 .dp-item 由 JS 预设折叠态 minHeight，网格行高不变 */
-.dp-item.has-effect:hover .dp-item-inner {
+/* P1-再补（WP6 补丁三轮）：溢出卡 inner 常驻 absolute（覆盖式生长）——折叠态高度=外层占位高
+   （内容即折叠态），hover 时向下溢出生长遮盖下一行（运营已认可此形态），收回对称；
+   全程不入文档流，网格行高零变化；z-index 仅 hover 抬升（外层 stacking 覆盖邻卡） */
+.dp-item.has-effect .dp-item-inner {
   position: absolute; top: 0; left: 0; right: 0;
-  height: auto; min-height: 100%;
-  z-index: 30;
+  height: auto;
+}
+.dp-item.has-effect:hover { z-index: 30; }
+/* hover 生长：投影覆盖下方卡片；高度生长由 .dp-item-effect-wrap max-height 动画驱动（inner 高度
+   内容驱动自动跟随）；外层 .dp-item 由 JS 预设折叠态 minHeight，网格行高不变 */
+.dp-item.has-effect:hover .dp-item-inner {
   box-shadow: 0 10px 24px rgba(0, 0, 0, 0.55);
 }
 .dp-item.has-effect:hover .dp-item-effect-wrap { max-height: 260px; }
@@ -363,23 +375,28 @@
 /* P4（WP6 补丁）：筛选联动置灰——当前筛选组合下 0 命中的未选 chip（已选恒不置灰，不自动清除） */
 .dp-chip.dp-chip-disabled { opacity: .4; cursor: not-allowed; border-style: dashed; }
 /* P4-补（WP6 补丁二轮，2026-08-09）：置灰点击反馈——①cursor:not-allowed（上行）②chip 抖动 200ms
-   （transform，§6 白名单内）+ 筛选条下浮出一行原因提示（opacity/transform 浮入、2s 后渐隐）③title 保留 */
+   （transform，§6 白名单内）+ 原因提示 ③title 保留。
+   P4-再补①（WP6 补丁三轮，2026-08-09）：提示改 fixed 定位 toast（复用主应用通知形态：不透明底 +
+   3px 左边线 + 投影）——旧 .dp-chip-hint absolute 贴筛选条下缘浮出会遮挡「命中 X 件」，已废；
+   toast 置视口底部居中、pointer-events:none 不挡交互、2s 渐隐 */
 .dp-chip-shake { animation: dpChipShake 0.2s ease-out; }
 @keyframes dpChipShake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-3px); } 75% { transform: translateX(3px); } }
-.dp-chip-hint {
-  position: absolute; left: 20px; right: 20px; top: calc(100% + 6px);
-  padding: 6px 10px;
-  background: var(--bg-card);
-  border: 1px solid var(--warning);
+.dp-chip-toast {
+  position: fixed; left: 50%; bottom: 24px;
+  transform: translate(-50%, 8px);
+  padding: 12px 20px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--warning); border-left: 3px solid var(--warning);
   border-radius: 6px;
   color: var(--warning);
-  font-size: 12px;
-  line-height: 17px;
-  opacity: 0; transform: translateY(-4px); pointer-events: none;
+  font-size: 13px; line-height: 18px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.55);
+  max-width: min(560px, 92vw);
+  opacity: 0; pointer-events: none;
   transition: opacity .25s ease-out, transform .25s ease-out;
-  z-index: 40;
+  z-index: 2000;
 }
-.dp-chip-hint.show { opacity: 1; transform: translateY(0); }
+.dp-chip-toast.show { opacity: 1; transform: translate(-50%, 0); }
 .dp-error { text-align: center; padding: 60px 0; }
 .dp-error-icon { font-size: 36px; margin-bottom: 12px; }
 .dp-error-text { color: var(--text-secondary); margin-bottom: 16px; }
@@ -387,7 +404,9 @@
 .dp-footer {
   max-width: 1100px;
   margin: 0 auto;
-  padding: 16px 20px 32px;
+  /* P1-再补 边界（WP6 补丁三轮）：底部 200px 缓冲带——池末行溢出卡 hover 向下生长（≤260px 封顶）
+     的 absolute 溢出被页末预留空间吸收，不撑出额外滚动区、滚动条零抖动 */
+  padding: 16px 20px 200px;
   font-size: 12px;
   color: var(--text-muted);
   border-top: 1px solid var(--border-color);
@@ -395,7 +414,7 @@
 
 /* 规范 v2 §6：尊重 prefers-reduced-motion（公示页全部过渡/动画降级为瞬时） */
 @media (prefers-reduced-motion: reduce) {
-  .dp-item-effect-wrap, .dp-collapse-btn svg, .dp-chip-hint { transition: none; }
+  .dp-item-effect-wrap, .dp-collapse-btn svg, .dp-chip-toast { transition: none; }
   .dp-chip-shake { animation: none; }
   .dp-item.dp-enter, .dp-filterbar.filters-open .dp-filter-rows { animation: none; }
   .dp-filter-rows.closing { transition: none; }

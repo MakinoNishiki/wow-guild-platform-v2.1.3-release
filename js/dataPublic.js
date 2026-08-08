@@ -397,31 +397,31 @@
   }
   function matchItem(l) { return matchExcept(l, null); }
 
-  // P4-补（WP6 补丁二轮，2026-08-09）：置灰点击反馈——不得「死无反馈」：
-  // chip 抖动 200ms + 筛选条下浮出一行原因提示（2s 渐隐）；title 悬浮提示保留；aria-disabled 与点击守卫不变
+  // P4-补（WP6 补丁二轮，2026-08-09）→ P4-再补①（补丁三轮）：置灰点击反馈——不得「死无反馈」：
+  // chip 抖动 200ms + fixed 定位 toast 原因提示（复用主应用通知形态：不透明底+3px 左边线+投影，
+  // 视口底部居中、pointer-events:none 不挡交互、2s 渐隐；旧 absolute 贴筛选条下缘浮出遮挡
+  // 「命中 X 件」已废）；title 悬浮提示保留；aria-disabled 与点击守卫不变
   let chipHintTimer = null;
   function chipDisabledFeedback(ch, label) {
     ch.classList.remove('dp-chip-shake');
     void ch.offsetWidth; // 重排以重启动画（连点可重复触发）
     ch.classList.add('dp-chip-shake');
     setTimeout(() => ch.classList.remove('dp-chip-shake'), 220);
-    const bar = $('dpFilterBar');
-    if (!bar) return;
-    let hint = $('dpChipHint');
-    if (!hint) {
-      hint = document.createElement('div');
-      hint.id = 'dpChipHint';
-      hint.className = 'dp-chip-hint';
-      hint.setAttribute('role', 'status');
-      bar.appendChild(hint);
+    let toast = $('dpChipToast');
+    if (!toast) {
+      toast = document.createElement('div');
+      toast.id = 'dpChipToast';
+      toast.className = 'dp-chip-toast';
+      toast.setAttribute('role', 'status');
+      document.body.appendChild(toast);
     }
     const causes = [];
     if (state.primaryStats.size || state.secondaryStats.size) causes.push('该类别装备均不含所选属性');
     if (state.search) causes.push('不含匹配当前搜索词的装备');
-    hint.textContent = `「${label}」在当前组合下无命中${causes.length ? '：' + causes.join('，') : '装备'}`;
-    hint.classList.add('show');
+    toast.textContent = `「${label}」在当前组合下无命中${causes.length ? '：' + causes.join('，') : '装备'}`;
+    toast.classList.add('show');
     clearTimeout(chipHintTimer);
-    chipHintTimer = setTimeout(() => hint.classList.remove('show'), 2000);
+    chipHintTimer = setTimeout(() => toast.classList.remove('show'), 2000);
   }
 
   // P4（WP6 补丁）：筛选联动置灰——未选 chip 在「其他组条件 + 搜索」下 0 命中即置灰不可点
@@ -508,17 +508,20 @@
     </div></div>`;
   }
 
-  // P1（WP6 补丁，运营 2026-08-09 体验终审）：hover 形态重构——废弃独立浮层遮盖，改为卡片本体
+  // P1（WP6 补丁，运营 2026-08-09 体验终审）→ P1-再补（补丁三轮，覆盖式生长）：hover 形态 = 卡片本体
   // 经 max-height 动画向下生长（§6 白名单例外已注册）：特效全文在框内展开、来源行随 flex 锚至新底部
   // 全程可见；生长部分 z-index 提升覆盖下方卡片、不推挤网格；离开动画收回。
-  // 预览恒为特效全文（CSS line-clamp:2 负责折叠态视觉截断带 …）；镜像只测溢出：
+  // 预览恒为特效全文（容器 2 行高 overflow 纯视口裁剪 + … 伪元素观感，无 line-clamp）；镜像只测溢出：
   // 未溢出 = 无 has-effect、无 hover、无生长（R7 不变量）；resize 防抖重算。
+  // P1-再补：溢出卡 inner 常驻 absolute（生长/收回全程不入文档流，网格行高零变化）——
+  // 故必须先在内联流态量取折叠态高度写入外层 minHeight，再加 has-effect（absolute 后外层失去内容撑高）；
+  // 隐藏池（折叠 BOSS/副本 display:none）量得 0 宽 0 高无害——折叠切换走整页 render() 重测自愈。
   let fxMirror = null;
   function measureEffectCards() {
     const cards = main.querySelectorAll('.dp-item');
     if (!cards.length) return;
-    // 第一趟：清除上轮占位 minHeight，避免残留撑高污染本轮测量
-    cards.forEach(c => { c.style.minHeight = ''; });
+    // 第一趟：清除上轮占位 minHeight 与 has-effect，全部回到内联流态，避免残留撑高/脱离文档流污染本轮测量
+    cards.forEach(c => { c.style.minHeight = ''; c.classList.remove('has-effect'); });
     const wraps = main.querySelectorAll('.dp-item-effect-wrap');
     if (!wraps.length) return;
     if (!fxMirror) {
@@ -541,12 +544,13 @@
       const maxH = parseFloat(cs.lineHeight) * 2 + 0.5;
       m.textContent = full;
       const overflow = m.offsetHeight > maxH;
-      card.classList.toggle('has-effect', overflow);
-      if (overflow) grow.push(card);
+      // 内联流态下量取折叠态高度（此时 has-effect 未加、inner 未 absolute，占位高=内容高）
+      if (overflow) grow.push([card, card.getBoundingClientRect().height]);
     });
     m.textContent = '';
-    // 第二趟：溢出卡预设折叠态高度——hover 时 inner 转 absolute 后卡片不失高、网格不塌
-    grow.forEach(c => { c.style.minHeight = `${c.getBoundingClientRect().height}px`; });
+    // 第二趟：溢出卡标 has-effect（inner 转常驻 absolute）+ 外层预设折叠态 minHeight——
+    // 网格占位高度恒定 = 折叠态高度，hover 生长/收回全程零牵连
+    grow.forEach(([c, h]) => { c.classList.add('has-effect'); c.style.minHeight = `${h}px`; });
   }
 
   const emptyText = t => `<div class="dp-empty">${esc(t)}</div>`;
@@ -720,12 +724,16 @@
         ${secHead('sec:tiers', '套装一览', tierFiltersHtml)}
         ${tiersBody}
       </section>`;
+    // P4-再补②（WP6 补丁三轮）：「命中 N 件」并入吸顶筛选条末行恒可见（旧位置在主内容流，
+    // 滚动时被吸顶区半裁遮盖并停留）；浏览态隐藏
+    const flatHead = $('dpFlatHead');
     if (flat) {
-      // 平铺态：命中卡片直接铺满网格 + 顶部「命中 N 件」；0 命中空态 + 重置引导；
+      // 平铺态：命中卡片直接铺满网格，命中计数在吸顶条末行（上方 flatHead）；0 命中空态 + 重置引导；
       // 来源（含实例级）退化为纯过滤（matchItem 已收口，不触发折叠/分组）
       const items = flatOrderedItems();
+      flatHead.innerHTML = `命中 <span class="dp-count">${items.length}</span> 件`;
+      flatHead.hidden = false;
       main.innerHTML = `<section class="dp-section">
-        <div class="dp-flat-head">命中 <span class="dp-count">${items.length}</span> 件</div>
         ${items.length
           ? `<div class="dp-items">${items.map(itemCard).join('')}</div>`
           : `<div class="dp-empty">无符合条件装备<div class="dp-empty-actions"><button type="button" class="btn btn-secondary" id="dpEmptyReset">重置筛选</button></div></div>`}
@@ -733,6 +741,7 @@
       const emptyReset = $('dpEmptyReset');
       if (emptyReset) emptyReset.onclick = () => { resetFilters(); render(true); };
     } else {
+      flatHead.hidden = true;
       // 浏览态：双池堆叠 + 实例/BOSS 分组 + R6 来源联动折叠（F2 实例级经 matchItem 收口，
       // 未选中实例的分组零命中自然不渲染 = 本池只剩该实例分组）
       const showRaids = state.source !== 'dungeon';

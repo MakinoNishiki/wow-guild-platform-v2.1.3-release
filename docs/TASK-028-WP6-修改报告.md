@@ -1,6 +1,6 @@
 # 任务书 #28-WP6 修改报告（过滤器二期：F1 分类三级 + F2 来源实例级 + F3 筛选态平铺）
 
-- 日期：2026-08-09 ｜ 站点版本串：**20260808.31**（双头 index.html 8 处 + data.html 6 处，旧串 .30 零残留；二轮补丁动了 js/css/html，.30→.31 递增，见 §七之二）
+- 日期：2026-08-09 ｜ 站点版本串：**20260808.32**（双头 index.html 8 处 + data.html 6 处，旧串 .31 零残留；三轮补丁动了 js/css/html，.31→.32 递增，见 §七之三）
 - 版本串跳号说明（运营 2026-08-09 指出）：WP3-v5 本地报告写 .28，但线上部署时实际按 .29 发布——同一版本串不得对应两次改动，故 WP6 跳过 .29、自 .30 起递增；verify 无版本串硬编码断言（仅校验 ?v= 存在性），无需同步改脚本。
 - 前置：F1 映射表送审稿（`docs/TASK-028-WP6-F1映射表.md`）→ 运营 2026-08-09 终版裁定（覆盖此前全部口径），按终版施工
 - 状态：**完工待验收，未 commit / 未 push**
@@ -58,17 +58,18 @@
 - `wp6p-p3-slot-12.png` — 部位 12 项含「饰品」末位
 - `wp6p-p4-chip-disabled.png` — 力量+敏捷选中 → 部位 chips 置灰（颈部/手指在列，背部/饰品保活）
 - 补丁二轮锚点：`wp6p2-grow-f0.png` ~ `wp6p2-grow-f4.png` — 凝视 hover 生长连帧（0/60/110/160/260ms），控制台逐帧实测特效文本 top 偏移全 0（零重排零抖动）；`wp6p2-disabled-feedback.png` — 力敏下点击置灰「颈部」→ 筛选条下浮出原因提示「『颈部』在当前组合下无命中：该类别装备均不含所选属性」+ chip 抖动，置灰虚线淡化生效
+- 补丁三轮锚点：`wp6p3-collapsed-ellipsis.png` / `wp6p3-ellipsis-zoom.png` — 凝视折叠态与省略号特写：「…持续12秒。激活期间，施放」字字完整，… 在右侧占位带内零压字（BUG-066）；`wp6p3-grow-mid.png` / `wp6p3-grow-full.png` / `wp6p3-grow-backmid.png` — 覆盖式生长连帧：整卡向下生长遮盖下一行（运营认可形态）、来源行跟随新底部、邻卡零位移（patch4 五帧 rect 断言在案）；`wp6p3-toast.png` — 置灰 toast 视口底部居中（筛选条与「命中 24 件」均无遮挡）；`wp6p3-sticky-scrolled.png` — 平铺态滚 900px 后「命中 149 件」在吸顶条末行完整可见零半裁
 
 ## 六、改动文件清单
 
-- `data.html` — 分类组 DOM（第一组）+ 来源组实例行容器；布局注释回写
-- `js/dataPublic.js` — state（catL2/catSel/sourceInstance）+ CAT_TABS（P2 加「全部」）/CAT_CHIPS（P3 加「饰品」）终版映射 + seasonLoot + renderCategory/renderInstanceChips + matchItem→matchExcept 拆组（P4）+ refreshChipAvailability（P4）+ isFlatMode/flatOrderedItems + render 双态分支 + resetFilters 扩展；P1：itemCard 包 .dp-item-inner、measureEffectCards 重写（镜像只测溢出 + 溢出卡预设折叠态 minHeight，旧二分截断/建 overlay 逻辑拆除）；**P4-补：chipDisabledFeedback(ch,label)——shake 类 200ms（void offsetWidth 重启动画）+ #dpChipHint（absolute 贴筛选条底、role=status、cause 拼接文案、2s 渐隐），三处 chip onclick 守卫改调它**
-- `css/data-public.css` — .dp-cat-tabs/.dp-cat-tab（chip 体系加粗）/.dp-instance-row/.dp-chip-inst 计数角标/.dp-flat-head/.dp-empty-actions；P1：卡盒样式迁 .dp-item-inner + hover 整卡生长（inner absolute + wrap max-height 动画）+ .dp-item-effect-overlay 规则删除；P4：.dp-chip-disabled；**P1-补：废弃 line-clamp——preview 改纯 block 全文排版（clamp 规则与 hover 释放规则全删），折叠态 = wrap max-height:34px+overflow:hidden 纯视口裁剪，省略观感改 ::after 渐变遮罩（hover 时 content:none），hover overflow-y:auto 故意不加（滚动条改宽度会引重排）；P4-补：.dp-chip-shake/@keyframes dpChipShake/.dp-chip-hint/.show + reduced-motion 降级；事故修复：一轮 §6 例外注释内 `.dp-detail-*/` 含 `*/` 毒丸提前闭合注释、吞掉 .dp-chip-disabled 整条规则（一轮置灰视觉实际从未生效，二轮 cursor 断言抓出），注释改全角 ＊ 修复，probe 实测 cursor:not-allowed/opacity .4/border dashed 生效**
-- `scripts/verify-task23-patch4.js` / `verify-task23-patch.js` / `verify-task23-patch3.js` — 断言适配 + WP6/P1–P4 新增（patch3 适配 P1 生长与 inner 边框 2 处）；二轮：patch4 ① 块四态 textTop0 + wrap 视口裁剪 + noClampCss + R7 不变量改 ::after 判定 + P4-补 3 断言，文首注释回写
-- `js/app.js` — changelog 四维补录「新增功能」一条（details 含 P1–P4 四行 + 二轮 P1-补/P4-补 两行，标题「含 P1–P4 补丁及二轮修订」）
-- `docs/公示页筛选系统设计规范.md` — **v3.2**（v3.0/v3.1 废止）：P2 全部 tab（§2/§3）、P3 饰品 12 项（§4-2）、P4 置灰（§3 规格表/§6 交互）、P4-补 置灰点击反馈（§3 置灰态行），标注日期
+- `data.html` — 分类组 DOM（第一组）+ 来源组实例行容器；布局注释回写；**三轮：#dpFlatHead 并入 .dp-filterbar 末行（P4-再补②）**
+- `js/dataPublic.js` — state（catL2/catSel/sourceInstance）+ CAT_TABS（P2 加「全部」）/CAT_CHIPS（P3 加「饰品」）终版映射 + seasonLoot + renderCategory/renderInstanceChips + matchItem→matchExcept 拆组（P4）+ refreshChipAvailability（P4）+ isFlatMode/flatOrderedItems + render 双态分支 + resetFilters 扩展；P1：itemCard 包 .dp-item-inner、measureEffectCards 重写（镜像只测溢出 + 溢出卡预设折叠态 minHeight，旧二分截断/建 overlay 逻辑拆除）；**P4-补：chipDisabledFeedback(ch,label)——shake 类 200ms（void offsetWidth 重启动画）+ #dpChipHint（absolute 贴筛选条底、role=status、cause 拼接文案、2s 渐隐），三处 chip onclick 守卫改调它；三轮：P1-再补 measureEffectCards 顺序改「清类回流态→量折叠态高→加类+写 minHeight」（inner 常驻 absolute 的前置）；P4-再补① #dpChipHint 废弃改 #dpChipToast 挂 body；P4-再补② render 平铺态命中计数写 #dpFlatHead（浏览态 hidden），主内容流旧 .dp-flat-head 移除**
+- `css/data-public.css` — .dp-cat-tabs/.dp-cat-tab（chip 体系加粗）/.dp-instance-row/.dp-chip-inst 计数角标/.dp-flat-head/.dp-empty-actions；P1：卡盒样式迁 .dp-item-inner + hover 整卡生长（inner absolute + wrap max-height 动画）+ .dp-item-effect-overlay 规则删除；P4：.dp-chip-disabled；**P1-补：废弃 line-clamp——preview 改纯 block 全文排版（clamp 规则与 hover 释放规则全删），折叠态 = wrap max-height:34px+overflow:hidden 纯视口裁剪，省略观感改 ::after 渐变遮罩（hover 时 content:none），hover overflow-y:auto 故意不加（滚动条改宽度会引重排）；P4-补：.dp-chip-shake/@keyframes dpChipShake/.dp-chip-hint/.show + reduced-motion 降级；事故修复：一轮 §6 例外注释内 `.dp-detail-*/` 含 `*/` 毒丸提前闭合注释、吞掉 .dp-chip-disabled 整条规则（一轮置灰视觉实际从未生效，二轮 cursor 断言抓出），注释改全角 ＊ 修复，probe 实测 cursor:not-allowed/opacity .4/border dashed 生效；三轮：P1-再补 溢出卡 inner 常驻 absolute（hover 仅加投影/z-index 挂外层）+ .dp-footer padding-bottom 200px 末行溢出缓冲带；BUG-066 wrap padding-right:18px 全态恒定 + ::after 收窄带内纯色底（渐变废除）；P4-再补① .dp-chip-hint 全删改 .dp-chip-toast（fixed 底部居中、主应用通知形态、pointer-events:none）；P4-再补② .dp-flat-head 改吸顶条末行规格**
+- `scripts/verify-task23-patch4.js` / `verify-task23-patch.js` / `verify-task23-patch3.js` — 断言适配 + WP6/P1–P4 新增（patch3 适配 P1 生长与 inner 边框 2 处）；二轮：patch4 ① 块四态 textTop0 + wrap 视口裁剪 + noClampCss + R7 不变量改 ::after 判定 + P4-补 3 断言，文首注释回写；**三轮：patch4 ① 块 innerPos/back.pos 改常驻 absolute + z 改读外层 + BUG-066 三断言（占位带恒定/渐变零残留/Range 字形零压字容差 1px）+ P1-再补邻卡五帧 rect 零位移 + P4-再补① toast 化（fixed/pointer-events）+ P4-再补② 吸顶容器与三档滚动 2 断言 + flat 判定改 hidden 口径 ×7 + §2 barKids 三元**
+- `js/app.js` — changelog 四维补录「新增功能」一条（details 含 P1–P4 四行 + 二轮 P1-补/P4-补 两行 + 三轮 P1-再补/P4-再补/BUG-066 三行，标题「含 P1–P4 补丁及二轮/三轮修订」）
+- `docs/公示页筛选系统设计规范.md` — **v3.3**（v3.0–v3.2 废止）：P2 全部 tab（§2/§3）、P3 饰品 12 项（§4-2）、P4 置灰（§3 规格表/§6 交互）、P4-补 置灰点击反馈、**P4-再补① toast 化（§3 置灰态行）+ P4-再补② 命中计数并入吸顶条（§7）**，标注日期
 - `docs/魔兽管家UI设计规范v2.md` — §4.4 装备卡条款回写 P1 整卡生长（浮层条款废止）+ §6 注册 max-height 高度动画例外（理由+日期）
-- `index.html` / `data.html` — 版本串 20260808.29→.30→**.31**（8+6 处，含顶部注释记录行；.29 为 WP3-v5 线上占用，见文首跳号说明；P1–P4 一轮同包复用 .30，**二轮补丁 P1-补/P4-补 动了 js/css/html，递增 .31，.30 零残留**）
+- `index.html` / `data.html` — 版本串 20260808.29→.30→.31→**.32**（8+6 处，含顶部注释记录行；.29 为 WP3-v5 线上占用，见文首跳号说明；P1–P4 一轮同包复用 .30，二轮递增 .31，**三轮补丁动了 js/css/html，递增 .32，.31 零残留**）
 
 ## 七、WP6 补丁 P1–P4（2026-08-09 运营体验终审追加，一轮同包复用 .30；二轮修订递增 .31，见 §七之二）
 
@@ -94,6 +95,19 @@
 - verify 二轮输出：patch4 **100/100**（98→100，新增 P4-补 3 断言，① 块改四态 textTop0、R7 全页不变量改 wrap+::after 判定）、patch **33/33**、patch3 **28/28**、npm test **5/5**、SEC-001 **34/34**，全绿；console 零报错、零 404；基线 308/104/204 不动。
 - 版本串 .30→.31（双头 index.html 8 处 + data.html 6 处，含注释行；.30 零残留）。
 - 文档回写：`docs/魔兽管家UI设计规范v2.md` §4.4（P1-补 视口裁剪口径）+ §6（P1-补 延续既有 max-height 例外、P4-补 shake/hint 在白名单内说明）；`docs/公示页筛选系统设计规范.md` 升 **v3.2**（§3 置灰态行加点击反馈规格）；changelog WP6 条目 details 补 P1-补/P4-补 两行、标题改「含 P1–P4 补丁及二轮修订」。
+
+## 七之三、WP6 补丁三轮（P1-再补 覆盖式生长 B2 修复 + P4-再补①② + BUG-066，2026-08-09 运营追加，版本串 .31→.32）
+
+| 补丁 | 口径 | 落地 | 实测 |
+|---|---|---|---|
+| P1-再补 覆盖式生长（B2❌ 修复） | .dp-item 网格占位高度恒定 = 折叠态高度；hover 生长由 inner 向下溢出实现，网格行高全程不变；z-index 抬升整卡（边框+内容+来源行）向下生长遮盖下一行（运营已认可）；独立浮层/来源行被遮不得复燃；二轮成果（文本一次性排版+视口裁剪零重排）保持；收回对称零牵连；末行溢出不得抖滚动条；reduced-motion 保留 | **根因实锤**：旧实现仅 :hover 时 inner 才 absolute——鼠标移出瞬间 inner 回文档流而 wrap 260→34 收缩动画仍在进行，200ms 内 in-flow inner 被撑高牵连整行、动画结束回落（与运营诊断一致）。修复：溢出卡 inner **常驻 absolute**（生长/收回全程不入流）；JS measureEffectCards 改「先清 has-effect/minHeight 回内联流态 → 量折叠态高 → 再加类+写 minHeight」顺序（absolute 后外层失去内容撑高，顺序反了占位=0）；z-index 抬升改挂外层 .dp-item；页末 .dp-footer padding-bottom 200px 缓冲带吸收末行向下溢出 | patch4 新增「全页邻卡 rect 展开/收回连帧零位移」断言（0/100/450ms 展开 + 收回中段/完成五帧，全页非悬停卡 top/height 逐字一致）；① 块 innerPos 折叠态即 absolute、back.pos absolute（收回不入流）；连帧截图在案 |
+| BUG-066 省略号遮罩压字 | 折叠态 ::after 渐变遮罩覆盖特效行末完整文字（「全暗。」「持续」被遮）；改 wrap 恒定 padding-right ≈1.5em 占位带、… 放带内零压字、渐变废除或收窄带内；padding 全态恒定零重排；hover content:none 保留 | wrap `padding-right:18px`（1.5em@12px）全态恒定（hover 同宽，零重排红线不破）；::after 收窄至带内 `width:18px` 纯色底（--bg-card），**渐变遮罩废除**；镜像测量随 preview.clientWidth 自适应（含 padding） | patch4：Range 末行字形右缘 ≤ 带左缘断言（3 锚点卡）+ hover 态 padR 恒定 + R7 全页渐变零残留/占位带全量检查；实测 CJK 标点挤压亚像素越线 ≤0.7px（… 字形带内居中墨线起点距带缘 ≥2px，视觉零压字，断言容差 1px 注明）；R7 未溢出样本本轮为 0（占位带缩窄后 8 张特效卡全部溢出，断言放宽并注明库实况） |
+| P4-再补① 置灰提示 toast 化 | .dp-chip-hint 在筛选条下方浮出遮挡「命中 X 件」；改 fixed 定位 toast 复用主应用通知形态；2s 渐隐、点击守卫、抖动、title 全保留 | #dpChipToast 挂 body：fixed 视口底部居中、不透明底（--bg-secondary）+3px 左边线+投影（main.css .toast 同款形态）、pointer-events:none 不挡交互、z-index 2000、2s 渐隐；旧 .dp-chip-hint 规则与元素创建全删 | patch4 P4-补块适配：toast 即时出现（fixed 定位+pointer-events:none 断言新增）、文案含「颈部」与原因、2s 渐隐、守卫不变——全绿；锚点截图在案 |
+| P4-再补② 滚动半裁修复 | 页面下滚筛选条吸顶时三级 chips 行与「命中X件」被吸顶区半裁遮盖并停留；吸顶改一个整体容器 sticky（统一背景+z-index，内部各行不互相半裁）；「命中X件」并入吸顶块末行恒可见或置块外滚走（二选一） | 取「并入」：#dpFlatHead 常驻 DOM 为 .dp-filterbar 末行（.dp-filter-rows 之外，移动端折叠筛选时仍可见），浏览态 hidden、平铺态填「命中 N 件」；.dp-filterbar 本即整体 sticky+不透明底+z-index 10（统一性断言锁定）；主内容流内旧 .dp-flat-head 渲染移除 | patch4 新增 2 断言：吸顶容器统一性（sticky+不透明背景+z-index+head 在条内）+ 平铺态 300/900/1800 三档滚动命中计数恒完整可见（在条内、在视口内，零半裁）；§2 结构断言同步（barKids 三元） |
+
+- verify 三轮输出：patch4 **103/103**（100→103：新增 P1-再补邻卡连帧、P4-再补② 容器/滚动 2 条；① 块与 R7 不变量按三轮口径适配）、patch **33/33**、patch3 **28/28**、npm test **5/5**、SEC-001 **34/34**，全绿；console 零报错、零 404；基线 308/104/204 不动。
+- 版本串 .31→.32（双头 index.html 8 处 + data.html 6 处，含注释行；.31 零残留）。
+- 文档回写：`docs/魔兽管家UI设计规范v2.md` §4.4（P1-再补 覆盖式生长 + BUG-066 占位带口径）+ §6（三轮延续说明）；`docs/公示页筛选系统设计规范.md` 升 **v3.3**（§3 置灰态 toast 化、§7 命中计数并入吸顶条）；台账登记 **BUG-066**（省略号遮罩压字，✅ 已修复待验收）；changelog WP6 条目 details 补三轮三行、标题改「含 P1–P4 补丁及二轮/三轮修订」。
 
 ## 八、任务书口径偏差点（已在断言与文档注明）
 
