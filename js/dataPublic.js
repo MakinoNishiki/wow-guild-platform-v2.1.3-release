@@ -2,11 +2,14 @@
 // 任务书 #28 WP2：筛选条重构（筛选规范 v2.0）——首行搜索+重置、主/副属性多选、来源单选、
 // 杂项数据层排除零渲染、「排除杂项」开关整块删除、卡片入场/筛选器展开收起动画（§7）。
 // 任务书 #28 WP3-v2（方向修正版，运营 2026-08-08 裁定⑤撤回+补充裁定 G/H）：全信息装备卡——
-// 卡片默认展示完整信息组（名称/meta/主属性+数值/副属性+数值/特效/来源 六结构行逐行排列，裁定 G），
+// 卡片默认展示完整信息组（名称/meta/主属性+数值/副属性+数值/特效/来源 逐行排列），
 // 主属性色板（§4.11）、副属性数值降序且唯一最大者⭐排第一（裁定 H；同值/缺值保持库内原序不加星）、
-// 特效恒 2 行截断、超 2 行 hover 覆盖层展全文（动画回归 §6 白名单：只动 transform/opacity）、
 // 来源行「实例 · BOSS（· 可兑换本赛季套装）」；卡片零点击交互（v1 点击详情层已整族拆除）。
-// boss_loot/dungeon_loot 读取收口公开 RPC（sql/21，杂项服务端排除），难度行继续不显（tiers 无数据）。
+// 任务书 #28 WP3-v3（体验修订 R1–R7）：星标裁切修复（行容器 overflow 放开）；
+// R2 占位行废止——只渲染有数据的行；R3 内容驱动行内等高（grid 原生 stretch，删全部固定/占位行高）；
+// R4/R7 特效 hover 续文展开——未溢出卡无 … 无 hover 无展开层，溢出卡展开层只放被截续文（镜像实测切分、resize 重算）；
+// R5 来源组 chip 间距复用 .dp-chip-sub；R6 来源单选联动折叠对应掉落池整段。
+// boss_loot/dungeon_loot 读取收口公开 RPC（sql/21，杂项服务端排除；sql/22 增排装饰品/幻化），难度行继续不显（tiers 无数据）。
 // 读取通道：anon key 直连 PostgREST（字典表匿名读 sql/16 + 公开 RPC sql/21），不登录、不走 server.js 写代理。
 // 任何加载失败给友好重试界面，不白屏；全部内容只读。
 (function () {
@@ -185,6 +188,13 @@
     buildChips($('dpPrimaryChips'), ['力量', '敏捷', '智力'], state.primaryStats);
     buildChips($('dpSecondaryChips'), ['爆击', '急速', '精通', '全能'], state.secondaryStats);
 
+    // R4（WP3-v3）：resize（含浏览器缩放）防抖重算特效截断切分点
+    let fxResizeTimer = null;
+    window.addEventListener('resize', () => {
+      clearTimeout(fxResizeTimer);
+      fxResizeTimer = setTimeout(() => measureEffectOverlays(), 150);
+    });
+
     render();
   }
 
@@ -217,11 +227,13 @@
     if (!container) return;
     const avail = SOURCE_DEFS.filter(d => sourceHasData(d.key));
     if (state.source && !avail.some(d => d.key === state.source)) state.source = '';
+    // R5（WP3-v3）：值 chip 包 .dp-chip-sub——与主/副属性组完全同一 gap（6px）
     container.innerHTML =
       `<span class="dp-chip dp-chip-all${state.source === '' ? ' active' : ''}" data-v="">全部</span>` +
-      (avail.length ? `<span class="dp-chip-divider"></span>` : '') +
-      avail.map(d =>
-        `<span class="dp-chip${state.source === d.key ? ' active' : ''}" data-v="${esc(d.key)}">${esc(d.label)}</span>`).join('');
+      (avail.length ? `<span class="dp-chip-divider"></span><span class="dp-chip-sub">` +
+        avail.map(d =>
+          `<span class="dp-chip${state.source === d.key ? ' active' : ''}" data-v="${esc(d.key)}">${esc(d.label)}</span>`).join('') +
+        `</span>` : '');
     container.querySelectorAll('.dp-chip').forEach(ch => {
       ch.onclick = () => {
         const v = ch.dataset.v;
@@ -256,28 +268,28 @@
     return true;
   }
 
-  // ---- 装备卡片（任务书 #28 WP3-v2：全信息卡，六结构行逐行排列——裁定 G） ----
-  // 行序：1 名称 / 2 meta（部位·类型）/ 3 主属性+数值 / 4 副属性+数值 / 5 特效（恒 2 行截断）/ 6 来源行。
-  // 六行恒占恒高（缺省=空行占位），兄弟卡天然等高、零 JS 依赖（CSS 保证，统一尺寸铁律由结构保证）。
-  // 主属性：库内原序，§4.11 色板（力量红/敏捷绿/智力蓝）；缺数值只显属性名（裁定 E）。
-  // 副属性（裁定 H）：数值降序，唯一最大者⭐星标排第一；同值并列/缺数值保持库内原序且不加星。
-  // 特效：恒 2 行 line-clamp 截断，超 2 行桌面 hover 覆盖层展全文（补丁4 模式，动画只动 transform/opacity）。
-  // 卡片零点击交互（运营 2026-08-08 方向修正：v1 点击详情层已整族拆除）。
+  // ---- 装备卡片（任务书 #28 WP3-v3 体验修订 R1–R7） ----
+  // 行序固定：名称 / meta / 主属性(如有) / 副属性(如有) / 特效(如有) / 来源——只渲染有数据的行（R2 占位行废止），
+  // 卡片高度内容驱动、同一 grid 行内原生 stretch 等高、行间允许不同高（R3，零 JS 测高）。
+  // 主属性：库内原序，§4.11 色板；缺数值只显属性名（裁定 E 不变）。
+  // 副属性（裁定 H 不变）：数值降序，唯一最大者⭐排第一；同值并列/缺数值保原序不加星。
+  // 特效（R4/R7）：空间够用（≤2 行）整行直显——无 …、无 hover、无展开层；
+  // 溢出卡 hover 只展开被 … 截掉的续文（渲染后 measureEffectOverlays 镜像实测切分，前缀+续文===全文，resize 重算）。
+  // 卡片零点击交互（运营 2026-08-08 方向修正）。
   // 主属性色板类映射（§4.11；未收录属性名回退 dp-tag-primary 蓝）
   const PRIMARY_TAG_CLASS = { '力量': 'dp-tag-p1', '敏捷': 'dp-tag-p2', '智力': 'dp-tag-p3' };
-  // 金星变体 SVG（§4.2 已注册：右上角金色五角星，自绘）
+  // 金星变体 SVG（§4.2 已注册：右上角金色五角星，自绘；R1：行容器 overflow 放开后任何缩放完整可见）
   const STAR_SVG = '<svg viewBox="0 0 10 10" aria-hidden="true"><path d="M5 0l1.4 3.1L10 3.6 7.3 6l.8 3.4L5 7.6 1.9 9.4 2.7 6 0 3.6l3.6-.5z" fill="#ffd700"/></svg>';
   function itemCard(l) {
-    const hasEffect = !!l.effect;
     const pv = l.primary_values || {};
     const sv = l.secondary_values || {};
-    // 行 3 主属性：库内原序 + 色板；缺数值只显属性名（裁定 E）
+    // 主属性行（有才渲染）：库内原序 + 色板；缺数值只显属性名（裁定 E）
     const primHtml = (l.primary_stats || []).map(s => {
       const v = pv[s];
       return `<span class="dp-tag ${PRIMARY_TAG_CLASS[s] || 'dp-tag-primary'}">${esc(s)}${v != null ? ` +${esc(v)}` : ''}</span>`;
     }).join('');
-    // 行 4 副属性（裁定 H）：数值降序稳定排序（同值/缺值保持库内原序，缺值沉底）；
-    // 唯一最大者加⭐，同值并列第一不加星
+    // 副属性行（有才渲染；裁定 H）：数值降序稳定排序（同值/缺值保持库内原序，缺值沉底）；
+    // 唯一最大者加⭐（≥2 个有值才参评），同值并列第一不加星
     const secEntries = (l.secondary_stats || []).map(s => {
       const raw = sv[s];
       const num = raw != null ? Number(raw) : NaN;
@@ -293,21 +305,71 @@
       const star = e.name === starName;
       return `<span class="dp-tag dp-tag-secondary${star ? ' dp-tag-star' : ''}">${esc(e.name)}${e.value != null ? ` +${esc(e.raw)}` : ''}${star ? STAR_SVG : ''}</span>`;
     }).join('');
-    // 行 6 来源：实例 · BOSS（空=整体池）· 套装归属并入同行末尾（确认点 C）
+    // 来源行：实例 · BOSS（空=整体池）· 套装归属并入同行末尾（确认点 C）
     const srcParts = [l.instance_name, l.boss_name || '整体池'];
     if (l.slot === '套装兑换物') srcParts.push('可兑换本赛季套装');
-    return `<div class="dp-item${hasEffect ? ' has-effect' : ''}">
+    return `<div class="dp-item">
       <div class="dp-item-name">${esc(l.item_name)}</div>
       <div class="dp-item-meta">
         ${l.slot ? `<span class="dp-tag">${esc(l.slot)}</span>` : ''}
         ${l.item_type ? `<span class="dp-tag">${esc(l.item_type)}</span>` : ''}
       </div>
-      <div class="dp-item-stats">${primHtml}</div>
-      <div class="dp-item-stats">${secHtml}</div>
-      <div class="dp-item-effect-preview">${hasEffect ? esc(l.effect) : ''}</div>
+      ${primHtml ? `<div class="dp-item-stats">${primHtml}</div>` : ''}
+      ${secHtml ? `<div class="dp-item-stats">${secHtml}</div>` : ''}
+      ${l.effect ? `<div class="dp-item-effect-wrap"><div class="dp-item-effect-preview">${esc(l.effect)}</div></div>` : ''}
       <div class="dp-item-src">${esc(srcParts.filter(Boolean).join(' · '))}</div>
-      ${hasEffect ? `<div class="dp-item-effect-overlay">${esc(l.effect)}</div>` : ''}
     </div>`;
+  }
+
+  // R4/R7 特效行实测切分（渲染后 + resize 重算）：
+  // 隐藏镜像同宽同字体测 2 行可容纳字符数；未溢出 = 无 … 无 hover 无展开层（R7）；
+  // 溢出 = 预览「前缀+…」、展开层只放续文（前缀+续文 === 全文，逐字接续，视觉接在截断处之后）
+  let fxMirror = null;
+  function measureEffectOverlays() {
+    const wraps = main.querySelectorAll('.dp-item-effect-wrap');
+    if (!wraps.length) return;
+    if (!fxMirror) {
+      fxMirror = document.createElement('div');
+      fxMirror.setAttribute('aria-hidden', 'true');
+      document.body.appendChild(fxMirror);
+    }
+    const m = fxMirror;
+    wraps.forEach(wrap => {
+      const card = wrap.closest('.dp-item');
+      const preview = wrap.querySelector('.dp-item-effect-preview');
+      const full = preview.dataset.full || preview.textContent;
+      preview.dataset.full = full;
+      const cs = getComputedStyle(preview);
+      m.style.cssText = 'position:absolute;visibility:hidden;left:-99999px;top:0;white-space:normal;'
+        + `width:${preview.clientWidth}px;font-size:${cs.fontSize};font-family:${cs.fontFamily};font-weight:${cs.fontWeight};`
+        + `line-height:${cs.lineHeight};letter-spacing:${cs.letterSpacing};word-break:${cs.wordBreak};overflow-wrap:${cs.overflowWrap};`;
+      const maxH = parseFloat(cs.lineHeight) * 2 + 0.5;
+      m.textContent = full;
+      const overflow = m.offsetHeight > maxH;
+      let overlay = wrap.querySelector('.dp-item-effect-overlay');
+      if (!overflow) { // R7：未溢出——整行直显，无 … 无 hover 无展开层
+        if (preview.textContent !== full) preview.textContent = full;
+        card.classList.remove('has-effect');
+        if (overlay) overlay.remove();
+        return;
+      }
+      // 二分：连 … 一起恰好装满 2 行的最长前缀
+      let lo = 0, hi = full.length;
+      while (lo < hi) {
+        const mid = Math.ceil((lo + hi) / 2);
+        m.textContent = full.slice(0, mid) + '…';
+        if (m.offsetHeight <= maxH) lo = mid; else hi = mid - 1;
+      }
+      m.textContent = '';
+      preview.textContent = full.slice(0, lo) + '…';
+      if (!overlay) {
+        overlay = document.createElement('div');
+        overlay.className = 'dp-item-effect-overlay';
+        wrap.appendChild(overlay);
+      }
+      overlay.textContent = full.slice(lo);
+      card.classList.add('has-effect');
+    });
   }
 
   const emptyText = t => `<div class="dp-empty">${esc(t)}</div>`;
@@ -446,6 +508,10 @@
   function render(enterAnim) {
     // 一级区块级折叠（团本/大秘境两大区块，默认展开，sessionStorage 记忆）
     const collapsed = getCollapsed();
+    // R6（WP3-v3）：来源单选联动折叠——选「团本」大秘境区块整段不渲染（含分组标题）；
+    // 选「大秘境」团本区块整段不渲染；「全部」均展开；与搜索/属性筛选叠加逻辑不变
+    const showRaids = state.source !== 'dungeon';
+    const showDungeons = state.source !== 'raid';
     const secHead = (id, title, extra) => `<div class="dp-section-head dp-section-collapser${collapsed.has(id) ? ' collapsed' : ''}" data-collapse="${id}">
       <div class="dp-section-title">${CARET_BTN}${title}</div>${extra || ''}</div>`;
     const raidsBody = collapsed.has('sec:raids') ? '' : renderRaids();
@@ -463,14 +529,14 @@
             <select id="dpTierSpec" class="form-select"></select>
           </div>`;
     main.innerHTML = `
-      <section class="dp-section">
+      ${showRaids ? `<section class="dp-section">
         ${secHead('sec:raids', '团本掉落池')}
         ${raidsBody}
-      </section>
-      <section class="dp-section">
+      </section>` : ''}
+      ${showDungeons ? `<section class="dp-section">
         ${secHead('sec:dungeons', '大秘境掉落池', mplusToggle)}
         ${mplusBody}
-      </section>
+      </section>` : ''}
       <section class="dp-section">
         ${secHead('sec:tiers', '套装一览', tierFiltersHtml)}
         ${tiersBody}
@@ -484,6 +550,8 @@
       el.onclick = ev => { if (ev.target.closest('.dp-toggle') || ev.target.closest('.dp-tier-filters')) return; toggleCollapse(el.dataset.collapse); };
     });
     bindTierFilters();
+    // R4/R7（WP3-v3）：特效行实测切分——未溢出卡无 … 无 hover 无展开层；溢出卡预览截断+展开层续文
+    measureEffectOverlays();
     // 任务书 #28 WP2（筛选规范 v2.0 §7）：筛选动作触发的重渲染给卡片入场 fade（0.2s ease-out，
     // 仅 opacity/transform，reduced-motion 由 CSS 降级）；视图切换/折叠/套装筛选走默认 render() 无入场动画
     if (enterAnim) main.querySelectorAll('.dp-item').forEach(c => c.classList.add('dp-enter'));

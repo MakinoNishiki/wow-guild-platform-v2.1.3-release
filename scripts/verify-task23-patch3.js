@@ -58,9 +58,10 @@ function assert(cond, label, detail) {
   ];
   console.log(`  [数据] 当前赛季「${cur.name}」：团本掉落 ${bossLoot.length} 行 + 大秘境掉落 ${dunLoot.length} 行`);
 
-  // 任务书 #28 WP2：杂项（slot='杂项'）在数据装载层过滤、页面零渲染——一切页面侧断言基线用排杂后集合
-  const visible = all.filter(l => l.slot !== '杂项');
-  console.log(`  [数据] 杂项 ${all.length - visible.length} 行数据层排除（零渲染），页面渲染基线 = ${visible.length} 件`);
+  // 任务书 #28 WP2：杂项（slot='杂项'）在数据装载层过滤、页面零渲染——一切页面侧断言基线用排杂后集合；
+  // R9（WP3-v3，sql/22）：公开 RPC 增排 item_type IN('装饰品','幻化')，基线同口径
+  const visible = all.filter(l => l.slot !== '杂项' && !['装饰品', '幻化'].includes(l.item_type));
+  console.log(`  [数据] 杂项+装饰品/幻化 ${all.length - visible.length} 行数据层排除（零渲染），页面渲染基线 = ${visible.length} 件`);
 
   const hasCrit = visible.filter(l => (l.secondary_stats || []).includes('爆击'));
   // 三维组合：从真实数据挑一组 来源+主属性+副属性（爆击优先）
@@ -125,7 +126,7 @@ function assert(cond, label, detail) {
   assert(noDropdowns, '右上角部位/类型两个下拉已移除（单形态 chips 筛选条）');
   // 来源单选 chips 值域：「全部」(data-v="") + 当季有数据的来源值（平铺直挂容器，无 .dp-chip-sub 包裹）；
   // 副本任务/专业制造为预留值、当前无数据源恒不渲染（任务书 #28 WP2）
-  const srcChips = await page.evaluate(() => [...document.querySelectorAll('#dpSourceChips > .dp-chip')].map(c => c.dataset.v));
+  const srcChips = await page.evaluate(() => [...document.querySelectorAll('#dpSourceChips .dp-chip')].map(c => c.dataset.v));
   const expectSrc = ['', ...new Set(visible.map(l => l._src))];
   assert(JSON.stringify(srcChips) === JSON.stringify(expectSrc),
     '来源 chips 值域 = 全部 + 当季有数据来源（预留值不渲染）', JSON.stringify(srcChips));

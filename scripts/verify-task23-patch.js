@@ -48,9 +48,10 @@ let serverProc = null, testBossId = null, emptySeasonId = null;
 let ref = null; // 服务端参照数据
 
 // 与页面完全同口径地算参照结果集（赛季内 团本+大秘境 全部掉落，再过筛选谓词）
-// 任务书 #28 WP2（筛选规范 v2.0）：杂项（slot='杂项'）在数据装载层过滤、页面零渲染，参照集同步排除（动态计算，不硬编码件数）
+// 任务书 #28 WP2（筛选规范 v2.0）：杂项（slot='杂项'）在数据装载层过滤、页面零渲染，参照集同步排除（动态计算，不硬编码件数）；
+// R9（WP3-v3，sql/22）：公开 RPC 增排 item_type IN('装饰品','幻化')，参照集同口径
 function refItems(pred) {
-  const all = [...ref.raidLoot, ...ref.dungeonLoot].filter(l => l.slot !== '杂项');
+  const all = [...ref.raidLoot, ...ref.dungeonLoot].filter(l => l.slot !== '杂项' && !['装饰品', '幻化'].includes(l.item_type));
   return all.filter(pred || (() => true)).map(l => l.item_name).sort();
 }
 
