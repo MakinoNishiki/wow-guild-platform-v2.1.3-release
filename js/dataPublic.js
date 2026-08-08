@@ -1,4 +1,6 @@
 // 任务书 #23 WP2：数据公示页（免登录公开，REQ-073）
+// 任务书 #28 WP2：筛选条重构（筛选规范 v2.0）——首行搜索+重置、主/副属性多选、来源单选、
+// 杂项数据层排除零渲染、「排除杂项」开关整块删除、卡片入场/筛选器展开收起动画（§7）。
 // 读取通道：anon key 直连 PostgREST（字典表匿名读，sql/16），不登录、不走 server.js 写代理。
 // 任何加载失败给友好重试界面，不白屏；全部内容只读。
 (function () {
@@ -13,45 +15,35 @@
     dungeons: [], dungeonLoot: [], classes: [], specs: [],
     seasonId: '', dungeonView: 'boss', // boss=按 BOSS（默认） / pool=整体池
     search: '',
-    slots: new Set(), types: new Set(), // 部位/类型 chips 多选（组内 OR、跨组 AND，任务书 #23-补丁3 修正项②）
     primaryStats: new Set(), secondaryStats: new Set(), // 主/副属性多标签筛选（AND，任务书 #23-补丁 修正项③）
-    excludeMisc: false, // 修正项⑥：排除杂项物品（默认关）
+    source: '', // 任务书 #28 WP2：来源单选（''=全部 / raid=团本 / dungeon=大秘境 / quest=副本任务 / profession=专业制造）
     tierClassId: '', tierRole: '', tierSpecId: '', // 套装三维筛选（修正项②）
   };
 
-  // ---- 修正项⑦（任务书 #23-补丁3，运营定稿版）：筛选选项分组排序模板 ----
-  // 部位：甲槽（背部=披风判定）→ 武器槽（含副手物品）→ 首饰（颈部/手指，独立分类，禁止叫饰品槽）
-  //   → 饰品（永远独立）→ 套装兑换物（独立，不与杂项同组）→ 杂项
-  const SLOT_GROUPS = [
-    { label: '护甲', values: ['头部', '肩部', '胸部', '腕部', '手部', '腰部', '腿部', '脚部', '背部'] },
-    { label: '武器', values: ['单手', '双手', '主手', '副手', '副手物品', '远程'] },
-    { label: '首饰', values: ['颈部', '手指'] },
-    { label: '饰品', values: ['饰品'] },
-    { label: '套装兑换物', values: ['套装兑换物'] },
-    { label: '杂项', values: ['杂项'] },
+  // ---- 来源维度（筛选规范 v2.0 §4，运营 2026-08-08 裁定②：单选四值，值域赛季数据驱动） ----
+  // 归组映射（不上界面）：团本=boss_loot（game_raids→赛季归属）；大秘境=dungeon_loot（game_dungeons→赛季链路）；
+  // 副本任务/专业制造=预留值——当前数据模型无此来源，当季无数据时 chip 不渲染（不写死、不置灰占位）。
+  const SOURCE_DEFS = [
+    { key: 'raid', label: '团本' },
+    { key: 'dungeon', label: '大秘境' },
+    { key: 'quest', label: '副本任务' },
+    { key: 'profession', label: '专业制造' },
   ];
-  // 类型：甲型 → 武器（远程武器三连：弓/枪械/弩）→ 首饰 → 饰品（独立）→ 套装兑换物（独立）→ 其它·杂项
-  const TYPE_GROUPS = [
-    { label: '护甲', values: ['板甲', '锁甲', '皮甲', '布甲', '盾牌'] },
-    { label: '武器', values: ['单手锤', '单手斧', '单手剑', '匕首', '拳套', '战刃', '长柄武器', '法杖', '弓', '枪械', '弩', '双手锤', '双手斧', '双手剑', '魔杖', '副手物品'] },
-    { label: '首饰', values: ['戒指', '项链'] },
-    { label: '饰品', values: ['饰品'] },
-    { label: '套装兑换物', values: ['套装兑换物'] },
-  ];
-  // 选项集合从数据动态聚合，但按模板分组排序；模板外新值归「其它·杂项」组保留，禁止丢弃（筛选规范 §4）
-  function groupOrder(values, template) {
-    const pool = new Set(values);
-    const out = [];
-    for (const g of template) {
-      const items = g.values.filter(v => pool.has(v));
-      items.forEach(v => pool.delete(v));
-      if (items.length) out.push({ label: g.label, items });
+  // 某来源当季是否有数据（无数据 → chip 不出现）
+  function sourceHasData(key) {
+    if (key === 'raid') {
+      const raidIds = new Set(state.raids.filter(r => r.season_id === state.seasonId).map(r => r.id));
+      const bossIds = new Set(state.bosses.filter(b => raidIds.has(b.raid_id)).map(b => b.id));
+      return state.loot.some(l => bossIds.has(l.boss_id));
     }
-    if (pool.size) out.push({ label: '其它·杂项', items: [...pool].sort((a, b) => a.localeCompare(b, 'zh')) });
-    return out;
+    if (key === 'dungeon') {
+      const dunIds = new Set(state.dungeons.filter(d => d.season_id === state.seasonId).map(d => d.id));
+      return state.dungeonLoot.some(l => dunIds.has(l.dungeon_id));
+    }
+    return false; // quest/profession：数据模型暂无此来源，恒不渲染
   }
 
-  // 杂项判定唯一口径（修正项④沉底/修正项⑥排除共用）：slot 为「杂项」
+  // 杂项判定唯一口径（任务书 #28 WP2：数据层排除零渲染，装载时过滤；「排除杂项」开关已整块删除）：slot 为「杂项」
   const isMisc = l => l.slot === '杂项';
   // 修正项④：装备 → 套装兑换物（独立分类）→ 杂项（永远最后）；同组内按部位/名称稳定排序
   function sortLoot(items) {
@@ -126,6 +118,10 @@
         restGet('/game_specs?select=*'),
       ]);
       Object.assign(state, { seasons, raids, bosses, loot, tierSets, dungeons, dungeonLoot, classes, specs });
+      // 任务书 #28 WP2：杂项数据层排除（slot=杂项 全表过滤，页面零渲染、筛选零入口）；
+      // _src 行标记 = 来源单选判定依据（boss_loot→raid / dungeon_loot→dungeon）
+      state.loot = state.loot.filter(l => !isMisc(l)).map(l => ({ ...l, _src: 'raid' }));
+      state.dungeonLoot = state.dungeonLoot.filter(l => !isMisc(l)).map(l => ({ ...l, _src: 'dungeon' }));
     } catch (e) {
       showError(e.message || '数据加载失败');
       return;
@@ -137,36 +133,39 @@
     state.seasonId = current ? current.id : '';
     $('dpSeasonSelect').innerHTML = seasons.map(s =>
       `<option value="${s.id}" ${s.id === state.seasonId ? 'selected' : ''}>${esc(s.name)}${s.is_current ? '（当前）' : ''}</option>`).join('');
-    $('dpSeasonSelect').onchange = e => { state.seasonId = e.target.value; resetFilters(); render(); };
+    $('dpSeasonSelect').onchange = e => { state.seasonId = e.target.value; resetFilters(); renderSourceChips(); render(); };
 
-    // 筛选条（结构 = 筛选规范 §2 唯一合法布局：四组各行 → 排除杂项行 → 搜索框独立行）
-    const allLoot = [...state.loot, ...state.dungeonLoot];
-    buildGroupedChips($('dpSlotChips'), groupOrder(allLoot.map(l => l.slot).filter(Boolean), SLOT_GROUPS), state.slots);
-    buildGroupedChips($('dpTypeChips'), groupOrder(allLoot.map(l => l.item_type).filter(Boolean), TYPE_GROUPS), state.types);
+    // 筛选条（结构 = 筛选规范 v2.0 §2 唯一合法布局：首行搜索+重置 → 主属性组 → 副属性组 → 来源组，区头标题层级）
+    renderSourceChips();
     // REQ-084（任务书 #23-补丁6）：搜索框清除钮——有内容才显示、点击/Esc 清空还原全集、焦点留输入框
     const searchInput = $('dpSearch'), searchClear = $('dpSearchClear');
     const syncSearchClear = () => { searchClear.style.display = searchInput.value ? 'block' : 'none'; };
     const clearSearch = () => {
-      searchInput.value = ''; state.search = ''; syncSearchClear(); searchInput.focus(); render();
+      searchInput.value = ''; state.search = ''; syncSearchClear(); searchInput.focus(); render(true);
     };
-    searchInput.oninput = e => { state.search = e.target.value.trim().toLowerCase(); syncSearchClear(); render(); };
+    searchInput.oninput = e => { state.search = e.target.value.trim().toLowerCase(); syncSearchClear(); render(true); };
     searchInput.onkeydown = e => { if (e.key === 'Escape' && searchInput.value) clearSearch(); };
     searchClear.onclick = clearSearch;
-    // 排除杂项开关（默认关）+ 问号说明（悬浮/点击）
-    $('dpExcludeMisc').onchange = e => { state.excludeMisc = e.target.checked; render(); };
-    $('dpMiscHelp').onclick = e => { e.preventDefault(); e.stopPropagation(); $('dpMiscHelp').classList.toggle('open'); };
-    document.addEventListener('click', () => $('dpMiscHelp').classList.remove('open'));
-    // 移动端（≤768px）筛选条整体折叠为「筛选 ▾」按钮（筛选规范 §6）
+    // 重置筛选（任务书 #28 WP2：一键清空全部筛选 + 搜索词，还原默认全集）
+    $('dpResetFilters').onclick = () => { resetFilters(); render(true); };
+    // 移动端（≤768px）筛选条整体折叠为「筛选 ▾」按钮（筛选规范 v2.0 §6）；
+    // 收起走 .closing 退出动画（0.2s ease-out，仅 opacity/transform），reduced-motion 直收
     $('dpFilterToggle').onclick = () => {
-      const bar = $('dpFilterBar');
-      const open = bar.classList.toggle('filters-open');
-      $('dpFilterToggle').textContent = open ? '筛选 ▴' : '筛选 ▾';
+      const bar = $('dpFilterBar'), rows = $('dpFilterRows');
+      const open = bar.classList.contains('filters-open');
+      const reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      if (!open) { bar.classList.add('filters-open'); $('dpFilterToggle').textContent = '筛选 ▴'; return; }
+      $('dpFilterToggle').textContent = '筛选 ▾';
+      if (reduced) { bar.classList.remove('filters-open'); return; }
+      if (rows.classList.contains('closing')) return; // 收起动画中防连点
+      rows.classList.add('closing');
+      setTimeout(() => { rows.classList.remove('closing'); bar.classList.remove('filters-open'); }, 200);
     };
 
     // 主/副属性多标签筛选（任务书 #23-补丁 修正项③：多标签 AND；
     // #23-补丁2 修正项③：筛选项为 WoW 封闭枚举固定全量——主：力量/敏捷/智力，副：爆击/急速/精通/全能，
     // 不再从已录入数据聚合；选中无匹配装备时显示空结果属正常；
-    // 筛选规范 §2 布局：主/副属性行无「全部」chip（未选中即不过滤））
+    // 筛选规范 v2.0 §2 布局：主/副属性组无「全部」chip（未选中即不过滤））
     buildChips($('dpPrimaryChips'), ['力量', '敏捷', '智力'], state.primaryStats);
     buildChips($('dpSecondaryChips'), ['爆击', '急速', '精通', '全能'], state.secondaryStats);
 
@@ -190,58 +189,50 @@
         const v = ch.dataset.v;
         if (stateSet.has(v)) stateSet.delete(v); else stateSet.add(v);
         syncChipRow(container, stateSet);
-        render();
+        render(true);
       };
     });
   }
 
-  // 分组 chips（筛选规范 §3/§4：「全部」chip 恒为组内第一个、选中 = 该组不过滤；
-  // 子类组按模板排序、组间 1px 竖分隔线）
-  function buildGroupedChips(container, groups, stateSet) {
+  // 来源单选 chips（筛选规范 v2.0 §4）：「全部」+ 当季有数据的来源值；
+  // 单选互斥——点已选中的值 chip 回「全部」；state.source 不在当季值域时回落 ''（赛季切换场景）
+  function renderSourceChips() {
+    const container = $('dpSourceChips');
     if (!container) return;
-    container.innerHTML = `<span class="dp-chip dp-chip-all${stateSet.size === 0 ? ' active' : ''}" data-v="">全部</span>` +
-      groups.map(g =>
-        `<span class="dp-chip-sub"><span class="dp-chip-group-label">${esc(g.label)}</span>` +
-        g.items.map(v => `<span class="dp-chip" data-v="${esc(v)}">${esc(v)}</span>`).join('') + '</span>'
-      ).join('<span class="dp-chip-divider"></span>');
-    container.querySelector('.dp-chip-all').onclick = () => {
-      if (!stateSet.size) return;
-      stateSet.clear();
-      syncChipRow(container, stateSet);
-      render();
-    };
-    container.querySelectorAll('.dp-chip:not(.dp-chip-all)').forEach(ch => {
+    const avail = SOURCE_DEFS.filter(d => sourceHasData(d.key));
+    if (state.source && !avail.some(d => d.key === state.source)) state.source = '';
+    container.innerHTML =
+      `<span class="dp-chip dp-chip-all${state.source === '' ? ' active' : ''}" data-v="">全部</span>` +
+      (avail.length ? `<span class="dp-chip-divider"></span>` : '') +
+      avail.map(d =>
+        `<span class="dp-chip${state.source === d.key ? ' active' : ''}" data-v="${esc(d.key)}">${esc(d.label)}</span>`).join('');
+    container.querySelectorAll('.dp-chip').forEach(ch => {
       ch.onclick = () => {
         const v = ch.dataset.v;
-        if (stateSet.has(v)) stateSet.delete(v); else stateSet.add(v);
-        syncChipRow(container, stateSet);
-        render();
+        state.source = (v && state.source !== v) ? v : '';
+        renderSourceChips();
+        render(true);
       };
     });
   }
 
-  // 赛季切换后全部筛选重置为默认（修正项③；筛选规范 §5：每组回「全部」、开关关、搜索清空）
+  // 全部筛选重置为默认（赛季切换 / 「重置筛选」按钮共用；筛选规范 v2.0 §5：每组回「全部」、来源回「全部」、搜索清空）
   function resetFilters() {
     state.search = '';
-    state.slots.clear(); state.types.clear();
     state.primaryStats.clear(); state.secondaryStats.clear();
-    state.excludeMisc = false;
+    state.source = '';
     state.tierClassId = ''; state.tierRole = ''; state.tierSpecId = '';
-    $('dpSearch').value = ''; $('dpSearchClear').style.display = 'none'; $('dpExcludeMisc').checked = false;
-    syncChipRow($('dpSlotChips'), state.slots);
-    syncChipRow($('dpTypeChips'), state.types);
+    $('dpSearch').value = ''; $('dpSearchClear').style.display = 'none';
     syncChipRow($('dpPrimaryChips'), state.primaryStats);
     syncChipRow($('dpSecondaryChips'), state.secondaryStats);
+    renderSourceChips();
   }
 
-  const hasLootFilter = () => !!(state.search || state.slots.size || state.types.size
-    || state.primaryStats.size || state.secondaryStats.size || state.excludeMisc);
+  const hasLootFilter = () => !!(state.search || state.primaryStats.size || state.secondaryStats.size || state.source);
 
-  // ---- 筛选（组内 OR、跨组 AND；主/副属性标签 AND；排除杂项即时隐藏） ----
+  // ---- 筛选（搜索 AND；主/副属性标签 AND；来源单选等值） ----
   function matchItem(l) {
-    if (state.excludeMisc && isMisc(l)) return false;
-    if (state.slots.size && !state.slots.has(l.slot)) return false;
-    if (state.types.size && !state.types.has(l.item_type)) return false;
+    if (state.source && l._src !== state.source) return false; // quest/profession 无行带此 _src，选中即空结果（当前值域不含这两值）
     if (state.search && !String(l.item_name || '').toLowerCase().includes(state.search)) return false;
     // 主/副属性：多标签 AND（选中标签必须全部出现在该装备对应数组中）
     if (state.primaryStats.size && ![...state.primaryStats].every(s => (l.primary_stats || []).includes(s))) return false;
@@ -402,7 +393,7 @@
     specSel.onchange = e => { state.tierSpecId = e.target.value; render(); };
   }
 
-  function render() {
+  function render(enterAnim) {
     // 一级区块级折叠（团本/大秘境两大区块，默认展开，sessionStorage 记忆）
     const collapsed = getCollapsed();
     const secHead = (id, title, extra) => `<div class="dp-section-head dp-section-collapser${collapsed.has(id) ? ' collapsed' : ''}" data-collapse="${id}">
@@ -447,6 +438,9 @@
       card.onclick = () => card.classList.toggle('expanded');
     });
     bindTierFilters();
+    // 任务书 #28 WP2（筛选规范 v2.0 §7）：筛选动作触发的重渲染给卡片入场 fade（0.2s ease-out，
+    // 仅 opacity/transform，reduced-motion 由 CSS 降级）；视图切换/折叠/套装筛选走默认 render() 无入场动画
+    if (enterAnim) main.querySelectorAll('.dp-item').forEach(c => c.classList.add('dp-enter'));
   }
 
   boot();

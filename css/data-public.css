@@ -39,24 +39,26 @@
   border-bottom: 1px solid var(--border-color);
 }
 .dp-filterbar .search-input { flex: 1; min-width: 200px; }
-.dp-filterbar .form-select { width: 150px; }
-.dp-misc-row, .dp-search-row { width: 100%; }
-/* BUG-055（任务书 #23-补丁7 修法变更，补丁6 的 64px 缩进撤销）：misc 行不缩进，
-   勾选框左缘与组头盒/搜索框行左缘同一条竖线（左缘对齐定稿） */
-.dp-search-row .search-input { width: 100%; box-sizing: border-box; padding-right: 36px; /* REQ-084：清除钮让位 */ }
 
-/* 移动端（≤768px）筛选条整体折叠为「筛选 ▾」按钮（筛选规范 §6），桌面恒展开 */
+/* 筛选规范 v2.0 §2（任务书 #28 WP2）：首行 = 搜索（置顶加宽 flex:1）+ 重置筛选按钮（不放任何 chip）；
+   小类别自第二行起，每组 = 区头标题（独占一行）+ chips 行；部位/类型细粒度取消；「排除杂项」整块删除 */
+.dp-filter-rows { display: flex; flex-direction: column; gap: 10px; width: 100%; }
+.dp-top-row { display: flex; gap: 10px; align-items: center; width: 100%; }
+.dp-search-wrap { flex: 1; min-width: 200px; }
+.dp-top-row .search-input { width: 100%; box-sizing: border-box; padding-right: 36px; /* REQ-084：清除钮让位 */ }
+.dp-reset-btn { flex: none; }
+.dp-group { display: flex; flex-direction: column; gap: 6px; width: 100%; }
+.dp-group-head { font-size: 12px; font-weight: 600; color: var(--text-secondary); letter-spacing: 0.02em; }
+.dp-group-note { font-size: 11px; font-weight: 400; color: var(--text-muted); margin-left: 6px; user-select: none; }
+
+/* 移动端（≤768px）筛选条整体折叠为「筛选 ▾」按钮（筛选规范 v2.0 §8），桌面恒展开 */
 .dp-filter-toggle { display: none; }
 
-/* 筛选 chips（规范 v2 §4.3/§5 + 筛选规范 §3：24px 恒定高、12px 圆角、12px/500、深底；
-   组头 56px 左对齐 12px 次级色、与首行 chip 同基线，组头/misc 行/搜索框行左缘同一条竖线
-   （任务书 #23-补丁7 BUG-055 定稿）；chip 间 6px、子类组间 8px + 1px 竖分隔线 16px 高
-   ——任务书 #23-补丁4 修正项③） */
-.dp-chip-row { display: flex; align-items: flex-start; gap: 8px; flex-wrap: wrap; width: 100%; }
-.dp-chip-label { font-size: 12px; color: var(--text-secondary); flex-shrink: 0; width: 56px; text-align: left; line-height: 24px; }
+/* 筛选 chips（规范 v2 §4.3 + 筛选规范 v2.0 §3：24px 恒定高、12px 圆角、12px/500、line-height:1 中文光学居中
+   （BUG-054 定稿）、深底；选中态金描边+金文字+10% 金底——多选/单选同一样式；chip 间 6px、
+   来源行「全部」与四值间 1px 竖分隔线 16px 高） */
 .dp-chips { display: flex; flex-wrap: wrap; column-gap: 0; row-gap: 6px; align-items: center; flex: 1; min-width: 0; }
 .dp-chip-sub { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; row-gap: 6px; min-width: 0; }
-.dp-chip-group-label { font-size: 11px; color: var(--text-muted); user-select: none; line-height: 24px; flex: none; white-space: nowrap; }
 .dp-chip-divider { width: 1px; height: 16px; background: var(--border-color); margin: 0 8px; flex: none; align-self: center; }
 .dp-chip {
   display: inline-flex;
@@ -83,10 +85,16 @@
 
 @media (max-width: 768px) {
   .dp-filter-toggle { display: inline-flex; align-items: center; }
-  .dp-filterbar:not(.filters-open) .dp-chip-row,
-  .dp-filterbar:not(.filters-open) .dp-misc-row,
-  .dp-filterbar:not(.filters-open) .dp-search-row { display: none; }
+  .dp-filterbar:not(.filters-open) .dp-filter-rows { display: none; }
+  /* 筛选规范 v2.0 §7：展开收起动画 150–250ms ease-out，只动 transform/opacity */
+  .dp-filterbar.filters-open .dp-filter-rows { animation: dpRowsIn 0.2s ease-out; }
+  .dp-filter-rows.closing { opacity: 0; transform: translateY(-6px); transition: opacity 0.2s ease-out, transform 0.2s ease-out; }
 }
+@keyframes dpRowsIn { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
+
+/* 筛选规范 v2.0 §7：筛选/搜索触发卡片重渲染入场 fade+轻微上浮（只动 transform/opacity，出场不做） */
+.dp-item.dp-enter { animation: dpCardIn 0.2s ease-out both; }
+@keyframes dpCardIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 
 /* 任务书 #23-补丁 修正项②：套装三维筛选条 */
 .dp-tier-filters { display: flex; gap: 8px; flex-wrap: wrap; }
@@ -249,25 +257,8 @@
 }
 
 /* ==================== 任务书 #23-补丁3：公示页交互优化 ==================== */
-/* 修正项⑥：排除杂项开关 + 问号帮助 */
-.dp-misc-toggle { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-secondary); cursor: pointer; user-select: none; }
-.dp-help {
-  position: relative;
-  display: inline-flex; align-items: center; justify-content: center;
-  width: 16px; height: 16px; border-radius: 50%;
-  border: 1px solid var(--border-color);
-  font-size: 11px; color: var(--text-muted); cursor: help;
-}
-.dp-help-pop {
-  position: absolute; left: 50%; top: calc(100% + 6px); transform: translateX(-50%);
-  width: 240px; padding: 8px 10px;
-  background: var(--bg-card); border: 1px solid var(--gold); border-radius: 6px;
-  font-size: 12px; color: var(--text-secondary); line-height: 1.6;
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
-  opacity: 0; visibility: hidden; transition: opacity .2s ease;
-  z-index: 40; cursor: default;
-}
-.dp-help:hover .dp-help-pop, .dp-help:focus .dp-help-pop, .dp-help.open .dp-help-pop { opacity: 1; visibility: visible; }
+/* （任务书 #28 WP2：「排除杂项」开关与问号帮助整块删除——杂项改数据层排除零渲染，
+    .dp-misc-toggle/.dp-help/.dp-help-pop 样式随 DOM 一并移除） */
 
 /* 折叠（区块/副本/BOSS 三级，任务书 #23-补丁4 修正项②：24×24 热区 + 2px 描边箭头，
    常态次要色、悬浮提亮，三级同规格；默认展开=向下，折叠=向右旋转 -90°） */
@@ -336,9 +327,11 @@
   border-top: 1px solid var(--border-color);
 }
 
-/* 规范 v2 §6：尊重 prefers-reduced-motion（公示页全部过渡降级为瞬时） */
+/* 规范 v2 §6：尊重 prefers-reduced-motion（公示页全部过渡/动画降级为瞬时） */
 @media (prefers-reduced-motion: reduce) {
-  .dp-item-effect-overlay, .dp-collapse-btn svg, .dp-help-pop { transition: none; }
+  .dp-item-effect-overlay, .dp-collapse-btn svg { transition: none; }
+  .dp-item.dp-enter, .dp-filterbar.filters-open .dp-filter-rows { animation: none; }
+  .dp-filter-rows.closing { transition: none; }
 }
 
 @media (max-width: 768px) {

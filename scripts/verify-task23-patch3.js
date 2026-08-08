@@ -1,4 +1,6 @@
 // 任务书 #23-补丁3 验证脚本：公示页交互优化（七修正项）
+// 2026-08-08 适配任务书 #28 WP2（筛选规范 v2.0）：部位/类型两维筛选与「排除杂项」开关已 abolish——
+// 四维组合改三维（来源+主+副）、部位/类型分组排序断言整段删除、杂项沉底改零渲染、开关用例改 DOM 不存在断言。
 // 公示页为免登录只读页（live 数据），本脚本不创建任何测试数据。
 // 用法：node scripts/verify-task23-patch3.js
 const fs = require('fs');
@@ -49,24 +51,31 @@ function assert(cond, label, detail) {
   const dungeonIds = new Set(dungeons.map(d => d.id));
   const bossLoot = (await rest('/boss_loot?select=*&limit=2000')).filter(l => bossIdsInSeason.has(l.boss_id));
   const dunLoot = (await rest('/dungeon_loot?select=*&limit=2000')).filter(l => dungeonIds.has(l.dungeon_id));
-  const all = [...bossLoot, ...dunLoot];
+  // _src 行标记 = 来源单选判定依据（boss_loot→raid / dungeon_loot→dungeon），与 js/dataPublic.js 装载口径一致
+  const all = [
+    ...bossLoot.map(l => ({ ...l, _src: 'raid' })),
+    ...dunLoot.map(l => ({ ...l, _src: 'dungeon' })),
+  ];
   console.log(`  [数据] 当前赛季「${cur.name}」：团本掉落 ${bossLoot.length} 行 + 大秘境掉落 ${dunLoot.length} 行`);
 
-  const hasCrit = all.filter(l => (l.secondary_stats || []).includes('爆击'));
-  // 四维组合：从真实数据挑一组 slot+type+primary+secondary（爆击优先）
+  // 任务书 #28 WP2：杂项（slot='杂项'）在数据装载层过滤、页面零渲染——一切页面侧断言基线用排杂后集合
+  const visible = all.filter(l => l.slot !== '杂项');
+  console.log(`  [数据] 杂项 ${all.length - visible.length} 行数据层排除（零渲染），页面渲染基线 = ${visible.length} 件`);
+
+  const hasCrit = visible.filter(l => (l.secondary_stats || []).includes('爆击'));
+  // 三维组合：从真实数据挑一组 来源+主属性+副属性（爆击优先）
   let combo = null;
-  for (const it of all) {
+  for (const it of visible) {
     const p = (it.primary_stats || []).find(x => ['力量', '敏捷', '智力'].includes(x));
     const s = (it.secondary_stats || []).find(x => ['爆击', '急速', '精通', '全能'].includes(x));
-    if (it.slot && it.item_type && p && s) {
-      combo = { slot: it.slot, type: it.item_type, primary: p, secondary: s };
-      combo.count = all.filter(l => l.slot === combo.slot && l.item_type === combo.type
-        && (l.primary_stats || []).includes(combo.primary) && (l.secondary_stats || []).includes(combo.secondary)
-        && !(false)).length;
+    if (p && s) {
+      combo = { source: it._src, sourceLabel: it._src === 'raid' ? '团本' : '大秘境', primary: p, secondary: s };
+      combo.count = visible.filter(l => l._src === combo.source
+        && (l.primary_stats || []).includes(combo.primary) && (l.secondary_stats || []).includes(combo.secondary)).length;
       break;
     }
   }
-  if (!combo) throw new Error('无法从真实数据构造四维组合');
+  if (!combo) throw new Error('无法从真实数据构造三维组合');
 
   // 数据断言（防再犯）：item_type='装饰' 不得出现在非杂项 slot
   for (const t of ['boss_loot', 'dungeon_loot']) {
@@ -95,7 +104,7 @@ function assert(cond, label, detail) {
 
   const cardCount = () => page.evaluate(() => document.querySelectorAll('.dp-item').length);
   const totalCards = await cardCount();
-  assert(totalCards === all.length, `无筛选基线：卡片数 = 当前赛季掉落总行数（${all.length}）`, `页面 ${totalCards}`);
+  assert(totalCards === visible.length, `无筛选基线：卡片数 = 当前赛季掉落排杂后总行数（${visible.length}）`, `页面 ${totalCards}`);
 
   // ================= ① 爆击 =================
   console.log('—— ① 爆击订正 ——');
@@ -110,68 +119,42 @@ function assert(cond, label, detail) {
   await sleep(500);
   assert(await cardCount() === totalCards, '清空筛选还原（卡片数回到基线）');
 
-  // ================= ② 合并筛选条四维组合 =================
-  console.log('—— ② 合并筛选条四维组合 ——');
+  // ================= ② 筛选条三维组合（来源+主属性+副属性） =================
+  console.log('—— ② 筛选条三维组合 ——');
   const noDropdowns = await page.evaluate(() => !document.getElementById('dpSlotFilter') && !document.getElementById('dpTypeFilter'));
   assert(noDropdowns, '右上角部位/类型两个下拉已移除（单形态 chips 筛选条）');
-  await page.click(`#dpSlotChips .dp-chip[data-v="${combo.slot}"]`);
-  await page.click(`#dpTypeChips .dp-chip[data-v="${combo.type}"]`);
+  // 来源单选 chips 值域：「全部」(data-v="") + 当季有数据的来源值（平铺直挂容器，无 .dp-chip-sub 包裹）；
+  // 副本任务/专业制造为预留值、当前无数据源恒不渲染（任务书 #28 WP2）
+  const srcChips = await page.evaluate(() => [...document.querySelectorAll('#dpSourceChips > .dp-chip')].map(c => c.dataset.v));
+  const expectSrc = ['', ...new Set(visible.map(l => l._src))];
+  assert(JSON.stringify(srcChips) === JSON.stringify(expectSrc),
+    '来源 chips 值域 = 全部 + 当季有数据来源（预留值不渲染）', JSON.stringify(srcChips));
+  await page.click(`#dpSourceChips .dp-chip[data-v="${combo.source}"]`);
   await page.click(`#dpPrimaryChips .dp-chip[data-v="${combo.primary}"]`);
   await page.click(`#dpSecondaryChips .dp-chip[data-v="${combo.secondary}"]`);
   await sleep(600);
   const comboCards = await cardCount();
   assert(comboCards === combo.count && comboCards > 0,
-    `四维组合（${combo.slot}+${combo.type}+${combo.primary}+${combo.secondary}）：页面 ${comboCards} = 库内 ${combo.count}`);
+    `三维组合（${combo.sourceLabel}+${combo.primary}+${combo.secondary}）：页面 ${comboCards} = 库内 ${combo.count}`);
   const comboConsistent = await page.evaluate(c => {
     return [...document.querySelectorAll('.dp-item')].every(el => {
       const t = el.textContent;
-      return t.includes(c.slot) && t.includes(c.type) && t.includes(c.primary) && t.includes(c.secondary);
+      return t.includes(c.primary) && t.includes(c.secondary);
     });
   }, combo);
-  assert(comboConsistent, '四维组合结果每张卡片四要素齐全');
-  for (const sel of [`#dpSlotChips .dp-chip[data-v="${combo.slot}"]`, `#dpTypeChips .dp-chip[data-v="${combo.type}"]`, `#dpPrimaryChips .dp-chip[data-v="${combo.primary}"]`, `#dpSecondaryChips .dp-chip[data-v="${combo.secondary}"]`]) {
+  assert(comboConsistent, '三维组合结果每张卡片主/副属性齐全');
+  // 筛选触发的重渲染给卡片加 .dp-enter 入场类（筛选规范 v2.0 §7）
+  const hasEnter = await page.evaluate(() => {
+    const cards = [...document.querySelectorAll('.dp-item')];
+    return cards.length > 0 && cards.every(c => c.classList.contains('dp-enter'));
+  });
+  assert(hasEnter, '筛选重渲染卡片带 .dp-enter 入场类');
+  for (const sel of [`#dpSourceChips .dp-chip[data-v="${combo.source}"]`, `#dpPrimaryChips .dp-chip[data-v="${combo.primary}"]`, `#dpSecondaryChips .dp-chip[data-v="${combo.secondary}"]`]) {
     await page.click(sel);
   }
   await sleep(500);
-  assert(await cardCount() === totalCards, '四维清空还原（卡片数回到基线）');
+  assert(await cardCount() === totalCards, '三维清空还原（卡片数回到基线）');
   await page.screenshot({ path: path.join(SHOT_DIR, '01-filterbar-groups-1366.png') });
-
-  // ================= ⑦ 分组排序（先断言顺序，趁无筛选） =================
-  console.log('—— ⑦ 筛选选项分组排序 ——');
-  const slotOrder = await page.evaluate(() => [...document.querySelectorAll('#dpSlotChips .dp-chip:not(.dp-chip-all)')].map(c => c.dataset.v)); // 「全部」chip（data-v=""）不参与排序断言
-  const expectSlots = ['头部', '肩部', '胸部', '腕部', '手部', '腰部', '腿部', '脚部', '背部',
-    '单手', '双手', '主手', '副手', '副手物品', '远程', '颈部', '手指', '饰品', '套装兑换物', '杂项']
-    .filter(v => slotOrder.includes(v));
-  assert(JSON.stringify(slotOrder.slice(0, expectSlots.length)) === JSON.stringify(expectSlots) && !slotOrder.includes('披风'),
-    '部位组按模板排序（护甲→武器→首饰→饰品→套装兑换物→杂项；背部=披风判定）', JSON.stringify(slotOrder));
-  const miscLast = slotOrder[slotOrder.length - 1] === '杂项' || slotOrder.indexOf('杂项') > slotOrder.indexOf('套装兑换物');
-  assert(miscLast, '部位组：套装兑换物独立成组、杂项最后');
-  const typeSeq = await page.evaluate(() => {
-    const seq = [];
-    document.querySelectorAll('#dpTypeChips > *').forEach(el => {
-      seq.push(el.classList.contains('dp-chip-group-label') ? '#' + el.textContent : el.dataset.v);
-    });
-    return seq;
-  });
-  const armorIdx = ['板甲', '锁甲', '皮甲', '布甲', '盾牌'].map(v => typeSeq.indexOf(v)).filter(i => i >= 0);
-  const weaponIdx = ['单手锤', '单手斧', '单手剑', '匕首', '拳套', '战刃', '长柄武器', '法杖', '弓', '枪械', '弩', '双手锤', '双手斧', '双手剑', '魔杖'].map(v => typeSeq.indexOf(v)).filter(i => i >= 0);
-  const otherIdx = typeSeq.indexOf('#其它');
-  assert(Math.max(...armorIdx) < Math.min(...weaponIdx) && (otherIdx === -1 || Math.max(...weaponIdx) < otherIdx),
-    '类型组：甲型 → 武器 → … → 其它 有序');
-  if (typeSeq.includes('弩')) {
-    // 弩为模板内正式成员（远程武器三连：弓/枪械/弩相邻，#23-补丁3 模板补充）
-    const bowI = typeSeq.indexOf('弓'), gunI = typeSeq.indexOf('枪械'), crossI = typeSeq.indexOf('弩');
-    assert(bowI !== -1 && gunI === bowI + 1 && crossI === gunI + 1 && (otherIdx === -1 || crossI < otherIdx),
-      '弩在武器组内与弓/枪械相邻（远程三连），不入「其它」组');
-    assert(typeSeq.indexOf('装饰') > otherIdx && otherIdx !== -1, '模板外值（装饰等）仍归「其它」组保留');
-  } else {
-    console.log('  [跳过] 当前数据无「弩」值，模板外归组由「装饰/附魔」等代验');
-    if (typeSeq.includes('装饰')) {
-      assert(otherIdx !== -1 && typeSeq.indexOf('装饰') > otherIdx, '模板外值（装饰等）归「其它」组保留');
-    } else {
-      console.log('  [跳过] 当前数据无「装饰」等模板外值（库内数据漂移），归组断言无样本可验');
-    }
-  }
 
   // ================= ③ 卡片同尺寸 + 展开 =================
   console.log('—— ③ 特效卡片 ——');
@@ -222,29 +205,29 @@ function assert(cond, label, detail) {
   await page.mouse.move(5, 5);
   await sleep(400);
 
-  // ================= ④ 杂项沉底 =================
-  console.log('—— ④ 杂项沉底 ——');
-  const sink = await page.evaluate(() => {
+  // ================= ④ 杂项零渲染 + 套装兑换物排序 =================
+  console.log('—— ④ 杂项零渲染 ——');
+  const order = await page.evaluate(() => {
     const bad = [];
     document.querySelectorAll('.dp-items').forEach(grid => {
       const cards = [...grid.querySelectorAll('.dp-item')];
       const slots = cards.map(c => (c.querySelector('.dp-tag') || {}).textContent || '');
-      const firstMisc = slots.findIndex(s => s === '杂项');
-      const lastNonMisc = slots.map((s, i) => s !== '杂项' && s !== '套装兑换物' ? i : -1).reduce((a, b) => Math.max(a, b), -1);
+      const lastEquip = slots.map((s, i) => s !== '套装兑换物' ? i : -1).reduce((a, b) => Math.max(a, b), -1);
       const lastToken = slots.map((s, i) => s === '套装兑换物' ? i : -1).reduce((a, b) => Math.max(a, b), -1);
-      if (firstMisc !== -1 && (lastNonMisc > firstMisc || lastToken > firstMisc)) bad.push(slots.join(','));
-      if (lastToken !== -1 && lastNonMisc > lastToken) bad.push('套装兑换物未在装备后:' + slots.join(','));
+      if (lastToken !== -1 && lastEquip > lastToken) bad.push('套装兑换物未在装备后:' + slots.join(','));
     });
     return bad;
   });
-  assert(sink.length === 0, '杂项沉底：所有网格 装备 → 套装兑换物 → 杂项', sink[0] || '');
+  assert(order.length === 0, '卡片排序：所有网格 装备 → 套装兑换物（杂项已不存在）', order[0] || '');
+  const miscTagsAny = await page.evaluate(() => [...document.querySelectorAll('.dp-tag')].filter(t => t.textContent === '杂项').length);
+  assert(miscTagsAny === 0, '杂项零渲染：全页 .dp-tag 不含「杂项」（数据装载层排除）', `出现 ${miscTagsAny} 处`);
   await page.evaluate(() => {
     const grids = [...document.querySelectorAll('.dp-items')];
-    const g = grids.find(x => [...x.querySelectorAll('.dp-item .dp-tag')].some(t => t.textContent === '杂项'));
+    const g = grids.find(x => [...x.querySelectorAll('.dp-item .dp-tag')].some(t => t.textContent === '套装兑换物'));
     if (g) g.scrollIntoView({ block: 'center' });
   });
   await sleep(400);
-  await page.screenshot({ path: path.join(SHOT_DIR, '03-misc-sink.png') });
+  await page.screenshot({ path: path.join(SHOT_DIR, '03-sort-order.png') });
 
   // ================= ⑤ 两级折叠 + 记忆 =================
   console.log('—— ⑤ 分区折叠 ——');
@@ -286,36 +269,14 @@ function assert(cond, label, detail) {
   await page.evaluate(id => document.querySelector(`[data-collapse="${id}"]`).click(), bossId);
   await sleep(300);
 
-  // ================= ⑥ 排除杂项开关 =================
-  console.log('—— ⑥ 排除杂项开关 ——');
-  const miscDefault = await page.evaluate(() => document.getElementById('dpExcludeMisc').checked);
-  assert(miscDefault === false, '「排除杂项物品」默认关');
-  const helpText = await page.evaluate(() => document.querySelector('#dpMiscHelp .dp-help-pop').textContent);
-  assert(helpText === '勾选后仅显示装备，屏蔽坐骑、玩具、装饰、配方、幻化及垃圾等杂项物品', '问号说明文本正确', helpText);
-  await page.click('#dpMiscHelp');
-  await sleep(300);
-  const helpVisible = await page.evaluate(() => {
-    const cs = getComputedStyle(document.querySelector('#dpMiscHelp .dp-help-pop'));
-    return parseFloat(cs.opacity) === 1;
-  });
-  assert(helpVisible, '问号点击展开说明');
-  await page.screenshot({ path: path.join(SHOT_DIR, '06-misc-help.png') });
-  await page.evaluate(() => document.body.click());
-  const miscCountBefore = await page.evaluate(() => [...document.querySelectorAll('.dp-item .dp-tag')].filter(t => t.textContent === '杂项').length);
-  await page.check('#dpExcludeMisc');
-  await sleep(500);
-  const miscCountAfter = await page.evaluate(() => [...document.querySelectorAll('.dp-item .dp-tag')].filter(t => t.textContent === '杂项').length);
-  assert(miscCountBefore > 0 && miscCountAfter === 0, `勾选后杂项卡片即时隐藏（${miscCountBefore} → 0）`);
-  // 叠加筛选不冲突：开关 + 爆击
-  await page.click('#dpSecondaryChips .dp-chip[data-v="爆击"]');
-  await sleep(500);
-  const stacked = await cardCount();
-  const expectStack = hasCrit.filter(l => l.slot !== '杂项').length;
-  assert(stacked === expectStack, `叠加筛选不冲突（排除杂项 + 爆击：页面 ${stacked} = 库内 ${expectStack}）`);
-  await page.click('#dpSecondaryChips .dp-chip[data-v="爆击"]');
-  await page.uncheck('#dpExcludeMisc');
-  await sleep(500);
-  assert(await cardCount() === totalCards, '开关与筛选全部还原');
+  // ================= ⑥ 「排除杂项」开关整块删除 =================
+  console.log('—— ⑥ 排除杂项开关删除 ——');
+  const gone = await page.evaluate(() =>
+    document.getElementById('dpExcludeMisc') === null && document.getElementById('dpMiscHelp') === null);
+  assert(gone, '「排除杂项」开关与问号帮助已从 DOM 整块删除');
+  const miscTags = await page.evaluate(() => [...document.querySelectorAll('.dp-tag')].filter(t => t.textContent === '杂项').length);
+  assert(miscTags === 0, '杂项零渲染（无开关、默认即数据层排杂）', `出现 ${miscTags} 处`);
+  assert(await cardCount() === visible.length, `默认全集计数 = 排杂动态基线（页面 = 库内 ${visible.length}）`);
 
   // ================= 两档截图 + 控制台 =================
   await page.evaluate(() => window.scrollTo(0, 0));

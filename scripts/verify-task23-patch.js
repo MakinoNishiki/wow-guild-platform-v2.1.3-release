@@ -48,8 +48,9 @@ let serverProc = null, testBossId = null, emptySeasonId = null;
 let ref = null; // 服务端参照数据
 
 // 与页面完全同口径地算参照结果集（赛季内 团本+大秘境 全部掉落，再过筛选谓词）
+// 任务书 #28 WP2（筛选规范 v2.0）：杂项（slot='杂项'）在数据装载层过滤、页面零渲染，参照集同步排除（动态计算，不硬编码件数）
 function refItems(pred) {
-  const all = [...ref.raidLoot, ...ref.dungeonLoot];
+  const all = [...ref.raidLoot, ...ref.dungeonLoot].filter(l => l.slot !== '杂项');
   return all.filter(pred || (() => true)).map(l => l.item_name).sort();
 }
 
@@ -288,7 +289,7 @@ const eqSet = (a, b) => a.length === b.length && a.every((v, i) => v === b[i]);
       // 赛季切换后筛选重置（仅 1366 档）：挂上筛选 → 切空赛季 → 控件全部复位
       if (vp.tag === '1366') {
         await clickChip('#dpPrimaryChips', '力量');
-        await clickChip('#dpSlotChips', '武器'); // 补丁3 起部位/类型为 chips（组内 OR），原 #dpSlotFilter 下拉已移除
+        await clickChip('#dpSourceChips', 'raid'); // 任务书 #28 WP2 起部位/类型筛选彻底取消（#dpSlotChips 不存在），改挂 v2.0 等价维度：来源单选
         await page.fill('#dpSearch', 'T23X');
         await sleep(500);
         await page.selectOption('#dpSeasonSelect', emptySeasonId);

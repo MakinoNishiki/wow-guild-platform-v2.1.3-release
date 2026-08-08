@@ -1,4 +1,6 @@
-// 任务书 #23-补丁4 验证：展开文本衔接（①）+ 三级折叠（②）+ 筛选条 PRD 规范化（③）
+// 任务书 #23-补丁4 验证：展开文本衔接（①）+ 三级折叠（②）+ 筛选条规范核验（③）
+// ③ 已按任务书 #28 WP2（筛选规范 v2.0）重构口径改锚：v1.0 部位/类型二维与「排除杂项」已彻底取消，
+// 现覆盖 = 行序/区头层级/chip 规格、来源单选互斥、重置筛选、杂项零渲染、§7 动画、§8 移动端折叠。
 // 公示页为免登录只读页（live 数据），本脚本不创建任何测试数据，收尾复核 T23X 遗留为零。
 // 用法: node scripts/verify-task23-patch4.js（PW_CHANNEL=chrome 可选）截图输出 backup/2026-08-07-task23-patch4/
 const fs = require('fs');
@@ -40,6 +42,19 @@ function assert(cond, label, detail) {
 (async () => {
   fs.mkdirSync(SHOT_DIR, { recursive: true });
 
+  // ---- node 侧：§7 动画规格文本断言（css/data-public.css）——时长 150-250ms ease-out、只动 transform/opacity ----
+  const dpCss = fs.readFileSync(path.join(ROOT, 'css', 'data-public.css'), 'utf8');
+  const ruleOf = sel => { const m = dpCss.match(new RegExp(sel.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s*\\{[^}]*\\}')); return m ? m[0] : ''; };
+  const closingRule = ruleOf('.dp-filter-rows.closing');
+  const enterRule = ruleOf('.dp-item.dp-enter');
+  const kfCard = (dpCss.match(/@keyframes dpCardIn\s*\{[\s\S]*?\n\}/) || [''])[0];
+  const kfRows = (dpCss.match(/@keyframes dpRowsIn\s*\{[\s\S]*?\n\}/) || [''])[0];
+  const onlyTransformOpacity = s => !/(width|height|margin|padding|top|left|right|bottom|background|box-shadow)\s*[:)]/.test(s.replace(/ease-out|transform:|opacity:/g, ''));
+  assert(/0\.(15|2|25)s ease-out|0\.2s ease-out/.test(closingRule) && /opacity/.test(closingRule) && /transform/.test(closingRule) && onlyTransformOpacity(closingRule),
+    '§7[CSS] 筛选条收起过渡 150-250ms ease-out、仅 opacity/transform', closingRule.slice(0, 120));
+  assert(/0\.2s ease-out/.test(enterRule) && /opacity/.test(kfCard) && /transform/.test(kfCard) && /opacity/.test(kfRows) && /transform/.test(kfRows),
+    '§7[CSS] 卡片入场/面板展开动画 0.2s ease-out、keyframes 仅 opacity/transform');
+
   // ---- node 侧：当前赛季参照数据（按行计，不按名去重——同名跨 BOSS 重复掉落是合法重复行） ----
   const seasons = await rest('/game_seasons?select=*');
   const cur = seasons.find(s => s.is_current) || seasons.sort((a, b) => String(a.start_date).localeCompare(String(b.start_date))).pop();
@@ -48,14 +63,19 @@ function assert(cond, label, detail) {
   const bossRows = await rest('/game_bosses?select=id,raid_id,dungeon_id&limit=1000');
   const bossIdsInSeason = new Set(bossRows.filter(b => raids.some(r => r.id === b.raid_id)).map(b => b.id));
   const dungeonIds = new Set(dungeons.map(d => d.id));
-  const raidLoot = (await rest('/boss_loot?select=*&limit=2000')).filter(l => bossIdsInSeason.has(l.boss_id));
-  const dunLoot = (await rest('/dungeon_loot?select=*&limit=2000')).filter(l => dungeonIds.has(l.dungeon_id));
+  const raidLootRaw = (await rest('/boss_loot?select=*&limit=2000')).filter(l => bossIdsInSeason.has(l.boss_id));
+  const dunLootRaw = (await rest('/dungeon_loot?select=*&limit=2000')).filter(l => dungeonIds.has(l.dungeon_id));
+  // 任务书 #28 WP2（筛选规范 v2.0）：杂项（slot='杂项'）数据层排除、页面零渲染——期望值按非杂项口径计算
+  const nMisc = [...raidLootRaw, ...dunLootRaw].filter(l => l.slot === '杂项').length;
+  const raidLoot = raidLootRaw.filter(l => l.slot !== '杂项');
+  const dunLoot = dunLootRaw.filter(l => l.slot !== '杂项');
   const all = [...raidLoot, ...dunLoot];
+  const nRaid = raidLoot.length, nDun = dunLoot.length;
   const nCrit = all.filter(l => (l.secondary_stats || []).includes('爆击')).length;
   const nStr = all.filter(l => (l.primary_stats || []).includes('力量')).length;
   const nCombo = all.filter(l => (l.primary_stats || []).includes('力量') && (l.secondary_stats || []).includes('爆击')).length;
-  console.log(`  [数据] 当前赛季「${cur.name}」：全集 ${all.length} 行｜爆击 ${nCrit}｜力量 ${nStr}｜力量AND爆击 ${nCombo}（按行计）`);
-  console.log(`  [基准] 运营给定参照：全集 411 / 爆击 167 / 力量 101 / 组合 45 → ${all.length === 411 && nCrit === 167 && nStr === 101 && nCombo === 45 ? '与库内一致' : '库内已变动，以库内实测为准'}`);
+  console.log(`  [数据] 当前赛季「${cur.name}」：非杂项全集 ${all.length} 行（团本 ${nRaid} + 大秘境 ${nDun}，已排除杂项 ${nMisc} 行）｜爆击 ${nCrit}｜力量 ${nStr}｜力量AND爆击 ${nCombo}（按行计）`);
+  console.log(`  [基准] v2.0 口径参照：全集 343（190−51 + 221−17）→ ${all.length === 343 ? '与库内一致' : '库内已变动，以库内实测为准'}`);
   // ① 用 3 张最长特效卡
   const effectCards = all.filter(l => l.effect && l.effect.length >= 30).sort((a, b) => b.effect.length - a.effect.length);
   const picked = [];
@@ -89,103 +109,137 @@ function assert(cond, label, detail) {
     }, [row, v]);
     const cardCount = () => page.evaluate(() => document.querySelectorAll('.dp-item').length);
 
-    // ============ 修正项③：PRD 逐节核验 ============
-    console.log('—— ③ 筛选条 PRD 逐节核验 ——');
-    // §2 布局顺序：四组各行 → 排除杂项行 → 搜索框独立行（折叠按钮首位，桌面隐藏）
-    const order = await page.evaluate(() => [...document.getElementById('dpFilterBar').children].map(e =>
-      e.id === 'dpFilterToggle' ? 'toggle' : e.querySelector('#dpSlotChips') ? 'slot' : e.querySelector('#dpTypeChips') ? 'type'
-      : e.querySelector('#dpPrimaryChips') ? 'primary' : e.querySelector('#dpSecondaryChips') ? 'secondary'
-      : e.classList.contains('dp-misc-row') ? 'misc' : e.classList.contains('dp-search-row') ? 'search' : '?'));
-    assert(JSON.stringify(order) === JSON.stringify(['toggle', 'slot', 'type', 'primary', 'secondary', 'misc', 'search']),
-      '§2 布局顺序：四组各行 → 排除杂项行 → 搜索框独立行', order.join('>'));
-    // §3 chip 尺寸体系
+    // ============ 修正项③：筛选规范 v2.0 逐节核验（任务书 #28 WP2 重构后口径） ============
+    console.log('—— ③ 筛选条 v2.0 逐节核验 ——');
+    // §2 布局：dpFilterBar = [dpFilterToggle, dpFilterRows]；rows 内行序 = 顶行（搜索+重置）→ 主属性组 → 副属性组 → 来源组
+    const layout = await page.evaluate(() => {
+      const bar = document.getElementById('dpFilterBar');
+      const rows = document.getElementById('dpFilterRows');
+      const top = rows.querySelector('.dp-top-row');
+      return {
+        barKids: [...bar.children].map(e => e.id),
+        rowKids: [...rows.children].map(e => e.classList.contains('dp-top-row') ? 'top'
+          : (e.querySelector('.dp-group-head') ? e.querySelector('.dp-group-head').childNodes[0].textContent.trim() : '?')),
+        topKids: [...top.children].map(e => e.classList.contains('dp-search-wrap') ? 'search' : e.id),
+        searchInWrap: !!top.querySelector('.dp-search-wrap #dpSearch'),
+        searchFlex: getComputedStyle(top.querySelector('.dp-search-wrap')).flexGrow,
+        resetText: document.getElementById('dpResetFilters').textContent.trim(),
+        heads: [...rows.querySelectorAll('.dp-group-head')].map(h => h.childNodes[0].textContent.trim()),
+        notes: [...rows.querySelectorAll('.dp-group-note')].map(n => n.textContent),
+        searchPh: document.getElementById('dpSearch').placeholder,
+      };
+    });
+    assert(JSON.stringify(layout.barKids) === JSON.stringify(['dpFilterToggle', 'dpFilterRows']),
+      '§2 筛选条结构：折叠按钮在前、dpFilterRows 在后', layout.barKids.join('>'));
+    assert(JSON.stringify(layout.rowKids) === JSON.stringify(['top', '主属性', '副属性', '来源']),
+      '§2 行序：顶行（搜索+重置）→ 主属性组 → 副属性组 → 来源组', layout.rowKids.join('>'));
+    assert(JSON.stringify(layout.topKids) === JSON.stringify(['search', 'dpResetFilters']) && layout.searchInWrap
+      && layout.searchFlex === '1' && layout.resetText === '重置筛选' && layout.searchPh.includes('…'),
+      '§2 顶行 = 搜索（置顶加宽 flex:1、占位省略号）+ 重置筛选按钮（不放 chip）', JSON.stringify(layout.topKids));
+    assert(JSON.stringify(layout.heads) === JSON.stringify(['主属性', '副属性', '来源'])
+      && JSON.stringify(layout.notes) === JSON.stringify(['多选', '多选', '单选 · 值域随赛季数据驱动']),
+      '§2 区头标题层级：主属性/副属性/来源 + 各带说明注记', JSON.stringify(layout.notes));
+    // §3 chip 视觉规格（锚到仍存在的主属性组）
     const chipCss = await page.evaluate(() => {
-      const c = document.querySelector('#dpSlotChips .dp-chip:not(.dp-chip-all)');
+      const c = document.querySelector('#dpPrimaryChips .dp-chip');
       const s = getComputedStyle(c);
       return { h: s.height, r: s.borderRadius, fs: s.fontSize, fw: s.fontWeight, bg: s.backgroundColor };
     });
     assert(chipCss.h === '24px' && chipCss.r === '12px' && chipCss.fs === '12px' && chipCss.fw === '500',
       '§3 chip 24px 高 / 12px 圆角 / 12px / 500', JSON.stringify(chipCss));
     assert(chipCss.bg === 'rgb(30, 37, 46)', '§3 chip 默认态深底（--bg-card）', chipCss.bg);
-    // §3 组头 56px 左对齐 12px 次级色，与首行 chip 同基线（§6 折行也对齐首行）
-    // （任务书 #23-补丁7 BUG-055 修法变更：右对齐→左对齐，组头/misc 行/搜索框行左缘同一条竖线）
-    const labelCss = await page.evaluate(() => {
-      const l = document.querySelector('.dp-chip-row .dp-chip-label');
-      const s = getComputedStyle(l);
-      const chip = document.querySelector('#dpSlotChips .dp-chip');
-      return { w: s.width, ta: s.textAlign, fs: s.fontSize, lh: s.lineHeight, color: s.color,
-        topDiff: Math.abs(l.getBoundingClientRect().top - chip.getBoundingClientRect().top) };
+    // §3 区头 12px/600 次级色
+    const headCss = await page.evaluate(() => {
+      const s = getComputedStyle(document.querySelector('.dp-group-head'));
+      return { fs: s.fontSize, fw: s.fontWeight, color: s.color };
     });
-    assert(labelCss.w === '56px' && labelCss.ta === 'left' && labelCss.fs === '12px' && labelCss.color === 'rgb(139, 148, 158)',
-      '§3 组头 56px 左对齐 12px 次级色', JSON.stringify(labelCss));
-    assert(labelCss.lh === '24px' && labelCss.topDiff <= 1, '§2/§6 组头与首行 chip 同基线（顶对齐+24px 行高）', `lineHeight=${labelCss.lh} topDiff=${labelCss.topDiff}`);
-    // §3 左缘一条竖线（补丁7 定稿）：组头四标签/misc 勾选框/搜索框左缘同线，chip 列基线（1366 档 217）不动
-    const align = await page.evaluate(() => {
-      const labelLefts = [...document.querySelectorAll('.dp-chip-label')].map(l => l.getBoundingClientRect().left);
-      const chipL = document.querySelector('#dpSlotChips .dp-chip').getBoundingClientRect().left;
-      const miscRow = document.querySelector('.dp-misc-row');
-      const miscBoxL = document.getElementById('dpExcludeMisc').getBoundingClientRect().left;
-      const searchL = document.querySelector('.dp-search-row .search-input').getBoundingClientRect().left;
-      return { labelLefts, chipL, miscPadL: getComputedStyle(miscRow).paddingLeft, miscBoxL, searchL };
-    });
-    assert(align.labelLefts.length === 4 && align.labelLefts.every(x => Math.abs(x - align.labelLefts[0]) <= 1),
-      '§3 组头四标签左缘同一条竖线', JSON.stringify(align.labelLefts));
-    assert(align.miscPadL === '0px' && Math.abs(align.miscBoxL - align.labelLefts[0]) <= 1 && Math.abs(align.searchL - align.labelLefts[0]) <= 1,
-      '§3 misc 勾选框/搜索框左缘与组头盒同线（misc 行零缩进）', JSON.stringify(align));
-    assert(Math.abs(align.chipL - 217) <= 1, '§3 chip 列 217 基线不动（1366 档）', `实测 ${align.chipL}`);
-    // §2 chip 间距 6px、组间 8px + 1px 竖分隔线 16px
+    assert(headCss.fs === '12px' && headCss.fw === '600' && headCss.color === 'rgb(139, 148, 158)',
+      '§3 区头 12px / 600 / 次级色', JSON.stringify(headCss));
+    // §3 组内 chip 间距 6px；来源行「全部」与值间 1px 竖分隔线 16px 高 + 8px 间距
     const gaps = await page.evaluate(() => {
-      const sub = document.querySelector('#dpSlotChips .dp-chip-sub');
-      const chips = [...sub.querySelectorAll('.dp-chip')];
+      const chips = [...document.querySelectorAll('#dpPrimaryChips .dp-chip-sub .dp-chip')];
       const g = chips[1].getBoundingClientRect().left - chips[0].getBoundingClientRect().right;
-      const div = document.querySelector('#dpSlotChips .dp-chip-divider');
+      const div = document.querySelector('#dpSourceChips .dp-chip-divider');
       const ds = getComputedStyle(div);
-      const before = div.previousElementSibling;
-      const gapBefore = div.getBoundingClientRect().left - before.getBoundingClientRect().right;
+      const gapBefore = div.getBoundingClientRect().left - div.previousElementSibling.getBoundingClientRect().right;
       return { chipGap: g, dw: ds.width, dh: ds.height, gapBefore };
     });
-    assert(Math.abs(gaps.chipGap - 6) <= 0.5, '§2 组内 chip 间距 6px', `实测 ${gaps.chipGap}`);
+    assert(Math.abs(gaps.chipGap - 6) <= 0.5, '§3 组内 chip 间距 6px', `实测 ${gaps.chipGap}`);
     assert(gaps.dw === '1px' && gaps.dh === '16px' && Math.abs(gaps.gapBefore - 8) <= 0.5,
-      '§3 子类间 1px 竖分隔线（16px 高）+ 组间 8px', JSON.stringify(gaps));
-    // §4 分组排序模板
-    const subLabels = row => page.evaluate(r => [...document.querySelectorAll(`${r} .dp-chip-sub .dp-chip-group-label`)].map(e => e.textContent), row);
-    const slotLabels = await subLabels('#dpSlotChips');
-    const typeLabels = await subLabels('#dpTypeChips');
-    assert(slotLabels[0] === '护甲' && slotLabels[1] === '武器' && slotLabels[slotLabels.length - 1] === '杂项',
-      '§4 部位组模板：护甲→武器→…→杂项（杂项最后）', slotLabels.join('/'));
-    const typeSubs = await page.evaluate(() => [...document.querySelectorAll('#dpTypeChips .dp-chip-sub')].map(s =>
-      ({ label: s.querySelector('.dp-chip-group-label').textContent, hasCrossbow: [...s.querySelectorAll('.dp-chip')].some(c => c.dataset.v === '弩') })));
-    const xbow = typeSubs.find(s => s.hasCrossbow);
-    assert(typeSubs[0].label === '护甲' && xbow && xbow.label === '武器', '§4 类型组模板：护甲首组、弩在武器组（远程三连）', JSON.stringify(typeSubs.map(s => s.label)));
-    const leftovers = typeLabels.filter(l => !['护甲', '武器', '首饰', '饰品', '套装兑换物'].includes(l));
-    assert(leftovers.every(l => l === '其它·杂项'), '§4 模板外新值归「其它·杂项」不丢弃', leftovers.join('/') || '无模板外值');
-    // §3 「全部」chip 恒为第一、默认选中 = 不过滤；点值 chip 后「全部」失焦；点「全部」清空还原
-    const allChipFlow = await page.evaluate(() => {
-      const row = document.getElementById('dpSlotChips');
-      const first = row.querySelector('.dp-chip');
-      const r0 = { firstIsAll: first.classList.contains('dp-chip-all') && first.textContent === '全部', defaultActive: first.classList.contains('active') };
-      row.querySelector('.dp-chip:not(.dp-chip-all)').click();
-      const r1 = { allOffAfterPick: !row.querySelector('.dp-chip-all').classList.contains('active') };
-      return { ...r0, ...r1 };
+      '§3 来源行 1px 竖分隔线（16px 高）+ 8px 间距', JSON.stringify(gaps));
+    // §4 结构：主/副属性 chips 包一层 .dp-chip-sub；来源组平铺；值域 = 「全部」+ 当季有数据的来源（副本任务/专业制造恒不渲染）
+    const expSrcVals = ['', ...(nRaid > 0 ? ['raid'] : []), ...(nDun > 0 ? ['dungeon'] : [])];
+    const srcDom = await page.evaluate(() => {
+      const first = document.querySelector('#dpSourceChips .dp-chip');
+      return {
+        primWrapped: !!document.querySelector('#dpPrimaryChips > .dp-chip-sub'),
+        secWrapped: !!document.querySelector('#dpSecondaryChips > .dp-chip-sub'),
+        srcFlat: !document.querySelector('#dpSourceChips .dp-chip-sub'),
+        vals: [...document.querySelectorAll('#dpSourceChips .dp-chip')].map(c => c.dataset.v),
+        firstIsAll: first.classList.contains('dp-chip-all') && first.textContent === '全部' && first.classList.contains('active'),
+      };
     });
-    await sleep(400);
-    assert(allChipFlow.firstIsAll && allChipFlow.defaultActive && allChipFlow.allOffAfterPick,
-      '§3 「全部」chip 恒为第一、默认选中、选值后失焦', JSON.stringify(allChipFlow));
-    await clickChip('#dpSlotChips', ''); // 点「全部」清空部位组
-    await sleep(400);
-    const afterAll = await page.evaluate(() => ({
-      allBack: document.querySelector('#dpSlotChips .dp-chip-all').classList.contains('active'),
+    assert(srcDom.primWrapped && srcDom.secWrapped && srcDom.srcFlat,
+      '§4 主/副属性 chips 包 .dp-chip-sub、来源组平铺', JSON.stringify(srcDom));
+    assert(JSON.stringify(srcDom.vals) === JSON.stringify(expSrcVals) && srcDom.firstIsAll,
+      '§4 来源值域赛季数据驱动：「全部」首位默认选中 + 团本/大秘境（无数据来源不渲染）', srcDom.vals.join('/'));
+    // §4 来源单选互斥：点 raid → raid active/全部失活、页面仅剩团本卡；点 dungeon → 互斥切换；再点已选 dungeon → 回全部
+    await clickChip('#dpSourceChips', 'raid');
+    await sleep(500);
+    const src1 = await page.evaluate(() => {
+      const dSec = [...document.querySelectorAll('.dp-section')][1];
+      return {
+        raidActive: document.querySelector('#dpSourceChips .dp-chip[data-v="raid"]').classList.contains('active'),
+        allOff: !document.querySelector('#dpSourceChips .dp-chip-all').classList.contains('active'),
+        cards: document.querySelectorAll('.dp-item').length,
+        dungeonCards: dSec.querySelectorAll('.dp-item').length,
+        dungeonEmpty: !!dSec.querySelector('.dp-empty'),
+        enterAnim: !!document.querySelector('.dp-item.dp-enter'),
+      };
+    });
+    assert(src1.raidActive && src1.allOff && src1.cards === nRaid && src1.dungeonCards === 0 && src1.dungeonEmpty,
+      '§4 来源单选「团本」：全部失活、页面仅剩团本卡（大秘境区块空态）', JSON.stringify(src1));
+    assert(src1.enterAnim, '§7 筛选交互触发的重渲染给卡片加 .dp-enter 入场动画');
+    await clickChip('#dpSourceChips', 'dungeon');
+    await sleep(500);
+    const src2 = await page.evaluate(() => ({
+      dungeonActive: document.querySelector('#dpSourceChips .dp-chip[data-v="dungeon"]').classList.contains('active'),
+      raidOff: !document.querySelector('#dpSourceChips .dp-chip[data-v="raid"]').classList.contains('active'),
       cards: document.querySelectorAll('.dp-item').length,
     }));
-    assert(afterAll.allBack && afterAll.cards === all.length, '§3 点「全部」清空该组并还原全集', JSON.stringify(afterAll));
-    // §5 排除杂项默认关 + 问号逐字文案 + 搜索框独立行占位
-    const miscState = await page.evaluate(() => ({
-      off: !document.getElementById('dpExcludeMisc').checked,
-      help: document.querySelector('.dp-help-pop').textContent,
-      ph: document.getElementById('dpSearch').placeholder,
+    assert(src2.dungeonActive && src2.raidOff && src2.cards === nDun,
+      '§4 来源单选互斥切换「大秘境」', JSON.stringify(src2));
+    await clickChip('#dpSourceChips', 'dungeon'); // 再点已选中的值 → 回「全部」
+    await sleep(500);
+    const src3 = await page.evaluate(() => ({
+      allBack: document.querySelector('#dpSourceChips .dp-chip-all').classList.contains('active'),
+      noValActive: document.querySelectorAll('#dpSourceChips .dp-chip.active:not(.dp-chip-all)').length,
+      cards: document.querySelectorAll('.dp-item').length,
     }));
-    assert(miscState.off && miscState.help === '勾选后仅显示装备，屏蔽坐骑、玩具、装饰、配方、幻化及垃圾等杂项物品' && miscState.ph.includes('…'),
-      '§5 排除杂项默认关 + 问号逐字文案 + 搜索框占位省略号', JSON.stringify(miscState));
+    assert(src3.allBack && src3.noValActive === 0 && src3.cards === all.length,
+      '§4 再点已选值回「全部」并还原全集', JSON.stringify(src3));
+    // §5 杂项零渲染：「排除杂项」开关/问号帮助 DOM 不存在，全页 .dp-tag 无「杂项」
+    const miscGone = await page.evaluate(() => ({
+      noExclude: !document.getElementById('dpExcludeMisc'),
+      noHelp: !document.getElementById('dpMiscHelp') && !document.querySelector('.dp-help-pop') && !document.querySelector('.dp-misc-toggle'),
+      miscTags: [...document.querySelectorAll('.dp-tag')].filter(t => t.textContent === '杂项').length,
+    }));
+    assert(miscGone.noExclude && miscGone.noHelp && miscGone.miscTags === 0,
+      '§5 杂项零渲染：排除杂项开关/帮助 DOM 不存在、全页无「杂项」标签', JSON.stringify(miscGone));
+    // §5 「重置筛选」一键还原：任意筛选+搜索词状态下点击 → 搜索空、仅来源「全部」active、卡片回基线
+    await clickChip('#dpPrimaryChips', '力量');
+    await page.fill('#dpSearch', 'abc');
+    await sleep(400);
+    await page.click('#dpResetFilters');
+    await sleep(500);
+    const resetBtn = await page.evaluate(() => ({
+      search: document.getElementById('dpSearch').value,
+      activeVals: document.querySelectorAll('.dp-filterbar .dp-chip.active:not(.dp-chip-all)').length,
+      allActive: document.querySelectorAll('#dpSourceChips .dp-chip-all.active').length,
+      cards: document.querySelectorAll('.dp-item').length,
+    }));
+    assert(resetBtn.search === '' && resetBtn.activeVals === 0 && resetBtn.allActive === 1 && resetBtn.cards === all.length,
+      '§5 「重置筛选」一键还原：搜索清空、值 chip 全清、来源「全部」回选、卡片回基线', JSON.stringify(resetBtn));
     // 筛选条两档截图
     await page.evaluate(() => window.scrollTo(0, 0));
     await sleep(200);
@@ -371,7 +425,7 @@ function assert(cond, label, detail) {
 
     // ============ 赛季切换筛选重置（回归，含「全部」chip 复位） ============
     await clickChip('#dpPrimaryChips', '力量');
-    await clickChip('#dpSlotChips', '单手');
+    await clickChip('#dpSourceChips', 'raid');
     await page.fill('#dpSearch', 'test');
     await sleep(300);
     await page.selectOption('#dpSeasonSelect', otherSeason.id);
@@ -380,10 +434,9 @@ function assert(cond, label, detail) {
       activeVals: document.querySelectorAll('.dp-filterbar .dp-chip.active:not(.dp-chip-all)').length,
       allChips: document.querySelectorAll('.dp-filterbar .dp-chip-all.active').length,
       search: document.getElementById('dpSearch').value,
-      misc: document.getElementById('dpExcludeMisc').checked,
     }));
-    assert(reset.activeVals === 0 && reset.allChips === 2 && !reset.search && !reset.misc,
-      '③§5 赛季切换全重置（值 chip 全清、两组「全部」回选、搜索清空、开关关）', JSON.stringify(reset));
+    assert(reset.activeVals === 0 && reset.allChips === 1 && !reset.search,
+      '③§5 赛季切换全重置（值 chip 全清、来源「全部」回选、搜索清空）', JSON.stringify(reset));
     await page.selectOption('#dpSeasonSelect', cur.id);
     await sleep(800);
 
@@ -397,11 +450,16 @@ function assert(cond, label, detail) {
     await page2.waitForSelector('.dp-item', { timeout: 20000 });
     await sleep(800);
     const rows1920 = await page2.evaluate(() => {
-      const tops = new Set([...document.querySelectorAll('.dp-chip-row')].map(r => Math.round(r.getBoundingClientRect().top)));
-      const wrap = [...document.querySelectorAll('.dp-chip-row')].map(r => r.getBoundingClientRect().height);
-      return { rows: tops.size, heights: wrap.map(Math.round) };
+      const rows = document.getElementById('dpFilterRows');
+      const kids = [...rows.children];
+      const tops = new Set(kids.map(r => Math.round(r.getBoundingClientRect().top)));
+      const toggleHidden = getComputedStyle(document.getElementById('dpFilterToggle')).display === 'none';
+      const groupLines = [...rows.querySelectorAll('.dp-group')].map(g =>
+        new Set([...g.querySelectorAll('.dp-chip')].map(c => Math.round(c.getBoundingClientRect().top))).size);
+      return { kids: kids.length, rows: tops.size, toggleHidden, groupLines };
     });
-    assert(rows1920.rows === 4, '③§6 1920×1080 四组各一行（无折行）', JSON.stringify(rows1920));
+    assert(rows1920.kids === 4 && rows1920.rows === 4 && rows1920.toggleHidden && rows1920.groupLines.every(n => n === 1),
+      '③§6 1920×1080 桌面档：toggle 隐藏、顶行+三组各一行（组内无折行）', JSON.stringify(rows1920));
     await page2.evaluate(() => window.scrollTo(0, 0));
     await page2.screenshot({ path: path.join(SHOT_DIR, '1920-filterbar.png') });
     // 1920 展开逐字比对一例 + 截图
@@ -420,7 +478,7 @@ function assert(cond, label, detail) {
     await page2.screenshot({ path: path.join(SHOT_DIR, '1920-expand-after.png') });
     await ctx2.close();
 
-    // ============ 移动端档：筛选条折叠（§6） ============
+    // ============ 移动端档：筛选条折叠（§8）+ 收起动画（§7） ============
     const ctx3 = await browser.newContext({ viewport: { width: 390, height: 844 } });
     const page3 = await ctx3.newPage();
     page3.on('pageerror', e => pageErrors.push('pageerror(m): ' + e.message));
@@ -430,17 +488,51 @@ function assert(cond, label, detail) {
     await sleep(500);
     const mob = await page3.evaluate(async () => {
       const toggle = document.getElementById('dpFilterToggle');
-      const rowsHidden = [...document.querySelectorAll('.dp-chip-row')].every(r => getComputedStyle(r).display === 'none');
-      const r0 = { toggleVisible: getComputedStyle(toggle).display !== 'none', rowsHidden, text0: toggle.textContent };
+      const rows = document.getElementById('dpFilterRows');
+      const bar = document.getElementById('dpFilterBar');
+      const r0 = { toggleVisible: getComputedStyle(toggle).display !== 'none',
+        rowsHidden: getComputedStyle(rows).display === 'none', text0: toggle.textContent };
       toggle.click();
       await new Promise(r => setTimeout(r, 300));
-      const r1 = { rowsShown: [...document.querySelectorAll('.dp-chip-row')].every(r => getComputedStyle(r).display !== 'none'), text1: toggle.textContent };
-      return { ...r0, ...r1 };
+      const r1 = { rowsShown: getComputedStyle(rows).display !== 'none', text1: toggle.textContent,
+        open: bar.classList.contains('filters-open') };
+      // 收起：先挂 .closing 退出动画（200ms），动画结束后才移除 filters-open
+      toggle.click();
+      const r2 = { closing: rows.classList.contains('closing'), stillOpen: bar.classList.contains('filters-open') };
+      await new Promise(r => setTimeout(r, 300));
+      const r3 = { closed: !bar.classList.contains('filters-open'), closingGone: !rows.classList.contains('closing'),
+        rowsHiddenAgain: getComputedStyle(rows).display === 'none' };
+      return { ...r0, ...r1, ...r2, ...r3 };
     });
-    assert(mob.toggleVisible && mob.rowsHidden && mob.rowsShown && mob.text0.includes('▾') && mob.text1.includes('▴'),
-      '③§6 移动端筛选条折叠为「筛选 ▾」按钮，点击展开面板', JSON.stringify(mob));
+    assert(mob.toggleVisible && mob.rowsHidden && mob.text0.includes('▾'),
+      '③§8 移动端筛选条默认折叠为「筛选 ▾」按钮', JSON.stringify(mob));
+    assert(mob.rowsShown && mob.open && mob.text1.includes('▴'),
+      '③§8 点击展开面板（filters-open，文案变 ▴）', JSON.stringify(mob));
+    assert(mob.closing && mob.stillOpen && mob.closed && mob.closingGone && mob.rowsHiddenAgain,
+      '③§7 收起走 .closing 退出动画（200ms 后移除 filters-open）', JSON.stringify(mob));
     await page3.screenshot({ path: path.join(SHOT_DIR, '390-mobile-filter-open.png') });
     await ctx3.close();
+    // §7 prefers-reduced-motion：直收，无 .closing 过渡
+    const ctx4 = await browser.newContext({ viewport: { width: 390, height: 844 }, reducedMotion: 'reduce' });
+    const page4 = await ctx4.newPage();
+    page4.on('pageerror', e => pageErrors.push('pageerror(rm): ' + e.message));
+    page4.on('response', r => { if (r.status() === 404) notFounds.push('rm: ' + r.url()); });
+    await page4.goto(`${BASE}/data.html`, { waitUntil: 'networkidle' });
+    await page4.waitForSelector('.dp-item', { timeout: 20000 });
+    await sleep(500);
+    const rm = await page4.evaluate(async () => {
+      const toggle = document.getElementById('dpFilterToggle');
+      const rows = document.getElementById('dpFilterRows');
+      const bar = document.getElementById('dpFilterBar');
+      toggle.click();
+      await new Promise(r => setTimeout(r, 100));
+      const opened = bar.classList.contains('filters-open');
+      toggle.click();
+      return { opened, closing: rows.classList.contains('closing'), closedNow: !bar.classList.contains('filters-open') };
+    });
+    assert(rm.opened && !rm.closing && rm.closedNow,
+      '③§7 prefers-reduced-motion：收起直收（无 .closing，立即移除 filters-open）', JSON.stringify(rm));
+    await ctx4.close();
     await ctx.close();
 
     const realErrors = pageErrors.filter(e => !e.includes('status of 406'));
