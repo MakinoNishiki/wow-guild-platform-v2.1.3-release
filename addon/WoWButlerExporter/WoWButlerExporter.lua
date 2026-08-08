@@ -9,8 +9,13 @@
 --   原有字段格式不变，向后兼容）
 -- （1.0.6：修复 gsub 次返回值误入 tonumber base 致数值行必炸（bad argument #2）；
 --   probe 新增物品级诊断 /wjdc probe <物品ID>）
+-- （1.0.7：四难度档采集（任务书 #29 WP1）——团本掉落按 随机/普通/英雄/史诗
+--   四档切 EJ 难度、取当档 link 重扫 tooltip，产出 primary_tiers/secondary_tiers
+--   （{lfr/normal/heroic/mythic} 枚举 key，只记存在的档）；
+--   切档通道不可用自动回退单档采集（tiers 不产出）并红字报告；
+--   大秘境无四难度（钥石层数缩放）不产 tiers；原字段格式零改动、向后兼容）
 -- ============================================================
-local ADDON_VERSION = "1.0.6"
+local ADDON_VERSION = "1.0.7"
 
 local function msg(s) DEFAULT_CHAT_FRAME:AddMessage("|cffffd200[wjdc]|r " .. s) end
 local function err(s) DEFAULT_CHAT_FRAME:AddMessage("|cffff4040[wjdc]|r " .. s) end
@@ -35,10 +40,7 @@ end
 local tip = CreateFrame("GameTooltip", "WJDCScanTip", UIParent, "GameTooltipTemplate")
 tip:SetOwner(WorldFrame, "ANCHOR_NONE")
 
-local function scanLines(itemID)
-  tip:ClearLines()
-  local ok = pcall(function() tip:SetItemByID(itemID) end)
-  if not ok then return nil end
+local function readTipLines()
   local lines, n = {}, tip:NumLines() or 0
   for i = 1, n do
     local fs = _G["WJDCScanTipTextLeft" .. i]
@@ -46,6 +48,22 @@ local function scanLines(itemID)
     if t and t ~= "" then lines[#lines + 1] = t end
   end
   return lines
+end
+
+local function scanLines(itemID)
+  tip:ClearLines()
+  local ok = pcall(function() tip:SetItemByID(itemID) end)
+  if not ok then return nil end
+  return readTipLines()
+end
+
+-- 链接扫描（1.0.7，任务书 #29 WP1）：EJ 掉落表 link 字段已按当前手册难度缩放，
+-- SetHyperlink 重扫拿到的即该档数值（SetItemByID 不受 EJ 难度影响，四档同值，不能用于切档）
+local function scanLink(link)
+  tip:ClearLines()
+  local ok = pcall(function() tip:SetHyperlink(link) end)
+  if not ok then return nil end
+  return readTipLines()
 end
 
 -- ---------- 物品明细：主副属性 / 特效（tooltip 扫描；装等走 GetItemInfo 见 getItemBasics） ----------
@@ -58,12 +76,10 @@ local function addUnique(list, v)
   list[#list + 1] = v
 end
 
-local function parseItemDetail(itemID)
-  local d = { primary = {}, secondary = {}, effect = "", primary_values = {}, secondary_values = {} }
-  local lines = scanLines(itemID)
-  if not lines then return d end
+-- 属性行解析（1.0.7 抽公共）："+1,234 爆击" → 名 + 数值（千分位逗号剥离）；
+-- d.effect 字段缺省时跳过特效提取（四档重扫只取数值，不重复解析特效）
+local function parseStatLines(lines, d)
   for _, t in ipairs(lines) do
-    -- 数值一并采集（任务书 #28 WP1）："+1,234 爆击" → 名 + 数值（千分位逗号剥离）
     local num, stat = t:match("^%+([%d,]+)%s*(.+)$")
     if stat then
       stat = stat:gsub("%s", "")
@@ -80,12 +96,19 @@ local function parseItemDetail(itemID)
       d.effect = t:match("^(装备：.+)$") or t:match("^(使用：.+)$") or ""
     end
   end
+end
+
+local function parseItemDetail(itemID)
+  local d = { primary = {}, secondary = {}, effect = "", primary_values = {}, secondary_values = {} }
+  local lines = scanLines(itemID)
+  if lines then parseStatLines(lines, d) end
   return d
 end
 
 -- ---------- 属性数值 API 通道（任务书 #28 WP1，优先于 tooltip 解析） ----------
 -- GetItemStats 返回 { [属性常量 key] = 数值 }，key 经 _G 解析为本地化短名后与 PRIMARY/SECONDARY 对照；
--- API 不存在 / 返回空表 → 返回 nil，由调用方回退 tooltip 解析值
+-- API 不存在 / 返回空表 → 返回 nil，由调用方回退 tooltip 解析
+-- （真机定论 1.0.6 probe：GetItemStats 12.x 不存在，数值链实际唯一通道 = tooltip 解析；本通道保留作未来兼容）
 local function statValuesFromApi(itemID)
   if type(GetItemStats) ~= "function" then return nil end
   local ok, stats = pcall(GetItemStats, "item:" .. itemID)
@@ -103,10 +126,77 @@ local function statValuesFromApi(itemID)
   return pv, sv
 end
 
--- 诊断模块共享（1.0.6，/wjdc probe <物品ID> 物品级诊断用，任务书 #28 WP1-fix）
+-- 诊断模块共享（1.0.6，/wjdc probe <物品ID> 物品级诊断用，任务书 #28 WP1-fix；
+-- 1.0.7 增 scanLink/parseStatLines 供四档实证诊断）
 WJDCShared.scanLines = scanLines
+WJDCShared.scanLink = scanLink
 WJDCShared.parseItemDetail = parseItemDetail
+WJDCShared.parseStatLines = parseStatLines
 WJDCShared.statValuesFromApi = statValuesFromApi
+
+-- ---------- 四难度档采集（1.0.7，任务书 #29 WP1） ----------
+-- 侦察结论（2026-08-08 桌面研究，warcraft.wiki.gg + 12.0 客户端 Blizzard UI 源码交叉验证）：
+--   EJ_SetDifficulty/EJ_GetDifficulty 12.x 仍存在（暴雪 EJ 界面源码在用），5.4 起吃标准
+--   DifficultyID：随机团队=17 / 普通=14 / 英雄=15 / 史诗=16；C_EncounterJournal 无等价替代。
+--   GetLootInfoByIndex 返回表的 link 字段由 C++ 按当前手册难度生成——切档→重取 link→
+--   SetHyperlink 重扫为暴雪原生路径；真机唯一待验证点 = 12.x 稀疏表是否带 link 字段，
+--   不在场则自动回退单档（tiers 不产出），不硬磕。
+local RAID_TIERS = {
+  { key = "lfr",    id = 17 },  -- 随机团队
+  { key = "normal", id = 14 },  -- 普通
+  { key = "heroic", id = 15 },  -- 英雄
+  { key = "mythic", id = 16 },  -- 史诗
+}
+
+local function tierChannelAvailable()
+  return type(EJ_SetDifficulty) == "function" and type(EJ_GetDifficulty) == "function"
+     and C_EncounterJournal and type(C_EncounterJournal.GetLootInfoByIndex) == "function"
+end
+
+local function stripTiers(loot)
+  for _, it in ipairs(loot) do it.primary_tiers = nil it.secondary_tiers = nil end
+end
+
+-- 逐 BOSS 四档重扫（loot 行需带 li = GetLootInfoByIndex 序号，切档后按同序号重取该档 link）。
+-- 返回 true,带档件数 ｜ false,原因（硬失败：切档读回不通过；软失败：全 BOSS 无一件扫出档值）
+local function collectTiers(loot)
+  for _, tier in ipairs(RAID_TIERS) do
+    local okSet = pcall(EJ_SetDifficulty, tier.id)
+    local okGet, cur = pcall(EJ_GetDifficulty)
+    if not okSet or not okGet or cur ~= tier.id then
+      return false, "切档读回失败（" .. tier.key .. "/" .. tostring(tier.id) .. " 档）"
+    end
+    for _, it in ipairs(loot) do
+      -- 同序号重取：itemID 一致性校验防「不同难度掉落列表错位」串行（对不上即放弃本件本档）
+      local okQ, info = pcall(C_EncounterJournal.GetLootInfoByIndex, it.li)
+      local link = okQ and type(info) == "table" and info.itemID == it.id and info.link or nil
+      if link then
+        local lines = scanLink(link)
+        if lines then
+          local d = { primary = {}, secondary = {}, primary_values = {}, secondary_values = {} }
+          parseStatLines(lines, d)
+          -- 只记有数值的档：无静态属性的品类（纯特效饰品/杂项）天然空档，与「缺档不记」同口径
+          if next(d.primary_values) then
+            it.primary_tiers = it.primary_tiers or {}
+            it.primary_tiers[tier.key] = d.primary_values
+          end
+          if next(d.secondary_values) then
+            it.secondary_tiers = it.secondary_tiers or {}
+            it.secondary_tiers[tier.key] = d.secondary_values
+          end
+        end
+      end
+    end
+  end
+  local tiered = 0
+  for _, it in ipairs(loot) do
+    if it.primary_tiers or it.secondary_tiers then tiered = tiered + 1 end
+  end
+  if tiered == 0 and #loot > 0 then
+    return false, "link 字段全缺或无一件物品扫出档位数值（12.x 稀疏表病害嫌疑）"
+  end
+  return true, tiered
+end
 
 -- ---------- 副本手册遍历（团本 / 大秘境共用） ----------
 -- 掉落枚举（任务书 #26-fix4）：EJ_SelectEncounter 后只许单参调用（实测双参全 nil）；
@@ -134,8 +224,16 @@ local function getItemBasics(itemID)
   return { name = name, ilvl = ilvl, type = subType or "", slot = (equipLoc and _G[equipLoc]) or "" }
 end
 
-local function exportInstances(isRaid, label)
+local function exportInstances(isRaid, label, tierOn)
   local out, idx = {}, 1
+  -- 四档采集前置（1.0.7）：EJ 难度是全局手册状态，采集前保存原档，收尾还原
+  local tierAlive = tierOn and true or false
+  local softFail = 0
+  local origDiff
+  if tierAlive then
+    local ok, d = pcall(EJ_GetDifficulty)
+    if ok then origDiff = d end
+  end
   while true do
     local instanceID, iname = EJ_GetInstanceByIndex(idx, isRaid)
     if not instanceID then break end
@@ -160,7 +258,8 @@ local function exportInstances(isRaid, label)
                               type = basics.type, ilvl = basics.ilvl,
                               primary = d.primary, secondary = d.secondary,
                               primary_values = pv, secondary_values = sv,
-                              effect = d.effect }
+                              effect = d.effect,
+                              li = li }  -- li 仅四档重扫用，出库前抹除
         else
           failed[#failed + 1] = itemID  -- 禁静默：记入 boss.failed 并红字报告
         end
@@ -169,6 +268,27 @@ local function exportInstances(isRaid, label)
       if #failed > 0 then
         err(string.format("%s · %s：%d 件物品未缓存记 failed（/reload 后重跑可补齐）", iname, bname, #failed))
       end
+      -- 四难度档重扫（1.0.7，仅团本且通道在场）：逐件切档重扫，失败只降级不拖垮单档数据
+      if tierAlive then
+        local okT, res, extra = pcall(collectTiers, loot)
+        if not okT then
+          err(string.format("%s · %s：四档采集报错中断（%s），本 BOSS 回退单档", iname, bname, tostring(res)))
+          stripTiers(loot)
+          softFail = softFail + 1
+        elseif res == false then
+          err(string.format("%s · %s：四档通道异常（%s），本 BOSS 回退单档", iname, bname, tostring(extra)))
+          stripTiers(loot)
+          softFail = softFail + 1
+        else
+          softFail = 0
+          msg(string.format("%s · %s：四档重扫完成（%d/%d 件带档）", iname, bname, extra, #loot))
+        end
+        if softFail >= 2 then
+          tierAlive = false
+          err("四档通道连续异常，后续 BOSS 不再切档（回退单档采集）——请把聊天框完整截图反馈顾问侧")
+        end
+      end
+      for _, it in ipairs(loot) do it.li = nil end
       bosses[#bosses + 1] = { boss = bname, loot = loot, failed = failed }
       bi = bi + 1
     end
@@ -177,6 +297,7 @@ local function exportInstances(isRaid, label)
       (function() local c = 0 for _, b in ipairs(bosses) do c = c + #b.loot end return c end)()))
     idx = idx + 1
   end
+  if origDiff then pcall(EJ_SetDifficulty, origDiff) end  -- 还原手册难度档，不留全局副作用
   return out
 end
 
@@ -232,13 +353,27 @@ local function doExport(kind)
   local ejTier = EJ_GetCurrentTier()
   if ejTier then pcall(EJ_SelectTier, ejTier) end  -- 只导当前资料片，旧实例一律不导
   local dump = { meta = buildMeta(kind) }
+  -- 四难度档通道探测（1.0.7，仅团本段用）：EJ 切档函数 + 掉落表 link 通道双条件在场才启用；
+  -- 不可用回退单档采集（tiers 不产出），红字明示——大秘境无四难度，永不启用
+  local tierOn = false
+  if kind == "all" or kind == "raid" then
+    tierOn = tierChannelAvailable()
+    dump.meta.tier_channel = tierOn and "ej-link" or "unavailable"
+    if tierOn then
+      msg("四难度档采集已启用（1.0.7）：随机/普通/英雄/史诗逐档切档重扫，时长约为单档 4 倍属预期，请耐心等待")
+    else
+      err("四档采集通道不可用（EJ_SetDifficulty/EJ_GetDifficulty 或 GetLootInfoByIndex 缺失），本次回退单档采集，tiers 不产出——请截图反馈顾问侧")
+    end
+  else
+    dump.meta.tier_channel = "n/a"
+  end
   msg("开始导出（" .. kind .. "），数据量大请稍候……")
   -- 分段独立 pcall（任务书 #26-fix4）：任一段失败不拖垮其他段
   local function guard(label, fn)
     local ok, e = pcall(fn)
     if not ok then err(label .. "段导出中断：" .. tostring(e) .. "（其余段落不受影响，建议重跑）") end
   end
-  if kind == "all" or kind == "raid" then guard("团本", function() dump.raids = exportInstances(true, "团本") end) end
+  if kind == "all" or kind == "raid" then guard("团本", function() dump.raids = exportInstances(true, "团本", tierOn) end) end
   if kind == "all" or kind == "mplus" then guard("大秘境", function() dump.dungeons = exportInstances(false, "大秘境") end) end
   WJDCDump = dump
   msg("已导出，请 /reload 或退出游戏写入文件")

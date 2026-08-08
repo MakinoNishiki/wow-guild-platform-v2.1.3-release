@@ -13,6 +13,14 @@
 
 字典（--dict）与存量（--existing）均为 JSON 导出文件，格式见 scripts/wjdc/README.md。
 零第三方依赖，Python 3.8+ 标准库即可运行。
+
+冻结声明 v2（任务书 #29 WP1，2026-08-12 冻结，8.13 S2 翻牌按此录入）：
+入库 JSON 字段 = 既有字段（item_name/slot/item_type/official_item_id/note/effect/
+primary_stats/secondary_stats + boss_id 或 dungeon_id+boss_id）
++ primary_values/secondary_values（sql/19，jsonb 或 null，键=中文属性名，值=整数）
++ primary_tiers/secondary_tiers（sql/20，jsonb 或 null；{lfr/normal/heroic/mythic: {属性名: 整数}}，
+只记存在的档；大秘境恒 null——大秘境无四难度，values 两列是其唯一数值口径）。
+冻结期内不再变更字段名、类型与空值口径。旧格式导出（无 values/tiers 字段）照常转换、相应列留 null。
 """
 import argparse
 import json
@@ -188,13 +196,34 @@ def stat_map(v):
     return out or None
 
 
-def stat_cell(names, values):
-    """核对表属性列：有数值时带值渲染（爆击(300)、急速(100)），无数值保持原名表（向后兼容）"""
+TIER_KEYS = ("lfr", "normal", "heroic", "mythic")
+
+
+def tier_map(v):
+    """四难度档数值表规整（任务书 #29 WP1）：{lfr/normal/heroic/mythic: {属性名: 数值}}；
+    档位 key 固定英文枚举、只记存在的档；缺字段/空表/非法档位 → None（tiers 列留空）。
+    大秘境掉落无四难度（钥石层数缩放），tiers 恒 None，values 两列继续作为其唯一数值口径。"""
+    if not isinstance(v, dict):
+        return None
+    out = {}
+    for tier in TIER_KEYS:
+        m = stat_map(v.get(tier))
+        if m:
+            out[tier] = m
+    return out or None
+
+
+def stat_cell(names, values, tiers=None):
+    """核对表属性列：有数值时带值渲染（爆击(300)、急速(100)），无数值保持原名表（向后兼容）；
+    四难度档（任务书 #29 WP1）有采集时尾部标档数〔N档〕（N=lfr/normal/heroic/mythic 中存在的档数）"""
     if not names:
         return "—"
+    suffix = ""
+    if tiers:
+        suffix = "〔%d档〕" % len(tiers)
     if values:
-        return "、".join("%s(%s)" % (n, values[n]) if n in values else n for n in names)
-    return "、".join(names)
+        return "、".join("%s(%s)" % (n, values[n]) if n in values else n for n in names) + suffix
+    return "、".join(names) + suffix
 
 
 def norm_items(dump, section):
@@ -217,6 +246,8 @@ def norm_items(dump, section):
                     "secondary": str_list(it.get("secondary")),
                     "primary_values": stat_map(it.get("primary_values")),
                     "secondary_values": stat_map(it.get("secondary_values")),
+                    "primary_tiers": tier_map(it.get("primary_tiers")),
+                    "secondary_tiers": tier_map(it.get("secondary_tiers")),
                     "effect": s(it.get("effect")),
                 })
     return rows
@@ -317,8 +348,8 @@ def write_checklist(path, dump, raid_rows, dungeon_rows):
                 cell(r["slot"], "缺部位" in iss),
                 cell(r["type"], "缺类型" in iss),
                 s(r["ilvl"]) or "—",
-                stat_cell(r["primary"], r["primary_values"]),
-                stat_cell(r["secondary"], r["secondary_values"]),
+                stat_cell(r["primary"], r["primary_values"], r["primary_tiers"]),
+                stat_cell(r["secondary"], r["secondary_values"], r["secondary_tiers"]),
                 cell(r["effect"], "特效为空" in iss),
             ))
         L.append("")
@@ -371,6 +402,9 @@ def build_load_rows(rows, matcher):
             # 任务书 #28 WP1：数值透传（jsonb 列，sql/19）；旧格式导出无数值 → None 留空
             "primary_values": r["primary_values"],
             "secondary_values": r["secondary_values"],
+            # 任务书 #29 WP1：四难度档数值透传（jsonb 列，sql/20）；旧格式导出/大秘境 → None 留空
+            "primary_tiers": r["primary_tiers"],
+            "secondary_tiers": r["secondary_tiers"],
         }
         key = (entry.get("id"), r["name"])
         if key in seen:  # 同 BOSS 同名去重（与 dungeon_loot 唯一约束同口径）
@@ -538,6 +572,12 @@ def main():
     print("  核对表.md            ：%d 团本行 / %d 大秘境行" % (len(raid_rows), len(dungeon_rows)))
     print("  boss_loot_load.json  ：%d 行" % len(boss_load))
     print("  dungeon_loot_load.json：%d 行" % len(dun_load))
+    boss_tiered = sum(1 for b in boss_load if b["primary_tiers"] or b["secondary_tiers"])
+    dun_tiered = sum(1 for d in dun_load if d["primary_tiers"] or d["secondary_tiers"])
+    print("  四难度档（任务书 #29）：团本 %d/%d 行带 tiers；大秘境 %d 行带 tiers（口径应为 0——大秘境无四难度，tiers 恒 null）" % (
+        boss_tiered, len(boss_load), dun_tiered))
+    if dun_tiered:
+        print("  警告：大秘境行出现 tiers 数据，与任务书 #29 大秘境单档口径冲突，请核查导出文件")
     print("  待匹配清单.md        ：%d 行（只报告不创建）" % (len(boss_unmatched) + len(dun_unmatched)))
     if char_path:
         print("  character.json       ：已生成（/wjdc me 产物）")

@@ -1,6 +1,7 @@
 -- ============================================================
 -- 诊断模块（任务书 #26-fix3）：/wjdc probe [团本序号，默认 1]
 -- 1.0.6 新增物品级诊断：/wjdc probe <物品ID>（数值采集链核验，任务书 #28 WP1-fix）
+-- 1.0.7 新增四难度档通道诊断（任务书 #29 WP1）：切档函数存在性/试切读回/link 字段/同件两档缩放实证
 -- 只读诊断，不改导出逻辑；输出全部走聊天框，请完整截图反馈顾问侧
 -- ============================================================
 local msg = WJDCShared.msg
@@ -10,6 +11,13 @@ local function retstr(t)
   local o = {}
   for i, v in ipairs(t) do o[i] = tostring(v) end
   return table.concat(o, ", ")
+end
+
+local function kv(t)
+  local o = {}
+  for k, v in pairs(t) do o[#o + 1] = tostring(k) .. "=" .. tostring(v) end
+  table.sort(o)
+  return "{" .. table.concat(o, ", ") .. "}"
 end
 
 -- 全字段 dump（含全部 key 名；嵌套 table 只报项数）
@@ -100,12 +108,6 @@ local function probeItem(itemID)
   end
   -- ④ 解析结果（与导出同函数）
   local d = WJDCShared.parseItemDetail(itemID)
-  local function kv(t)
-    local o = {}
-    for k, v in pairs(t) do o[#o + 1] = tostring(k) .. "=" .. tostring(v) end
-    table.sort(o)
-    return "{" .. table.concat(o, ", ") .. "}"
-  end
   msg("parseItemDetail：primary=" .. retstr(d.primary) .. " ｜ secondary=" .. retstr(d.secondary))
   msg("  tooltip 数值：primary_values=" .. kv(d.primary_values) .. " secondary_values=" .. kv(d.secondary_values))
   msg("  API 数值：primary_values=" .. kv(pv or {}) .. " secondary_values=" .. kv(sv or {}))
@@ -147,6 +149,25 @@ function WJDCProbe(arg)
     msg("GetSlotFilter：函数不存在")
   end
 
+  -- 四难度档通道诊断（1.0.7，任务书 #29 WP1）：
+  -- ① 切档函数存在性 ② 试切 LFR(17) 读回 + 还原 ③ 旁证 API 存在性存档
+  msg("----- 四难度档通道诊断（1.0.7） -----")
+  msg("EJ_SetDifficulty = " .. type(EJ_SetDifficulty) .. " ｜ EJ_GetDifficulty = " .. type(EJ_GetDifficulty))
+  if type(EJ_GetDifficulty) == "function" then
+    local ok, d = pcall(EJ_GetDifficulty)
+    msg("EJ_GetDifficulty() 当前值 = " .. (ok and tostring(d) or ("报错：" .. tostring(d))))
+  end
+  if type(EJ_SetDifficulty) == "function" and type(EJ_GetDifficulty) == "function" then
+    local okS = pcall(EJ_SetDifficulty, 17)
+    local okG, cur = pcall(EJ_GetDifficulty)
+    msg("试切 LFR(17)：set ok=" .. tostring(okS) .. " ｜ 读回=" .. (okG and tostring(cur) or ("报错：" .. tostring(cur))))
+    pcall(EJ_SetDifficulty, 14)
+    local okG2, cur2 = pcall(EJ_GetDifficulty)
+    msg("还原 Normal(14)：读回=" .. (okG2 and tostring(cur2) or ("报错：" .. tostring(cur2))))
+  end
+  msg("存档：C_Item.GetItemStats = " .. tostring(type(C_Item and C_Item.GetItemStats))
+      .. " ｜ C_TooltipInfo.GetHyperlink = " .. tostring(type(C_TooltipInfo and C_TooltipInfo.GetHyperlink)))
+
   probeLoot("GetLootInfoByIndex(i) 单参")
   probeLoot("GetLootInfoByIndex(i, encounterID) 双参", encounterID)
 
@@ -182,6 +203,28 @@ function WJDCProbe(arg)
     end
   else
     msg("未能从 GetLootInfoByIndex 拿到任何 itemID，单件详查跳过（=病害①现场）")
+  end
+  -- 四档缩放实证（1.0.7）：同一切换 LFR(17)/史诗(16) 重取 link 重扫，两档值应不同；
+  -- link 字段缺失或两档同值 = 通道不实，导出会自动回退单档（此段为唯一真机待验证点）
+  if firstID and WJDCShared.scanLink and type(EJ_SetDifficulty) == "function"
+     and type(EJ_GetDifficulty) == "function" and C_EncounterJournal
+     and type(C_EncounterJournal.GetLootInfoByIndex) == "function" then
+    msg("----- 四档缩放实证（itemID=" .. firstID .. "） -----")
+    for _, td in ipairs({ { 17, "lfr" }, { 16, "mythic" } }) do
+      pcall(EJ_SetDifficulty, td[1])
+      local okQ, info = pcall(C_EncounterJournal.GetLootInfoByIndex, 1)
+      local link = okQ and type(info) == "table" and info.link or nil
+      if link then
+        local lines = WJDCShared.scanLink(link)
+        local d = { primary = {}, secondary = {}, primary_values = {}, secondary_values = {} }
+        if lines then WJDCShared.parseStatLines(lines, d) end
+        msg(td[2] .. "(" .. td[1] .. ")：pv=" .. kv(d.primary_values) .. " sv=" .. kv(d.secondary_values))
+      else
+        msg(td[2] .. "(" .. td[1] .. ")：GetLootInfoByIndex(1) 无 link 字段（稀疏表现场）")
+      end
+    end
+    pcall(EJ_SetDifficulty, 14)
+    msg("（两档 pv/sv 应有可见差异；完全相同请截图反馈顾问侧）")
   end
   -- 存档记录（任务书 #26-fix4）：套装专精级 API 存在性，供顾问侧 OCR 管道对照
   msg("存档：C_Item.GetSetBonusesForSpecializationByItemID = " .. tostring(type(C_Item and C_Item.GetSetBonusesForSpecializationByItemID)))
