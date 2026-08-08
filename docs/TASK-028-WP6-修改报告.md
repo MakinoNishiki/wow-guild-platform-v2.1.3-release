@@ -1,6 +1,6 @@
 # 任务书 #28-WP6 修改报告（过滤器二期：F1 分类三级 + F2 来源实例级 + F3 筛选态平铺）
 
-- 日期：2026-08-09 ｜ 站点版本串：**20260808.30**（双头 index.html 8 处 + data.html 6 处，旧串 .29 零残留）
+- 日期：2026-08-09 ｜ 站点版本串：**20260808.31**（双头 index.html 8 处 + data.html 6 处，旧串 .30 零残留；二轮补丁动了 js/css/html，.30→.31 递增，见 §七之二）
 - 版本串跳号说明（运营 2026-08-09 指出）：WP3-v5 本地报告写 .28，但线上部署时实际按 .29 发布——同一版本串不得对应两次改动，故 WP6 跳过 .29、自 .30 起递增；verify 无版本串硬编码断言（仅校验 ?v= 存在性），无需同步改脚本。
 - 前置：F1 映射表送审稿（`docs/TASK-028-WP6-F1映射表.md`）→ 运营 2026-08-09 终版裁定（覆盖此前全部口径），按终版施工
 - 状态：**完工待验收，未 commit / 未 push**
@@ -39,11 +39,11 @@
 
 | 脚本 | 结果 | 说明 |
 |---|---|---|
-| verify-task23-patch4.js | **98/98**（WP6 主体时 92/92 → 补丁后 98/98） | §2 行序改五段（顶行/分类/主属性/副属性/来源）、1920 档 4 行→5 行；WP6 断言（F1 结构/12+4+5 chips/逐值映射对库/切换清空/OR、F2 实例计数/选中折叠/取消恢复、F3 平铺计数=REST/纯过滤/0 命中空态/空态重置）；补丁新增 6 项（P2 全部 tab 结构并入 F1 结构断言、P3 饰品 40=40、P4 置灰集逐值对库/原因提示+aria/已选不置灰/置灰不可点/重置恢复）；① hover 块整段重写为 P1 整卡生长（3 张长特效卡逐字核验 + R7/P1 全页不变量 + WP3-9 生长动画 + WP3-10 零挤压 + 1920 同款）；双视图一致回归挪浏览态「来源=大秘境」 |
-| verify-task23-patch.js | **33/33** | 同上双视图块适配浏览态（参照集=大秘境全集），其余不动 |
-| verify-task23-patch3.js | **28/28** | 补丁适配 2 处：悬浮「覆盖层」断言改「整卡生长」（inner absolute 高度生长 + wrap max-height 过渡 200–300ms）、边框高亮断言改读 .dp-item-inner |
-| npm test | **5/5** | — |
-| verify-authz.js（SEC-001） | **34/34** | 未碰写路径，回归确认 |
+| verify-task23-patch4.js | **100/100**（WP6 主体 92/92 → 补丁一轮 98/98 → 补丁二轮 100/100） | §2 行序改五段（顶行/分类/主属性/副属性/来源）、1920 档 4 行→5 行；WP6 断言（F1 结构/12+4+5 chips/逐值映射对库/切换清空/OR、F2 实例计数/选中折叠/取消恢复、F3 平铺计数=REST/纯过滤/0 命中空态/空态重置）；补丁新增 6 项（P2 全部 tab 结构并入 F1 结构断言、P3 饰品 40=40、P4 置灰集逐值对库/原因提示+aria/已选不置灰/置灰不可点/重置恢复）；① hover 块整段重写为 P1 整卡生长（3 张长特效卡逐字核验 + R7/P1 全页不变量 + WP3-9 生长动画 + WP3-10 零挤压 + 1920 同款）；双视图一致回归挪浏览态「来源=大秘境」；**二轮：① 块改四态 textTop0（折叠/动画中段 100ms/展开/收回）+ wrap 视口裁剪判定 + noClampCss；R7 全页不变量改 wrap 判定 + ::after 伪元素 … 检查 + clamp 零残留；P4-补新增 3 断言（反馈即时出现含 cursor/title、点击无效、2s 渐隐）** |
+| verify-task23-patch.js | **33/33** | 同上双视图块适配浏览态（参照集=大秘境全集），其余不动；二轮重跑确认 |
+| verify-task23-patch3.js | **28/28** | 补丁适配 2 处：悬浮「覆盖层」断言改「整卡生长」（inner absolute 高度生长 + wrap max-height 过渡 200–300ms）、边框高亮断言改读 .dp-item-inner；二轮重跑确认 |
+| npm test | **5/5** | 二轮重跑确认 |
+| verify-authz.js（SEC-001） | **34/34** | 未碰写路径，二轮重跑确认 |
 | 基线 | 308/104/204 不动 | patch4 基准行 + WP3-13 全页 308 张卡片断言在案 |
 | console/404 | 零 JS 报错、零 404 | patch4 尾部断言 |
 
@@ -57,19 +57,20 @@
 - `wp6p-p2-cat-all-default.png` — 分类二级「全部」默认选中、三级区不渲染
 - `wp6p-p3-slot-12.png` — 部位 12 项含「饰品」末位
 - `wp6p-p4-chip-disabled.png` — 力量+敏捷选中 → 部位 chips 置灰（颈部/手指在列，背部/饰品保活）
+- 补丁二轮锚点：`wp6p2-grow-f0.png` ~ `wp6p2-grow-f4.png` — 凝视 hover 生长连帧（0/60/110/160/260ms），控制台逐帧实测特效文本 top 偏移全 0（零重排零抖动）；`wp6p2-disabled-feedback.png` — 力敏下点击置灰「颈部」→ 筛选条下浮出原因提示「『颈部』在当前组合下无命中：该类别装备均不含所选属性」+ chip 抖动，置灰虚线淡化生效
 
 ## 六、改动文件清单
 
 - `data.html` — 分类组 DOM（第一组）+ 来源组实例行容器；布局注释回写
-- `js/dataPublic.js` — state（catL2/catSel/sourceInstance）+ CAT_TABS（P2 加「全部」）/CAT_CHIPS（P3 加「饰品」）终版映射 + seasonLoot + renderCategory/renderInstanceChips + matchItem→matchExcept 拆组（P4）+ refreshChipAvailability（P4）+ isFlatMode/flatOrderedItems + render 双态分支 + resetFilters 扩展；P1：itemCard 包 .dp-item-inner、measureEffectCards 重写（镜像只测溢出 + 溢出卡预设折叠态 minHeight，旧二分截断/建 overlay 逻辑拆除）
-- `css/data-public.css` — .dp-cat-tabs/.dp-cat-tab（chip 体系加粗）/.dp-instance-row/.dp-chip-inst 计数角标/.dp-flat-head/.dp-empty-actions；P1：卡盒样式迁 .dp-item-inner + hover 整卡生长（inner absolute + wrap max-height 动画）+ .dp-item-effect-overlay 规则删除；P4：.dp-chip-disabled
-- `scripts/verify-task23-patch4.js` / `verify-task23-patch.js` / `verify-task23-patch3.js` — 断言适配 + WP6/P1–P4 新增（patch3 适配 P1 生长与 inner 边框 2 处）
-- `js/app.js` — changelog 四维补录「新增功能」一条（details 含 P1–P4 四行）
-- `docs/公示页筛选系统设计规范.md` — **v3.1**（v3.0 废止）：P2 全部 tab（§2/§3）、P3 饰品 12 项（§4-2）、P4 置灰（§3 规格表/§6 交互），标注日期
+- `js/dataPublic.js` — state（catL2/catSel/sourceInstance）+ CAT_TABS（P2 加「全部」）/CAT_CHIPS（P3 加「饰品」）终版映射 + seasonLoot + renderCategory/renderInstanceChips + matchItem→matchExcept 拆组（P4）+ refreshChipAvailability（P4）+ isFlatMode/flatOrderedItems + render 双态分支 + resetFilters 扩展；P1：itemCard 包 .dp-item-inner、measureEffectCards 重写（镜像只测溢出 + 溢出卡预设折叠态 minHeight，旧二分截断/建 overlay 逻辑拆除）；**P4-补：chipDisabledFeedback(ch,label)——shake 类 200ms（void offsetWidth 重启动画）+ #dpChipHint（absolute 贴筛选条底、role=status、cause 拼接文案、2s 渐隐），三处 chip onclick 守卫改调它**
+- `css/data-public.css` — .dp-cat-tabs/.dp-cat-tab（chip 体系加粗）/.dp-instance-row/.dp-chip-inst 计数角标/.dp-flat-head/.dp-empty-actions；P1：卡盒样式迁 .dp-item-inner + hover 整卡生长（inner absolute + wrap max-height 动画）+ .dp-item-effect-overlay 规则删除；P4：.dp-chip-disabled；**P1-补：废弃 line-clamp——preview 改纯 block 全文排版（clamp 规则与 hover 释放规则全删），折叠态 = wrap max-height:34px+overflow:hidden 纯视口裁剪，省略观感改 ::after 渐变遮罩（hover 时 content:none），hover overflow-y:auto 故意不加（滚动条改宽度会引重排）；P4-补：.dp-chip-shake/@keyframes dpChipShake/.dp-chip-hint/.show + reduced-motion 降级；事故修复：一轮 §6 例外注释内 `.dp-detail-*/` 含 `*/` 毒丸提前闭合注释、吞掉 .dp-chip-disabled 整条规则（一轮置灰视觉实际从未生效，二轮 cursor 断言抓出），注释改全角 ＊ 修复，probe 实测 cursor:not-allowed/opacity .4/border dashed 生效**
+- `scripts/verify-task23-patch4.js` / `verify-task23-patch.js` / `verify-task23-patch3.js` — 断言适配 + WP6/P1–P4 新增（patch3 适配 P1 生长与 inner 边框 2 处）；二轮：patch4 ① 块四态 textTop0 + wrap 视口裁剪 + noClampCss + R7 不变量改 ::after 判定 + P4-补 3 断言，文首注释回写
+- `js/app.js` — changelog 四维补录「新增功能」一条（details 含 P1–P4 四行 + 二轮 P1-补/P4-补 两行，标题「含 P1–P4 补丁及二轮修订」）
+- `docs/公示页筛选系统设计规范.md` — **v3.2**（v3.0/v3.1 废止）：P2 全部 tab（§2/§3）、P3 饰品 12 项（§4-2）、P4 置灰（§3 规格表/§6 交互）、P4-补 置灰点击反馈（§3 置灰态行），标注日期
 - `docs/魔兽管家UI设计规范v2.md` — §4.4 装备卡条款回写 P1 整卡生长（浮层条款废止）+ §6 注册 max-height 高度动画例外（理由+日期）
-- `index.html` / `data.html` — 版本串 20260808.29→.30（8+6 处，含顶部注释记录行；.29 为 WP3-v5 线上占用，见文首跳号说明；P1–P4 补丁同包复用 .30，不再次递增）
+- `index.html` / `data.html` — 版本串 20260808.29→.30→**.31**（8+6 处，含顶部注释记录行；.29 为 WP3-v5 线上占用，见文首跳号说明；P1–P4 一轮同包复用 .30，**二轮补丁 P1-补/P4-补 动了 js/css/html，递增 .31，.30 零残留**）
 
-## 七、WP6 补丁 P1–P4（2026-08-09 运营体验终审追加，同包提交，版本串保持 .30 不再递增）
+## 七、WP6 补丁 P1–P4（2026-08-09 运营体验终审追加，一轮同包复用 .30；二轮修订递增 .31，见 §七之二）
 
 | 补丁 | 口径 | 落地 | 实测 |
 |---|---|---|---|
@@ -81,6 +82,18 @@
 - §6 白名单例外已注册（`docs/魔兽管家UI设计规范v2.md` §6，2026-08-09）：P1 整卡 max-height 高度动画——理由「整卡框内展开+来源行跟随」是运营终审指定形态，transform/opacity 无法实现框内高度生长；浮层 opacity/transform 旧条款同步标注废止。
 - 规范回写：`docs/公示页筛选系统设计规范.md` 升 **v3.1**（P2 全部 tab 进 §2 布局图+§3 分类条款、P3 饰品进 §4-2 映射表、P4 置灰进 §3 规格表+§6 交互）；`docs/魔兽管家UI设计规范v2.md` §4.4 装备卡条款回写 P1 生长口径（浮层条款废止）。
 - changelog WP6 条目 details 补 P1–P4 四行（js/app.js，标题同步加「含 P1–P4 补丁」）。
+
+## 七之二、WP6 补丁二轮（P1-补 生长防抖 + P4-补 置灰反馈，2026-08-09 运营追加，版本串 .30→.31）
+
+| 补丁 | 口径 | 落地 | 实测 |
+|---|---|---|---|
+| P1-补 生长防抖 | 废弃 line-clamp 截断（动画中 clamp 释放导致文本逐行重排抖动）；特效文本恒一次性完整排版、永不重排；折叠态 = 容器 2 行高 overflow:hidden 纯视口裁剪；hover 动画作用于容器高度（视口扩大）、文本零位移；省略观感用渐变遮罩/伪元素对齐现状；reduced-motion 降级不变 | preview 改纯 block 全文排版，CSS clamp 规则与 hover 释放规则全删（库内零残留，patch4 noClampCss 断言在案）；wrap 加 `max-height:34px; overflow:hidden; transition:max-height .2s ease-out`；省略观感 = `.dp-item.has-effect .dp-item-effect-wrap::after`（`…` + padding-left 22px 渐变遮罩，hover 时 `content:none`）；hover 不加 overflow-y:auto（滚动条改宽度会引重排，违背零位移） | patch4 ① 块改四态 textTop0 断言（折叠/动画中段 100ms/展开/收回，全程 `getBoundingClientRect().top` 偏移 0）+ wrap 视口裁剪判定全绿；连帧截图 f0–f4（0/60/110/160/260ms）控制台逐帧实测 top 偏移全 0，目检无抖动 |
+| P4-补 置灰反馈 | 置灰 chip 不得死无反馈：①cursor:not-allowed；②点击 → chip 抖动 200ms + 筛选条下浮出一行原因提示（如「『颈部』在当前组合下无命中：该类别装备均不含所选属性」），2s 渐隐；③title 悬浮保留；aria-disabled 与点击守卫不变 | `chipDisabledFeedback(ch,label)`：shake 类 200ms（`void ch.offsetWidth` 强制重排重启动画）+ `#dpChipHint`（absolute 贴 .dp-filterbar 底、role=status、cause 拼接、2s 后移除 .show 渐隐）；三处 chip onclick 置灰守卫改调它；CSS：.dp-chip-shake/@keyframes dpChipShake（translateX ±3px）+ .dp-chip-hint/.show + reduced-motion 降级 | patch4 P4-补 3 断言全绿：点击置灰「颈部」反馈即时出现（shake 类+hint 可见+文案含部位名与原因+cursor:not-allowed+title）、守卫依旧不选中不清除、2s 后渐隐；锚点截图 wp6p2-disabled-feedback.png 在案 |
+
+- **事故如实上报（证据三标）**：一轮交付时 css 注释内 `.dp-detail-*/` 含 `*/` 毒丸，提前闭合注释把 `.dp-chip.dp-chip-disabled` 整条规则吞掉——**一轮置灰视觉（opacity .4/虚线/not-allowed）实际从未生效**，逻辑置灰（aria-disabled/点击守卫/原因 title）不受影响；二轮 P4-补 cursor 断言跑出红才暴露。已把该注释改全角 `＊` 修复，probe 实测 cursor:not-allowed / opacity .4 / border dashed 生效，patch4 100/100 复核。
+- verify 二轮输出：patch4 **100/100**（98→100，新增 P4-补 3 断言，① 块改四态 textTop0、R7 全页不变量改 wrap+::after 判定）、patch **33/33**、patch3 **28/28**、npm test **5/5**、SEC-001 **34/34**，全绿；console 零报错、零 404；基线 308/104/204 不动。
+- 版本串 .30→.31（双头 index.html 8 处 + data.html 6 处，含注释行；.30 零残留）。
+- 文档回写：`docs/魔兽管家UI设计规范v2.md` §4.4（P1-补 视口裁剪口径）+ §6（P1-补 延续既有 max-height 例外、P4-补 shake/hint 在白名单内说明）；`docs/公示页筛选系统设计规范.md` 升 **v3.2**（§3 置灰态行加点击反馈规格）；changelog WP6 条目 details 补 P1-补/P4-补 两行、标题改「含 P1–P4 补丁及二轮修订」。
 
 ## 八、任务书口径偏差点（已在断言与文档注明）
 

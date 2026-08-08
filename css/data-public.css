@@ -318,16 +318,26 @@
    P1（WP6 补丁）：独立浮层遮盖废止——hover 时卡片本体（含边框）经 max-height 动画向下生长，
    特效全文在框内展开，来源行随 flex 锚至新底部、全程可见不被遮盖；生长部分 z-index 提升覆盖
    下方卡片、不推挤网格；离开动画收回（200ms ease-out；§6 白名单例外已注册，2026-08-09，
-   理由：整卡高度生长是运营终审指定形态，transform/opacity 无法实现框内全文展开） */
-/* 特效容器：折叠态 max-height=2 行（2×17px 行高）+ overflow 隐藏；hover 展开至 260px 封顶 */
-.dp-item-effect-wrap { margin-top: 6px; overflow: hidden; max-height: 34px; transition: max-height .2s ease-out; }
-/* 特效预览：恒为特效全文（JS 镜像只测溢出）；line-clamp:2 负责折叠态视觉截断（带 …） */
-.dp-item-effect-preview {
-  line-height: 17px;
-  font-size: 12px; color: #1eff00;
-  white-space: normal; overflow: hidden;
-  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+   理由：整卡高度生长是运营终审指定形态，transform/opacity 无法实现框内全文展开）。
+   P1-补（WP6 补丁二轮，2026-08-09 生长防抖）：废弃 line-clamp 截断（动画中 clamp 释放导致文本
+   逐行重排抖动）——特效文本恒一次性完整排版、永不重排；折叠态 = 容器 2 行高 overflow:hidden
+   纯视口裁剪；hover 动画只作用于容器高度（视口扩大），文本 top 偏移恒 0 */
+/* 特效容器：折叠态 max-height=2 行（2×17px 行高）+ overflow 纯视口裁剪；hover 展开至 260px 封顶
+   （不挂 overflow-y:auto——滚动条出现会改宽度引起重排，违背零位移口径；S1 最长特效远未及 260px） */
+.dp-item-effect-wrap { position: relative; margin-top: 6px; overflow: hidden; max-height: 34px; transition: max-height .2s ease-out; }
+/* 特效预览：恒为特效全文、一次性完整排版（无 line-clamp、无高度约束——裁剪全部由容器视口承担） */
+.dp-item-effect-preview { line-height: 17px; font-size: 12px; color: #1eff00; white-space: normal; }
+/* 折叠态省略观感（仅溢出卡）：右下「…」伪元素 + 左向渐变遮罩，视觉对齐原 line-clamp 省略号；
+   hover 展开即隐去；未溢出卡无此层（R7：无 … 无 hover） */
+.dp-item.has-effect .dp-item-effect-wrap::after {
+  content: '…';
+  position: absolute; right: 0; bottom: 0;
+  padding-left: 22px;
+  background: linear-gradient(to right, transparent, var(--bg-card) 45%);
+  color: #1eff00; font-size: 12px; line-height: 17px;
+  pointer-events: none;
 }
+.dp-item.has-effect:hover .dp-item-effect-wrap::after { content: none; }
 /* 特效溢出卡片：边框高亮（金色微光引导「可 hover 读全文」；未溢出卡无此类——R7 无 … 无 hover） */
 .dp-item.has-effect .dp-item-inner {
   border-color: rgba(240, 192, 96, 0.55);
@@ -342,17 +352,34 @@
   z-index: 30;
   box-shadow: 0 10px 24px rgba(0, 0, 0, 0.55);
 }
-.dp-item.has-effect:hover .dp-item-effect-wrap { max-height: 260px; overflow-y: auto; }
-.dp-item.has-effect:hover .dp-item-effect-preview { display: block; -webkit-line-clamp: unset; }
+.dp-item.has-effect:hover .dp-item-effect-wrap { max-height: 260px; }
 
 /* ==================== 任务书 #28 WP3-v2/v3：全信息装备卡（方向修正版 + 体验修订） ====================
-   v1 点击详情覆盖层（.dp-item-detail/.dp-detail-*/.dp-detail-open 族）已整族拆除——
+   v1 点击详情覆盖层（.dp-item-detail 与 .dp-detail-＊/.dp-detail-open 族）已整族拆除——
    运营 2026-08-08 方向修正：卡片零点击交互；v3（R2/R3）占位行与恒占行高废止，内容驱动行内等高；
    WP3-v3~v5 的独立浮层续文展开（.dp-item-effect-overlay）经 WP6 补丁 P1 废止拆除（2026-08-09），
    改为整卡生长（规则见上方 .dp-item-inner/.dp-item-effect-wrap/hover 生长段）。 */
 
 /* P4（WP6 补丁）：筛选联动置灰——当前筛选组合下 0 命中的未选 chip（已选恒不置灰，不自动清除） */
 .dp-chip.dp-chip-disabled { opacity: .4; cursor: not-allowed; border-style: dashed; }
+/* P4-补（WP6 补丁二轮，2026-08-09）：置灰点击反馈——①cursor:not-allowed（上行）②chip 抖动 200ms
+   （transform，§6 白名单内）+ 筛选条下浮出一行原因提示（opacity/transform 浮入、2s 后渐隐）③title 保留 */
+.dp-chip-shake { animation: dpChipShake 0.2s ease-out; }
+@keyframes dpChipShake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-3px); } 75% { transform: translateX(3px); } }
+.dp-chip-hint {
+  position: absolute; left: 20px; right: 20px; top: calc(100% + 6px);
+  padding: 6px 10px;
+  background: var(--bg-card);
+  border: 1px solid var(--warning);
+  border-radius: 6px;
+  color: var(--warning);
+  font-size: 12px;
+  line-height: 17px;
+  opacity: 0; transform: translateY(-4px); pointer-events: none;
+  transition: opacity .25s ease-out, transform .25s ease-out;
+  z-index: 40;
+}
+.dp-chip-hint.show { opacity: 1; transform: translateY(0); }
 .dp-error { text-align: center; padding: 60px 0; }
 .dp-error-icon { font-size: 36px; margin-bottom: 12px; }
 .dp-error-text { color: var(--text-secondary); margin-bottom: 16px; }
@@ -368,7 +395,8 @@
 
 /* 规范 v2 §6：尊重 prefers-reduced-motion（公示页全部过渡/动画降级为瞬时） */
 @media (prefers-reduced-motion: reduce) {
-  .dp-item-effect-wrap, .dp-collapse-btn svg { transition: none; }
+  .dp-item-effect-wrap, .dp-collapse-btn svg, .dp-chip-hint { transition: none; }
+  .dp-chip-shake { animation: none; }
   .dp-item.dp-enter, .dp-filterbar.filters-open .dp-filter-rows { animation: none; }
   .dp-filter-rows.closing { transition: none; }
 }

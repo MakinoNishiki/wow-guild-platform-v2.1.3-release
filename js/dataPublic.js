@@ -254,7 +254,7 @@
       values.map(v => `<span class="dp-chip" data-v="${esc(v)}">${esc(v)}</span>`).join('') + `</span>`;
     container.querySelectorAll('.dp-chip').forEach(ch => {
       ch.onclick = () => {
-        if (ch.classList.contains('dp-chip-disabled')) return; // P4：置灰不可点
+        if (ch.classList.contains('dp-chip-disabled')) { chipDisabledFeedback(ch, ch.dataset.v); return; } // P4-补：置灰点击反馈
         const v = ch.dataset.v;
         if (stateSet.has(v)) stateSet.delete(v); else stateSet.add(v);
         syncChipRow(container, stateSet);
@@ -288,7 +288,7 @@
       `<span class="dp-chip${state.catSel.has(d.key) ? ' active' : ''}" data-v="${esc(d.key)}">${esc(d.key)}</span>`).join('') + `</span>`;
     chipsBox.querySelectorAll('.dp-chip').forEach(ch => {
       ch.onclick = () => {
-        if (ch.classList.contains('dp-chip-disabled')) return; // P4：置灰不可点
+        if (ch.classList.contains('dp-chip-disabled')) { chipDisabledFeedback(ch, ch.dataset.v); return; } // P4-补：置灰点击反馈
         const v = ch.dataset.v;
         if (state.catSel.has(v)) state.catSel.delete(v); else state.catSel.add(v);
         ch.classList.toggle('active', state.catSel.has(v));
@@ -321,7 +321,10 @@
       `<span class="dp-chip dp-chip-inst${state.sourceInstance === x.id ? ' active' : ''}" data-v="${x.id}">${esc(x.name)}<span class="dp-count">${x.count}</span></span>`).join('') + `</span>`;
     box.querySelectorAll('.dp-chip-inst').forEach(ch => {
       ch.onclick = () => {
-        if (ch.classList.contains('dp-chip-disabled')) return; // P4：置灰不可点
+        if (ch.classList.contains('dp-chip-disabled')) { // P4-补：置灰点击反馈
+          chipDisabledFeedback(ch, ch.childNodes[0] ? ch.childNodes[0].textContent : ch.dataset.v);
+          return;
+        }
         state.sourceInstance = (state.sourceInstance === ch.dataset.v) ? '' : ch.dataset.v;
         renderInstanceChips();
         render(true);
@@ -394,6 +397,33 @@
   }
   function matchItem(l) { return matchExcept(l, null); }
 
+  // P4-补（WP6 补丁二轮，2026-08-09）：置灰点击反馈——不得「死无反馈」：
+  // chip 抖动 200ms + 筛选条下浮出一行原因提示（2s 渐隐）；title 悬浮提示保留；aria-disabled 与点击守卫不变
+  let chipHintTimer = null;
+  function chipDisabledFeedback(ch, label) {
+    ch.classList.remove('dp-chip-shake');
+    void ch.offsetWidth; // 重排以重启动画（连点可重复触发）
+    ch.classList.add('dp-chip-shake');
+    setTimeout(() => ch.classList.remove('dp-chip-shake'), 220);
+    const bar = $('dpFilterBar');
+    if (!bar) return;
+    let hint = $('dpChipHint');
+    if (!hint) {
+      hint = document.createElement('div');
+      hint.id = 'dpChipHint';
+      hint.className = 'dp-chip-hint';
+      hint.setAttribute('role', 'status');
+      bar.appendChild(hint);
+    }
+    const causes = [];
+    if (state.primaryStats.size || state.secondaryStats.size) causes.push('该类别装备均不含所选属性');
+    if (state.search) causes.push('不含匹配当前搜索词的装备');
+    hint.textContent = `「${label}」在当前组合下无命中${causes.length ? '：' + causes.join('，') : '装备'}`;
+    hint.classList.add('show');
+    clearTimeout(chipHintTimer);
+    chipHintTimer = setTimeout(() => hint.classList.remove('show'), 2000);
+  }
+
   // P4（WP6 补丁）：筛选联动置灰——未选 chip 在「其他组条件 + 搜索」下 0 命中即置灰不可点
   // （视觉降级 + 悬浮原因提示）；已选 chip 恒不置灰；禁止自动清除已选；条件变化经 render() 实时刷新。
   // 纯前端内存计算（seasonLoot 308 行），不新增接口；来源一级 chips 不做（单选 + 全部锚点语义）。
@@ -427,8 +457,9 @@
   // 卡片高度内容驱动、同一 grid 行内原生 stretch 等高、行间允许不同高（R3，零 JS 测高）。
   // 主属性：库内原序，§4.11 色板；缺数值只显属性名（裁定 E 不变）。
   // 副属性（裁定 H 不变）：数值降序，唯一最大者⭐排第一；同值并列/缺数值保原序不加星。
-  // 特效（P1 WP6 补丁 / R7）：空间够用（≤2 行）整行直显——无 …、无 hover；
-  // 溢出卡预览 CSS line-clamp:2 视觉截断（…），hover 整卡向下生长显示特效全文（镜像实测溢出，resize 重算）。
+  // 特效（P1 WP6 补丁 / R7 / P1-补 生长防抖）：空间够用（≤2 行）整行直显——无 …、无 hover；
+  // 溢出卡预览恒为全文一次性排版（无 line-clamp），容器 2 行高 overflow 纯视口裁剪（…观感由伪元素承担），
+  // hover 整卡向下生长 = 容器视口扩大、文本 top 偏移恒 0（镜像实测溢出，resize 重算）。
   // 卡片零点击交互（运营 2026-08-08 方向修正）。
   // 主属性色板类映射（§4.11；未收录属性名回退 dp-tag-primary 蓝）
   const PRIMARY_TAG_CLASS = { '力量': 'dp-tag-p1', '敏捷': 'dp-tag-p2', '智力': 'dp-tag-p3' };
