@@ -1,14 +1,20 @@
 // 任务书 #23-补丁4 验证：展开文本衔接（①）+ 三级折叠（②）+ 筛选条规范核验（③）
 // ③ 已按任务书 #28 WP2（筛选规范 v2.0）重构口径改锚：v1.0 部位/类型二维与「排除杂项」已彻底取消，
 // 现覆盖 = 行序/区头层级/chip 规格、来源单选互斥、重置筛选、杂项零渲染、§7 动画、§8 移动端折叠。
+// 适配任务书 #28 WP6（过滤器二期，2026-08-09）：F1 分类三级过滤组（第一组；二级 3 tab、三级 部位11/武器4（主手 0 命中
+// 定义保留不渲染）/护甲5、切换清空、多选 OR、映射终版逐值对库）、F2 来源实例级（实例 chips 数据驱动带计数、
+// 点实例=另一池折叠+本池只剩该实例、再点取消）、F3 筛选态平铺（内容筛选激活→无池标题+命中计数=REST 口径、
+// 来源退化为纯过滤、0 命中空态+重置引导、清空回浏览态双池）；③§2 行序改 五段（顶行/分类/主属性/副属性/来源）、
+// 1920 档 4 行改 5 行；双视图一致回归挪浏览态「来源=大秘境」（内容筛选触发平铺态无视图开关）。
 // 适配任务书 #28 WP3-v2（全信息装备卡，运营 2026-08-08 方向修正+补充裁定 G/H）：v1 点击详情层断言块整体替换。
 // 适配任务书 #28 WP3-v3（R1–R10，2026-08-08）：恒占恒高/占位行废止 → 内容驱动行内等高（R3）；
-// hover 全文替换 → 续文展开（R4：预览截…、展开层仅续文、前缀+续文===全文；R7：未溢出卡无 … 无 hover 无展开层）；
+// hover 全文替换 → 特效展开层（R4：预览截…+展开层；R7：未溢出卡无 … 无 hover 无展开层）；
 // R5 来源组 chip 同包 .dp-chip-sub（6px 同距）；R6 来源单选联动折叠对应掉落池整段（含分组标题）；
 // R1 星标边界盒断言；R2 锚点卡（永恒虚空之歌/圣光纽带/上古饥渴之心）+ 零空 stats 行；
 // R9 期望值增排 item_type IN('装饰品','幻化')（sql/22 服务端口径）。
 // 适配任务书 #28 WP3-v4（R11–R13，2026-08-08）：R11 来源行锚底（margin-top:auto，WP3-13 全页贴底 ±1px + 分叉指环锚点）；
-// R12 hover 续文自然接续（隐藏前缀占位：展开态省略号消失、续文内联接续同线/自然换行，①块几何断言）；
+// R12 hover 续文自然接续（WP3-v4 隐藏前缀占位）→ WP3-v5（2026-08-08）返修：占位废止，展开层=特效全文可见
+// （展开无省略号、无不可见占位、overlay 文本逐字=数据源全文、首行与预览原位对齐）；
 // R13 世界BOSS剔除（BUG-062，sql/24：至暗之夜 type='world'、RPC 黑名单 is distinct from 'world'，lair 保留；
 // S1 基线 308=团本 104+大秘境 204；WP3-14 零 world 行断言）。
 // 公示页为免登录只读页（live 数据），本脚本不创建任何测试数据，收尾复核 T23X 遗留为零。
@@ -148,14 +154,14 @@ function assert(cond, label, detail) {
     });
     assert(JSON.stringify(layout.barKids) === JSON.stringify(['dpFilterToggle', 'dpFilterRows']),
       '§2 筛选条结构：折叠按钮在前、dpFilterRows 在后', layout.barKids.join('>'));
-    assert(JSON.stringify(layout.rowKids) === JSON.stringify(['top', '主属性', '副属性', '来源']),
-      '§2 行序：顶行（搜索+重置）→ 主属性组 → 副属性组 → 来源组', layout.rowKids.join('>'));
+    assert(JSON.stringify(layout.rowKids) === JSON.stringify(['top', '分类', '主属性', '副属性', '来源']),
+      '§2 行序：顶行（搜索+重置）→ 分类组（WP6 起第一组）→ 主属性组 → 副属性组 → 来源组', layout.rowKids.join('>'));
     assert(JSON.stringify(layout.topKids) === JSON.stringify(['search', 'dpResetFilters']) && layout.searchInWrap
       && layout.searchFlex === '1' && layout.resetText === '重置筛选' && layout.searchPh.includes('…'),
       '§2 顶行 = 搜索（置顶加宽 flex:1、占位省略号）+ 重置筛选按钮（不放 chip）', JSON.stringify(layout.topKids));
-    assert(JSON.stringify(layout.heads) === JSON.stringify(['主属性', '副属性', '来源'])
-      && JSON.stringify(layout.notes) === JSON.stringify(['多选', '多选', '单选 · 值域随赛季数据驱动']),
-      '§2 区头标题层级：主属性/副属性/来源 + 各带说明注记', JSON.stringify(layout.notes));
+    assert(JSON.stringify(layout.heads) === JSON.stringify(['分类', '主属性', '副属性', '来源'])
+      && JSON.stringify(layout.notes) === JSON.stringify(['二级单选 · 三级多选', '多选', '多选', '单选 · 值域随赛季数据驱动']),
+      '§2 区头标题层级：分类/主属性/副属性/来源 + 各带说明注记（WP6 分类组为第一组）', JSON.stringify(layout.notes));
     // §3 chip 视觉规格（锚到仍存在的主属性组）
     const chipCss = await page.evaluate(() => {
       const c = document.querySelector('#dpPrimaryChips .dp-chip');
@@ -285,22 +291,176 @@ function assert(cond, label, detail) {
     await sleep(500);
     cnt = await cardCount();
     assert(cnt === nCombo, `组合「力量 AND 爆击」精确匹配（页面 ${cnt} = 库内 ${nCombo}）`);
-    // 双视图筛选一致（回归）
-    await page.evaluate(() => { [...document.querySelectorAll('.dp-toggle')].find(b => b.dataset.view === 'pool').click(); });
-    await sleep(500);
-    const poolCnt = await cardCount();
-    await page.evaluate(() => { [...document.querySelectorAll('.dp-toggle')].find(b => b.dataset.view === 'boss').click(); });
-    await sleep(400);
-    assert(poolCnt === nCombo, `双视图筛选一致（整体池 ${poolCnt} = 按BOSS ${nCombo}）`);
-    // 清空还原
+    // 清空还原（撤力量+爆击 → 回浏览态全集）
     await clickChip('#dpPrimaryChips', '力量');
     await clickChip('#dpSecondaryChips', '爆击');
     await sleep(500);
     cnt = await cardCount();
     assert(cnt === all.length, `清空还原全集（页面 ${cnt} = 库内 ${all.length}）`);
+    // 双视图一致（WP6 F3 起内容筛选触发平铺态、无视图开关——改在浏览态「来源=大秘境」下回归：按BOSS ≡ 整体池 ≡ 大秘境全集）
+    await clickChip('#dpSourceChips', 'dungeon');
+    await sleep(500);
+    const bossViewCnt = await cardCount();
+    await page.evaluate(() => { [...document.querySelectorAll('.dp-toggle')].find(b => b.dataset.view === 'pool').click(); });
+    await sleep(500);
+    const poolCnt = await cardCount();
+    await page.evaluate(() => { [...document.querySelectorAll('.dp-toggle')].find(b => b.dataset.view === 'boss').click(); });
+    await sleep(400);
+    assert(bossViewCnt === nDun && poolCnt === nDun,
+      `双视图一致（浏览态来源=大秘境：按BOSS ${bossViewCnt} = 整体池 ${poolCnt} = ${nDun}）`);
+    await clickChip('#dpSourceChips', 'dungeon'); // 回「全部」
+    await sleep(500);
+    cnt = await cardCount();
+    assert(cnt === all.length, `来源回「全部」还原全集（页面 ${cnt} = 库内 ${all.length}）`);
 
-    // ============ 修正项①（WP3-v3 R4/R7）：hover 续文展开——预览截…、展开层只放续文、前缀+续文===全文；未溢出卡无 … 无 hover ============
-    console.log('—— ① hover 续文展开逐字比对（3 张长特效卡；R4 续文/R7 未溢出零 hover） ——');
+    // ============ WP6（过滤器二期）：F1 分类三级 + F2 来源实例级 + F3 筛选态平铺 ============
+    console.log('—— WP6 F1 分类三级 / F2 来源实例级 / F3 筛选态平铺 ——');
+    // F1 结构：二级 3 tab；未选 tab 时三级行隐藏
+    const f1Tabs = await page.evaluate(() => ({
+      tabs: [...document.querySelectorAll('#dpCatTabs .dp-cat-tab')].map(t => t.dataset.v),
+      chipsHidden: document.getElementById('dpCatChips').hidden,
+    }));
+    assert(JSON.stringify(f1Tabs.tabs) === JSON.stringify(['slot', 'weapon', 'armor']) && f1Tabs.chipsHidden,
+      'WP6-F1 分类组结构：二级 3 tab（部位/武器/护甲），未选 tab 时三级行隐藏', JSON.stringify(f1Tabs));
+    // F1 三级 chips 数量与值域（映射终版 2026-08-09 运营定）：部位 11 / 武器 4（主手全库 0 命中定义保留不渲染）/ 护甲 5
+    await page.click('#dpCatTabs .dp-cat-tab[data-v="slot"]');
+    await sleep(400);
+    const f1Slot = await page.evaluate(() => [...document.querySelectorAll('#dpCatChips .dp-chip')].map(c => c.dataset.v));
+    assert(JSON.stringify(f1Slot) === JSON.stringify(['头部', '肩部', '胸部', '腕部', '手部', '腰部', '腿部', '脚部', '背部', '颈部', '手指']),
+      'WP6-F1 部位 11 chips（slot 判定）', f1Slot.join('/'));
+    // 部位多选 OR：头部+颈部 = 库内两 slot 并集
+    await page.click('#dpCatChips .dp-chip[data-v="头部"]');
+    await page.click('#dpCatChips .dp-chip[data-v="颈部"]');
+    await sleep(500);
+    const nHeadNeck = all.filter(l => l.slot === '头部' || l.slot === '颈部').length;
+    cnt = await cardCount();
+    const f1Or = await page.evaluate(() => ({
+      flat: !!document.querySelector('.dp-flat-head'),
+      head: document.querySelector('.dp-flat-head') ? document.querySelector('.dp-flat-head').textContent.trim() : '',
+    }));
+    assert(cnt === nHeadNeck && f1Or.flat && f1Or.head === `命中 ${nHeadNeck} 件`,
+      `WP6-F1 部位多选 OR + F3 平铺头（头部+颈部：页面 ${cnt} = 库内 ${nHeadNeck}）`, f1Or.head);
+    // 二级切换清空三级（武器 tab）：三级已选清空 → 回浏览态全集；武器 chips = 单手/双手/远程/副手（主手不渲染）
+    await page.click('#dpCatTabs .dp-cat-tab[data-v="weapon"]');
+    await sleep(500);
+    const f1Weapon = await page.evaluate(() => ({
+      chips: [...document.querySelectorAll('#dpCatChips .dp-chip')].map(c => c.dataset.v),
+      flat: !!document.querySelector('.dp-flat-head'),
+      cards: document.querySelectorAll('.dp-item').length,
+    }));
+    assert(JSON.stringify(f1Weapon.chips) === JSON.stringify(['单手', '双手', '远程', '副手'])
+      && !f1Weapon.flat && f1Weapon.cards === all.length,
+      'WP6-F1 二级切换清空三级（回浏览态全集）+ 武器 chips 4 枚（主手 0 命中定义保留不渲染）', f1Weapon.chips.join('/'));
+    // F1 映射终版抽查（W1：法杖归双手、弓弩枪归远程、魔杖归单手、副手=副手物品）
+    const CAT_EXP = {
+      '单手': l => ['单手剑', '单手锤', '单手斧', '匕首', '拳套', '战刃', '魔杖'].includes(l.item_type),
+      '双手': l => ['双手剑', '双手锤', '双手斧', '长柄武器', '法杖'].includes(l.item_type),
+      '远程': l => ['弓', '弩', '枪械'].includes(l.item_type),
+      '副手': l => l.slot === '副手物品',
+    };
+    for (const [k, pred] of Object.entries(CAT_EXP)) {
+      await page.click(`#dpCatChips .dp-chip[data-v="${k}"]`);
+      await sleep(400);
+      cnt = await cardCount();
+      const expN = all.filter(pred).length;
+      assert(cnt === expN, `WP6-F1 武器「${k}」映射精确匹配（页面 ${cnt} = 库内 ${expN}）`);
+      await page.click(`#dpCatChips .dp-chip[data-v="${k}"]`); // 撤选
+      await sleep(300);
+    }
+    // 护甲：5 chips（盾牌归护甲不归武器副手，与武器-副手零重叠）
+    await page.click('#dpCatTabs .dp-cat-tab[data-v="armor"]');
+    await sleep(400);
+    const f1Armor = await page.evaluate(() => [...document.querySelectorAll('#dpCatChips .dp-chip')].map(c => c.dataset.v));
+    assert(JSON.stringify(f1Armor) === JSON.stringify(['板甲', '锁甲', '皮甲', '布甲', '盾牌']),
+      'WP6-F1 护甲 5 chips（item_type 判定，盾牌归护甲）', f1Armor.join('/'));
+    await page.click('#dpCatChips .dp-chip[data-v="盾牌"]');
+    await sleep(400);
+    cnt = await cardCount();
+    const nShield = all.filter(l => l.item_type === '盾牌').length;
+    assert(cnt === nShield && nShield === all.filter(l => l.slot === '副手').length,
+      `WP6-F1 护甲「盾牌」精确匹配且与 slot='副手' 同集（${cnt} = ${nShield}，武器-副手零重叠）`);
+    await page.click('#dpCatChips .dp-chip[data-v="盾牌"]');
+    await sleep(300);
+    await page.click('#dpCatTabs .dp-cat-tab[data-v="armor"]'); // 收起分类 tab
+    await sleep(400);
+    // F2 来源实例级：来源=团本 → 实例 chips 数据驱动（4 枚带计数、合计 = 团本总数）；
+    // 点「虚影尖塔」→ 秘境池整段折叠 + 团本池只剩该实例分组 + 卡片数 = 该实例件数；再点取消恢复池全量
+    await page.click('#dpSourceChips .dp-chip[data-v="raid"]');
+    await sleep(500);
+    const f2 = await page.evaluate(() => ({
+      chips: [...document.querySelectorAll('#dpInstanceChips .dp-chip-inst')].map(c => ({
+        name: c.childNodes[0].textContent.trim(), count: Number(c.querySelector('.dp-count').textContent),
+      })),
+      flat: !!document.querySelector('.dp-flat-head'),
+    }));
+    const raidInstExp = {};
+    all.filter(l => l.source === 'raid').forEach(l => { raidInstExp[l.instance_name] = (raidInstExp[l.instance_name] || 0) + 1; });
+    const f2Sum = f2.chips.reduce((a, c) => a + c.count, 0);
+    assert(f2.chips.length === Object.keys(raidInstExp).length && f2Sum === nRaid && !f2.flat
+      && f2.chips.every(c => raidInstExp[c.name] === c.count),
+      'WP6-F2 团本实例 chips 数据驱动（枚数/逐实例计数/合计均与库内一致，仅来源不触发平铺）', JSON.stringify(f2.chips));
+    const target = f2.chips.find(c => c.name === '虚影尖塔') || f2.chips[0];
+    await page.evaluate((nm) => {
+      [...document.querySelectorAll('#dpInstanceChips .dp-chip-inst')].find(c => c.childNodes[0].textContent.trim() === nm).click();
+    }, target.name);
+    await sleep(500);
+    const f2Sel = await page.evaluate(() => ({
+      cards: document.querySelectorAll('.dp-item').length,
+      groups: [...document.querySelectorAll('.dp-raid > .dp-raid-name')].map(h => h.textContent.replace(/\d+$/, '').trim()),
+      dungeonGone: ![...document.querySelectorAll('.dp-section')].some(s => s.textContent.includes('大秘境掉落池')),
+    }));
+    assert(f2Sel.cards === target.count && f2Sel.groups.length === 1 && f2Sel.groups[0].startsWith(target.name) && f2Sel.dungeonGone,
+      `WP6-F2 点「${target.name}」：秘境池折叠 + 团本池只剩该实例（${f2Sel.cards} = ${target.count} 件）`, JSON.stringify(f2Sel));
+    await page.evaluate((nm) => { // 再点取消 → 恢复池全量
+      [...document.querySelectorAll('#dpInstanceChips .dp-chip-inst')].find(c => c.childNodes[0].textContent.trim() === nm).click();
+    }, target.name);
+    await sleep(500);
+    cnt = await cardCount();
+    assert(cnt === nRaid, `WP6-F2 再点取消实例选中：团本池恢复全量（${cnt} = ${nRaid}）`);
+    await clickChip('#dpSourceChips', 'raid'); // F3-W4 需全局口径：来源先回「全部」
+    await sleep(500);
+    // F3 平铺态（W4/W5）：爆击+精通 → 全局平铺（无池标题无分组）+ 顶部命中计数 = REST 口径逐字一致；
+    // 平铺态来源=团本（含实例）退化为纯过滤 → 命中仅团本装备、不触发折叠/分组
+    await clickChip('#dpSecondaryChips', '爆击');
+    await clickChip('#dpSecondaryChips', '精通');
+    await sleep(500);
+    const nCritMast = all.filter(l => (l.secondary_stats || []).includes('爆击') && (l.secondary_stats || []).includes('精通')).length;
+    const nCritMastRaid = all.filter(l => l.source === 'raid' && (l.secondary_stats || []).includes('爆击') && (l.secondary_stats || []).includes('精通')).length;
+    const f3 = await page.evaluate(() => ({
+      flat: !!document.querySelector('.dp-flat-head'),
+      head: document.querySelector('.dp-flat-head') ? document.querySelector('.dp-flat-head').textContent.trim() : '',
+      cards: document.querySelectorAll('.dp-item').length,
+      poolTitles: [...document.querySelectorAll('.dp-section-title')].map(t => t.textContent.trim()).filter(t => t.includes('掉落池')),
+    }));
+    assert(f3.flat && f3.head === `命中 ${nCritMast} 件` && f3.cards === nCritMast && f3.poolTitles.length === 0,
+      `WP6-F3 平铺态：爆击+精通命中 ${f3.cards} = REST 口径 ${nCritMast}，无池标题无分组`, JSON.stringify(f3));
+    assert(f3.cards === nCritMast && nCritMast > 0, 'WP6-F3 平铺命中计数与 REST 逐字一致（备料非零）', `${nCritMast}`);
+    // W5：平铺态 + 来源=团本（raid 仍选中）→ 命中仅团本装备
+    cnt = await cardCount();
+    assert(cnt === nCritMastRaid, `WP6-F3 平铺态来源退化为纯过滤（团本+爆击+精通：页面 ${cnt} = 库内 ${nCritMastRaid}）`);
+    // W6：0 命中空态 + 重置引导（叠加搜索 zzz）
+    await page.fill('#dpSearch', 'zzz');
+    await sleep(500);
+    const f3Empty = await page.evaluate(() => ({
+      head: document.querySelector('.dp-flat-head') ? document.querySelector('.dp-flat-head').textContent.trim() : '',
+      empty: document.querySelector('.dp-empty') ? document.querySelector('.dp-empty').textContent : '',
+      resetBtn: !!document.getElementById('dpEmptyReset'),
+      cards: document.querySelectorAll('.dp-item').length,
+    }));
+    assert(f3Empty.head === '命中 0 件' && f3Empty.empty.includes('无符合条件装备') && f3Empty.resetBtn && f3Empty.cards === 0,
+      'WP6-F3 0 命中空态：「无符合条件装备」+ 重置引导按钮', JSON.stringify(f3Empty));
+    await page.click('#dpEmptyReset'); // 空态重置 → 回浏览态全集
+    await sleep(600);
+    const f3Reset = await page.evaluate(() => ({
+      cards: document.querySelectorAll('.dp-item').length,
+      flat: !!document.querySelector('.dp-flat-head'),
+      bothPools: [...document.querySelectorAll('.dp-section-title')].filter(t => t.textContent.includes('掉落池')).length,
+    }));
+    assert(f3Reset.cards === all.length && !f3Reset.flat && f3Reset.bothPools === 2,
+      'WP6-F3 空态重置：回浏览态双池全集', JSON.stringify(f3Reset));
+
+    // ============ 修正项①（WP3-v3 R4/R7 + WP3-v5 R12）：hover 特效展开——预览截…、展开层=全文可见（无省略号/无占位）；未溢出卡无 … 无 hover ============
+    console.log('—— ① hover 特效展开逐字比对（3 张长特效卡；R12-v5 全文可见/R7 未溢出零 hover） ——');
     let overflowSeen = 0;
     for (let i = 0; i < picked.length; i++) {
       const item = picked[i];
@@ -332,16 +492,13 @@ function assert(cond, label, detail) {
           const card = document.querySelector('[data-t4-hover]');
           const preview = card.querySelector('.dp-item-effect-preview');
           const overlay = card.querySelector('.dp-item-effect-overlay');
-          const hid = overlay.querySelector('.dp-fx-hidden');
-          const prefix = hid ? hid.textContent : null;
-          const remainder = overlay.textContent.slice(prefix ? prefix.length : 0);
-          // R12 内联接续几何：续文首字 top 相对预览 top 的偏移 ≈ 1×行高（与预览末字同线续接）
-          // 或 ≈ 2×行高（前缀恰好装满第二行、自然换行）——两种都是连续文本流，不得更大（另起块级行/空白行）
+          // R12（WP3-v5）：展开层 = 特效全文可见（隐藏前缀占位废止）——
+          // 首字几何：展开层第一个字与预览首行原位对齐（top 偏移 ≈ 0），视觉=从截断态生长为完整态
           let topOffset = null, lh = null;
           const tn = [...overlay.childNodes].find(n => n.nodeType === Node.TEXT_NODE && n.textContent.length);
           if (tn) {
             const range = document.createRange();
-            range.setStart(tn, 0); range.setEnd(tn, Math.min(1, tn.textContent.length));
+            range.setStart(tn, 0); range.setEnd(tn, 1);
             lh = parseFloat(getComputedStyle(preview).lineHeight);
             topOffset = Math.round((range.getBoundingClientRect().top - preview.getBoundingClientRect().top) * 10) / 10;
           }
@@ -349,7 +506,8 @@ function assert(cond, label, detail) {
             previewOpacity: getComputedStyle(preview).opacity,
             overlayOpacity: getComputedStyle(overlay).opacity,
             overlayHasEllipsis: overlay.textContent.includes('…'),
-            prefix, remainder, topOffset, lh,
+            hasHiddenSpan: !!overlay.querySelector('.dp-fx-hidden'),
+            overlayText: overlay.textContent, topOffset, lh,
           };
           card.removeAttribute('data-t4-hover'); // 避免下一张定位到旧卡
           return out;
@@ -359,24 +517,23 @@ function assert(cond, label, detail) {
       } else if (pre.found) {
         await page.evaluate(() => document.querySelector('[data-t4-hover]').removeAttribute('data-t4-hover'));
       }
-      const inlineOk = after && after.topOffset != null
-        && (Math.abs(after.topOffset - after.lh) <= 2 || Math.abs(after.topOffset - 2 * after.lh) <= 2);
+      const alignOk = after && after.topOffset != null && Math.abs(after.topOffset) <= 2;
       const ok = pre.found && (pre.overflow
         ? (after
           && pre.before.endsEllipsis                              // 折叠态预览被 … 截断
           && pre.before.overlayHidden                             // 折叠态展开层不渲染
           && after.previewOpacity === '1'
           && after.overlayOpacity === '1'
-          && !after.overlayHasEllipsis                            // R12①：展开态省略号消失
-          && after.prefix === pre.before.previewText.slice(0, -1) // R12②：隐藏前缀=折叠态可见前缀（续文接在预览末字之后）
-          && after.prefix + after.remainder === item.effect       // 前缀+续文 === 数据源全文（逐字）
-          && inlineOk)                                            // R12②：续文内联接续（同线或自然换行，无空白行）
+          && !after.overlayHasEllipsis                            // R12②：展开态省略号移除
+          && !after.hasHiddenSpan                                 // R12④：无任何不可见占位区
+          && after.overlayText === item.effect                    // R12①③：展开层=全文，从第一个字起连续可见
+          && alignOk)                                             // 展开层首行与预览首行原位对齐（截断态→完整态生长）
         : (!pre.before.endsEllipsis && pre.before.previewText === item.effect && pre.before.overlayHidden === null)); // R7：未溢出整行直显
-      assert(ok, `①卡${i + 1}「${item.item_name}」${pre.found && pre.overflow ? 'hover 续文自然接续（R12）：折叠截…、展开无省略号、续文内联接续逐字=全文' : '未溢出：整行直显无 … 无展开层（R7）'}`,
-        pre.found && after ? `topOffset=${after.topOffset} lh=${after.lh} 省略号残留=${after.overlayHasEllipsis}` : (pre.found ? `溢出=${pre.overflow}` : '卡片未找到'));
+      assert(ok, `①卡${i + 1}「${item.item_name}」${pre.found && pre.overflow ? 'hover 展开完整连续（R12-v5）：折叠截…、展开无省略号无占位、全文从首字连续可见且首行原位对齐' : '未溢出：整行直显无 … 无展开层（R7）'}`,
+        pre.found && after ? `topOffset=${after.topOffset} lh=${after.lh} 省略号残留=${after.overlayHasEllipsis} 占位=${after.hasHiddenSpan}` : (pre.found ? `溢出=${pre.overflow}` : '卡片未找到'));
     }
     assert(overflowSeen >= 1, '①备料：3 张长特效卡中至少 1 张实测溢出（has-effect，续文路径被真实覆盖）', `溢出 ${overflowSeen}/3`);
-    // R7 专项（全页不变量）：未溢出卡 = 无 has-effect/无展开层/无 …/预览=全文；溢出卡 = 截…+展开层续文且 前缀+续文===全文
+    // R7 专项（全页不变量）：未溢出卡 = 无 has-effect/无展开层/无 …/预览=全文；溢出卡 = 预览截…+展开层全文可见（R12-v5：无省略号、无占位、overlay 文本=数据源全文）
     const r7 = await page.evaluate(() => {
       const bad = [];
       let shortSeen = 0, longSeen = 0;
@@ -389,10 +546,8 @@ function assert(cond, label, detail) {
         const ellipsis = p.textContent.endsWith('…');
         if (has) {
           longSeen++;
-          const hid = ov && ov.querySelector('.dp-fx-hidden');
-          const rem = ov ? ov.textContent.slice(hid ? hid.textContent.length : 0) : '';
-          if (!ellipsis || !ov || !hid || ov.textContent.includes('…')
-            || (p.textContent.slice(0, -1) + rem) !== p.dataset.full) bad.push('溢出卡异常:' + name);
+          if (!ellipsis || !ov || ov.querySelector('.dp-fx-hidden') || ov.textContent.includes('…')
+            || ov.textContent !== p.dataset.full) bad.push('溢出卡异常:' + name);
         } else {
           shortSeen++;
           if (ellipsis || ov || p.textContent !== p.dataset.full) bad.push('未溢出卡异常:' + name);
@@ -401,7 +556,7 @@ function assert(cond, label, detail) {
       return { bad, shortSeen, longSeen };
     });
     assert(r7.bad.length === 0 && r7.shortSeen > 0 && r7.longSeen > 0,
-      `①R7/R4 全页不变量：未溢出卡 ${r7.shortSeen} 张零 … 零展开层零 hover、溢出卡 ${r7.longSeen} 张截…+续文逐字=全文`,
+      `①R7/R12-v5 全页不变量：未溢出卡 ${r7.shortSeen} 张零 … 零展开层零 hover、溢出卡 ${r7.longSeen} 张截…+展开层全文逐字=数据源且无占位`,
       JSON.stringify(r7.bad));
     // ① 截图：特效卡 折叠态 vs 悬浮展开态
     await page.evaluate(() => {
@@ -864,9 +1019,11 @@ function assert(cond, label, detail) {
       activeVals: document.querySelectorAll('.dp-filterbar .dp-chip.active:not(.dp-chip-all)').length,
       allChips: document.querySelectorAll('.dp-filterbar .dp-chip-all.active').length,
       search: document.getElementById('dpSearch').value,
+      catChipsHidden: document.getElementById('dpCatChips').hidden, // WP6：分类三级行随重置收起
+      instHidden: document.getElementById('dpInstanceChips').hidden, // WP6：实例行随来源清空收起
     }));
-    assert(reset.activeVals === 0 && reset.allChips === 1 && !reset.search,
-      '③§5 赛季切换全重置（值 chip 全清、来源「全部」回选、搜索清空）', JSON.stringify(reset));
+    assert(reset.activeVals === 0 && reset.allChips === 1 && !reset.search && reset.catChipsHidden && reset.instHidden,
+      '③§5 赛季切换全重置（值 chip 全清、来源「全部」回选、搜索清空、分类三级与实例行收起）', JSON.stringify(reset));
     await page.selectOption('#dpSeasonSelect', cur.id);
     await sleep(800);
 
@@ -888,11 +1045,11 @@ function assert(cond, label, detail) {
         new Set([...g.querySelectorAll('.dp-chip')].map(c => Math.round(c.getBoundingClientRect().top))).size);
       return { kids: kids.length, rows: tops.size, toggleHidden, groupLines };
     });
-    assert(rows1920.kids === 4 && rows1920.rows === 4 && rows1920.toggleHidden && rows1920.groupLines.every(n => n === 1),
-      '③§6 1920×1080 桌面档：toggle 隐藏、顶行+三组各一行（组内无折行）', JSON.stringify(rows1920));
+    assert(rows1920.kids === 5 && rows1920.rows === 5 && rows1920.toggleHidden && rows1920.groupLines.every(n => n === 1),
+      '③§6 1920×1080 桌面档：toggle 隐藏、顶行+四组各一行（组内无折行；WP6 分类组为第一组，三级行未选 tab 时隐藏）', JSON.stringify(rows1920));
     await page2.evaluate(() => window.scrollTo(0, 0));
     await page2.screenshot({ path: path.join(SHOT_DIR, '1920-filterbar.png') });
-    // 1920 悬浮续文展开逐字比对一例 + 截图（WP3-v3 R4：hover 唯一触发路径；按 名字+预览 dataset.full 双重定位）
+    // 1920 悬浮特效展开逐字比对一例 + 截图（WP3-v5 R12：hover 唯一触发路径；按 名字+预览 dataset.full 双重定位）
     const pre1920 = await page2.evaluate((it) => {
       const card = [...document.querySelectorAll('.dp-item.has-effect')].find(c => {
         const p = c.querySelector('.dp-item-effect-preview');
@@ -912,15 +1069,14 @@ function assert(cond, label, detail) {
         const card = document.querySelector('[data-t4-1920]');
         const preview = card.querySelector('.dp-item-effect-preview');
         const overlay = card.querySelector('.dp-item-effect-overlay');
-        const hid = overlay.querySelector('.dp-fx-hidden');
-        const rem = overlay.textContent.slice(hid ? hid.textContent.length : 0);
         return { po: getComputedStyle(preview).opacity, oo: getComputedStyle(overlay).opacity,
           noEll: !overlay.textContent.includes('…'),
-          joined: preview.textContent.slice(0, -1) + rem };
+          noHidden: !overlay.querySelector('.dp-fx-hidden'),
+          fullText: overlay.textContent };
       });
     }
-    assert(r1920 && r1920.po === '1' && r1920.oo === '1' && r1920.noEll && r1920.joined === picked[0].effect,
-      '①[1920] hover 续文自然接续（R12）：展开无省略号、隐藏前缀占位、前缀+续文逐字=数据源全文');
+    assert(r1920 && r1920.po === '1' && r1920.oo === '1' && r1920.noEll && r1920.noHidden && r1920.fullText === picked[0].effect,
+      '①[1920] hover 展开完整连续（R12-v5）：展开无省略号、无隐藏占位、展开层全文逐字=数据源全文');
     await page2.screenshot({ path: path.join(SHOT_DIR, '1920-expand-after.png') });
     await ctx2.close();
 

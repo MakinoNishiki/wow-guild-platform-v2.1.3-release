@@ -83,6 +83,17 @@
   background: rgba(240, 192, 96, 0.1);
 }
 
+/* ==================== 任务书 #28 WP6：过滤器二期（2026-08-09） ====================
+   F1 分类三级过滤组：二级 tab 复用 chip 体系、加粗与三级 chips 区分；
+   F2 来源实例行：来源组内第二行，chip 内计数角标沿用 .dp-count 组标题计数样式；
+   F3 平铺态头：命中计数行 + 0 命中空态重置引导 */
+.dp-cat-tabs { display: flex; gap: 6px; flex-wrap: wrap; row-gap: 6px; }
+.dp-cat-tab { font-weight: 600; letter-spacing: 0.02em; }
+.dp-instance-row { margin-top: 2px; }
+.dp-chip-inst .dp-count { margin-left: 5px; }
+.dp-flat-head { font-size: 13px; color: var(--text-secondary); padding: 2px 2px 12px; user-select: none; }
+.dp-empty-actions { margin-top: 12px; }
+
 @media (max-width: 768px) {
   .dp-filter-toggle { display: inline-flex; align-items: center; }
   .dp-filterbar:not(.filters-open) .dp-filter-rows { display: none; }
@@ -313,10 +324,10 @@
   box-shadow: 0 0 6px rgba(240, 192, 96, 0.12);
 }
 .dp-item.has-effect:hover { z-index: 30; }
-/* R4 hover 续文展开层（R12 WP3-v4 改为自然接续）：展开层与预览行同宽同字体、top:0 原位覆盖——
-   内部 = 隐藏前缀（.dp-fx-hidden 占位，与预览可见文本逐字相同）+ 可见续文，同一文本流内联接续：
-   省略号只存在于折叠态，展开态消失（预览行被实底遮住）；续文从省略号原位置接着预览末字生长、
-   自然换行，不另起块级行、无空白行；absolute 不推挤布局；实底遮严邻卡；
+/* R4 hover 特效展开层（R12 WP3-v5 返修：完整连续可见）：展开层与预览行同宽同字体、top:0 实底原位覆盖——
+   内容 = 特效全文（同一文本流全程可见；WP3-v4 的隐藏前缀 .dp-fx-hidden 占位已废止拆除）：
+   省略号只存在于折叠态预览；hover 后前两行与预览逐字重合、续文自断点自然生长——
+   从第一个字起连续可读，无任何不可见占位区、无空白行；absolute 不推挤布局；实底遮严邻卡；
    200ms ease-out 只动 transform/opacity（§6 白名单），reduced-motion 瞬时（见文件尾部媒体查询） */
 .dp-item-effect-overlay {
   position: absolute; left: 0; right: 0; top: 0;
@@ -330,8 +341,6 @@
   transition: opacity .2s ease-out, transform .2s ease-out;
   z-index: 30;
 }
-/* R12：隐藏前缀——占位使续文内联接续在预览末字之后（visibility 保留布局，不可见不删字） */
-.dp-item-effect-overlay .dp-fx-hidden { visibility: hidden; }
 .dp-item.has-effect:hover .dp-item-effect-overlay { opacity: 1; transform: translateY(0); }
 
 /* ==================== 任务书 #28 WP3-v2/v3：全信息装备卡（方向修正版 + 体验修订） ====================
