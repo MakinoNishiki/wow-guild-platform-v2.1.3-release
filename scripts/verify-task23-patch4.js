@@ -44,6 +44,8 @@
 // 新增滚动后 hover elementFromPoint 断言（条卡重叠区命中条=条在上层、展开下端命中卡=遮盖下一行形态不破）。
 // 适配任务书 #28 WP4（灰色系对比度整改，2026-08-09）：.dp-item-src 文字色→rgb(150,158,170)、卡片 meta 灰 tag
 // 文字色→rgb(165,173,185)（选择器级，:root 变量不动）；新增 §2 生效值 + 合成背景对比度 ≥4.5 脚本计算断言 ×2。
+// WP4-F3 追加（2026-08-10 运营拍板）：.dp-count 件数徽标同灰阶提亮（同值 165,173,185）——全场景逐实例祖先链
+// 合成背景对比度断言（副本/BOSS 折叠头、实例 chips 角标、平铺态命中计数）。
 // 公示页为免登录只读页（live 数据），本脚本不创建任何测试数据，收尾复核 T23X 遗留为零。
 // 用法: node scripts/verify-task23-patch4.js（PW_CHANNEL=chrome 可选）截图输出 backup/2026-08-07-task23-patch4/
 const fs = require('fs');
@@ -904,6 +906,34 @@ function assert(cond, label, detail) {
     assert(wp4.tagC.join(',') === '165,173,185' && wp4.tagRatio >= 4.5,
       `WP4-F2 卡片 meta 灰 tag 文字色 rgb(165,173,185) 生效、15% 灰合成底色对比度 ${wp4.tagRatio} ≥4.5（§2 生效值+脚本算）`,
       JSON.stringify(wp4));
+    // WP4-F3（2026-08-10 追加，运营拍板）：.dp-count 件数徽标同灰阶提亮——§2 生效值 +
+    // 全场景（副本/BOSS 折叠头、实例 chips 角标、平铺态命中计数）逐实例祖先链合成背景对比度 ≥4.5
+    const wp4f3 = await page.evaluate(() => {
+      const lum = (r, g, b) => { const f = c => { c /= 255; return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); }; return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b); };
+      const ratio = (c1, c2) => { const l1 = lum(...c1), l2 = lum(...c2); return (Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05); };
+      const parse = s => s.match(/[\d.]+/g).map(Number);
+      const items = [...document.querySelectorAll('.dp-count')].map(el => {
+        const c = parse(getComputedStyle(el).color);
+        // 祖先链合成：从元素自身 15% 灰底逐层向上叠到底（透明层自动跳过），得有效背景
+        const stack = [];
+        let node = el;
+        while (node && node !== document.documentElement) {
+          const v = parse(getComputedStyle(node).backgroundColor);
+          stack.push(v.length === 3 ? [...v, 1] : v.slice(0, 4));
+          node = node.parentElement;
+        }
+        stack.push([13, 17, 23, 1]); // 兜底页面底色（body 恒不透明，实际不会用到）
+        let under = stack.pop();
+        while (stack.length) { const t = stack.pop(); under = t.slice(0, 3).map((v, i) => v * t[3] + under[i] * (1 - t[3])); }
+        return { c, ratio: Math.round(ratio(c, under) * 100) / 100 };
+      });
+      return { n: items.length,
+        allColorOk: items.every(x => x.c.join(',') === '165,173,185'),
+        minRatio: Math.min(...items.map(x => x.ratio)) };
+    });
+    assert(wp4f3.n > 0 && wp4f3.allColorOk && wp4f3.minRatio >= 4.5,
+      `WP4-F3 件数徽标 .dp-count 文字色 rgb(165,173,185) 全场景（${wp4f3.n} 枚）生效、最低合成对比度 ${wp4f3.minRatio} ≥4.5（§2 生效值+逐实例合成算）`,
+      JSON.stringify(wp4f3));
 
     // ============ P4-再补②（WP6 补丁三轮）：命中计数并入吸顶条末行——任意滚动位置完整可见、不半裁 ============
     const stickyCk = await page.evaluate(() => {

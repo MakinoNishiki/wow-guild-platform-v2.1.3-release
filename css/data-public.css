@@ -196,7 +196,9 @@
   align-items: center;
   gap: 6px;
 }
-/* 件数徽标同并轨：几何同 .tag，语义色同 .tag-grey（弱化灰） */
+/* 件数徽标同并轨：几何同 .tag，语义色同 .tag-grey（弱化灰）；
+   WP4-F3（2026-08-10 追加，运营拍板）：文字色 var(--text-secondary)=rgb(139,148,158) → rgb(165,173,185)
+   ——与 WP4-F2 灰 tag 同值同坑（合成对比度 3.99 不达 4.5）；徽标底色不动；选择器级落地（:root 变量不动） */
 .dp-count {
   display: inline-flex;
   align-items: center;
@@ -206,7 +208,7 @@
   font-weight: 600;
   line-height: 1;
   white-space: nowrap;
-  color: var(--text-secondary);
+  color: rgb(165, 173, 185);
   background: rgba(139, 148, 158, 0.15);
   border-radius: 5px;
 }
