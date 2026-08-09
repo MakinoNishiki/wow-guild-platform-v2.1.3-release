@@ -39,6 +39,9 @@
 // 逐卡对照输出（§1 审计单数据源）。BUG-068 hover 动画双向对称——根因=260 恒定封顶使插值行程远大于可视行程
 // （展开瞬时/收回双段），修法=hover 目标值改逐卡实测 --fx-full（同一 max-height 驱动路径，零 JS 事件）；
 // 新增 rAF 逐帧双向连帧断言（单调连续、单帧跳变≤行程50% 逐帧口径、60ms 反病态、260ms 到位、终态=--fx-full）。
+// 适配 WP6 补丁五轮（BUG-069，2026-08-09）：z-index 层级规约——sticky 筛选条(10)＞hover 展开卡(5)＞普通卡(auto)
+// （旧值 30 越过吸顶条：滚动后展开卡上半压条）；hover 卡 z 30→5，① 块与 ①[1920] 块 z 断言同步适配；
+// 新增滚动后 hover elementFromPoint 断言（条卡重叠区命中条=条在上层、展开下端命中卡=遮盖下一行形态不破）。
 // 公示页为免登录只读页（live 数据），本脚本不创建任何测试数据，收尾复核 T23X 遗留为零。
 // 用法: node scripts/verify-task23-patch4.js（PW_CHANNEL=chrome 可选）截图输出 backup/2026-08-07-task23-patch4/
 const fs = require('fs');
@@ -677,7 +680,7 @@ function assert(cond, label, detail) {
           && /max-height/.test(pre.before.wrapTrans) && /0\.2s/.test(pre.before.wrapTrans) && /ease-out/.test(pre.before.wrapTrans) // §6 例外已注册
           && pre.before.padR === '18px' && pre.before.afterGrad === 'none' && pre.before.glyphClear // BUG-066：占位带恒定+渐变废除+零压字
           && mid.textTop0 && mid.sameText                              // P1-补：动画中段文本 top 偏移 0、文本零变化
-          && after.pos === 'absolute' && after.z === '30'
+          && after.pos === 'absolute' && after.z === '5'                         // BUG-069 五轮：层级规约 筛选条(10)＞hover卡(5)＞普通卡
           && after.padRHover === '18px'                                // BUG-066：hover 态占位带不变（零重排）
           && after.grown && after.cardStable                           // 整卡生长 + 网格不塌
           && after.srcFollows && after.srcInside                       // 来源行跟随新底部全程可见
@@ -825,6 +828,55 @@ function assert(cond, label, detail) {
       && Math.abs(hTop - animCard.fxFull) <= 1.5,                                   // 展开终态 = --fx-full 实测全文高（测量正确性）
       `BUG-068 双向对称：展开/收回同一 max-height 路径、逐帧单调连续、单帧跳变≤行程50%、60ms 反病态（非瞬时/无双段）、260ms 到位、终态=--fx-full(${animCard.fxFull}px)`,
       `h0=${h0} hTop=${hTop} travel=${Math.round(travel * 10) / 10} up60=${up60} down60=${down60} upMaxStep=${maxStep(upFrames)} downMaxStep=${maxStep(downFrames)} up260=${up260} down260=${down260}`);
+
+    // ============ BUG-069（WP6 补丁五轮）：z-index 层级修正——sticky 筛选条(10) ＞ hover 展开卡(5) ＞ 普通卡；
+    // 滚动后 hover 溢出卡：卡上半被吸顶条正常遮挡（elementFromPoint 命中条内元素）、向下展开部分正常可见（命中卡内元素） ============
+    console.log('—— BUG-069 层级：滚动后 hover 展开卡不越吸顶筛选条 ——');
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await sleep(300);
+    // 构造「卡顶没入吸顶条下 12px」的重叠区——两段式：先粗滚让条进入 sticky 态，再按条 settled rect 精调
+    // （条未吸顶时 rect 含页首偏移，直接拿它算滚动位会算错——一轮断言即因此跑红，如实留痕）
+    await page.evaluate(() => {
+      const card = document.querySelector('.dp-item.has-effect');
+      card.setAttribute('data-t4-z', '1');
+      window.scrollTo(0, card.getBoundingClientRect().top + window.scrollY - 100);
+    });
+    await sleep(300);
+    await page.evaluate(() => {
+      const card = document.querySelector('[data-t4-z]');
+      const b = document.getElementById('dpFilterBar').getBoundingClientRect(); // 已吸顶，rect 已 settled
+      window.scrollTo(0, window.scrollY + card.getBoundingClientRect().top - b.bottom + 12);
+    });
+    await sleep(300);
+    const zPt = await page.evaluate(() => {
+      const card = document.querySelector('[data-t4-z]');
+      const bar = document.getElementById('dpFilterBar');
+      const r = card.getBoundingClientRect(), b = bar.getBoundingClientRect();
+      return { cx: Math.round(r.left + r.width / 2),
+        overlapY: Math.round((Math.max(r.top, b.top) + b.bottom) / 2), // 条卡重叠区中点
+        hoverY: Math.round(b.bottom + 30) };                            // 条下缘之下卡体可见区（hover 落点）
+    });
+    await page.mouse.move(zPt.cx, zPt.hoverY); // 坐标直达 hover——不用 page.hover（其自动 scrollIntoView 会破坏构造的滚动位）
+    await sleep(450); // 展开完成（200ms 动画+余量）
+    const zCk = await page.evaluate((pt) => {
+      const card = document.querySelector('[data-t4-z]');
+      const inner = card.querySelector('.dp-item-inner');
+      const bar = document.getElementById('dpFilterBar');
+      const r = inner.getBoundingClientRect(), b = bar.getBoundingClientRect();
+      const hitTop = document.elementFromPoint(pt.cx, pt.overlapY);  // 重叠区 → 应命中条内元素（条在上层）
+      const hitLow = document.elementFromPoint(pt.cx, r.bottom - 4); // 展开下端 → 应命中卡内元素（遮盖下一行形态不破）
+      return { zCard: getComputedStyle(card).zIndex, zBar: getComputedStyle(bar).zIndex,
+        grownDown: r.bottom > b.bottom + 10,
+        topHitBar: !!hitTop && !!hitTop.closest('#dpFilterBar'),
+        lowHitCard: !!hitLow && !!hitLow.closest('[data-t4-z]') };
+    }, zPt);
+    await page.mouse.move(8, 460);
+    await sleep(300);
+    await page.evaluate(() => { document.querySelector('[data-t4-z]').removeAttribute('data-t4-z'); window.scrollTo(0, 0); });
+    await sleep(300);
+    assert(zCk.zBar === '10' && zCk.zCard === '5' && zCk.grownDown && zCk.topHitBar && zCk.lowHitCard,
+      'BUG-069 层级规约：sticky 筛选条(10)＞hover 展开卡(5)＞普通卡——滚动后卡上半被条正常遮挡（elementFromPoint 命中条）、向下展开部分正常可见（命中卡、遮盖下一行形态不破）',
+      JSON.stringify(zCk));
 
     // ============ P4-再补②（WP6 补丁三轮）：命中计数并入吸顶条末行——任意滚动位置完整可见、不半裁 ============
     const stickyCk = await page.evaluate(() => {
@@ -1384,7 +1436,7 @@ function assert(cond, label, detail) {
           noOverlay: !document.querySelector('.dp-item-effect-overlay') };
       });
     }
-    assert(r1920 && r1920.pos === 'absolute' && r1920.z === '30' && r1920.grown && r1920.srcFollows
+    assert(r1920 && r1920.pos === 'absolute' && r1920.z === '5' && r1920.grown && r1920.srcFollows
       && r1920.textTop0 && r1920.fullText === picked[0].effect && r1920.noOverlay,
       '①[1920] hover 整卡生长（P1+P1-补）：inner absolute 生长、来源行跟随新底部、特效全文框内逐字=数据源、文本零位移、零 overlay');
     await page2.screenshot({ path: path.join(SHOT_DIR, '1920-expand-after.png') });

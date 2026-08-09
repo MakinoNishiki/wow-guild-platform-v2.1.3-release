@@ -363,7 +363,10 @@
   position: absolute; top: 0; left: 0; right: 0;
   height: auto;
 }
-.dp-item.has-effect:hover { z-index: 30; }
+/* BUG-069（WP6 补丁五轮）层级规约：sticky 筛选条(10) ＞ hover 展开卡(5) ＞ 普通卡(auto)——
+   旧值 30 越过吸顶筛选条（滚动后展开卡上半压住条）；降 5 后卡上半被条正常遮挡、
+   向下展开部分仍覆盖下一行卡（auto 同级），「遮盖下一行」形态不破；#dpChipToast(2000) 独立层不动 */
+.dp-item.has-effect:hover { z-index: 5; }
 /* hover 生长：投影覆盖下方卡片；高度生长由 .dp-item-effect-wrap max-height 动画驱动（inner 高度
    内容驱动自动跟随）；外层 .dp-item 由 JS 预设折叠态 minHeight，网格行高不变 */
 .dp-item.has-effect:hover .dp-item-inner {
