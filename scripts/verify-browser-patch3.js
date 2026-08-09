@@ -41,7 +41,7 @@ async function svc(method, restPath, body) {
 }
 
 let serverProc = null;
-let testUid = null, testGuildId = null, tempLootId = null, tempTierId = null;
+let testUid = null, testGuildId = null, tempLootId = null, tempTierId = null, tempSeasonId = null;
 
 async function setup() {
   // 1. 测试用户
@@ -80,11 +80,18 @@ async function setup() {
   const tmp = await svc('POST', '/rest/v1/boss_loot', { boss_id: bossId, item_name: '补丁3特效验证剑', slot: '武器', item_type: '双手剑', effect: '装备：攻击附带剧毒' });
   if (tmp.status !== 201) throw new Error('临时掉落行插入失败: ' + JSON.stringify(tmp.body));
   tempLootId = tmp.body[0].id;
+  // 6. 临时赛季（C2 解绑断言专用——2026-08-10 脆性修复：S1/S2 套装名均已物化，真实赛季再无「无套装名行」，
+  //    在真实赛季上写 2 件效果会污染/误删生产字典行（S1 战士·防护事故在案）；临时赛季零数据天然满足前提）
+  const ts = await svc('POST', '/rest/v1/game_seasons', { name: '补丁3临时赛季', start_date: '2020-01-01', is_current: false });
+  if (ts.status !== 201) throw new Error('临时赛季插入失败: ' + JSON.stringify(ts.body));
+  tempSeasonId = ts.body[0].id;
 }
 
 async function cleanup() {
   try { if (tempLootId) await svc('DELETE', `/rest/v1/boss_loot?id=eq.${tempLootId}`); } catch {}
   try { if (tempTierId) await svc('DELETE', `/rest/v1/tier_sets?id=eq.${tempTierId}`); } catch {}
+  try { if (tempSeasonId) await svc('DELETE', `/rest/v1/tier_sets?season_id=eq.${tempSeasonId}`); } catch {}
+  try { if (tempSeasonId) await svc('DELETE', `/rest/v1/game_seasons?id=eq.${tempSeasonId}`); } catch {}
   try { if (testGuildId) await svc('DELETE', `/rest/v1/guilds?id=eq.${testGuildId}`); } catch (e) { console.error('删公会失败', e); }
   try { if (testUid) await fetch(`${SB}/auth/v1/admin/users/${testUid}`, { method: 'DELETE', headers: SVC }); } catch (e) { console.error('删用户失败', e); }
   if (serverProc) serverProc.kill();
@@ -192,8 +199,18 @@ async function cleanup() {
     await sleep(1500);
     await page.click('#mdTabs .view-tab[data-mdtab="tiersets"]');
     await sleep(1200);
+    // 赛季选择按名称前缀匹配（当前赛季标签带「（当前）」后缀，is_current 翻转不炸脚本，2026-08-10 脆性修复）
+    const mdSelectSeason = async (name) => {
+      const v = await page.evaluate(n => {
+        const sel = document.querySelector('#mdPanel select');
+        const opt = sel && [...sel.options].find(o => o.textContent === n || o.textContent === n + '（当前）');
+        return opt ? opt.value : null;
+      }, name);
+      if (!v) throw new Error('赛季选项不存在: ' + name);
+      await page.selectOption('#mdPanel select', v);
+    };
     // S2 套装名物化断言（战士=翡翠督军的统御）
-    await page.selectOption('#mdPanel select', { label: 'S2' });
+    await mdSelectSeason('S2');
     await sleep(1200);
     const s2Warrior = await page.evaluate(() => {
       const rows = [...document.querySelectorAll('#mdPanel tr')].filter(tr => tr.textContent.includes('战士'));
@@ -201,8 +218,8 @@ async function cleanup() {
     });
     check('C1. S2 战士全专精行套装名已物化', s2Warrior.length === 3 && s2Warrior.every(v => v === '翡翠督军的统御'), JSON.stringify(s2Warrior));
     await page.screenshot({ path: path.join(SHOT_DIR, 'C-tiersets-s2.png'), fullPage: true });
-    // S1 战士（无套装名行）：直接填 2 件效果 → 应可独立建行（解绑）
-    await page.selectOption('#mdPanel select', { label: 'S1' });
+    // C2 解绑断言：临时赛季（零数据，全部行天然无套装名）——严禁在真实赛季写效果字段（2026-08-10 事故教训）
+    await mdSelectSeason('补丁3临时赛季');
     await sleep(1200);
     await page.evaluate(() => {
       const tr = [...document.querySelectorAll('#mdPanel tr')].find(tr => tr.textContent.includes('战士'));

@@ -1945,7 +1945,8 @@ const pageTitles = {
   reports: '统计报表',
   data: '数据管理',
   changelog: '更新日志',
-  datacenter: '数据中心'
+  datacenter: '数据中心',
+  lootdrop: '副本掉落' // 任务书 #28 WP5（REQ-086）：原「数据公示」更名 + 双壳嵌入
 };
 
 function switchPage(pageName) {
@@ -1987,6 +1988,12 @@ function switchPage(pageName) {
     renderDatacenter();
   }
   
+  // 任务书 #28 WP5：副本掉落 tab——首次切入懒挂载渲染层（DPLootDrop.mount 挂 page-lootdrop 容器），
+  // 此后切入 activate() 重测特效溢出（tab 隐藏期间 resize 被可见性守卫跳过，归来校正）
+  if (pageName === 'lootdrop') {
+    ensureLootdropMounted();
+  }
+
   // 移动端关闭侧边栏
   if (window.innerWidth <= 768) {
     document.getElementById('sidebar').classList.remove('show');
@@ -1999,6 +2006,18 @@ function switchPage(pageName) {
     case 'attendance': renderAttendance(); break;
     case 'reports': renderReports(); break;
     case 'data': renderDataPage(); break;
+  }
+}
+
+// 任务书 #28 WP5：副本掉落 tab 懒挂载（双壳之登录壳；渲染层 js/dataPublic.js 与公开页 data.html 同源单一真源）
+let lootdropMounted = false;
+function ensureLootdropMounted() {
+  if (!window.DPLootDrop) return;
+  if (!lootdropMounted) {
+    lootdropMounted = true;
+    DPLootDrop.mount(document.getElementById('page-lootdrop'));
+  } else {
+    DPLootDrop.activate();
   }
 }
 
@@ -6581,6 +6600,20 @@ function lootFillAssignedTo(name) {
 // ==================== 初始化 ====================
 // ==================== 更新日志 ====================
 const changelogData = [
+  {
+    id: 'v3.2.0-task28-wp5-lootdrop',
+    version: 'v3.2.0',
+    date: '2026-08-10',
+    type: 'feature',
+    typeLabel: '新增功能',
+    title: '「数据公示」更名「副本掉落」并嵌入主应用（任务书 #28 WP5，REQ-086 收官）',
+    summary: '原「数据公示」更名「副本掉落」；侧边栏入口改为应用内切换页签（与考勤记录、成员管理同款），不再新开页面。免登录公开页 data.html 原样保留（已分享链接不受损），双壳共用同一套渲染层与数据通道。',
+    details: [
+      '登录后在主应用内直接查看：赛季切换、分类/属性/来源筛选、搜索、团本与大秘境掉落池、套装一览，全部功能与公开页一致',
+      '筛选条在页签内吸顶于顶部栏之下；特效卡悬浮生长、置灰提示、折叠记忆等行为双壳一致',
+      '三角色（owner/editor/viewer）均可见，全部内容只读'
+    ]
+  },
   {
     id: 'v3.2.0-task28-wp4-contrast-fix',
     version: 'v3.2.0',

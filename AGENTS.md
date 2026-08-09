@@ -42,10 +42,13 @@
 
 ```
 ├── index.html          # 入口页面（含认证界面、公会管理、主应用 DOM）
+├── data.html           # 副本掉落公开壳（免登录，URL 不变可分享）
 ├── css/
-│   └── main.css        # 全局样式（WoW 暗色主题 + 认证界面样式）
+│   ├── main.css        # 全局样式（WoW 暗色主题 + 认证界面样式）
+│   └── data-public.css # 副本掉落双壳共用（.dp-* 前缀 + #page-lootdrop 作用域，零泄漏）
 ├── js/
 │   ├── cloud.js        # 云端数据层（Supabase 集成：认证、公会、数据同步）
+│   ├── dataPublic.js   # 副本掉落渲染层（双壳单一真源 window.DPLootDrop；公开壳自动挂载）
 │   └── app.js          # 完整应用逻辑（约7700行）
 │       ├── 数据管理（loadData/saveData/cloudCrud）
 │       ├── 成员管理（增删改查、职业专精、职责标签）
@@ -85,6 +88,8 @@
 10. **数据管理**（page:data） - 设置、JSON导入导出、重置
 
 11. **更新日志**（page:changelog） - 版本历史
+
+12. **副本掉落**（page:lootdrop + data.html） - REQ-086 收官（任务书 #28 WP5，原「数据公示」更名）：双壳同一渲染层 js/dataPublic.js（window.DPLootDrop，单一真源禁复制）——登录壳 = 主应用 #page-lootdrop 页签（app.js ensureLootdropMounted 懒挂载，切回 activate 重测；筛选条吸顶 top:56px 让开 topbar，层级规约 筛选条10＞hover卡5 同效），公开壳 = data.html 免登录可分享（body.data-public-body 自动挂载，URL 不动）；anon 直连 PostgREST（字典表 + 公开 RPC get_public_loot_detail），全角色只读
 
 ## 云端架构
 

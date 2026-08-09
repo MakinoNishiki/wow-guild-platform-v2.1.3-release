@@ -446,3 +446,14 @@
   .dp-items { grid-template-columns: 1fr; }
   .dp-tiers { grid-template-columns: 1fr; }
 }
+
+/* ==================== 任务书 #28 WP5：双壳嵌入——登录壳 tab（#page-lootdrop）作用域覆盖 ====================
+   仅 3 条、全部 #page-lootdrop 作用域，公开壳（data.html）零影响：
+   ① 吸顶让位——主应用 topbar sticky top:0 高 56px z-50，tab 内筛选条吸顶点上移 56px 免于压盖
+      （公开壳无 topbar，top:0 不动）；层级规约不变：筛选条(10)＞hover卡(5)＜topbar(50)，无越层；
+   ② 池末缓冲——登录壳无 .dp-footer 的 200px 底部缓冲带，由 .dp-main 自补（末行溢出卡 hover
+      向下生长 ≤260px 的 absolute 溢出被吸收，不撑滚动区）；
+   ③ 赛季行对齐——登录壳无 .dp-header，赛季行与筛选条/主内容同 1100px 版心对齐 */
+#page-lootdrop .dp-filterbar { top: 56px; }
+#page-lootdrop .dp-main { padding-bottom: 200px; }
+#page-lootdrop .dp-season { max-width: 1100px; margin: 0 auto 4px; padding: 0 20px; justify-content: flex-end; }

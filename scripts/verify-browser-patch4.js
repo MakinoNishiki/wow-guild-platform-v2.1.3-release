@@ -110,6 +110,7 @@ async function setup() {
     raid: '补丁4迁移模拟', start_time: '20:00', end_time: '23:00', status: 'normal',
   };
   if (teamTagColumnExists) actRow.team_tag = '3'; // 旧字段有值、team_label 留空
+  else actRow.team_label = '3'; // sql/13 已删列（2026-08-10 实测）：直接置迁移后终态，B10 等价验证徽章渲染
   const ta = await svc('POST', '/rest/v1/activities', actRow);
   if (ta.status !== 201) throw new Error('迁移模拟活动插入失败: ' + JSON.stringify(ta.body));
   tmpActId = ta.body[0].id;

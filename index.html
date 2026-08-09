@@ -4,11 +4,12 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>魔兽管家</title>
-<!-- 静态资源版本号：20260808.36（任务书 #22 WP3-②：凡改动 js/css 的 commit 必须同步递增此处与所有 ?v= 查询串，见 docs/开发规范.md 第五章） -->
+<!-- 静态资源版本号：20260808.37（任务书 #22 WP3-②：凡改动 js/css 的 commit 必须同步递增此处与所有 ?v= 查询串，见 docs/开发规范.md 第五章） -->
 <link rel="icon" type="image/png" sizes="32x32" href="assets/brand/favicon-32.png">
 <link rel="icon" type="image/png" sizes="16x16" href="assets/brand/favicon-16.png">
-<link rel="stylesheet" href="css/main.css?v=20260808.36">
-<script src="assets/vendor/supabase-js-2.js?v=20260808.36"></script>
+<link rel="stylesheet" href="css/main.css?v=20260808.37">
+<link rel="stylesheet" href="css/data-public.css?v=20260808.37"><!-- 任务书 #28 WP5：副本掉落 tab（选择器全 .dp- 前缀 + #page-lootdrop 作用域，零泄漏） -->
+<script src="assets/vendor/supabase-js-2.js?v=20260808.37"></script>
 </head>
 <body>
 
@@ -146,9 +147,10 @@
       <div class="nav-item" id="navDatacenter" data-page="datacenter" onclick="switchPage('datacenter')" style="display:none">
         <span class="nav-icon">🗄</span><span>数据中心</span>
       </div>
-      <!-- 任务书 #23 WP2：数据公示（免登录公开页，全角色可见，新开标签页） -->
-      <div class="nav-item" onclick="window.open('data.html', '_blank')">
-        <span class="nav-icon">📖</span><span>数据公示</span>
+      <!-- 任务书 #28 WP5：副本掉落（REQ-086 收官；原「数据公示」更名 + 双壳嵌入——应用内切 tab，
+           免登录公开页 data.html 保留可分享；全角色可见、只读） -->
+      <div class="nav-item" data-page="lootdrop" onclick="switchPage('lootdrop')">
+        <span class="nav-icon">📖</span><span>副本掉落</span>
       </div>
       <div class="nav-item" onclick="openUserCenter()">
         <span class="nav-icon">👤</span><span>用户中心</span>
@@ -662,6 +664,48 @@
           </div>
           <div id="mdPanel"></div>
         </div>
+      </div>
+
+      <!-- 任务书 #28 WP5：副本掉落（REQ-086 收官）——双壳之登录壳 tab；渲染层/数据通道与公开页
+           data.html 同源（js/dataPublic.js 的 DPLootDrop.mount 挂本容器，禁止复制第二份渲染代码）；
+           外壳骨架为壳差异（无 dp-header/dp-footer：标题由 topbar 承担，池末 hover 生长缓冲由
+           #page-lootdrop .dp-main 的 padding-bottom 承担）；筛选条骨架与公开壳逐字同构 -->
+      <div class="page" id="page-lootdrop">
+        <div class="dp-season">
+          <label for="dpSeasonSelect">赛季</label>
+          <select id="dpSeasonSelect" class="form-select"></select>
+        </div>
+        <div class="dp-filterbar" id="dpFilterBar">
+          <button id="dpFilterToggle" class="btn btn-secondary dp-filter-toggle">筛选 ▾</button>
+          <div class="dp-filter-rows" id="dpFilterRows">
+            <div class="dp-top-row">
+              <div class="uc-input-wrap dp-search-wrap"><input type="text" id="dpSearch" class="search-input" placeholder="搜索装备名…"><button type="button" id="dpSearchClear" class="uc-clear-btn" aria-label="清除搜索" title="清空" style="display:none">&times;</button></div>
+              <button type="button" id="dpResetFilters" class="btn btn-secondary dp-reset-btn">重置筛选</button>
+            </div>
+            <div class="dp-group" id="dpCategoryGroup">
+              <div class="dp-group-head">分类<span class="dp-group-note">二级单选 · 三级多选</span></div>
+              <div class="dp-cat-tabs" id="dpCatTabs"></div>
+              <div class="dp-chips" id="dpCatChips" hidden></div>
+            </div>
+            <div class="dp-group">
+              <div class="dp-group-head">主属性<span class="dp-group-note">多选</span></div>
+              <div class="dp-chips" id="dpPrimaryChips"></div>
+            </div>
+            <div class="dp-group">
+              <div class="dp-group-head">副属性<span class="dp-group-note">多选</span></div>
+              <div class="dp-chips" id="dpSecondaryChips"></div>
+            </div>
+            <div class="dp-group" id="dpSourceGroup">
+              <div class="dp-group-head">来源<span class="dp-group-note">单选 · 值域随赛季数据驱动</span></div>
+              <div class="dp-chips" id="dpSourceChips"></div>
+              <div class="dp-chips dp-instance-row" id="dpInstanceChips" hidden></div>
+            </div>
+          </div>
+          <div class="dp-flat-head" id="dpFlatHead" hidden></div>
+        </div>
+        <main class="dp-main" id="dpMain">
+          <div class="dp-loading">数据加载中…</div>
+        </main>
       </div>
     </div>
   </main>
@@ -1824,12 +1868,14 @@
   </div>
 </div>
 
-<script src="js/cloud.js?v=20260808.36"></script>
+<script src="js/cloud.js?v=20260808.37"></script>
 <!-- 任务书 #14：主数据层（快照兜底 + 加载层），须在 app.js 之前 -->
-<script src="js/masterDataSnapshot.js?v=20260808.36"></script>
-<script src="js/masterData.js?v=20260808.36"></script>
+<script src="js/masterDataSnapshot.js?v=20260808.37"></script>
+<script src="js/masterData.js?v=20260808.37"></script>
 <!-- 任务书 #22 WP2：职业/专精/职责图标集中映射（全站唯一取图处） -->
-<script src="js/iconMap.js?v=20260808.36"></script>
-<script src="js/app.js?v=20260808.36"></script>
+<script src="js/iconMap.js?v=20260808.37"></script>
+<!-- 任务书 #28 WP5：副本掉落渲染层（双壳同源；无 data-public-body 不自动启动，由 app.js 懒挂载，须在 app.js 之前） -->
+<script src="js/dataPublic.js?v=20260808.37"></script>
+<script src="js/app.js?v=20260808.37"></script>
 </body>
 </html>

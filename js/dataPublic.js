@@ -19,14 +19,23 @@
 // F2 来源实例级（选中团本/大秘境展开实例 chips：单选、再点取消、带计数、赛季数据驱动；浏览态另一池折叠+本池只剩该实例）；
 // F3 筛选态平铺（搜索/分类/主属性/副属性任一激活 → 全局平铺无池标题无分组 + 顶部「命中 N 件」；
 // 0 命中空态 + 重置引导；平铺态来源含实例退化为纯过滤不触发折叠；清空内容条件回浏览态；排序保持数据自然序）。
+// 任务书 #28 WP5（2026-08-10，REQ-086 收官）：双壳嵌入——渲染层参数化为 window.DPLootDrop，
+// 公开壳（data.html，body.data-public-body）自动挂载 document；登录壳（index.html #page-lootdrop tab）
+// 由 app.js 首次切入时懒挂载容器根。同一渲染层/数据通道单一真源，禁止复制第二份；URL 不动。
+// 更名「数据公示」→「副本掉落」。全局副作用处置（§1 审计）：toast/fxMirror 维持 document.body 单例
+// （fixed/aria-hidden 屏外，按文档查找不重复）；resize 监听加可见性守卫（tab 隐藏 display:none 跳过测量，
+// 回 tab 由 activate() 重测校正）；sessionStorage 折叠记忆键不变（双壳异文档，无冲突）。
 // boss_loot/dungeon_loot 读取收口公开 RPC（sql/21，杂项服务端排除；sql/22 增排装饰品/幻化），难度行继续不显（tiers 无数据）。
 // 读取通道：anon key 直连 PostgREST（字典表匿名读 sql/16 + 公开 RPC sql/21），不登录、不走 server.js 写代理。
 // 任何加载失败给友好重试界面，不白屏；全部内容只读。
 (function () {
   'use strict';
 
-  const $ = id => document.getElementById(id);
-  const main = $('dpMain');
+  // WP5（双壳嵌入）：root = 挂载根——公开壳为 document，登录壳 tab 为 #page-lootdrop 容器；
+  // 全部 id 查找限定 root 作用域（主应用文档内还有其他页签 DOM，不得越界）；boot() 时由 mount 定 root
+  let root = document;
+  const $ = id => root.querySelector(`#${id}`);
+  let main = null; // boot() 首行解析（此时 root 已定）
 
   const state = {
     url: '', anon: '',
@@ -152,6 +161,7 @@
   }
 
   async function boot() {
+    main = $('dpMain'); // WP5：root 已由 mount 定，此处解析内容容器
     // 配置与登录页同源（/api/supabase-config 本为免登录端点）；失败给重试界面
     let cfg;
     try {
@@ -234,7 +244,8 @@
     let fxResizeTimer = null;
     window.addEventListener('resize', () => {
       clearTimeout(fxResizeTimer);
-      fxResizeTimer = setTimeout(() => measureEffectCards(), 150);
+      // WP5：tab 隐藏（display:none）时跳过——隐藏态量得 0 宽会污染溢出标记；回 tab 由 activate() 重测校正
+      fxResizeTimer = setTimeout(() => { if (main.getClientRects().length) measureEffectCards(); }, 150);
     });
 
     render();
@@ -407,7 +418,7 @@
     void ch.offsetWidth; // 重排以重启动画（连点可重复触发）
     ch.classList.add('dp-chip-shake');
     setTimeout(() => ch.classList.remove('dp-chip-shake'), 220);
-    let toast = $('dpChipToast');
+    let toast = document.getElementById('dpChipToast'); // WP5：toast 挂 document.body（root 作用域外），固定单例按文档查找
     if (!toast) {
       toast = document.createElement('div');
       toast.id = 'dpChipToast';
@@ -795,5 +806,20 @@
     if (enterAnim) main.querySelectorAll('.dp-item').forEach(c => c.classList.add('dp-enter'));
   }
 
-  boot();
+  // WP5：双宿主挂载入口——公开壳（data.html，body.data-public-body）自动挂 document 立即启动；
+  // 登录壳 tab（index.html #page-lootdrop）由 app.js 首次切入时 mount(容器) 懒启动（每文档仅一次，幂等）；
+  // activate() 供 tab 再次切入时重测特效溢出（隐藏期间 resize 被可见性守卫跳过，归来校正）
+  let started = false;
+  window.DPLootDrop = {
+    mount(el) {
+      if (started) return;
+      started = true;
+      root = el || document;
+      boot();
+    },
+    activate() {
+      if (started && main && main.getClientRects().length) measureEffectCards();
+    },
+  };
+  if (document.body.classList.contains('data-public-body')) window.DPLootDrop.mount(document);
 })();
