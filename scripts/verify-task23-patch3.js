@@ -193,6 +193,8 @@ function assert(cond, label, detail) {
   await page.hover('[data-t3-eff]');
   await sleep(450);
   // P1（#28-WP6 补丁）：浮层遮盖废止——hover 整卡生长（inner absolute + wrap max-height 展开）
+  // WP6 补丁四轮（BUG-068）：hover 目标值 260 恒定封顶改逐卡实测 --fx-full（34<目标≤260，兜底 260）——
+  // maxH 断言相应改「> 折叠态 34px 且 ≤ 260」（生长语义不变，上限不再恒 260）
   const grow = await page.evaluate(() => {
     const card = document.querySelector('[data-t3-eff]');
     const inner = card.querySelector('.dp-item-inner');
@@ -201,7 +203,7 @@ function assert(cond, label, detail) {
     return { pos: cs.position, maxH: parseFloat(wcs.maxHeight), transition: wcs.transitionDuration,
       grown: inner.getBoundingClientRect().height > parseFloat(card.style.minHeight) + 10 };
   });
-  assert(grow.pos === 'absolute' && grow.maxH > 100 && grow.grown, '悬浮整卡生长（inner absolute 高度生长 + wrap 展开，P1）', JSON.stringify(grow));
+  assert(grow.pos === 'absolute' && grow.maxH > 34 && grow.maxH <= 260 && grow.grown, '悬浮整卡生长（inner absolute 高度生长 + wrap 展开，P1；四轮目标值=--fx-full 实测高）', JSON.stringify(grow));
   assert(parseFloat(grow.transition) >= 0.2 && parseFloat(grow.transition) <= 0.3, '生长过渡 200–300ms', grow.transition);
   const neighborAfter = await page.evaluate(() => {
     const next = document.querySelector('[data-t3-next]');

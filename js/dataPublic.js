@@ -516,6 +516,10 @@
   // P1-再补：溢出卡 inner 常驻 absolute（生长/收回全程不入文档流，网格行高零变化）——
   // 故必须先在内联流态量取折叠态高度写入外层 minHeight，再加 has-effect（absolute 后外层失去内容撑高）；
   // 隐藏池（折叠 BOSS/副本 display:none）量得 0 宽 0 高无害——折叠切换走整页 render() 重测自愈。
+  // BUG-067（四轮）：占位带改溢出卡专属（基础规则无 padding）——清类后所有卡即无带态，
+  // preview.clientWidth 自动 = 无 padding 全宽，镜像按无带宽度排版判定：≤2 行恰好放下 = 不加带不标溢出。
+  // BUG-068（四轮）：hover 展开目标值改逐卡实测全文高 --fx-full（按加带后宽度复测，260 仅兜底）——
+  // 旧恒定 260 封顶使插值行程远大于可视行程（展开瞬时/收回双段）；改后双向行程对称，纯 CSS 零事件。
   let fxMirror = null;
   function measureEffectCards() {
     const cards = main.querySelectorAll('.dp-item');
@@ -532,6 +536,7 @@
     const m = fxMirror;
     const grow = [];
     wraps.forEach(wrap => {
+      wrap.style.removeProperty('--fx-full'); // 清上轮实测高（未溢出即不再使用）
       const card = wrap.closest('.dp-item');
       const preview = wrap.querySelector('.dp-item-effect-preview');
       const full = preview.dataset.full || preview.textContent;
@@ -545,12 +550,21 @@
       m.textContent = full;
       const overflow = m.offsetHeight > maxH;
       // 内联流态下量取折叠态高度（此时 has-effect 未加、inner 未 absolute，占位高=内容高）
-      if (overflow) grow.push([card, card.getBoundingClientRect().height]);
+      if (overflow) {
+        // BUG-068：按加带后宽度（占位带 18px 全态恒定）复测全文高 → --fx-full 精确展开目标（260 兜底）
+        m.style.width = `${preview.clientWidth - 18}px`;
+        const fxFull = Math.min(Math.ceil(m.offsetHeight), 260);
+        grow.push([card, card.getBoundingClientRect().height, wrap, fxFull]);
+      }
     });
     m.textContent = '';
-    // 第二趟：溢出卡标 has-effect（inner 转常驻 absolute）+ 外层预设折叠态 minHeight——
+    // 第二趟：溢出卡标 has-effect（inner 转常驻 absolute + 占位带）+ 外层预设折叠态 minHeight + 写 --fx-full——
     // 网格占位高度恒定 = 折叠态高度，hover 生长/收回全程零牵连
-    grow.forEach(([c, h]) => { c.classList.add('has-effect'); c.style.minHeight = `${h}px`; });
+    grow.forEach(([c, h, wrap, fxFull]) => {
+      c.classList.add('has-effect');
+      c.style.minHeight = `${h}px`;
+      wrap.style.setProperty('--fx-full', `${fxFull}px`);
+    });
   }
 
   const emptyText = t => `<div class="dp-empty">${esc(t)}</div>`;

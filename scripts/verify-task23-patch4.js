@@ -33,6 +33,12 @@
 // 命中计数已废）。P4-再补② 命中计数并入吸顶条末行（#dpFlatHead 常驻 DOM、浏览态 hidden，flat 判定改 hidden 口径）+
 // 吸顶条整体容器断言 + 多档滚动完整可见断言。BUG-066 省略号遮罩压字修复——wrap padding-right 18px 全态恒定
 // 占位带、渐变遮罩废除、::after 收窄带内零压字（Range 末行字形右缘 ≤ 带左缘断言）。
+// 适配 WP6 补丁四轮（BUG-067/BUG-068，2026-08-09）：BUG-067 占位带从全卡恒定改溢出卡专属（基础态无带）——
+// 溢出判定改按无 padding 宽度镜像排版（≤2 行恰好放下=不加带不标溢出，回归 R7 全宽无带态）；R7 全页不变量
+// 占位带一刀切断言改分态（溢出 18px/未溢出 0px，§2 生效值），shortSeen≥1 硬断言恢复（§4 样本声明随断言文案输出）+
+// 逐卡对照输出（§1 审计单数据源）。BUG-068 hover 动画双向对称——根因=260 恒定封顶使插值行程远大于可视行程
+// （展开瞬时/收回双段），修法=hover 目标值改逐卡实测 --fx-full（同一 max-height 驱动路径，零 JS 事件）；
+// 新增 rAF 逐帧双向连帧断言（单调连续、单帧跳变≤行程50% 逐帧口径、60ms 反病态、260ms 到位、终态=--fx-full）。
 // 公示页为免登录只读页（live 数据），本脚本不创建任何测试数据，收尾复核 T23X 遗留为零。
 // 用法: node scripts/verify-task23-patch4.js（PW_CHANNEL=chrome 可选）截图输出 backup/2026-08-07-task23-patch4/
 const fs = require('fs');
@@ -677,16 +683,17 @@ function assert(cond, label, detail) {
           && after.srcFollows && after.srcInside                       // 来源行跟随新底部全程可见
           && after.textFull && after.textTop0 && after.displayBlock && after.noClampCss // 全文展开、无 clamp、零位移
           && back.pos === 'absolute' && back.cropped && back.textTop0) // P1-再补：离开收回（inner 不回文档流、视口裁剪恢复、零位移）
-        : (pre.before.previewFull && !pre.before.cropped && pre.before.noOverlay && !pre.before.minH && pre.before.textTop0 && pre.before.padR === '18px')); // R7：未溢出整行直显
+        : (pre.before.previewFull && !pre.before.cropped && pre.before.noOverlay && !pre.before.minH && pre.before.textTop0 && pre.before.padR === '0px')); // R7：未溢出整行直显（BUG-067 四轮：基础态无占位带，§2 生效值断言）
       assert(ok, `①卡${i + 1}「${item.item_name}」${pre.found && pre.overflow ? 'hover 整卡生长（P1+P1-补+P1-再补）：覆盖式生长（inner 常驻 absolute）、全程文本 top 偏移 0、来源行跟随、网格不塌、离开收回不入流、省略号占位带零压字（BUG-066）' : '未溢出：整行直显无裁剪无 hover（R7）'}`,
         pre.found ? `before=${JSON.stringify(pre.before)} mid=${JSON.stringify(mid)} after=${JSON.stringify(after)} back=${JSON.stringify(back)}` : '卡片未找到');
     }
     assert(overflowSeen >= 1, '①备料：3 张长特效卡中至少 1 张实测溢出（has-effect，生长路径被真实覆盖）', `溢出 ${overflowSeen}/3`);
     // R7/P1/P1-补 专项（全页不变量）：全页零 overlay DOM、零 line-clamp；预览恒=特效全文一次性排版、文本 top 偏移恒 0；
-    // 未溢出卡 = 无 has-effect/无占位 minHeight/无视口裁剪/无 … 伪元素；
-    // 溢出卡 = has-effect + 容器 2 行高视口裁剪（… 观感由 ::after 伪元素承担）+ JS 预设折叠态 minHeight（hover 生长不塌网格）
+    // 未溢出卡 = 无 has-effect/无占位 minHeight/无视口裁剪/无 … 伪元素/无占位带（BUG-067 四轮：基础态无带）；
+    // 溢出卡 = has-effect + 占位带 18px + 容器 2 行高视口裁剪（… 观感由 ::after 伪元素承担）+ JS 预设折叠态 minHeight（hover 生长不塌网格）
     const r7 = await page.evaluate(() => {
       const bad = [];
+      const audit = []; // BUG-067 逐卡对照（报告 §1 审计单数据源）
       let shortSeen = 0, longSeen = 0;
       document.querySelectorAll('.dp-item').forEach(c => {
         const p = c.querySelector('.dp-item-effect-preview');
@@ -697,25 +704,32 @@ function assert(cond, label, detail) {
         const cropped = wrap.scrollHeight > wrap.clientHeight + 1;
         const dots = getComputedStyle(wrap, '::after').content.includes('…');
         const topOff = Math.abs(p.getBoundingClientRect().top - wrap.getBoundingClientRect().top) > 1;
+        const lineH = parseFloat(getComputedStyle(p).lineHeight);
+        audit.push({ name, lines: Math.round(p.scrollHeight / lineH * 10) / 10, overflow: has,
+          fxFull: has ? getComputedStyle(wrap).getPropertyValue('--fx-full').trim() : '' });
         if (p.textContent !== p.dataset.full) bad.push('预览非全文:' + name);
         if (c.querySelector('.dp-item-effect-overlay')) bad.push('overlay残留:' + name);
         if (topOff) bad.push('文本偏移:' + name);
         if (getComputedStyle(p).webkitLineClamp !== 'none') bad.push('clamp残留:' + name);
-        if (getComputedStyle(wrap).paddingRight !== '18px') bad.push('省略号占位带缺失:' + name); // BUG-066：全态恒定
         if (getComputedStyle(wrap, '::after').backgroundImage !== 'none') bad.push('渐变遮罩残留:' + name); // BUG-066：渐变废除
         if (has) {
           longSeen++;
+          if (getComputedStyle(wrap).paddingRight !== '18px') bad.push('溢出卡占位带缺失:' + name); // BUG-066/067：带=溢出卡专属（§2 生效值）
           if (!cropped || !c.style.minHeight || !dots) bad.push('溢出卡异常:' + name);
           if (getComputedStyle(c.querySelector('.dp-item-inner')).position !== 'absolute') bad.push('溢出卡inner非absolute:' + name); // P1-再补：常驻 absolute
         } else {
           shortSeen++;
+          if (getComputedStyle(wrap).paddingRight !== '0px') bad.push('未溢出卡误加占位带:' + name); // BUG-067：基础态无带（§2 生效值）
           if (cropped || c.style.minHeight || dots) bad.push('未溢出卡异常:' + name);
         }
       });
-      return { bad, shortSeen, longSeen, overlayDom: document.querySelectorAll('.dp-item-effect-overlay').length };
+      return { bad, audit, shortSeen, longSeen, overlayDom: document.querySelectorAll('.dp-item-effect-overlay').length };
     });
-    assert(r7.bad.length === 0 && r7.longSeen > 0 && r7.overlayDom === 0,
-      `①R7/P1-补 全页不变量：未溢出卡 ${r7.shortSeen} 张零裁剪零 hover 零占位零 …（S1 库实况：占位带 18px 缩窄文本宽后特效卡全部溢出，未溢出路径本轮无样本）、溢出卡 ${r7.longSeen} 张视口裁剪+…伪元素+占位高+inner 常驻 absolute、全页零 overlay 零 clamp 零渐变、文本偏移恒 0、预览恒全文`,
+    // BUG-067（四轮）逐卡对照输出：§1 副作用审计单「8 张特效卡前后状态对照」数据源（lines=当前宽度排版行数）
+    console.log('  [BUG-067 逐卡对照] ' + r7.audit.map(a =>
+      `${a.name}=${a.lines}行/${a.overflow ? `溢出(带,--fx-full=${a.fxFull})` : '恰好放下(全宽无带)'}`).join('；'));
+    assert(r7.bad.length === 0 && r7.longSeen > 0 && r7.shortSeen >= 1 && r7.overlayDom === 0,
+      `①R7 全页不变量（BUG-067 样本恢复，§4 样本声明：本轮未溢出样本=${r7.shortSeen} 张、溢出样本=${r7.longSeen} 张）：未溢出卡全宽无带零裁剪零 hover 零 …、溢出卡占位带+视口裁剪+…伪元素+占位高+inner 常驻 absolute、全页零 overlay 零 clamp 零渐变、文本偏移恒 0、预览恒全文`,
       JSON.stringify(r7.bad));
 
     // ============ P1-再补（WP6 补丁三轮，B2 修复）：覆盖式生长——全页邻卡 rect 展开/收回连帧零位移 ============
@@ -750,6 +764,67 @@ function assert(cond, label, detail) {
       'WP6-P1-再补 覆盖式生长：hover 展开/收回连帧，全页邻卡 rect top/height 变化 = 0（网格占位恒定，B2 修复）',
       `mid=${!nbSame(nb0, nbMid)} grown=${!nbSame(nb0, nbGrown)} backMid=${!nbSame(nb0, nbBackMid)} back=${!nbSame(nb0, nbBack)}`);
     await page.evaluate(() => document.querySelector('[data-t4-nb]').removeAttribute('data-t4-nb'));
+
+    // ============ BUG-068（WP6 补丁四轮）：hover 动画双向对称——同一驱动路径（wrap max-height transition，
+    // 目标值 = 逐卡实测 --fx-full）；rAF 逐帧连帧：双向单调连续、单帧跳变 ≤ 总行程 50%（逐帧口径，运营 2026-08-09 裁定）、
+    // 展开非瞬时（60ms 未走完）、收无双段（60ms 已离开起点）、260ms 双向到位、终态=--fx-full ============
+    console.log('—— BUG-068 双向连帧：展开/收回 200ms 平滑对称（rAF 逐帧） ——');
+    const animCard = await page.evaluate(() => {
+      const card = [...document.querySelectorAll('.dp-item.has-effect')].find(c => {
+        const r = c.getBoundingClientRect();
+        return r.top > 0 && r.bottom < innerHeight - 40;
+      }) || document.querySelector('.dp-item.has-effect');
+      card.setAttribute('data-t4-anim', '1');
+      card.scrollIntoView({ block: 'center' });
+      const wrap = card.querySelector('.dp-item-effect-wrap');
+      return { h0: Math.round(wrap.getBoundingClientRect().height * 10) / 10,
+        fxFull: parseFloat(getComputedStyle(wrap).getPropertyValue('--fx-full')) };
+    });
+    await sleep(300);
+    // rAF 逐帧采样 wrap 高度直到稳定（连续 8 帧不变，上限 600ms）
+    const sampleFrames = () => page.evaluate(() => new Promise(resolve => {
+      const wrap = document.querySelector('[data-t4-anim] .dp-item-effect-wrap');
+      const frames = [];
+      let last = NaN, stable = 0;
+      const t0 = performance.now();
+      (function tick() {
+        const h = Math.round(wrap.getBoundingClientRect().height * 10) / 10;
+        frames.push([Math.round(performance.now() - t0), h]);
+        if (Math.abs(h - last) < 0.05) stable++; else stable = 0;
+        last = h;
+        if (stable >= 8 || performance.now() - t0 > 600) return resolve(frames);
+        requestAnimationFrame(tick);
+      })();
+    }));
+    await page.hover('[data-t4-anim]');
+    const upFrames = await sampleFrames();
+    await sleep(150); // 展开到位后稳定片刻
+    await page.mouse.move(8, 460); // 移开 → 收回（页左缘空白，不触发滚动）
+    const downFrames = await sampleFrames();
+    await page.evaluate(() => document.querySelector('[data-t4-anim]').removeAttribute('data-t4-anim'));
+    const h0 = animCard.h0, hTop = upFrames[upFrames.length - 1][1], travel = hTop - h0;
+    const atT = (fr, t) => { // 相邻帧线性插值取 t ms 处高度（粗点位 0/60/140/260 连续性检查）
+      let prev = fr[0];
+      for (const f of fr) {
+        if (f[0] >= t) { const span = f[0] - prev[0]; return span > 0 ? prev[1] + (f[1] - prev[1]) * (t - prev[0]) / span : f[1]; }
+        prev = f;
+      }
+      return fr[fr.length - 1][1];
+    };
+    const mono = (fr, dir) => fr.every((f, i) => i === 0 || (f[1] - fr[i - 1][1]) * dir >= -0.5);
+    const maxStep = fr => Math.max(...fr.slice(1).map((f, i) => Math.abs(f[1] - fr[i][1])));
+    const up60 = atT(upFrames, 60), up140 = atT(upFrames, 140), up260 = atT(upFrames, 260);
+    const down60 = atT(downFrames, 60), down140 = atT(downFrames, 140), down260 = atT(downFrames, 260);
+    assert(travel > 10
+      && mono(upFrames, 1) && mono(downFrames, -1)                                  // 双向逐帧单调连续（±0.5px 容差）
+      && up60 <= up140 && up140 <= up260 && down60 >= down140 && down140 >= down260 // 粗点位 0/60/140/260 连续
+      && maxStep(upFrames) <= travel * 0.5 && maxStep(downFrames) <= travel * 0.5   // 单帧跳变 ≤ 总行程 50%（逐帧口径）
+      && up60 > h0 + travel * 0.15 && up60 < h0 + travel * 0.9                      // 展开 60ms：在走但未完（非瞬时一帧到位）
+      && down60 < hTop - travel * 0.15                                              // 收回 60ms：已离开起点（无双段前段静止）
+      && Math.abs(up260 - hTop) <= 1 && Math.abs(down260 - h0) <= 1                 // 260ms 双向到位（200ms 动画+余量）
+      && Math.abs(hTop - animCard.fxFull) <= 1.5,                                   // 展开终态 = --fx-full 实测全文高（测量正确性）
+      `BUG-068 双向对称：展开/收回同一 max-height 路径、逐帧单调连续、单帧跳变≤行程50%、60ms 反病态（非瞬时/无双段）、260ms 到位、终态=--fx-full(${animCard.fxFull}px)`,
+      `h0=${h0} hTop=${hTop} travel=${Math.round(travel * 10) / 10} up60=${up60} down60=${down60} upMaxStep=${maxStep(upFrames)} downMaxStep=${maxStep(downFrames)} up260=${up260} down260=${down260}`);
 
     // ============ P4-再补②（WP6 补丁三轮）：命中计数并入吸顶条末行——任意滚动位置完整可见、不半裁 ============
     const stickyCk = await page.evaluate(() => {
@@ -793,6 +868,14 @@ function assert(cond, label, detail) {
     await page.screenshot({ path: path.join(SHOT_DIR, '1366-expand-after.png') });
     await page.hover('.dp-footer');
     await sleep(300);
+    // BUG-067（四轮）锚点截图：恰好放下卡（未溢出样本）全宽无带、无省略号
+    await page.evaluate(() => {
+      const card = [...document.querySelectorAll('.dp-item')].find(c =>
+        c.querySelector('.dp-item-effect-preview') && !c.classList.contains('has-effect'));
+      if (card) { card.setAttribute('data-t4-fit', '1'); card.scrollIntoView({ block: 'center' }); }
+    });
+    await sleep(300);
+    await page.screenshot({ path: path.join(SHOT_DIR, 'wp6p4-fit-card.png') });
 
     // ============ ①+ 任务书 #28 WP3-v2：全信息装备卡 ============
     console.log('—— ①+ WP3-v2 全信息装备卡 ——');

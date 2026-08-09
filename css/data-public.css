@@ -328,11 +328,16 @@
    文档流（不再仅 hover 才 absolute）——根因 = 旧实现鼠标移出瞬间 inner 回文档流而 wrap 收缩
    动画仍在进行，200ms 内 in-flow inner 被撑高牵连整行、动画结束行高回落；现生长/收回全程
    不入流，网格占位由外层 .dp-item 的 JS 预设 minHeight（= 折叠态高度）恒定承担，行高全程不变 */
-/* 特效容器：折叠态 max-height=2 行（2×17px 行高）+ overflow 纯视口裁剪；hover 展开至 260px 封顶
-   （不挂 overflow-y:auto——滚动条出现会改宽度引起重排，违背零位移口径；S1 最长特效远未及 260px）。
-   BUG-066（WP6 补丁三轮）：padding-right 18px（≈1.5em）为省略号预留占位带、全态恒定——
-   文本自然提前换行，省略号落在带内零压字；hover 展开/收回宽度不变，零重排红线不破 */
-.dp-item-effect-wrap { position: relative; margin-top: 6px; overflow: hidden; max-height: 34px; transition: max-height .2s ease-out; padding-right: 18px; box-sizing: border-box; }
+/* 特效容器：折叠态 max-height=2 行（2×17px 行高）+ overflow 纯视口裁剪；hover 展开至逐卡实测全文高
+   （--fx-full，260px 仅兜底；不挂 overflow-y:auto——滚动条出现会改宽度引起重排，违背零位移口径；
+   S1 最长特效远未及 260px）。
+   BUG-066（WP6 补丁三轮）：padding-right 18px（≈1.5em）为省略号预留占位带——
+   文本自然提前换行，省略号落在带内零压字；hover 展开/收回宽度不变，零重排红线不破。
+   BUG-067（WP6 补丁四轮）：占位带从全卡恒定改溢出卡专属（基础态无带）——带缩窄文本宽曾使
+   差 1 字的卡被迫溢出；溢出判定改按无 padding 宽度镜像排版（≤2 行恰好放下=不加带不标溢出） */
+.dp-item-effect-wrap { position: relative; margin-top: 6px; overflow: hidden; max-height: 34px; transition: max-height .2s ease-out; box-sizing: border-box; }
+/* BUG-067（四轮）：占位带仅溢出卡加（has-effect）；未溢出卡全宽无带、无省略号、无 hover 展开（R7） */
+.dp-item.has-effect .dp-item-effect-wrap { padding-right: 18px; }
 /* 特效预览：恒为特效全文、一次性完整排版（无 line-clamp、无高度约束——裁剪全部由容器视口承担） */
 .dp-item-effect-preview { line-height: 17px; font-size: 12px; color: #1eff00; white-space: normal; }
 /* 折叠态省略观感（仅溢出卡）：右下「…」伪元素落在 padding 预留带内、纯色底收窄至带范围
@@ -364,7 +369,11 @@
 .dp-item.has-effect:hover .dp-item-inner {
   box-shadow: 0 10px 24px rgba(0, 0, 0, 0.55);
 }
-.dp-item.has-effect:hover .dp-item-effect-wrap { max-height: 260px; }
+/* BUG-068（WP6 补丁四轮）：hover 目标值 260 恒定封顶 → 逐卡实测全文高 --fx-full（JS 镜像按加带宽度
+   量得，260 仅兜底）——旧恒定封顶使插值行程（34↔260）远大于可视行程（34↔内容高 ≈51-68px）：
+   展开前段触顶观感瞬时、收回前段静止末段急降观感双段；改后插值行程=可视行程，
+   双向 200ms ease-out 严格对称，同一 CSS 驱动路径、零 JS 事件 */
+.dp-item.has-effect:hover .dp-item-effect-wrap { max-height: var(--fx-full, 260px); }
 
 /* ==================== 任务书 #28 WP3-v2/v3：全信息装备卡（方向修正版 + 体验修订） ====================
    v1 点击详情覆盖层（.dp-item-detail 与 .dp-detail-＊/.dp-detail-open 族）已整族拆除——
