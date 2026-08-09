@@ -1,0 +1,6 @@
+interface:
+  display_name: "SDD 项目状态"
+  short_description: "显示工作树位置、任务状态、生命周期阶段、判断依据与冲突"
+  default_prompt: "Use $sdd-status to explain where the current project and task stand."
+policy:
+  allow_implicit_invocation: false

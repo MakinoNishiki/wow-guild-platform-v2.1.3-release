@@ -1,0 +1,6 @@
+interface:
+  display_name: "SDD 项目身份"
+  short_description: "识别当前项目名称、目标、治理版本、任务焦点与授权角色"
+  default_prompt: "Use $sdd-project to explain what project context I am currently working in."
+policy:
+  allow_implicit_invocation: false

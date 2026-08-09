@@ -1,0 +1,6 @@
+interface:
+  display_name: "项目范围与生命周期规划"
+  short_description: "把一句话需求拆清，并让用户选择和固化完整或裁剪后的项目路线"
+  default_prompt: "Use $project-scope-breakdown to clarify this broad requirement, show the complete lifecycle, and persist the user-selected route."
+policy:
+  allow_implicit_invocation: true

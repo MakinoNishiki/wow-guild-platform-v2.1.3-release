@@ -1,0 +1,71 @@
+{
+  "skill_name": "project-scope-breakdown",
+  "evals": [
+    {
+      "id": 1,
+      "name": "standard-full-route",
+      "prompt": "We have a new multi-module internal platform idea. Show me the complete SDD workflow and use the standard full mode.",
+      "expected_output": "Shows the complete applicable lifecycle before selection and produces a human-confirmed standard route without claiming progress.",
+      "assertions": [
+        "Complete route is shown before mode selection",
+        "Every stage includes purpose, input, artifact, and gate",
+        "Plan is separated from actual task state"
+      ]
+    },
+    {
+      "id": 2,
+      "name": "small-tailored-route",
+      "prompt": "This is only one filter added to an existing page. I want scope breakdown, an incremental PRD, and implementation only.",
+      "expected_output": "Preserves the three-step tailored route and does not expand it because other workflow skills exist.",
+      "assertions": [
+        "Full route is shown as reference",
+        "Tailored route is preserved exactly",
+        "Skipped standard stages are not returned as current next steps"
+      ]
+    },
+    {
+      "id": 3,
+      "name": "forced-skip-mrd",
+      "prompt": "Skip MRD and go straight from scope to PRD. I understand the risk and I refuse to define a substitute input.",
+      "expected_output": "Warns about the dependency, records unknown substitute input and human-accepted risk, then preserves the forced route without blocking.",
+      "assertions": [
+        "Dependency risk is explained",
+        "Unknown substitute input is allowed",
+        "MRD is not silently restored or treated as satisfied"
+      ]
+    },
+    {
+      "id": 4,
+      "name": "existing-plan-status",
+      "prompt": "The project plan selected scope, incremental PRD, and implementation. The task registry says scope is complete and PRD is active. Where are we?",
+      "expected_output": "Joins selected plan with task state and reports PRD as current without storing progress in the plan.",
+      "assertions": [
+        "Plan and actual task state are reported separately",
+        "Current step is derived from task evidence",
+        "No skipped stage is inserted"
+      ]
+    },
+    {
+      "id": 5,
+      "name": "next-does-not-expand",
+      "prompt": "Our confirmed route is scope then incremental PRD then implementation. What should we do next after scope?",
+      "expected_output": "Recommends incremental PRD as the next selected step and treats other stages only as explicit plan-change options.",
+      "assertions": [
+        "Next action is inside the confirmed route",
+        "Installed workflow availability does not expand scope",
+        "Restoring a skipped stage requires human confirmation"
+      ]
+    },
+    {
+      "id": 6,
+      "name": "plan-change-proposal",
+      "prompt": "Implementation found a cross-module dependency. Add an integration phase that our current plan skipped.",
+      "expected_output": "Explains the proposed change and keeps the current route until explicit human confirmation, then records the decision and superseded route.",
+      "assertions": [
+        "Route change is identified as a scope decision",
+        "Current plan remains authoritative before confirmation",
+        "Confirmed change updates plan and decision evidence without erasing history"
+      ]
+    }
+  ]
+}

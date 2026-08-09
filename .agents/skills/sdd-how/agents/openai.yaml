@@ -1,0 +1,6 @@
+interface:
+  display_name: "SDD 目标路由"
+  short_description: "说明完成指定目标所需工作流、前置输入、预期产物和授权要求"
+  default_prompt: "Use $sdd-how to explain how to accomplish my stated goal without executing it."
+policy:
+  allow_implicit_invocation: false

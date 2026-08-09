@@ -1,0 +1,67 @@
+{
+  "schema_version": 3,
+  "group": "sdd-workbench",
+  "version": "0.3.0",
+  "runtime_scope": "portable-agent-skills",
+  "core": "sdd",
+  "members": [
+    "sdd",
+    "sdd-help",
+    "sdd-project",
+    "sdd-status",
+    "sdd-next",
+    "sdd-how",
+    "sdd-check"
+  ],
+  "adapters": {
+    "sdd-help": "help",
+    "sdd-project": "project",
+    "sdd-status": "status",
+    "sdd-next": "next",
+    "sdd-how": "how",
+    "sdd-check": "check"
+  },
+  "adapter_contract": {
+    "dependency_marker": "CORE_DEPENDENCY",
+    "sibling_path": "../sdd/",
+    "catalog_resolution": "exactly one enabled Skill named",
+    "fail_closed_text": "If zero or multiple cores resolve"
+  },
+  "explicit_only": true,
+  "workflows": {
+    "registry": "sdd/references/companion-registry.json",
+    "default_profile": "minimal",
+    "profiles": {
+      "minimal": {
+        "description": "Seven workbench core skills plus the scope/lifecycle-planning workflow required to create a project plan.",
+        "bundled": [
+          "project-scope-breakdown"
+        ]
+      },
+      "full": {
+        "description": "Seven workbench core skills plus the complete portable product-lifecycle workflow set.",
+        "bundled": [
+          "project-init",
+          "project-scope-breakdown",
+          "mrd-generation",
+          "mrd-integration",
+          "prd-prep",
+          "prd-write",
+          "prd-incremental-on-asis",
+          "prd-humanize",
+          "prd-review",
+          "prd-review-simulation",
+          "prd-update-from-meeting",
+          "prd-split"
+        ]
+      }
+    }
+  },
+  "excluded": [
+    "sdd-router",
+    "sdd-goal-doc",
+    "sdd-goal-code",
+    "sdd-upgrade-v2",
+    "sdd-experience-report"
+  ]
+}

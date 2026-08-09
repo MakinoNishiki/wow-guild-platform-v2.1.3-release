@@ -1,0 +1,6 @@
+interface:
+  display_name: "SDD 对抗检查"
+  short_description: "启动三个独立子代理，对项目状态、治理阶段和产物做只读审查"
+  default_prompt: "Use $sdd-check to run a read-only adversarial review of the current project state."
+policy:
+  allow_implicit_invocation: false

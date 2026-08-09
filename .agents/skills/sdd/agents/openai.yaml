@@ -1,0 +1,6 @@
+interface:
+  display_name: "SDD 工作台"
+  short_description: "统一回答项目身份、状态、下一步与目标路径的 SDD 工作台入口"
+  default_prompt: "Use $sdd to show the current project workbench and available SDD actions."
+policy:
+  allow_implicit_invocation: false

@@ -1,0 +1,6 @@
+interface:
+  display_name: "SDD 下一步"
+  short_description: "基于当前任务焦点推测最可能的下一步，并列出其他可选方向"
+  default_prompt: "Use $sdd-next to identify the likely next action and alternative choices."
+policy:
+  allow_implicit_invocation: false

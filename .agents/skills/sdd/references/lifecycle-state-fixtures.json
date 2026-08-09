@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "fixtures": [
+    {
+      "name": "draft-does-not-constrain",
+      "plan_state": "Draft",
+      "selected": ["scope", "incremental-prd", "implementation"],
+      "completed": ["scope"],
+      "recorded_next": "incremental-prd",
+      "expected": {"active_plan": false, "next": null, "conflict": "plan-not-confirmed"}
+    },
+    {
+      "name": "superseded-does-not-constrain",
+      "plan_state": "Superseded",
+      "selected": ["scope", "mrd", "prd"],
+      "completed": ["scope"],
+      "recorded_next": "mrd",
+      "expected": {"active_plan": false, "next": null, "conflict": "plan-not-active"}
+    },
+    {
+      "name": "forced-skip-stays-skipped",
+      "plan_state": "Human-confirmed",
+      "selected": ["scope", "prd", "implementation"],
+      "completed": ["scope"],
+      "recorded_next": "prd",
+      "expected": {"active_plan": true, "next": "prd", "conflict": null}
+    },
+    {
+      "name": "recorded-next-outside-plan-conflicts",
+      "plan_state": "Human-confirmed",
+      "selected": ["scope", "prd", "implementation"],
+      "completed": ["scope"],
+      "recorded_next": "mrd",
+      "expected": {"active_plan": true, "next": "prd", "conflict": "recorded-next-outside-plan"}
+    }
+  ]
+}

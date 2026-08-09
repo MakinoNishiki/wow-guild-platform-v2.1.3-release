@@ -1,0 +1,6 @@
+interface:
+  display_name: "SDD 新手帮助"
+  short_description: "面向新手循环展示 SDD 能力、项目身份、当前状态和下一步"
+  default_prompt: "Use $sdd-help to guide me from the current context toward a concrete project artifact."
+policy:
+  allow_implicit_invocation: false

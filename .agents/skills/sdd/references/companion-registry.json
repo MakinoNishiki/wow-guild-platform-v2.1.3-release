@@ -1,0 +1,24 @@
+{
+  "schema_version": 2,
+  "purpose": "Portable registry of workflow skills that SDD may route after profile and runtime availability checks",
+  "execution_policy": "route_only_never_execute",
+  "skills": [
+    {"name": "project-init", "kind": "workflow", "source_version": "2.0", "routes": ["project-initialization"], "package_profiles": ["full"]},
+    {"name": "project-scope-breakdown", "kind": "workflow", "source_version": "2.0", "routes": ["scope-breakdown", "lifecycle-planning"], "package_profiles": ["minimal", "full"], "completion_handoff": "sdd-status"},
+    {"name": "mrd-generation", "kind": "workflow", "source_version": "1.0", "routes": ["module-requirements"], "package_profiles": ["full"]},
+    {"name": "mrd-integration", "kind": "workflow", "source_version": "1.0", "routes": ["requirements-integration"], "package_profiles": ["full"]},
+    {"name": "prd-prep", "kind": "workflow", "source_version": "2.1", "routes": ["product-requirements-preparation"], "package_profiles": ["full"]},
+    {"name": "prd-write", "kind": "workflow", "source_version": "3.0", "routes": ["full-product-requirements"], "package_profiles": ["full"]},
+    {"name": "prd-incremental-on-asis", "kind": "workflow", "source_version": "1.0", "routes": ["incremental-product-requirements"], "package_profiles": ["full"]},
+    {"name": "prd-humanize", "kind": "workflow", "source_version": "1.3", "routes": ["reader-version"], "package_profiles": ["full"]},
+    {"name": "prd-review", "kind": "workflow", "source_version": "unversioned", "routes": ["requirements-review"], "package_profiles": ["full"]},
+    {"name": "prd-review-simulation", "kind": "workflow", "source_version": "unversioned", "routes": ["requirements-review"], "package_profiles": ["full"]},
+    {"name": "prd-update-from-meeting", "kind": "workflow", "source_version": "1.0", "routes": ["meeting-driven-requirement-update"], "package_profiles": ["full"]},
+    {"name": "prd-split", "kind": "workflow", "source_version": "1.1", "routes": ["requirements-downstream-slicing"], "package_profiles": ["full"]},
+    {"name": "generate-trd", "kind": "workflow", "source_version": "external", "routes": ["technical-design"], "package_profiles": []},
+    {"name": "technical-design-doc-creator", "kind": "workflow", "source_version": "external", "routes": ["technical-design"], "package_profiles": []},
+    {"name": "test-case", "kind": "workflow", "source_version": "external", "routes": ["test-design"], "package_profiles": []},
+    {"name": "prototype-walkthrough", "kind": "workflow", "source_version": "external", "routes": ["prototype-review"], "package_profiles": []},
+    {"name": "sdd-experience-report", "kind": "workflow", "source_version": "external", "routes": ["project-summary", "methodology-feedback"], "package_profiles": []}
+  ]
+}
