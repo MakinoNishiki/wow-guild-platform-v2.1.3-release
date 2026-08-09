@@ -238,6 +238,9 @@
 .dp-item-meta { display: flex; flex-wrap: nowrap; overflow: hidden; gap: 4px; }
 /* 装备/套装 meta 标签同并轨：几何同 .tag（字重 400→600、圆角 4→5、高 18→20），
    语义色与 main.css .tag-grey/.tag-blue/.tag-green 同值 */
+/* WP4（2026-08-09 灰色系对比度整改）：灰 tag 文字色 var(--text-secondary)=rgb(139,148,158) → rgb(165,173,185)
+   ——15% 灰合成底色对比度 3.98→5.41（WCAG AA 4.5 实测）；底色 rgba(139,148,158,.15) 不动；
+   选择器级落地（不改 :root 变量——--text-secondary 主应用全站 60+ 处在用，变量级改动超出本补丁范围） */
 .dp-tag {
   display: inline-flex;
   align-items: center;
@@ -249,7 +252,7 @@
   line-height: 1;
   white-space: nowrap;
   background: rgba(139, 148, 158, 0.15);
-  color: var(--text-secondary);
+  color: rgb(165, 173, 185);
 }
 .dp-tag-primary { background: rgba(88, 166, 255, 0.15); color: var(--info); }
 .dp-tag-secondary { background: rgba(63, 185, 80, 0.15); color: var(--success); }
@@ -264,8 +267,10 @@
 /* 金星变体（§4.2 已注册）：副属性唯一最大者——右上角金色五角星 SVG + 金色描边（裁定 H） */
 .dp-tag-star { position: relative; border: 1px solid var(--gold); padding-right: 12px; }
 .dp-tag-star svg { position: absolute; top: -5px; right: -4px; width: 10px; height: 10px; }
-/* 来源行（单行截断）：R11（WP3-v4）锚定卡片底部——margin-top:auto 吸收短卡空白，padding-top 保底 6px 间距 */
-.dp-item-src { margin-top: auto; padding-top: 6px; line-height: 16px; font-size: 11px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* 来源行（单行截断）：R11（WP3-v4）锚定卡片底部——margin-top:auto 吸收短卡空白，padding-top 保底 6px 间距；
+   WP4（2026-08-09 灰色系对比度整改）：文字色 var(--text-muted)=rgb(110,118,129) → rgb(150,158,170)
+   ——卡片底色合成对比度 3.36→5.71（WCAG AA 4.5 实测）；选择器级落地（--text-muted 主应用全站在用，不动变量） */
+.dp-item-src { margin-top: auto; padding-top: 6px; line-height: 16px; font-size: 11px; color: rgb(150, 158, 170); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .dp-item-effect { margin-top: 6px; font-size: 12px; color: #1eff00; }
 
 .dp-tiers { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 10px; }

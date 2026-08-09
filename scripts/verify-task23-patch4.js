@@ -42,6 +42,8 @@
 // 适配 WP6 补丁五轮（BUG-069，2026-08-09）：z-index 层级规约——sticky 筛选条(10)＞hover 展开卡(5)＞普通卡(auto)
 // （旧值 30 越过吸顶条：滚动后展开卡上半压条）；hover 卡 z 30→5，① 块与 ①[1920] 块 z 断言同步适配；
 // 新增滚动后 hover elementFromPoint 断言（条卡重叠区命中条=条在上层、展开下端命中卡=遮盖下一行形态不破）。
+// 适配任务书 #28 WP4（灰色系对比度整改，2026-08-09）：.dp-item-src 文字色→rgb(150,158,170)、卡片 meta 灰 tag
+// 文字色→rgb(165,173,185)（选择器级，:root 变量不动）；新增 §2 生效值 + 合成背景对比度 ≥4.5 脚本计算断言 ×2。
 // 公示页为免登录只读页（live 数据），本脚本不创建任何测试数据，收尾复核 T23X 遗留为零。
 // 用法: node scripts/verify-task23-patch4.js（PW_CHANNEL=chrome 可选）截图输出 backup/2026-08-07-task23-patch4/
 const fs = require('fs');
@@ -877,6 +879,31 @@ function assert(cond, label, detail) {
     assert(zCk.zBar === '10' && zCk.zCard === '5' && zCk.grownDown && zCk.topHitBar && zCk.lowHitCard,
       'BUG-069 层级规约：sticky 筛选条(10)＞hover 展开卡(5)＞普通卡——滚动后卡上半被条正常遮挡（elementFromPoint 命中条）、向下展开部分正常可见（命中卡、遮盖下一行形态不破）',
       JSON.stringify(zCk));
+
+    // ============ WP4（任务书 #28 WP4，2026-08-09 灰色系对比度整改）：来源行/灰 tag 两处色值——
+    // §2 生效值断言 + 脚本按合成背景计算 WCAG 对比度 ≥4.5（不目检）；留白/间距/密度零改动 ============
+    const wp4 = await page.evaluate(() => {
+      const lum = (r, g, b) => { const f = c => { c /= 255; return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); }; return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b); };
+      const ratio = (c1, c2) => { const l1 = lum(...c1), l2 = lum(...c2); return (Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05); };
+      const parse = s => s.match(/[\d.]+/g).map(Number);
+      const card = document.querySelector('.dp-item');
+      const src = card.querySelector('.dp-item-src');
+      const tag = card.querySelector('.dp-item-meta .dp-tag');
+      const cardBg = parse(getComputedStyle(card.querySelector('.dp-item-inner')).backgroundColor);
+      const srcC = parse(getComputedStyle(src).color);
+      const tagC = parse(getComputedStyle(tag).color);
+      const tagBg = parse(getComputedStyle(tag).backgroundColor); // rgba(139,148,158,0.15) 不动
+      const comp = tagBg.slice(0, 3).map((v, i) => Math.round(v * tagBg[3] + cardBg[i] * (1 - tagBg[3]))); // 15% 灰合成到底色
+      return { srcC, tagC, cardBg, comp,
+        srcRatio: Math.round(ratio(srcC, cardBg) * 100) / 100,
+        tagRatio: Math.round(ratio(tagC, comp) * 100) / 100 };
+    });
+    assert(wp4.srcC.join(',') === '150,158,170' && wp4.srcRatio >= 4.5,
+      `WP4-F1 来源行 .dp-item-src 文字色 rgb(150,158,170) 生效、卡片底色合成对比度 ${wp4.srcRatio} ≥4.5（§2 生效值+脚本算）`,
+      JSON.stringify(wp4));
+    assert(wp4.tagC.join(',') === '165,173,185' && wp4.tagRatio >= 4.5,
+      `WP4-F2 卡片 meta 灰 tag 文字色 rgb(165,173,185) 生效、15% 灰合成底色对比度 ${wp4.tagRatio} ≥4.5（§2 生效值+脚本算）`,
+      JSON.stringify(wp4));
 
     // ============ P4-再补②（WP6 补丁三轮）：命中计数并入吸顶条末行——任意滚动位置完整可见、不半裁 ============
     const stickyCk = await page.evaluate(() => {
