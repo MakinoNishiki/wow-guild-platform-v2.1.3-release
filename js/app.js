@@ -5401,18 +5401,28 @@ function lootRender() {
       : '-';
     // REQ-008："心愿"独立成列，非心愿装备显示 —
     const wishlistBadge = loot.is_wishlist ? '<span class="badge" style="background:#f0c060;color:#0d1117">心愿</span>' : '<span style="color:var(--text-muted)">—</span>';
-    // REQ-042（软删除）+ 任务书 #27 WP2：assignedTo 为名字快照（member_name 优先）——
-    // 活跃成员 → 职业色 chip；名在垃圾桶（deletedMemberNames）→ 灰色（已删除）；
-    // 其余（离队成员或找不到）→ 灰色（已离队）。同名成员场景以垃圾桶名单为权威判定
-    const assignedMember = loot.assignedTo ? appData.members.find(m => m.name === loot.assignedTo && m.status !== '离队') : null;
+    // REQ-042（软删除）+ 任务书 #27 WP2：assignedTo 为名字快照（member_name 优先）。
+    // BUG-059（任务书 #27-补丁2，方案 C 运营拍板）：分配人解析 id 优先、名字回退——
+    // A：character_id 非空按 id 在成员表（含离队）精确定位，同名零碰撞；id 定位不到 = 已彻底删除 →「已删除」；
+    // B：id 为空的存量行按名字匹配（放行离队命中、按真实状态显示）→ 垃圾桶名单 →「已删除」→ 兜底「已离队」。
+    // 已知限制（在案不追求两全）：同名一删一留的存量 NULL 行，显示方向以在册成员为准
     const deletedNames = appData.deletedMemberNames || new Set();
+    let assignedMember = null;
+    let assignedMark = ''; // ''=在队（职业色 chip）/ 'departed'=已离队 / 'deleted'=已删除
+    if (loot.character_id) {
+      assignedMember = appData.members.find(m => m.id === loot.character_id) || null;
+      assignedMark = assignedMember ? (assignedMember.status === '离队' ? 'departed' : '') : 'deleted';
+    } else if (loot.assignedTo) {
+      assignedMember = appData.members.find(m => m.name === loot.assignedTo) || null;
+      assignedMark = assignedMember
+        ? (assignedMember.status === '离队' ? 'departed' : '')
+        : (deletedNames.has(loot.assignedTo) ? 'deleted' : 'departed');
+    }
     const assignedToHtml = !loot.assignedTo
       ? '-'
-      : assignedMember
+      : assignedMark === ''
         ? memberChipHtml(assignedMember)
-        : deletedNames.has(loot.assignedTo)
-          ? `<span class="member-departed">${loot.assignedTo}（已删除）</span>`
-          : `<span class="member-departed">${loot.assignedTo}（已离队）</span>`;
+        : `<span class="member-departed">${loot.assignedTo}（${assignedMark === 'deleted' ? '已删除' : '已离队'}）</span>`;
     
     return `
       <tr>
@@ -5424,7 +5434,7 @@ function lootRender() {
         <td>${loot.slot || ''}</td>
         <td>${loot.primaryStat || ''}</td>
         <td><div class="loot-secondary-stats">${secondaryStatsHtml || '-'}</div></td>
-        <td>${assignedToHtml}${claimerLabelHtml(assignedMember)}</td>
+        <td>${assignedToHtml}${claimerLabelHtml(assignedMark === '' ? assignedMember : null)}</td>
         <td class="center"><span class="badge ${statusBadge}">${loot.status || '待分配'}</span></td>
         <td>${distMethodText}</td>
         <td class="num">${rollText}</td>
@@ -5716,9 +5726,17 @@ async function lootSave() {
   const isEdit = !!lootEditingId;
   const oldLoot = isEdit ? (appData.loots || []).find(l => l.id === lootEditingId) : null;
 
+  // BUG-059（任务书 #27-补丁2 方案 C-A）：保存补写 character_id（既有列、仅填列，非 schema 变更）——
+  // 分配人下拉值为成员名，按当前公会活跃成员解析 id；解析不到（自定义名/同名仅命中离队）时
+  // 编辑态保留原 id、新建写 null，不阻断保存；分配人选择 UI 流程零变化
+  const assignedMemberRow = lootData.assignedTo
+    ? (appData.members || []).find(m => m.name === lootData.assignedTo && m.status !== '离队')
+    : null;
+  const lootCharacterId = assignedMemberRow ? assignedMemberRow.id : ((oldLoot && oldLoot.character_id) || null);
+
   // 严格 DB-first（Save DB -> Load DB -> Update State -> Render）
   try {
-    const payload = { ...lootData, id: lootEditingId || undefined };
+    const payload = { ...lootData, character_id: lootCharacterId, id: lootEditingId || undefined };
     await cloudCrud('loots', isEdit ? 'update' : 'add', payload, { renderFn: lootRender });
 
     // 联动心愿单：将分配状态变化同步到数据库
@@ -6600,6 +6618,35 @@ function lootFillAssignedTo(name) {
 // ==================== 初始化 ====================
 // ==================== 更新日志 ====================
 const changelogData = [
+  {
+    id: 'v3.2.0-task27-patch2-bug059',
+    version: 'v3.2.0',
+    date: '2026-08-10',
+    type: 'fix',
+    typeLabel: '修复BUG',
+    title: '装备分配「离队成员误显已删除」口径修正（任务书 #27-补丁2，BUG-059）',
+    summary: '装备分配列表的分配人解析改为「成员 id 优先、名字回退」：新保存的分配记录携带成员 id，同名成员零碰撞；存量记录按名字匹配时放行离队成员命中、按真实状态显示——离队成员的装备行不再因垃圾桶同名而误显「已删除」。',
+    details: [
+      '保存装备分配时补写成员 id（既有字段，分配人选择流程不变、用户无感）；编辑既有分配保存时同步补 id',
+      'id 可解析：在队正常显示、离队显示「已离队」；id 定位不到（已彻底删除）显示「已删除」',
+      'id 为空的存量记录：名字命中在册成员（含离队）按真实状态显示；未命中查垃圾桶显示「已删除」，再未命中显示「已离队」',
+      '已知限制（运营在案）：同名一删一留的存量记录，显示方向以在册成员为准'
+    ]
+  },
+  {
+    id: 'v3.2.0-task27-patch-display-fix',
+    version: 'v3.2.0',
+    date: '2026-08-10',
+    type: 'fix',
+    typeLabel: '修复BUG',
+    title: '装备库选择回填大类/部位修正 + 报表出勤率排名表自适配（任务书 #27-补丁，BUG-057/058）',
+    summary: '从装备库选择装备后，「装备大类/装备部位」按库内 部位/类型 数据正确回填（心愿单与装备分配两面板同标准）；统计报表「出勤率排名」表在 1366×768 下不再出现横向滚动条，角色名与「已删除」徽标完整可见。',
+    details: [
+      'BUG-057：选饰品（如 艾林先知的凝视，库内类型字段为「其它」）不再错显 武器/单手锤——回填改以库内部位为主键、类型细分武器/副手，兼容插件采集词汇（单手/双手/远程等），缺数据字段保持现状可手改',
+      '两面板同一解析函数同治，部位精确选中取代旧延时模糊匹配',
+      'BUG-058：排名表去除固定最小宽度并收紧单元格内距，1366/1920 两档均无横向滚动条，信息不裁剪'
+    ]
+  },
   {
     id: 'v3.2.0-task28-wp5-lootdrop',
     version: 'v3.2.0',
@@ -11218,6 +11265,46 @@ function resolveItemDbBossName(item) {
   }
 }
 
+// BUG-057（任务书 #27-补丁）：picker 回填「大类/部位」的统一解析——以库内 slot（部位）为主键、
+// item_type 作武器/副手的部位细分，联动口径沿用 REQ-060 部位↔类型映射，并兼容插件采集词汇
+// （单手/双手/远程/副手物品/腕部，2026-08-10 库内实测分布）。库内缺值或非装备词汇（杂项/套装兑换物等）
+// 时对应字段返回 ''，调用方保持表单现状不改动（留空不报错、不阻断手改）。
+// 旧实现只看 item_type 且部位用文本模糊匹配：item_type 为「其它」等噪声值时大类落默认「武器」、
+// 部位落首项「单手锤」（实测样本：饰品 艾林先知的凝视 slot=饰品 item_type=其它）。
+function resolvePickerCategorySlot(item) {
+  const slot = ((item && item.slot) || '').trim();
+  const type = ((item && item.armorType) || '').trim(); // 主数据路径 armorType = 库内 item_type
+  // 部位 → 大类（REQ-060 口径：防具九部位 / 颈部手指=首饰 / 饰品 / 武器与副手=武器）
+  const slotCategoryMap = {
+    '武器': '武器', '副手': '武器', '单手': '武器', '双手': '武器', '远程': '武器', '副手物品': '武器',
+    '头部': '防具', '肩部': '防具', '胸部': '防具', '手腕': '防具', '腕部': '防具', '手部': '防具',
+    '腰部': '防具', '腿部': '防具', '脚部': '防具', '背部': '防具',
+    '颈部': '首饰', '手指': '首饰', '饰品': '饰品'
+  };
+  // 库内词汇 → 表单部位词汇（lootSlotMap）差异项归一
+  const formSlotMap = { '手腕': '腕部', '项链': '颈部', '戒指': '手指', '披风': '背部', '长柄武器': '长柄', '枪': '枪械', '副手': '副手物品' };
+  const norm = v => formSlotMap[v] || v;
+  let category = slotCategoryMap[slot] || '';
+  let formSlot = '';
+  if (category === '武器') {
+    // 武器/副手：部位取 item_type 细分（盾牌/副手物品同在表单「武器」大类下）；item_type 不可用时取 slot 本身
+    const t = norm(type);
+    if ((lootSlotMap['武器'] || []).includes(t)) formSlot = t;
+    else if ((lootSlotMap['武器'] || []).includes(norm(slot))) formSlot = norm(slot);
+  } else if (category) {
+    const s = norm(slot);
+    if ((lootSlotMap[category] || []).includes(s)) formSlot = s;
+  }
+  if (!category && type) {
+    // 部位缺失/非装备词汇：回退 item_type 推大类（部位能定则定，否则留空）
+    if (['板甲', '锁甲', '皮甲', '布甲', '披风'].includes(type)) category = '防具';
+    else if (type === '饰品') { category = '饰品'; formSlot = '饰品'; }
+    else if (['项链', '戒指'].includes(type)) { category = '首饰'; formSlot = norm(type); }
+    else if ((lootSlotMap['武器'] || []).includes(norm(type))) { category = '武器'; formSlot = norm(type); }
+  }
+  return { category, slot: formSlot };
+}
+
 // 装备分配-从装备库填充
 function lootFillFromItemDb(item) {
   document.getElementById('lootName').value = item.name;
@@ -11233,47 +11320,13 @@ function lootFillFromItemDb(item) {
     lootUpdateBossOptions(resolveItemDbBossName(item));
   }
   
-  // 装备大类和部位映射（REQ-060 新类型词汇 → 大类）
-  const typeCategory = (t) => {
-    if (!t) return '防具';
-    if (['板甲', '锁甲', '皮甲', '布甲', '披风'].includes(t)) return '防具';
-    if (t === '饰品') return '饰品';
-    if (['项链', '戒指'].includes(t)) return '首饰';
-    return '武器'; // 单手剑…战刃 / 盾牌 / 副手物品
-  };
-  const categoryMap = {
-    '武器': '武器',
-    '布甲': '防具', '皮甲': '防具', '锁甲': '防具', '板甲': '防具', '披风': '防具',
-    '饰品': '饰品',
-    '项链': '首饰', '戒指': '首饰',
-    '副手': '武器'
-  };
-  // slot名称映射（装备库叫法 → 部位下拉叫法）
-  const slotNameMap = {
-    '项链': '颈部',
-    '戒指': '手指',
-    '副手': '副手物品',
-    '披风': '背部'
-  };
-  const category = categoryMap[item.armorType] || typeCategory(item.armorType);
-  const targetSlot = slotNameMap[item.slot] || item.slot;
+  // 装备大类和部位（BUG-057：按库内 slot/item_type 回填，REQ-060 联动口径统一解析；
+  // 解析不出的字段保持表单现状，不阻断手改；部位精确选中取代旧 setTimeout+文本模糊匹配，无时序窗口）
+  const pickerCS = resolvePickerCategorySlot(item);
   const categorySelect = document.getElementById('lootCategory');
-  if (categorySelect) {
-    categorySelect.value = category;
-    if (typeof lootOnCategoryChange === 'function') {
-      lootOnCategoryChange();
-      setTimeout(() => {
-        const slotSelect = document.getElementById('lootSlot');
-        if (slotSelect) {
-          for (let i = 0; i < slotSelect.options.length; i++) {
-            if (slotSelect.options[i].text.includes(targetSlot)) {
-              slotSelect.selectedIndex = i;
-              break;
-            }
-          }
-        }
-      }, 50);
-    }
+  if (categorySelect && pickerCS.category) {
+    categorySelect.value = pickerCS.category;
+    lootUpdateSlotOptions(pickerCS.slot);
   }
   
   // 主属性（取第一个）
@@ -11339,47 +11392,13 @@ function wishlistFillFromItemDb(selectedDbItem) {
     }
   }
   
-  // 设置部位和类型（REQ-060 新类型词汇 → 大类）
-  const typeCategoryW = (t) => {
-    if (!t) return '防具';
-    if (['板甲', '锁甲', '皮甲', '布甲', '披风'].includes(t)) return '防具';
-    if (t === '饰品') return '饰品';
-    if (['项链', '戒指'].includes(t)) return '首饰';
-    return '武器';
-  };
-  const categoryMap = {
-    '武器': '武器',
-    '布甲': '防具', '皮甲': '防具', '锁甲': '防具', '板甲': '防具', '披风': '防具',
-    '饰品': '饰品',
-    '项链': '首饰', '戒指': '首饰',
-    '副手': '武器'
-  };
-  // slot名称映射（装备库叫法 → 部位下拉叫法）
-  const slotNameMap = {
-    '项链': '颈部',
-    '戒指': '手指',
-    '副手': '副手物品',
-    '披风': '背部'
-  };
-  const category = categoryMap[selectedDbItem.armorType] || typeCategoryW(selectedDbItem.armorType);
-  const targetSlot = slotNameMap[selectedDbItem.slot] || selectedDbItem.slot;
+  // 设置部位和类型（BUG-057：与装备分配面板同一解析 resolvePickerCategorySlot，两面板同标准；
+  // 解析不出的字段保持表单现状，不阻断手改；部位精确选中取代旧 setTimeout+文本模糊匹配）
+  const pickerCSW = resolvePickerCategorySlot(selectedDbItem);
   const categorySelect = document.getElementById('wishlistCategory');
-  if (categorySelect) {
-    categorySelect.value = category;
-    if (typeof wishlistOnCategoryChange === 'function') {
-      wishlistOnCategoryChange();
-      setTimeout(() => {
-        const slotSelect = document.getElementById('wishlistSlot');
-        if (slotSelect) {
-          for (let i = 0; i < slotSelect.options.length; i++) {
-            if (slotSelect.options[i].text.includes(targetSlot)) {
-              slotSelect.selectedIndex = i;
-              break;
-            }
-          }
-        }
-      }, 50);
-    }
+  if (categorySelect && pickerCSW.category) {
+    categorySelect.value = pickerCSW.category;
+    wishlistUpdateSlotOptions(pickerCSW.slot);
   }
 }
 

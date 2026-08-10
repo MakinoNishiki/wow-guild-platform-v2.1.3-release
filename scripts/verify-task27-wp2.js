@@ -188,10 +188,13 @@ function assert(cond, label, detail) {
   await sleep(300);
 
   // 历史灰色展示：装备分配
+  // BUG-059（任务书 #27-补丁2 方案 C 运营拍板）后预期更新：本场景恰为「同名一删一留」——活跃李雷已删、
+  // 离队李雷在册，存量行 character_id 被 FK SET NULL 后按名字匹配放行离队命中 → 显「（已离队）」。
+  // 「存量 NULL 行以在册成员为准」为记录在案的已知限制（补丁脚本 C(b) 同口径），旧预期「（已删除）」作废。
   await page.evaluate(() => switchPage('loot'));
   await sleep(800);
   const lootHtml = await page.evaluate(() => document.querySelector('#page-loot').innerHTML);
-  assert(lootHtml.includes('李雷（已删除）'), '装备分配：李雷（已删除）灰色标记');
+  assert(lootHtml.includes('李雷（已离队）'), '装备分配：李雷存量行灰色标记（BUG-059 方案 C：同名一删一留以在册成员为准→已离队）');
   await page.screenshot({ path: path.join(SHOT_DIR, '03-loot-deleted-gray.png') });
 
   // 统计断言（硬指标：删除前后一致）
