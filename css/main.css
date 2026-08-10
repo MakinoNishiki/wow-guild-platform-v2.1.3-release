@@ -3794,6 +3794,16 @@ body.viewer-mode #memberSelectAll {
   padding: 10px 8px;
 }
 
+/* BUG-070：1366 档职业列不折行（职业名最长 4 字「死亡骑士」）。
+   根因 = 表格 auto 布局列宽分配：1366 档单卡约 468px，职业列分得宽度不足 4 字+内距，
+   white-space 默认 normal 允许 CJK 任意断行，遂两字一折。
+   只对本表第 3 列（职业）nowrap——本表各列 min-content 总和仍小于 468px，不撑出横滚，
+   BUG-058 零回退由 verify-bug070.js 双档 scrollWidth/clientWidth 实测断言兜底。 */
+#page-reports .stats-rank-table th:nth-child(3),
+#page-reports .stats-rank-table td:nth-child(3) {
+  white-space: nowrap;
+}
+
 /* ==================== 任务书 #13 REQ-045：冲突信息直显 ==================== */
 .activity-conflict-line {
   color: var(--warning);

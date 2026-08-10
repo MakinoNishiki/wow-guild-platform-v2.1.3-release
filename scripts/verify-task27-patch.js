@@ -466,9 +466,10 @@ async function cleanup() {
     note(`C(c) reloadData('loots') 后：deletedMemberNames 含探测名 = ${c3}（预期 true）`);
     check('C(c) reloadData(\'loots\') 后垃圾桶名单更新', c3 === true, `has=${c3}`);
 
-    // 406=既有噪音；400=REQ-094 新增 ensureTagNum 对未迁移 tag_num 列的 PostgREST 探测噪音（sql/25 待运营执行，console.warn 已吞错误，迁移后自然消失）
-    const realErrors = pageErrors.filter(e => !/status of (400|406)/.test(e));
-    check('全程零 JS 报错（406=既有噪音、400=tag_num 未迁移探测噪音，均已排除）', realErrors.length === 0, realErrors.join(' | ') || '无');
+    // 406=既有噪音；400=REQ-094 ensureTagNum 探测噪音（sql/25 执行前）；409=sql/25 执行后 tag_num 随机分配
+    // 撞唯一索引（23505）重试的必然 console 噪音（cloud.js 内容错重试成功，均属探测性资源日志）
+    const realErrors = pageErrors.filter(e => !/status of (400|406|409)/.test(e));
+    check('全程零 JS 报错（406=既有噪音、400/409=tag_num 分配探测噪音，均已排除）', realErrors.length === 0, realErrors.join(' | ') || '无');
     await ctx.close();
   } finally {
     await browser.close();
