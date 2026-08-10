@@ -247,8 +247,95 @@
     currentGuild = null;
     currentMembership = null;
     userGuilds = [];
+    currentTagNum = null; // REQ-094：玩家ID 数字段随会话清除
     isCloudMode = false;
     onUserSignedOut();
+  }
+
+  // ==================== REQ-094（任务书 #29 WP1）：修改密码 + 玩家ID ====================
+
+  // 当前密码服务端校验：直连 gotrue token 端点，不触碰 supabaseClient 当前会话
+  // （避免 signInWithPassword 换新 session 触发 onAuthStateChange 回调链，会话零抖动）
+  async function verifyCurrentPassword(password) {
+    const client = await initSupabase();
+    if (!client || !currentUser || !currentUser.email) return false;
+    try {
+      const resp = await fetch(`${client.supabaseUrl}/auth/v1/token?grant_type=password`, {
+        method: 'POST',
+        headers: { apikey: client.supabaseKey, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: currentUser.email, password })
+      });
+      return resp.ok;
+    } catch (e) {
+      console.error('校验当前密码失败:', e);
+      return false;
+    }
+  }
+
+  // 修改密码：supabase-js updateUser 官方保持当前会话（不登出、不刷新页面）
+  async function updatePassword(newPassword) {
+    const client = await initSupabase();
+    if (!client) throw new Error('云端服务不可用');
+    const { error } = await client.auth.updateUser({ password: newPassword });
+    if (error) throw error;
+    return true;
+  }
+
+  // 玩家ID 数字段（tag_num，BattleTag 风格 {显示名}#{5位数字} 的数字部分）——
+  // 注册/登录后确保分配，恒定不变；纯展示识别用途，不进入任何鉴权/查重逻辑。
+  // 写路径与 user_characters 同先例：SDK 直连（user_profiles RLS 限本人），碰撞（23505）重试至多 5 次。
+  let currentTagNum = null;
+  function pickTagNum() { return 10000 + Math.floor(Math.random() * 90000); }
+  async function ensureTagNum() {
+    if (!isCloudMode || !currentUser || !supabaseClient) return null;
+    try {
+      const { data: row } = await supabaseClient
+        .from('user_profiles').select('tag_num').eq('user_id', currentUser.id).maybeSingle();
+      if (row && row.tag_num) { currentTagNum = row.tag_num; return currentTagNum; }
+      for (let attempt = 0; attempt < 5; attempt++) {
+        const candidate = pickTagNum();
+        if (!row) {
+          // 无资料行：插入建行（23505 = tag_num 撞车或并发建行）
+          const { error } = await supabaseClient
+            .from('user_profiles').insert({ user_id: currentUser.id, tag_num: candidate });
+          if (!error) { currentTagNum = candidate; return currentTagNum; }
+          if (error.code === '23505') {
+            const { data: reread } = await supabaseClient
+              .from('user_profiles').select('tag_num').eq('user_id', currentUser.id).maybeSingle();
+            if (reread && reread.tag_num) { currentTagNum = reread.tag_num; return currentTagNum; }
+            continue; // 撞号重试
+          }
+          console.warn('[tag_num] 分配失败:', error);
+          return null;
+        }
+        // 有行缺号：仅当仍为空时写入（并发双标签页不互覆盖）
+        const { data: upd, error } = await supabaseClient
+          .from('user_profiles').update({ tag_num: candidate })
+          .eq('user_id', currentUser.id).is('tag_num', null).select('tag_num');
+        if (error) {
+          if (error.code === '23505') continue; // 撞号重试
+          console.warn('[tag_num] 分配失败:', error);
+          return null;
+        }
+        if (upd && upd.length) { currentTagNum = upd[0].tag_num; return currentTagNum; }
+        const { data: reread } = await supabaseClient
+          .from('user_profiles').select('tag_num').eq('user_id', currentUser.id).maybeSingle();
+        if (reread && reread.tag_num) { currentTagNum = reread.tag_num; return currentTagNum; }
+      }
+      console.warn('[tag_num] 5 次碰撞重试均未成功，登录后下次再试');
+      return null;
+    } catch (e) {
+      console.warn('[tag_num] 确保分配失败:', e);
+      return null;
+    }
+  }
+  function getTagNum() { return currentTagNum; }
+  // 完整玩家ID：名字部分实时跟随 user_metadata.display_name（唯一真源），数字段恒定
+  function getPlayerId() {
+    if (!currentUser) return '';
+    const name = (currentUser.user_metadata && currentUser.user_metadata.display_name)
+      || (currentUser.email ? currentUser.email.split('@')[0] : '用户');
+    return currentTagNum ? `${name}#${currentTagNum}` : '';
   }
 
   // ---- 清除当前公会上下文（BUG-015：退出公会后调用，不登出） ----
@@ -276,6 +363,11 @@
 
     try {
       await loadUserGuilds();
+      // REQ-094（任务书 #29 WP1）：登录/注册后确保玩家ID 数字段已分配——fire-and-forget 不阻塞进应用，
+      // 分配完成后刷新右上角等展示（改名不受影响，数字段恒定）
+      ensureTagNum().then((tn) => {
+        if (tn && typeof updateCloudUI === 'function') updateCloudUI();
+      }).catch(() => {});
       const lastGuildId = localStorage.getItem('wow_raid_last_guild');
       const guild = userGuilds.find(g => g.id === lastGuildId) || userGuilds[0];
       if (guild) {
@@ -1644,6 +1736,12 @@
     markNotificationRead: markNotificationRead,
     markAllNotificationsRead: markAllNotificationsRead,
     parseArmoryUrl: parseArmoryUrl,
+    // REQ-094（任务书 #29 WP1）：修改密码 + 玩家ID
+    verifyCurrentPassword: verifyCurrentPassword,
+    updatePassword: updatePassword,
+    ensureTagNum: ensureTagNum,
+    getTagNum: getTagNum,
+    getPlayerId: getPlayerId,
     setAppData: (data) => { if (typeof window !== 'undefined') window.appData = data; },
   };
 

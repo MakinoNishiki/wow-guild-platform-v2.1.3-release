@@ -520,9 +520,13 @@ function loadData() {
 // 打开用户中心
 async function openUserCenter() {
   openModal('userCenterModal');
+  await window.CloudSync.ensureTagNum(); // REQ-094：玩家ID 数字段确保已分配（幂等）
   await loadUserProfile();
   await loadUserCharacters();
   await loadNotifications();
+  // REQ-094：异步回填完成后重拍快照——openModal 时字段尚为空，
+  // 不补拍则防误关把数据回填误判为「未保存编辑」（误拦关闭）
+  snapshotModalForm('userCenterModal');
 }
 
 // 切换用户中心标签页
@@ -653,8 +657,80 @@ async function loadUserProfile() {
     // user_profiles.display_name 仅为存量数据回退展示（不再写入）
     const metaName = user.user_metadata && user.user_metadata.display_name;
     document.getElementById('ucDisplayName').value = metaName || (profile && profile.display_name) || '';
+
+    // REQ-094（任务书 #29 WP1）：玩家ID 顶部卡片（名字部分跟随改名、数字段恒定）
+    const pid = window.CloudSync.getPlayerId ? window.CloudSync.getPlayerId() : '';
+    const pidCard = document.getElementById('ucPlayerIdCard');
+    if (pidCard) {
+      pidCard.style.display = pid ? '' : 'none';
+      if (pid) document.getElementById('ucPlayerIdText').textContent = pid;
+    }
   } catch (e) {
     console.error('加载用户资料失败:', e);
+  }
+}
+
+// REQ-094（任务书 #29 WP1）：复制完整玩家ID（昵称#12345）到剪贴板
+async function copyPlayerId() {
+  const text = (window.CloudSync.getPlayerId && window.CloudSync.getPlayerId()) || '';
+  if (!text) { showToast('玩家ID 尚未生成，请稍后重试', 'error'); return; }
+  try {
+    await navigator.clipboard.writeText(text);
+    showToast(`已复制 ${text}`, 'success');
+  } catch (e) {
+    // 剪贴板 API 不可用（非安全上下文等）时回退 execCommand
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    document.body.appendChild(ta);
+    ta.select();
+    try {
+      document.execCommand('copy');
+      showToast(`已复制 ${text}`, 'success');
+    } catch (e2) {
+      showToast('复制失败，请手动选择复制', 'error');
+    }
+    ta.remove();
+  }
+}
+
+// REQ-094（任务书 #29 WP1）：修改密码——当前密码服务端校验 + 强度规则同注册 + 会话保持
+async function changePassword() {
+  const cur = document.getElementById('ucPwCurrent').value;
+  const nw = document.getElementById('ucPwNew').value;
+  const cf = document.getElementById('ucPwConfirm').value;
+  const hint = document.getElementById('ucPwHint');
+  const showHint = (msg, ok) => {
+    hint.textContent = msg || '';
+    hint.style.display = msg ? '' : 'none';
+    hint.style.color = ok ? 'var(--success)' : 'var(--danger)';
+  };
+  if (!cur) { showHint('请输入当前密码'); return; }
+  const ruleErr = passwordRuleError(nw);
+  if (ruleErr) { showHint(ruleErr); return; }
+  if (nw === cur) { showHint('新密码不能与当前密码相同'); return; }
+  if (nw !== cf) { showHint('两次输入的新密码不一致'); return; }
+
+  const btn = document.getElementById('ucPwSubmitBtn');
+  try {
+    btn.disabled = true;
+    btn.textContent = '修改中...';
+    // 当前密码服务端校验（独立 token 端点，不触碰当前会话）
+    const curOk = await window.CloudSync.verifyCurrentPassword(cur);
+    if (!curOk) { showHint('当前密码错误'); return; }
+    await window.CloudSync.updatePassword(nw); // 官方保持当前会话，不登出不刷新
+    document.getElementById('ucPwCurrent').value = '';
+    document.getElementById('ucPwNew').value = '';
+    document.getElementById('ucPwConfirm').value = '';
+    updatePwStrength('uc');
+    showHint('');
+    showToast('密码已修改', 'success');
+  } catch (e) {
+    console.error('修改密码失败:', e);
+    showHint('修改失败：' + (e.message || '未知错误'));
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '确认修改';
+    updatePwGate('uc');
   }
 }
 
@@ -1287,9 +1363,74 @@ function authSetBusy(form, busy) {
 function resetAuthButtons() {
   authSetBusy('login', false);
   authSetBusy('register', false);
+  if (typeof updatePwGate === 'function') updatePwGate('reg'); // REQ-094：复位后按强度规则重估注册提交门
   showAuthError('');
 }
 window.resetAuthButtons = resetAuthButtons; // cloud.js showAuthView 回登录页时调用
+
+// ==================== REQ-094（任务书 #29 WP1）：密码强度 ====================
+// 规则：≥8 位、必须同时含字母与数字、拦截 top-20 常见弱密码。
+// 同一套校验 + 三档强度条组件复用注册（reg）与修改密码（uc）两表单。
+const WEAK_PASSWORDS = [
+  '12345678', '123456789', '1234567890', 'password', 'password1', 'qwerty123', 'abc12345', 'abcd1234',
+  'qq123456', '11111111', '00000000', 'iloveyou', '123123123', 'admin123', 'letmein123', 'wow123456',
+  'a12345678', '87654321', '66668888', '52013145'
+];
+// 返回 '' = 合规可提交；否则为就地中文提示文案
+function passwordRuleError(pw) {
+  if (!pw) return '请输入密码';
+  if (pw.length < 8) return '密码至少 8 位';
+  if (!/[A-Za-z]/.test(pw) || !/[0-9]/.test(pw)) return '密码需同时包含字母和数字';
+  if (WEAK_PASSWORDS.includes(pw.toLowerCase())) return '该密码过于常见，请更换更安全的密码';
+  return '';
+}
+// 三档：1=弱（不合规）2=中（合规）3=强（合规且 ≥10 位且大小写混合或含符号）
+function passwordStrengthLevel(pw) {
+  if (!pw) return 0;
+  if (passwordRuleError(pw)) return 1;
+  const mixedCase = /[a-z]/.test(pw) && /[A-Z]/.test(pw);
+  const hasSymbol = /[^A-Za-z0-9]/.test(pw);
+  return (pw.length >= 10 && (mixedCase || hasSymbol)) ? 3 : 2;
+}
+function updatePwStrength(scope) {
+  const input = document.getElementById(scope === 'reg' ? 'regPassword' : 'ucPwNew');
+  const box = document.getElementById(scope + 'PwStrength');
+  const fill = document.getElementById(scope + 'PwStrengthFill');
+  const text = document.getElementById(scope + 'PwStrengthText');
+  if (!input || !box || !fill || !text) return;
+  const pw = input.value;
+  if (!pw) {
+    box.style.display = 'none';
+    updatePwGate(scope);
+    return;
+  }
+  box.style.display = '';
+  const lv = passwordStrengthLevel(pw);
+  const styles = {
+    1: ['弱', 'var(--danger)', '33%'],
+    2: ['中', 'var(--warning)', '66%'],
+    3: ['强', 'var(--success)', '100%']
+  };
+  const [label, color, width] = styles[lv];
+  fill.style.width = width;
+  fill.style.backgroundColor = color;
+  const ruleErr = passwordRuleError(pw);
+  text.textContent = lv === 1 ? `强度：弱（${ruleErr}）` : `强度：${label}`;
+  text.style.color = color;
+  updatePwGate(scope);
+}
+// 提交门：密码非空且不合规时禁用提交（空密码保留原点击报错路径）
+function updatePwGate(scope) {
+  if (scope === 'reg') {
+    const btn = document.getElementById('authRegisterBtn');
+    const pw = document.getElementById('regPassword');
+    if (btn && pw) btn.disabled = !!pw.value && !!passwordRuleError(pw.value);
+  } else {
+    const btn = document.getElementById('ucPwSubmitBtn');
+    const pw = document.getElementById('ucPwNew');
+    if (btn && pw) btn.disabled = !!pw.value && !!passwordRuleError(pw.value);
+  }
+}
 
 // 登录
 async function handleLogin() {
@@ -1332,7 +1473,9 @@ async function handleRegister() {
   const email = document.getElementById('regEmail').value.trim();
   const password = document.getElementById('regPassword').value;
   if (!email || !password) { showAuthError('请填写邮箱和密码'); return; }
-  if (password.length < 6) { showAuthError('密码至少6位'); return; }
+  // REQ-094（任务书 #29 WP1）：强度规则兜底校验（与实时门禁同一口径，防绕过禁用态直点）
+  const pwRuleErr = passwordRuleError(password);
+  if (pwRuleErr) { showAuthError(pwRuleErr); return; }
 
   try {
     authSetBusy('register', true); // 防重复提交
@@ -1349,8 +1492,10 @@ async function handleRegister() {
     showAuthError('');
     showGuildForm();
     authSetBusy('register', false);
+    updatePwGate('reg'); // REQ-094：复位后按强度规则重估提交门
   } catch (e) {
     authSetBusy('register', false);
+    updatePwGate('reg'); // REQ-094：同上
     showAuthError(mapAuthError(e) || '注册失败');
   }
 }
@@ -1812,6 +1957,16 @@ function updateCloudUI() {
       const avatarEl = document.getElementById('userAvatar');
       if (nickEl) nickEl.textContent = nickname;
       if (avatarEl) avatarEl.textContent = (nickname || '用').slice(0, 1);
+      // REQ-094（任务书 #29 WP1）：菜单下拉头部——昵称 + 玩家ID 小字（未分配时整头隐藏，不占布局）
+      const menuHead = document.getElementById('userMenuHead');
+      const playerId = window.CloudSync.getPlayerId ? window.CloudSync.getPlayerId() : '';
+      if (menuHead) {
+        menuHead.style.display = playerId ? '' : 'none';
+        if (playerId) {
+          document.getElementById('userMenuHeadName').textContent = nickname;
+          document.getElementById('userMenuHeadId').textContent = playerId;
+        }
+      }
     }
     if (guild && guildName) {
       // 显示公会名称 + 服务器信息
@@ -2074,6 +2229,8 @@ const modalDirtyChecks = {
   memberHardDeleteModal: () => isModalFormDirty('memberHardDeleteModal'),
   activityModal: () => isModalFormDirty('activityModal'),
   lootModal: () => isModalFormDirty('lootModal'),
+  // REQ-094（任务书 #29 WP1）：用户中心含可编辑字段（显示名/修改密码表单），纳入防误关
+  userCenterModal: () => isModalFormDirty('userCenterModal'),
   // 公会设置：成员角色变更即时保存不算未保存内容，只跟踪公会资料三字段
   guildSettingsModal: () => {
     const g = (window.CloudSync && window.CloudSync.getCurrentGuild()) || {};
@@ -6618,6 +6775,21 @@ function lootFillAssignedTo(name) {
 // ==================== 初始化 ====================
 // ==================== 更新日志 ====================
 const changelogData = [
+  {
+    id: 'v3.2.0-task29-wp1-account',
+    version: 'v3.2.0',
+    date: '2026-08-10',
+    type: 'feature',
+    typeLabel: '新增功能',
+    title: '账号体系完善 A 组：注册密码强度 + 修改密码 + 玩家ID（任务书 #29 WP1，REQ-094）',
+    summary: '注册启用密码强度规则（≥8 位、须含字母和数字、拦截常见弱密码），输入实时显示弱/中/强三档强度条，不合规禁用提交；用户中心新增「修改密码」（当前密码服务端校验、改密后不掉线）；新增 BattleTag 风格玩家ID「昵称#5位数字」，用户中心顶部卡片一键复制，头像菜单昵称下方同步显示。',
+    details: [
+      '强度三档：弱（不合规，红）/中（合规，黄）/强（合规且更长更复杂，绿），修改密码表单复用同一校验组件',
+      '修改密码：当前密码错误/强度不足/两次不一致均就地提示，成功 toast「密码已修改」，当前会话保持登录',
+      '玩家ID 数字段注册时随机分配、恒定不变，名字部分实时跟随改名；仅作展示识别，不参与任何鉴权与查重',
+      '存量账号数字段由增量迁移统一补发（sql/25，运营执行）；登录时亦有幂等兜底分配'
+    ]
+  },
   {
     id: 'v3.2.0-task27-patch2-bug059',
     version: 'v3.2.0',

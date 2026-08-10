@@ -4,12 +4,12 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>魔兽管家</title>
-<!-- 静态资源版本号：20260810.39（任务书 #22 WP3-②：凡改动 js/css 的 commit 必须同步递增此处与所有 ?v= 查询串，见 docs/开发规范.md 第五章） -->
+<!-- 静态资源版本号：20260810.40（任务书 #22 WP3-②：凡改动 js/css 的 commit 必须同步递增此处与所有 ?v= 查询串，见 docs/开发规范.md 第五章） -->
 <link rel="icon" type="image/png" sizes="32x32" href="assets/brand/favicon-32.png">
 <link rel="icon" type="image/png" sizes="16x16" href="assets/brand/favicon-16.png">
-<link rel="stylesheet" href="css/main.css?v=20260810.39">
-<link rel="stylesheet" href="css/data-public.css?v=20260810.39"><!-- 任务书 #28 WP5：副本掉落 tab（选择器全 .dp- 前缀 + #page-lootdrop 作用域，零泄漏） -->
-<script src="assets/vendor/supabase-js-2.js?v=20260810.39"></script>
+<link rel="stylesheet" href="css/main.css?v=20260810.40">
+<link rel="stylesheet" href="css/data-public.css?v=20260810.40"><!-- 任务书 #28 WP5：副本掉落 tab（选择器全 .dp- 前缀 + #page-lootdrop 作用域，零泄漏） -->
+<script src="assets/vendor/supabase-js-2.js?v=20260810.40"></script>
 </head>
 <body>
 
@@ -28,7 +28,7 @@
       </div>
       <div class="auth-field">
         <label>密码</label>
-        <input type="password" id="authPassword" placeholder="至少6位" class="auth-input">
+        <input type="password" id="authPassword" placeholder="登录密码" class="auth-input">
       </div>
       <button class="btn btn-primary auth-btn" id="authLoginBtn" onclick="handleLogin()">登录</button>
       <div class="auth-switch">
@@ -48,7 +48,12 @@
       </div>
       <div class="auth-field">
         <label>密码</label>
-        <input type="password" id="regPassword" placeholder="至少6位" class="auth-input">
+        <input type="password" id="regPassword" placeholder="至少8位，需含字母和数字" class="auth-input" oninput="updatePwStrength('reg')">
+        <!-- REQ-094（任务书 #29 WP1）：注册密码强度实时指示（弱/中/强三档色条+原因提示） -->
+        <div class="pw-strength" id="regPwStrength" style="display:none">
+          <div class="pw-strength-track"><div class="pw-strength-fill" id="regPwStrengthFill"></div></div>
+          <div class="pw-strength-text" id="regPwStrengthText"></div>
+        </div>
       </div>
       <button class="btn btn-primary auth-btn" id="authRegisterBtn" onclick="handleRegister()">注册</button>
       <button class="btn btn-ghost auth-btn" style="margin-top:8px" onclick="showLoginForm()">返回登录</button>
@@ -188,6 +193,11 @@
             <span class="user-menu-caret">▾</span>
           </button>
           <div class="user-menu-dropdown" id="userMenuDropdown" style="display:none">
+            <!-- REQ-094（任务书 #29 WP1）：菜单头部——昵称 + 玩家ID 小字（放下拉内，topbar 触发行一行结构不动） -->
+            <div class="user-menu-head" id="userMenuHead" style="display:none">
+              <div class="user-menu-head-name" id="userMenuHeadName"></div>
+              <div class="user-menu-head-id" id="userMenuHeadId"></div>
+            </div>
             <div class="user-menu-item" onclick="userMenuAction('center')">👤 用户中心</div>
             <div class="user-menu-item" onclick="userMenuAction('switch')">🏰 切换公会</div>
             <div class="user-menu-divider"></div>
@@ -1681,9 +1691,16 @@
         <button class="modal-close" onclick="closeModal('userCenterModal')">&times;</button>
       </div>
       <div class="modal-body">
+        <!-- REQ-094（任务书 #29 WP1）：玩家ID 顶部卡片（昵称#5位数字 + 一键复制；数字段恒定、名字部分跟随改名） -->
+        <div class="uc-playerid-card" id="ucPlayerIdCard" style="display:none">
+          <span class="uc-playerid-label">玩家ID</span>
+          <span class="uc-playerid-text" id="ucPlayerIdText"></span>
+          <button class="uc-btn uc-btn-secondary uc-playerid-copy" onclick="copyPlayerId()">复制</button>
+        </div>
         <!-- 标签页导航 -->
         <div class="uc-tabs">
           <button class="uc-tab active" data-tab="profile" onclick="switchUserTab('profile')">📝 个人资料</button>
+          <button class="uc-tab" data-tab="password" onclick="switchUserTab('password')">🔒 修改密码</button>
           <button class="uc-tab" data-tab="characters" onclick="switchUserTab('characters')">⚔️ 我的角色</button>
           <button class="uc-tab" data-tab="claims" onclick="switchUserTab('claims')">🤝 我的认领</button>
           <button class="uc-tab" data-tab="notifications" onclick="switchUserTab('notifications')">
@@ -1704,6 +1721,31 @@
               <input type="text" id="ucDisplayName" class="uc-input" placeholder="输入显示名称">
             </div>
             <button class="uc-btn uc-btn-primary" onclick="saveUserProfile()">保存资料</button>
+          </div>
+        </div>
+
+        <!-- 修改密码标签页（REQ-094 任务书 #29 WP1：当前密码服务端校验；强度规则同注册；改密后会话保持） -->
+        <div class="uc-tab-content" id="tab-password" style="display:none">
+          <div class="uc-section">
+            <h3>修改密码</h3>
+            <div class="uc-form-group">
+              <label>当前密码</label>
+              <input type="password" id="ucPwCurrent" class="uc-input" placeholder="输入当前密码" autocomplete="current-password">
+            </div>
+            <div class="uc-form-group">
+              <label>新密码</label>
+              <input type="password" id="ucPwNew" class="uc-input" placeholder="至少8位，需含字母和数字" autocomplete="new-password" oninput="updatePwStrength('uc')">
+              <div class="pw-strength" id="ucPwStrength" style="display:none">
+                <div class="pw-strength-track"><div class="pw-strength-fill" id="ucPwStrengthFill"></div></div>
+                <div class="pw-strength-text" id="ucPwStrengthText"></div>
+              </div>
+            </div>
+            <div class="uc-form-group">
+              <label>确认新密码</label>
+              <input type="password" id="ucPwConfirm" class="uc-input" placeholder="再次输入新密码" autocomplete="new-password">
+            </div>
+            <div class="uc-hint" id="ucPwHint" style="display:none;margin-bottom:12px"></div>
+            <button class="uc-btn uc-btn-primary" id="ucPwSubmitBtn" onclick="changePassword()">确认修改</button>
           </div>
         </div>
 
@@ -1868,14 +1910,14 @@
   </div>
 </div>
 
-<script src="js/cloud.js?v=20260810.39"></script>
+<script src="js/cloud.js?v=20260810.40"></script>
 <!-- 任务书 #14：主数据层（快照兜底 + 加载层），须在 app.js 之前 -->
-<script src="js/masterDataSnapshot.js?v=20260810.39"></script>
-<script src="js/masterData.js?v=20260810.39"></script>
+<script src="js/masterDataSnapshot.js?v=20260810.40"></script>
+<script src="js/masterData.js?v=20260810.40"></script>
 <!-- 任务书 #22 WP2：职业/专精/职责图标集中映射（全站唯一取图处） -->
-<script src="js/iconMap.js?v=20260810.39"></script>
+<script src="js/iconMap.js?v=20260810.40"></script>
 <!-- 任务书 #28 WP5：副本掉落渲染层（双壳同源；无 data-public-body 不自动启动，由 app.js 懒挂载，须在 app.js 之前） -->
-<script src="js/dataPublic.js?v=20260810.39"></script>
-<script src="js/app.js?v=20260810.39"></script>
+<script src="js/dataPublic.js?v=20260810.40"></script>
+<script src="js/app.js?v=20260810.40"></script>
 </body>
 </html>
