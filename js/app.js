@@ -6972,6 +6972,20 @@ function lootFillAssignedTo(name) {
 // ==================== 更新日志 ====================
 const changelogData = [
   {
+    id: 'v3.2.0-req110-venomcurse',
+    version: 'v3.2.0',
+    date: '2026-08-11',
+    type: 'feature',
+    typeLabel: '新增功能',
+    title: '副本掉落「毒咒」字段支持（任务书 #37，REQ-110 WP1）',
+    summary: '掉落池数据模型新增毒咒标签字段（文本标签型，存「毒咒」，可空，未来其他咒直接存新值不再加列）；数据中心掉落录入/编辑表单加「毒咒」预设下拉（无/毒咒，禁自由输入），列表同步展示；副本掉落装备卡 meta 行新增「毒咒」绿色徽标，仅毒咒装备显示，毒咒效果文本仍走现有特效行。',
+    details: [
+      'boss_loot / dungeon_loot 两表加 venomcurse 列（sql/26），存量零回填（S1 无毒咒装备）',
+      '公开 RPC get_public_loot_detail 白名单透出 venomcurse，双壳（登录壳/公开壳）同一渲染器自动覆盖',
+      '徽标样式沿用 .dp-tag 徽标族，绿色调与特效行同族（.dp-tag-venom）；无毒咒装备卡片零变化'
+    ]
+  },
+  {
     id: 'v3.2.0-req103-entry-consolidation',
     version: 'v3.2.0',
     date: '2026-08-11',
@@ -12363,7 +12377,7 @@ function mdRenderLoot(panel) {
       ${boss ? `<button class="btn btn-primary btn-sm" onclick="mdEditLootItem(null)">+ 新增掉落</button>
       <button class="btn btn-sm" onclick="mdOpenLootBatch()">📋 批量录入</button>` : ''}
     </div>
-    ${boss ? mdTable('<th>装备名</th><th>部位</th><th>类型</th><th>主属性</th><th>副属性</th><th>特效</th><th class="center">操作</th>',
+    ${boss ? mdTable('<th>装备名</th><th>部位</th><th>类型</th><th>主属性</th><th>副属性</th><th>特效</th><th>毒咒</th><th class="center">操作</th>',
       loot.map(l => `<tr>
         <td style="font-weight:500">${l.item_name}</td>
         <td>${l.slot || '-'}</td>
@@ -12371,6 +12385,7 @@ function mdRenderLoot(panel) {
         <td>${(l.primary_stats || []).join('、') || '-'}</td>
         <td>${(l.secondary_stats || []).join('、') || '-'}</td>
         <td style="font-size:12px;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${(l.effect || '').replace(/"/g, '&quot;')}">${l.effect ? `<span class="loot-effect-green">${l.effect}</span>` : '-'}</td>
+        <td>${l.venomcurse || '-'}</td>
         ${mdActionBtns(`mdEditLootItem('${l.id}')`, `mdDeleteRow('boss_loot','${l.id}','${l.item_name}','')`)}
       </tr>`).join('')) : '<div style="color:var(--text-muted)">该团本暂无 BOSS，请先到「BOSS」区新增</div>'}`;
 }
@@ -12382,7 +12397,8 @@ function mdEditLootItem(id) {
     { key: 'item_type', label: '类型', type: 'selectCustom', options: MD_LOOT_TYPES },
     { key: 'primary_stats', label: '主属性（可多选）', type: 'tags', options: MD_PRIMARY_STATS },
     { key: 'secondary_stats', label: '副属性（可多选）', type: 'tags', options: MD_SECONDARY_STATS },
-    { key: 'effect', label: '特效', type: 'textarea', placeholder: '装备：……（可空，多行）' }
+    { key: 'effect', label: '特效', type: 'textarea', placeholder: '装备：……（可空，多行）' },
+    { key: 'venomcurse', label: '毒咒', type: 'select', options: [{ value: '', label: '无' }, { value: '毒咒', label: '毒咒' }] }
   ], row, async (out) => {
     // REQ-060：手输非法组合保存前弹提示确认（兜底优先，不硬拦；取消则中止保持弹窗）
     if (out.slot && out.item_type && MD_SLOT_TYPE_MAP[out.slot] && !MD_SLOT_TYPE_MAP[out.slot].includes(out.item_type)) {
@@ -12390,7 +12406,8 @@ function mdEditLootItem(id) {
         throw new Error('已取消保存');
       }
     }
-    const payload = { item_name: out.item_name, slot: out.slot, item_type: out.item_type, effect: out.effect, primary_stats: out.primary_stats, secondary_stats: out.secondary_stats };
+    // REQ-110：venomcurse 预设下拉（无/毒咒，禁自由输入），空串由 mdEditorSave 统一转 NULL
+    const payload = { item_name: out.item_name, slot: out.slot, item_type: out.item_type, effect: out.effect, primary_stats: out.primary_stats, secondary_stats: out.secondary_stats, venomcurse: out.venomcurse };
     if (id) await MasterData.mdUpdate('boss_loot', payload, `id=eq.${id}`);
     else await MasterData.mdInsert('boss_loot', { boss_id: mdLootNav.bossId, ...payload });
     await MasterData.refresh('boss_loot');
@@ -12501,7 +12518,7 @@ function mdRenderDungeonLoot(panel) {
       ${navBoss !== '__all__' ? `<button class="btn btn-primary btn-sm" onclick="mdEditDungeonLootItem(null)">+ 新增掉落</button>` : ''}
       <button class="btn btn-sm" onclick="mdOpenDungeonLootBatch()">📋 批量录入</button>
     </div>
-    ${mdTable('<th>装备名</th><th>BOSS 归属</th><th>部位</th><th>类型</th><th>主属性</th><th>副属性</th><th>特效</th><th class="center">操作</th>',
+    ${mdTable('<th>装备名</th><th>BOSS 归属</th><th>部位</th><th>类型</th><th>主属性</th><th>副属性</th><th>特效</th><th>毒咒</th><th class="center">操作</th>',
       loot.map(l => `<tr>
         <td style="font-weight:500">${l.item_name}</td>
         <td>${bossName(l.boss_id)}</td>
@@ -12510,6 +12527,7 @@ function mdRenderDungeonLoot(panel) {
         <td>${(l.primary_stats || []).join('、') || '-'}</td>
         <td>${(l.secondary_stats || []).join('、') || '-'}</td>
         <td style="font-size:12px;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${(l.effect || '').replace(/"/g, '&quot;')}">${l.effect ? `<span class="loot-effect-green">${l.effect}</span>` : '-'}</td>
+        <td>${l.venomcurse || '-'}</td>
         ${mdActionBtns(`mdEditDungeonLootItem('${l.id}')`, `mdDeleteRow('dungeon_loot','${l.id}','${l.item_name}','')`)}
       </tr>`).join(''))}`;
 }
@@ -12521,14 +12539,16 @@ function mdEditDungeonLootItem(id) {
     { key: 'item_type', label: '类型', type: 'selectCustom', options: MD_LOOT_TYPES },
     { key: 'primary_stats', label: '主属性（可多选）', type: 'tags', options: MD_PRIMARY_STATS },
     { key: 'secondary_stats', label: '副属性（可多选）', type: 'tags', options: MD_SECONDARY_STATS },
-    { key: 'effect', label: '特效', type: 'textarea', placeholder: '装备：……（可空，多行）' }
+    { key: 'effect', label: '特效', type: 'textarea', placeholder: '装备：……（可空，多行）' },
+    { key: 'venomcurse', label: '毒咒', type: 'select', options: [{ value: '', label: '无' }, { value: '毒咒', label: '毒咒' }] }
   ], row, async (out) => {
     if (out.slot && out.item_type && MD_SLOT_TYPE_MAP[out.slot] && !MD_SLOT_TYPE_MAP[out.slot].includes(out.item_type)) {
       if (!confirm(`部位「${out.slot}」与类型「${out.item_type}」不是常见组合，仍要保存吗？`)) {
         throw new Error('已取消保存');
       }
     }
-    const payload = { item_name: out.item_name, slot: out.slot, item_type: out.item_type, effect: out.effect, primary_stats: out.primary_stats, secondary_stats: out.secondary_stats };
+    // REQ-110：venomcurse 预设下拉（无/毒咒，禁自由输入），空串由 mdEditorSave 统一转 NULL
+    const payload = { item_name: out.item_name, slot: out.slot, item_type: out.item_type, effect: out.effect, primary_stats: out.primary_stats, secondary_stats: out.secondary_stats, venomcurse: out.venomcurse };
     if (id) await MasterData.mdUpdate('dungeon_loot', payload, `id=eq.${id}`);
     else await MasterData.mdInsert('dungeon_loot', {
       dungeon_id: mdDungeonLootNav.dungeonId,

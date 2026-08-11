@@ -89,7 +89,7 @@
 
 11. **更新日志**（page:changelog） - 版本历史
 
-12. **副本掉落**（page:lootdrop + data.html） - REQ-086 收官（任务书 #28 WP5，原「数据公示」更名）：双壳同一渲染层 js/dataPublic.js（window.DPLootDrop，单一真源禁复制）——登录壳 = 主应用 #page-lootdrop 页签（app.js ensureLootdropMounted 懒挂载，切回 activate 重测；筛选条吸顶 top:56px 让开 topbar，层级规约 筛选条10＞hover卡5 同效），公开壳 = data.html 免登录可分享（body.data-public-body 自动挂载，URL 不动）；anon 直连 PostgREST（字典表 + 公开 RPC get_public_loot_detail），全角色只读
+12. **副本掉落**（page:lootdrop + data.html） - REQ-086 收官（任务书 #28 WP5，原「数据公示」更名）：双壳同一渲染层 js/dataPublic.js（window.DPLootDrop，单一真源禁复制）——登录壳 = 主应用 #page-lootdrop 页签（app.js ensureLootdropMounted 懒挂载，切回 activate 重测；筛选条吸顶 top:56px 让开 topbar，层级规约 筛选条10＞hover卡5 同效），公开壳 = data.html 免登录可分享（body.data-public-body 自动挂载，URL 不动）；anon 直连 PostgREST（字典表 + 公开 RPC get_public_loot_detail，**显式字段白名单——boss_loot/dungeon_loot 加列须 CREATE OR REPLACE 才透出**），全角色只读；毒咒徽标（REQ-110，任务书 #37：venomcurse 列非空时装备卡 meta 行渲染绿色 .dp-tag-venom，sql/26；数据中心录入=预设下拉 无/毒咒 禁自由输入；插件采集与筛选项为后续批次）
 
 ## 云端架构
 

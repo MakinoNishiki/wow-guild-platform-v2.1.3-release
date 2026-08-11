@@ -258,6 +258,8 @@
 }
 .dp-tag-primary { background: rgba(88, 166, 255, 0.15); color: var(--info); }
 .dp-tag-secondary { background: rgba(63, 185, 80, 0.15); color: var(--success); }
+/* REQ-110（任务书 #37）：毒咒徽标——仅 venomcurse 非空时渲染；绿色调与特效行 #1eff00 同族（运营裁定绿） */
+.dp-tag-venom { background: rgba(30, 255, 0, 0.12); color: #1eff00; }
 /* 任务书 #28 WP3-v3：主/副属性各占一行（有才渲染，R2 占位行废止）；
    R1 星标裁切修复：根因 = 行容器 overflow:hidden 把角部外溢的⭐SVG 切半——放开 overflow，
    并加 margin-top 6px 给星标 5px 上溢留出净空间，任何缩放下完整可见 */

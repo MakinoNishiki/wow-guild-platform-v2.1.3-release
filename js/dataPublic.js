@@ -511,6 +511,7 @@
       <div class="dp-item-meta">
         ${l.slot ? `<span class="dp-tag">${esc(l.slot)}</span>` : ''}
         ${l.item_type ? `<span class="dp-tag">${esc(l.item_type)}</span>` : ''}
+        ${l.venomcurse ? `<span class="dp-tag dp-tag-venom">${esc(l.venomcurse)}</span>` : ''}
       </div>
       ${primHtml ? `<div class="dp-item-stats">${primHtml}</div>` : ''}
       ${secHtml ? `<div class="dp-item-stats">${secHtml}</div>` : ''}
