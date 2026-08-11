@@ -843,6 +843,28 @@ body {
   box-shadow: 0 0 0 2px rgba(240, 192, 96, 0.55), 0 0 18px rgba(240, 192, 96, 0.25);
 }
 
+/* REQ-104（任务书 #34 WP1）：密码校验失败抖动——一处实现两处复用（注册页 regPassword / 用户中心 ucPw*）。
+   水平衰减摆动 0.4s、幅度 ≤8px；可重复触发（JS 移除类→强制 reflow→再添加）；
+   红字提示保留，抖动是增量感知；prefers-reduced-motion 降级为不抖动。 */
+@keyframes pwShake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-8px); }
+  40% { transform: translateX(7px); }
+  60% { transform: translateX(-5px); }
+  80% { transform: translateX(3px); }
+}
+.pw-shake { animation: pwShake 0.4s ease-out; }
+@media (prefers-reduced-motion: reduce) {
+  .pw-shake { animation: none; }
+}
+
+/* REQ-108（任务书 #34 WP3）：仪表盘看板细分行（正式/替补/试用/离队、取消 X 个，0 段不显示） */
+.stat-sub {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+
 /* 排行榜 */
 .rank-list { display: flex; flex-direction: column; gap: 8px; }
 

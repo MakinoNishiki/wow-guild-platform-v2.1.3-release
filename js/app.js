@@ -693,6 +693,30 @@ async function copyPlayerId() {
   }
 }
 
+// ==================== REQ-104（任务书 #34 WP1）：密码校验失败抖动 ====================
+// 一处实现两处复用（注册页 regPassword / 用户中心 ucPw*）；红字提示保留，抖动为增量感知。
+// 可重复触发：移除类 → 强制 reflow → 再添加；reduced-motion 降级在 CSS 层（animation:none）。
+function shakePwField(el) {
+  if (!el) return;
+  el.classList.remove('pw-shake');
+  void el.offsetWidth; // 强制 reflow，保证连续失败也能重新播放
+  el.classList.add('pw-shake');
+}
+// 服务端 422 weak_password 判定（supabase AuthApiError：status=422 / code=weak_password）
+function isWeakPassword422(e) {
+  return !!(e && (e.status === 422 || /weak_password/i.test(String(e.code || '')) || /weak_password/i.test(String(e.message || ''))));
+}
+// blur 补位触发面：两表单均有 REQ-094 提交门（非空不合规禁用提交），弱密码下提交路径不可达——
+// 字段失焦且内容不合规时抖动一次（空值不抖：未输入不算校验失败），B1/B2 验收路径由此可达。
+(function bindPwShakeOnBlur() {
+  const regPw = document.getElementById('regPassword');
+  if (regPw) regPw.addEventListener('blur', () => { if (regPw.value && passwordRuleError(regPw.value)) shakePwField(regPw); });
+  const ucNew = document.getElementById('ucPwNew');
+  if (ucNew) ucNew.addEventListener('blur', () => { if (ucNew.value && passwordRuleError(ucNew.value)) shakePwField(ucNew); });
+  const ucCf = document.getElementById('ucPwConfirm');
+  if (ucCf) ucCf.addEventListener('blur', () => { if (ucCf.value && ucCf.value !== ucNew.value) shakePwField(ucCf); });
+})();
+
 // REQ-094（任务书 #29 WP1）：修改密码——当前密码服务端校验 + 强度规则同注册
 // REQ-096（2026-08-11 验收修复小包，口径变更推翻任务书 #29 WP1「会话保持」裁定）：改密成功 → 提示 → 强制登出回登录页
 async function changePassword() {
@@ -707,9 +731,10 @@ async function changePassword() {
   };
   if (!cur) { showHint('请输入当前密码'); return; }
   const ruleErr = passwordRuleError(nw);
-  if (ruleErr) { showHint(ruleErr); return; }
-  if (nw === cur) { showHint('新密码不能与当前密码相同'); return; }
-  if (nw !== cf) { showHint('两次输入的新密码不一致'); return; }
+  // REQ-104：前端校验失败抖动——目标 = 不符字段本身（新密码不合规→新密码框；两次不一致→确认框）
+  if (ruleErr) { showHint(ruleErr); shakePwField(document.getElementById('ucPwNew')); return; }
+  if (nw === cur) { showHint('新密码不能与当前密码相同'); shakePwField(document.getElementById('ucPwNew')); return; }
+  if (nw !== cf) { showHint('两次输入的新密码不一致'); shakePwField(document.getElementById('ucPwConfirm')); return; }
 
   const btn = document.getElementById('ucPwSubmitBtn');
   try {
@@ -734,6 +759,7 @@ async function changePassword() {
   } catch (e) {
     console.error('修改密码失败:', e);
     showHint('修改失败：' + (e.message || '未知错误'));
+    if (isWeakPassword422(e)) shakePwField(document.getElementById('ucPwNew')); // REQ-104：服务端 422 → 新密码框
   } finally {
     btn.disabled = false;
     btn.textContent = '确认修改';
@@ -1491,8 +1517,9 @@ async function handleRegister() {
   const password = document.getElementById('regPassword').value;
   if (!email || !password) { showAuthError('请填写邮箱和密码'); return; }
   // REQ-094（任务书 #29 WP1）：强度规则兜底校验（与实时门禁同一口径，防绕过禁用态直点）
+  // REQ-104（任务书 #34 WP1）：前端校验失败 → 注册密码框抖动
   const pwRuleErr = passwordRuleError(password);
-  if (pwRuleErr) { showAuthError(pwRuleErr); return; }
+  if (pwRuleErr) { showAuthError(pwRuleErr); shakePwField(document.getElementById('regPassword')); return; }
 
   try {
     authSetBusy('register', true); // 防重复提交
@@ -1514,6 +1541,7 @@ async function handleRegister() {
     authSetBusy('register', false);
     updatePwGate('reg'); // REQ-094：同上
     showAuthError(mapAuthError(e) || '注册失败');
+    if (isWeakPassword422(e)) shakePwField(document.getElementById('regPassword')); // REQ-104：服务端 422 → 密码框
   }
 }
 
@@ -2374,16 +2402,29 @@ function renderDashboard() {
   const avgRate = calculateAvgAttendanceRate(activities);
   
   // 统计卡片
+  // REQ-108（任务书 #34 WP3）：看板细分——团员卡细分「正式/替补/试用/离队」（0 段不显示，分隔符随显示段动态拼接）；
+  // 本月活动卡追加「取消 X 个」（0 不显示）。数据源与既有看板同链（appData 现算），无新增缓存。
+  const normMemberStatus = m => {
+    const s = (m.status || '').trim();
+    return s === 'active' ? '正式' : s === 'inactive' ? '离队' : s; // 兼容存量英文状态（与成员列表徽标同口径）
+  };
+  const memberSegText = ['正式', '替补', '试用', '离队']
+    .map(s => ({ s, n: appData.members.filter(m => normMemberStatus(m) === s).length }))
+    .filter(x => x.n > 0)
+    .map(x => `${x.s} ${x.n}`).join(' · ');
+  const monthCancelled = monthActivities.filter(a => a.status === 'cancelled').length;
   document.getElementById('statsGrid').innerHTML = `
     <div class="stat-card">
       <div class="stat-icon">👥</div>
       <div class="stat-value">${members.length}</div>
       <div class="stat-label">团员总数</div>
+      ${memberSegText ? `<div class="stat-sub" id="statSubMembers">${memberSegText}</div>` : ''}
     </div>
     <div class="stat-card">
       <div class="stat-icon">📅</div>
       <div class="stat-value">${monthActivities.length}</div>
       <div class="stat-label">本月活动次数</div>
+      ${monthCancelled > 0 ? `<div class="stat-sub" id="statSubCancelled">取消 ${monthCancelled} 个</div>` : ''}
     </div>
     <div class="stat-card">
       <div class="stat-icon">📊</div>
@@ -6836,6 +6877,57 @@ function lootFillAssignedTo(name) {
 // ==================== 更新日志 ====================
 const changelogData = [
   {
+    id: 'v3.2.0-req109-att-bulk-trim',
+    version: 'v3.2.0',
+    date: '2026-08-11',
+    type: 'improve',
+    typeLabel: '功能优化',
+    title: '考勤弹窗批量按钮精简（任务书 #34 WP4，REQ-109）',
+    summary: '考勤详情弹窗批量条移除「全部缺席」「全部替补」「全部请假」三按钮，保留「全部出席」；单个标记、勾选批量标记、保存考勤等其余功能不变。',
+    details: [
+      '三按钮及其引用零残留；共享 handler 保留供「全部出席」使用',
+      '弹窗布局随按钮移除自然收拢，无空占位'
+    ]
+  },
+  {
+    id: 'v3.2.0-req108-dashboard-breakdown',
+    version: 'v3.2.0',
+    date: '2026-08-11',
+    type: 'improve',
+    typeLabel: '功能优化',
+    title: '仪表盘看板细分（任务书 #34 WP3，REQ-108）',
+    summary: '团员总数卡下方新增细分行「正式 X · 替补 X · 试用 X · 离队 X」（为 0 的段不显示）；本月活动次数卡下方追加「取消 X 个」（0 不显示）。大数字与既有口径不变，数据均实时现算。',
+    details: [
+      '细分段动态拼接，分隔符随显示段自适应；存量英文状态（active/inactive）按既有口径归并',
+      '与既有看板同一数据源（appData 现算），无新增缓存'
+    ]
+  },
+  {
+    id: 'v3.2.0-req106-topbar-seconds',
+    version: 'v3.2.0',
+    date: '2026-08-11',
+    type: 'improve',
+    typeLabel: '功能优化',
+    title: 'topbar 时间精确到秒（任务书 #34 WP2，REQ-106）',
+    summary: '右上角日期由「2026/8/11 周二」升级为「2026/8/11 周二 20:03:45」，每秒走动；页面隐藏期间跳过写入，切回立即恢复准确时间。',
+    details: [
+      '单一定时器随 topbar 生命周期，零依赖、登出/切页无泄漏'
+    ]
+  },
+  {
+    id: 'v3.2.0-req104-pw-shake',
+    version: 'v3.2.0',
+    date: '2026-08-11',
+    type: 'improve',
+    typeLabel: '功能优化',
+    title: '密码校验失败抖动反馈（任务书 #34 WP1，REQ-104）',
+    summary: '修改密码与注册页密码框新增校验失败抖动动画：新密码不合规抖新密码框、两次不一致抖确认框、服务端拒绝（弱密码）同样触发；红字提示保留，抖动为增量感知；系统开启减弱动态效果时自动降级不抖动。',
+    details: [
+      '一处实现两处复用：水平衰减摆动 0.4s、幅度 ≤8px，连续失败可重复触发',
+      '提交门禁（REQ-094）不变；字段失焦且内容不合规时同样给出一次抖动提示'
+    ]
+  },
+  {
     id: 'v3.2.0-bug071-reports-deleted-row-height',
     version: 'v3.2.0',
     date: '2026-08-11',
@@ -8337,14 +8429,21 @@ async function init() {
   const verEl = document.getElementById('appVersion');
   if (verEl) verEl.textContent = APP_VERSION;
 
-  // 设置今日日期显示
-  const now = new Date();
+  // 设置今日日期显示（REQ-106，任务书 #34 WP2：精确到秒、每秒走动；页面隐藏时跳过 DOM 写入，可见即恢复准确值）
   const weekdays = ['日', '一', '二', '三', '四', '五', '六'];
-  const todayEl = document.getElementById('todayStr');
-  if (todayEl) {
-    todayEl.textContent = 
-      `${now.getFullYear()}/${now.getMonth() + 1}/${now.getDate()} 周${weekdays[now.getDay()]}`;
-  }
+  const p2 = n => String(n).padStart(2, '0');
+  const renderTopbarTime = () => {
+    const todayEl = document.getElementById('todayStr');
+    if (!todayEl) return;
+    const now = new Date();
+    todayEl.textContent =
+      `${now.getFullYear()}/${now.getMonth() + 1}/${now.getDate()} 周${weekdays[now.getDay()]} ${p2(now.getHours())}:${p2(now.getMinutes())}:${p2(now.getSeconds())}`;
+  };
+  renderTopbarTime();
+  setInterval(() => {
+    if (document.visibilityState === 'hidden') return; // 隐藏页签不写入，回来自动恢复准确值
+    renderTopbarTime();
+  }, 1000); // SPA 单定时器，随 topbar 生命周期，登出/切页无泄漏面
 
   // 尝试初始化云端
   let cloudReady = false;
