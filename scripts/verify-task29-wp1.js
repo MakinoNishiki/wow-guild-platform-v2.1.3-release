@@ -1,6 +1,8 @@
 // 任务书 #29 WP1 验证（REQ-094 A 组：注册密码强度 / 用户中心修改密码 / 玩家ID BattleTag 风格）：
 //   A. 注册密码强度（真浏览器注册页 UI，getComputedStyle 生效值断言：颜色对照 CSS 变量解析 RGB、宽度按比例实测）；
-//   B. 修改密码主链路（UI 注册 T29A 账号 → 建会 → 用户中心修改密码 6 子场景 + 登出后旧/新密码登录）；
+//   B. 修改密码主链路（UI 注册 T29A 账号 → 建会 → 用户中心修改密码 6 子场景 + 旧/新密码登录）；
+//      REQ-096（2026-08-11 验收修复小包，口径变更推翻任务书 #29 WP1「会话保持」裁定）：
+//      B5 原「会话保持」断言反转为「强制登出回登录页」断言，属裁定驱动合法更新；
 //   C. 玩家ID（tag_num 列存在才跑——sql/25 未执行时整组 SKIP 并显著标注，脚本两次运行均可通过）；
 //   D. 测试数据（T29A 前缀：auth 用户×2 / user_profiles / 公会 / guild_members）自清理并复核为零。
 // 红线：不执行 sql/25（不 ALTER 生产库）；不改业务代码；不 git 操作。
@@ -276,14 +278,14 @@ async function cleanup() {
     check('B4 弱新密码 12345678 → 提交禁用+强度条 danger 色', b4.disabled === true && b4.bg === COLORS['--danger'],
       `disabled=${b4.disabled} bg=${b4.bg} text=${b4.text}`);
 
-    // B5 合规成功 → toast + 三字段清空 + 会话保持
-    // 注：业务 bug（cloud.js verifyCurrentPassword 引用 initSupabase 局部 const config → ReferenceError →
-    // 正确密码也恒 false）修复前，B5/B6 必阻塞——包 try/catch 记 FAIL 并继续，修复后复跑应自然转绿。
+    // B5 合规成功 → toast「密码已修改，请重新登录」+ 三字段清空 + 强制登出回登录页
+    // （REQ-096 口径变更，2026-08-11 验收修复小包：推翻任务书 #29 WP1「会话保持」裁定，
+    //   原「会话保持」断言按新口径反转为强制登出断言，属裁定驱动合法更新）
     let b5ok = false;
     await fillPwForm(PWD, NEW_PWD, NEW_PWD);
     await page.click('#ucPwSubmitBtn');
     try {
-      await page.waitForFunction(() => [...document.querySelectorAll('#toastContainer .toast')].some(t => t.textContent.includes('密码已修改')), undefined, { timeout: 20000 });
+      await page.waitForFunction(() => [...document.querySelectorAll('#toastContainer .toast')].some(t => t.textContent.includes('密码已修改，请重新登录')), undefined, { timeout: 20000 });
       b5ok = true;
     } catch (e) {
       const diag = await page.evaluate(() => ({
@@ -299,31 +301,36 @@ async function cleanup() {
         nw: document.getElementById('ucPwNew').value,
         cf: document.getElementById('ucPwConfirm').value,
       }));
-      check('B5 修改成功 → toast「密码已修改」+ 三字段清空', b5.cur === '' && b5.nw === '' && b5.cf === '', JSON.stringify(b5));
-      await page.screenshot({ path: path.join(SHOT_DIR, 'uc-changepw.png') });
+      check('B5 修改成功 → toast「密码已修改，请重新登录」+ 三字段清空', b5.cur === '' && b5.nw === '' && b5.cf === '', JSON.stringify(b5));
+      // REQ-096：旧会话即刻失效——等强制登出落地（toast 出现≠signOut 完成，先等终态再断言）
+      await page.waitForFunction(() => {
+        const ov = getComputedStyle(document.getElementById('authOverlay')).display !== 'none';
+        const loginVisible = document.getElementById('authLoginForm').style.display !== 'none';
+        const notice = document.getElementById('authError').textContent.includes('密码已修改，请重新登录');
+        return ov && loginVisible && notice;
+      }, undefined, { timeout: 10000 });
       const b5b = await page.evaluate(async () => ({
         token: !!(await window.CloudSync.getAccessToken()),
-        authHidden: getComputedStyle(document.getElementById('authOverlay')).display === 'none',
+        modalClosed: !document.getElementById('userCenterModal').classList.contains('show'),
       }));
-      check('B5 会话保持（token 非空且未回登录页）', b5b.token && b5b.authHidden, JSON.stringify(b5b));
+      check('B5 REQ-096 强制登出（回登录页+登录页提示+token 清空+弹窗已关）',
+        !b5b.token && b5b.modalClosed, JSON.stringify(b5b));
+      await page.screenshot({ path: path.join(SHOT_DIR, 'uc-changepw-relogin.png') });
     } else {
-      check('B5 修改成功 → toast「密码已修改」+ 三字段清空', false,
-        '业务 bug 阻塞：cloud.js:263 verifyCurrentPassword 引用 initSupabase 局部 const config（ReferenceError: config is not defined）→ 正确密码恒校验失败，待主代理修复');
-      check('B5 会话保持（token 非空且未回登录页）', false, '依赖 B5，同阻塞');
+      check('B5 修改成功 → toast「密码已修改，请重新登录」+ 三字段清空', false,
+        '改密主链路阻塞（见上方 [B5 阻塞] 诊断）');
+      check('B5 REQ-096 强制登出（回登录页+登录页提示+token 清空+弹窗已关）', false, '依赖 B5，同阻塞');
     }
 
-    // B6 登出 → 旧密码登录失败 → 新密码登录成功（依赖 B5 改密生效）
+    // B6 旧密码登录失败 → 新密码登录成功（REQ-096：B5 已强制登出并落在登录表单，无需手动 logout）
     if (b5ok) {
-      await page.evaluate(() => userMenuAction('logout'));
-      await sleep(800);
-      await page.evaluate(() => showLoginForm()); // showAuthView 只显遮罩，登录/注册表单停留在上次状态（B0 走的是注册表单）
       await page.waitForSelector('#authEmail', { state: 'visible', timeout: 15000 });
       await page.fill('#authEmail', EMAIL);
       await page.fill('#authPassword', PWD); // 旧密码
       await page.click('#authLoginBtn');
       await page.waitForFunction(() => document.getElementById('authError').textContent.trim().length > 0, undefined, { timeout: 15000 });
       const oldErr = await page.evaluate(() => document.getElementById('authError').textContent.trim());
-      check('B6 旧密码登录失败（有错误提示）', oldErr.length > 0, `authError=${oldErr}`);
+      check('B6 旧密码登录失败（有错误提示）', oldErr.length > 0 && !oldErr.includes('密码已修改'), `authError=${oldErr}`);
       await page.fill('#authEmail', EMAIL);
       await page.fill('#authPassword', NEW_PWD); // 新密码
       await page.click('#authLoginBtn');
@@ -381,21 +388,22 @@ async function cleanup() {
       await page.screenshot({ path: path.join(SHOT_DIR, 'avatar-menu.png') });
       await page.evaluate(() => userMenuClose());
 
-      // C5 改名：数字段不变、名字部分跟随（卡片 + 菜单头）
+      // C5 改名：数字段不变、名字部分跟随——卡片 + 菜单头 + topbar 昵称
+      // （BUG-072，2026-08-11 验收修复小包：保存链路内即时刷新全部显示点，不再需手动 loadUserProfile/重进用户中心）
       await page.evaluate(async () => { await openUserCenter(); switchUserTab('profile'); });
       await sleep(600);
       await page.fill('#ucDisplayName', 'T29新名');
       await page.click('button[onclick="saveUserProfile()"]');
-      await sleep(1500); // alert 由 dialog 监听自动 accept；updateCloudUI 即时刷新菜单头
-      await page.evaluate(async () => { await loadUserProfile(); }); // 卡片文本随资料重载
-      await sleep(500);
+      await sleep(2000); // alert 由 dialog 监听自动 accept；BUG-072 修复后保存即刷卡片/菜单头/topbar
       const c5 = await page.evaluate(() => ({
         card: document.getElementById('ucPlayerIdText').textContent,
         menuPid: document.getElementById('userMenuHeadId').textContent,
         menuName: document.getElementById('userMenuHeadName').textContent,
+        topbar: document.getElementById('userNickname').textContent,
+        input: document.getElementById('ucDisplayName').value,
       }));
-      check('C5 改名「T29新名」：卡片与菜单头名字跟随、数字段不变',
-        c5.card === `T29新名#${tag}` && c5.menuPid === `T29新名#${tag}` && c5.menuName === 'T29新名', JSON.stringify(c5));
+      check('C5 改名「T29新名」：卡片/菜单头/topbar/输入框即时跟随（BUG-072）、数字段不变',
+        c5.card === `T29新名#${tag}` && c5.menuPid === `T29新名#${tag}` && c5.menuName === 'T29新名' && c5.topbar === 'T29新名' && c5.input === 'T29新名', JSON.stringify(c5));
       await page.evaluate(() => { snapshotModalForm('userCenterModal'); closeModal('userCenterModal'); });
       await sleep(300);
 

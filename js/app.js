@@ -693,7 +693,8 @@ async function copyPlayerId() {
   }
 }
 
-// REQ-094（任务书 #29 WP1）：修改密码——当前密码服务端校验 + 强度规则同注册 + 会话保持
+// REQ-094（任务书 #29 WP1）：修改密码——当前密码服务端校验 + 强度规则同注册
+// REQ-096（2026-08-11 验收修复小包，口径变更推翻任务书 #29 WP1「会话保持」裁定）：改密成功 → 提示 → 强制登出回登录页
 async function changePassword() {
   const cur = document.getElementById('ucPwCurrent').value;
   const nw = document.getElementById('ucPwNew').value;
@@ -717,13 +718,19 @@ async function changePassword() {
     // 当前密码服务端校验（独立 token 端点，不触碰当前会话）
     const curOk = await window.CloudSync.verifyCurrentPassword(cur);
     if (!curOk) { showHint('当前密码错误'); return; }
-    await window.CloudSync.updatePassword(nw); // 官方保持当前会话，不登出不刷新
+    await window.CloudSync.updatePassword(nw);
+    // REQ-096：改密成功 → toast/登录页提示「密码已修改，请重新登录」→ 强制登出，旧会话即刻失效。
+    // 登出走全站唯一 logout 路径 handleSignOut（清会话/公会态 + 全弹窗出栈 + 回登录页 + 按钮状态机复位）。
     document.getElementById('ucPwCurrent').value = '';
     document.getElementById('ucPwNew').value = '';
     document.getElementById('ucPwConfirm').value = '';
     updatePwStrength('uc');
     showHint('');
-    showToast('密码已修改', 'success');
+    showToast('密码已修改，请重新登录', 'success');
+    await handleSignOut();
+    showLoginForm(); // showAuthView 只显遮罩，表单停留在上次状态——强制回登录表单
+    // toast 容器在应用视图内、登出后随之隐藏，登录页落持久提示（绿色语义）
+    showAuthNotice('密码已修改，请重新登录');
   } catch (e) {
     console.error('修改密码失败:', e);
     showHint('修改失败：' + (e.message || '未知错误'));
@@ -740,6 +747,10 @@ async function saveUserProfile() {
   try {
     await window.CloudSync.saveUserProfile({ display_name: displayName });
     // 任务书 #21 WP1-④：改名后右上角立即生效，不依赖重新登录
+    // BUG-072（2026-08-11 验收修复小包）：改名刷新链断在 render 环——玩家ID卡/页内昵称只在
+    // 进入用户中心时渲染。补环（禁整页 reload）：loadUserProfile 重读服务端用户刷用户中心
+    // 顶部玩家ID卡与页内昵称输入；updateCloudUI 刷 topbar 昵称/头像 + 头像菜单头（昵称+玩家ID）
+    await loadUserProfile();
     updateCloudUI();
     // 任务书 #22 WP3-④：同步本人所有公会 guild_members.display_name 快照（他人视角显示新名）
     let syncWarn = '';
@@ -1296,7 +1307,13 @@ function formatDate(d) {
 // 显示认证错误
 function showAuthError(msg) {
   const el = document.getElementById('authError');
-  if (el) el.textContent = msg;
+  if (el) { el.textContent = msg; el.style.color = ''; } // 颜色复位，避免盖过 REQ-096 成功级提示的覆写
+}
+
+// REQ-096：登录页成功级提示（改密强制重新登录等场景），复用 authError 元素、绿色语义
+function showAuthNotice(msg) {
+  const el = document.getElementById('authError');
+  if (el) { el.textContent = msg; el.style.color = 'var(--success)'; }
 }
 
 // BUG-009：Supabase Auth 英文错误 → 中文提示映射
@@ -6776,6 +6793,32 @@ function lootFillAssignedTo(name) {
 // ==================== 更新日志 ====================
 const changelogData = [
   {
+    id: 'v3.2.0-req096-force-relogin',
+    version: 'v3.2.0',
+    date: '2026-08-11',
+    type: 'improve',
+    typeLabel: '功能优化',
+    title: '改密成功后强制重新登录（验收修复小包，REQ-096）',
+    summary: '修改密码成功后旧会话即刻失效：提示「密码已修改，请重新登录」并自动登出回登录页，新密码可正常登录。本口径推翻任务书 #29 WP1 的「会话保持」裁定。',
+    details: [
+      '登出走全站唯一 logout 路径：清理会话与公会态、全弹窗出栈、回登录页、登录按钮状态机复位',
+      'toast 容器随应用视图隐藏，登录页同步落持久提示（绿色）；注册/登录按钮与强度条组件零改动'
+    ]
+  },
+  {
+    id: 'v3.2.0-bug072-rename-refresh',
+    version: 'v3.2.0',
+    date: '2026-08-11',
+    type: 'fix',
+    typeLabel: '修复BUG',
+    title: '改名后昵称显示即时刷新（验收修复小包，BUG-072）',
+    summary: '用户中心修改显示名称成功后，顶部玩家ID卡（昵称部分）、页内昵称、右上角头像菜单与 topbar 昵称全部即时更新为新值，无需重进用户中心或刷新页面；F5 后不回落。',
+    details: [
+      '断点定位（DB-first 逐环核对）：改名写入与本地缓存更新正常，断在 render 环——玩家ID卡只在进入用户中心时渲染，保存后未重渲',
+      '修法：保存成功后重读服务端用户并同步刷新全部显示点（用户中心卡片/昵称输入、topbar、头像菜单头），不做整页 reload'
+    ]
+  },
+  {
     id: 'v3.2.0-bug070-reports-class-nowrap',
     version: 'v3.2.0',
     date: '2026-08-10',
@@ -6796,10 +6839,10 @@ const changelogData = [
     type: 'feature',
     typeLabel: '新增功能',
     title: '账号体系完善 A 组：注册密码强度 + 修改密码 + 玩家ID（任务书 #29 WP1，REQ-094）',
-    summary: '注册启用密码强度规则（≥8 位、须含字母和数字、拦截常见弱密码），输入实时显示弱/中/强三档强度条，不合规禁用提交；用户中心新增「修改密码」（当前密码服务端校验、改密后不掉线）；新增 BattleTag 风格玩家ID「昵称#5位数字」，用户中心顶部卡片一键复制，头像菜单昵称下方同步显示。',
+    summary: '注册启用密码强度规则（≥8 位、须含字母和数字、拦截常见弱密码），输入实时显示弱/中/强三档强度条，不合规禁用提交；用户中心新增「修改密码」（当前密码服务端校验；改密后会话策略后经 REQ-096 调整为强制重新登录，见同版「功能优化」条目）；新增 BattleTag 风格玩家ID「昵称#5位数字」，用户中心顶部卡片一键复制，头像菜单昵称下方同步显示。',
     details: [
       '强度三档：弱（不合规，红）/中（合规，黄）/强（合规且更长更复杂，绿），修改密码表单复用同一校验组件',
-      '修改密码：当前密码错误/强度不足/两次不一致均就地提示，成功 toast「密码已修改」，当前会话保持登录',
+      '修改密码：当前密码错误/强度不足/两次不一致均就地提示，成功 toast「密码已修改」（原「会话保持」口径已由 REQ-096 推翻：改密成功强制登出重新登录）',
       '玩家ID 数字段注册时随机分配、恒定不变，名字部分实时跟随改名；仅作展示识别，不参与任何鉴权与查重',
       '存量账号数字段由增量迁移统一补发（sql/25，运营执行）；登录时亦有幂等兜底分配'
     ]

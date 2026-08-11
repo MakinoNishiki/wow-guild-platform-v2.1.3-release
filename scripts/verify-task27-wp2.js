@@ -1,6 +1,8 @@
 // 任务书 #27-WP2 验证脚本：彻底删除放开 + 历史保全 + 垃圾桶 + 统计口径 + 离队回归
 // 前置：sql/17 已在真实库执行（member_name 列 / SET NULL 外键 / deleted_raid_members 表）
 // 用法：node scripts/verify-task27-wp2.js
+// 2026-08-11（验收修复小包 BUG-072+REQ-096 回归期）：三处写后固定 sleep 改条件等待——实测删除链路
+//   远端代理写耗时 3.6s 超出原 2.5s 固定窗口致假红（HEAD 未改动代码同病复现），断言本身零改动零放宽。
 const fs = require('fs');
 const path = require('path');
 const { spawn } = require('child_process');
@@ -145,7 +147,11 @@ function assert(cond, label, detail) {
   assert(btnEnabled === false, '输全名后确认按钮启用');
   await page.screenshot({ path: path.join(SHOT_DIR, '01-harddelete-modal.png') });
   await page.click('#hardDeleteConfirmBtn');
-  await sleep(2500);
+  // 条件等待（替代固定 2.5s sleep）：等删除结果 toast 出现，成功/失败都放行给下方断言判定
+  await page.waitForFunction(() => {
+    const ts = [...document.querySelectorAll('#toastContainer .toast')];
+    return ts.some(t => t.textContent.includes('已彻底删除') || t.textContent.includes('彻底删除失败'));
+  }, undefined, { timeout: 30000, polling: 500 }).catch(() => {});
   const toast1 = await page.evaluate(() => {
     const ts = [...document.querySelectorAll('#toastContainer .toast')];
     return ts.length ? ts[ts.length - 1].textContent : '';
@@ -221,7 +227,12 @@ function assert(cond, label, detail) {
   await sleep(800);
   const m4row = page.locator('#membersTableBody tr', { hasText: '零历史' }).first();
   await m4row.locator('button.danger').click();
-  await sleep(2500); // 原生 confirm 由 dialog 监听自动 accept
+  // 条件等待（替代固定 2.5s sleep）：轮询 DB 直至 零历史 行消失（原生 confirm 由 dialog 监听自动 accept）
+  for (let i = 0; i < 60; i++) {
+    const chk = await svc('GET', `/rest/v1/raid_members?guild_id=eq.${guildId}&name=eq.零历史&select=id`);
+    if (Array.isArray(chk.body) && chk.body.length === 0) break;
+    await sleep(500);
+  }
   const rm4 = await svc('GET', `/rest/v1/raid_members?guild_id=eq.${guildId}&name=eq.零历史&select=id`);
   assert(rm4.body.length === 0, '0 历史成员已彻底删除');
   const trash4 = await svc('GET', `/rest/v1/deleted_raid_members?guild_id=eq.${guildId}&name=eq.零历史&select=history_counts`);
@@ -232,7 +243,12 @@ function assert(cond, label, detail) {
   console.log('—— 场景③：离队软删不回归 ——');
   const m5row = page.locator('#membersTableBody tr', { hasText: '离队回归' }).first();
   await m5row.locator('button[title="离队"]').click(); // 🚪 离队（原生 confirm 由 dialog 监听自动 accept）
-  await sleep(2000);
+  // 条件等待（替代固定 2s sleep）：轮询 DB 直至 status=离队
+  for (let i = 0; i < 60; i++) {
+    const chk = await svc('GET', `/rest/v1/raid_members?guild_id=eq.${guildId}&name=eq.离队回归&select=id,status`);
+    if (Array.isArray(chk.body) && chk.body[0] && chk.body[0].status === '离队') break;
+    await sleep(500);
+  }
   const rm5 = await svc('GET', `/rest/v1/raid_members?guild_id=eq.${guildId}&name=eq.离队回归&select=id,status`);
   assert(rm5.body.length === 1 && rm5.body[0].status === '离队', '离队路径：行保留、status=离队', JSON.stringify(rm5.body));
   const att5 = await svc('GET', `/rest/v1/activity_attendance?activity_id=eq.${A1.id}&member_name=eq.离队回归&select=member_id,member_name`);

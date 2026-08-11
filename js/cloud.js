@@ -272,7 +272,9 @@
     }
   }
 
-  // 修改密码：supabase-js updateUser 官方保持当前会话（不登出、不刷新页面）
+  // 修改密码：supabase-js updateUser 本身保持当前会话；
+  // REQ-096（2026-08-11 口径变更，推翻任务书 #29 WP1「会话保持」）：改密后须强制重新登录——
+  // 由调用方（app.js changePassword）在成功后走 handleSignOut 全站唯一 logout 路径，本层不登出
   async function updatePassword(newPassword) {
     const client = await initSupabase();
     if (!client) throw new Error('云端服务不可用');
