@@ -823,6 +823,26 @@ body {
   font-weight: 600;
 }
 
+/* REQ-100（任务书 #32 F1）：最近活动状态徽标——已取消条目整体灰化降饱和 + 高对比实色徽标 */
+.recent-item .tag { margin-left: 8px; }
+.recent-item.recent-cancelled {
+  opacity: 0.55;
+  filter: saturate(0.5);
+}
+.recent-item.recent-cancelled:hover { transform: none; }
+.recent-status-cancelled {
+  background: var(--danger);
+  color: #fff;
+}
+
+/* REQ-100（任务书 #32 F2）：dashboard 跳转定位高亮——复用 .activity-item 既有 transition: all 0.2s，
+   加/去类均走同一过渡路径，出现/消退双向对称（零新增 JS 动画） */
+.activity-item.activity-jump-highlight {
+  border-color: var(--gold);
+  background: rgba(240, 192, 96, 0.08);
+  box-shadow: 0 0 0 2px rgba(240, 192, 96, 0.55), 0 0 18px rgba(240, 192, 96, 0.25);
+}
+
 /* 排行榜 */
 .rank-list { display: flex; flex-direction: column; gap: 8px; }
 

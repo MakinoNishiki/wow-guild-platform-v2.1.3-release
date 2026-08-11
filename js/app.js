@@ -2080,6 +2080,43 @@ function renderCurrentPage() {
   }
 }
 
+// ==================== REQ-100（任务书 #32 F2）：dashboard 最近活动点击 → 考勤 tab 定位高亮 ====================
+// 决策①（运营放行）：跳转当次自动勾选「含已取消」+ 清空其余筛选，只动当次筛选态（不写任何存储）；
+//   跳转成功不弹 toast；「该活动已被删除」toast 严格限定 appData 真不存在的场景。
+// 决策②（运营放行）：当次强制列表视图渲染定位——不落记忆键、不改写用户视图偏好（BUG-023 记忆逻辑零改动），
+//   用户事后手动切日历视图行为与现状完全一致。
+function gotoActivityInAttendance(activityId) {
+  const exists = appData.activities.some(a => a.id === activityId);
+  switchPage('attendance');
+  if (!exists) {
+    // 真删除：落 tab 顶部 + toast（严格限定此场景）
+    const main = document.getElementById('mainContent');
+    if (main) main.scrollTop = 0;
+    showToast('该活动已被删除', 'warning');
+    return;
+  }
+  // 决策①：当次筛选态复位 + 含已取消（DOM 与 attFilter 对象经 attFilterChange 同步，保证目标卡片必渲染）
+  document.getElementById('attFilterMember').value = '';
+  document.querySelectorAll('#attFilterStatuses input').forEach(cb => { cb.checked = false; });
+  document.getElementById('attFilterRange').value = 'all';
+  document.getElementById('attFilterFrom').value = '';
+  document.getElementById('attFilterTo').value = '';
+  document.getElementById('attFilterIncludeCancelled').checked = true;
+  attFilterChange(); // 内部重读 DOM → 同步 attFilter → renderActivityList
+  // 决策②：当次强制列表视图（手动同步 tab/容器显隐，不碰 getAttendanceView 记忆键）
+  document.querySelectorAll('.view-tab').forEach((tab, i) => {
+    tab.classList.toggle('active', i === 1); // i=1 为列表视图 tab
+  });
+  document.getElementById('calendarView').style.display = 'none';
+  document.getElementById('listView').style.display = 'block';
+  // 定位 + 高亮 1.8s（卡片标识 = data-activity-id，renderActivityList 渲染）
+  const card = document.querySelector(`#activityList .activity-item[data-activity-id="${activityId}"]`);
+  if (!card) { console.warn('[REQ-100] 活动存在但卡片未渲染（异常兜底，静默）:', activityId); return; }
+  card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  card.classList.add('activity-jump-highlight');
+  setTimeout(() => card.classList.remove('activity-jump-highlight'), 1800);
+}
+
 // ==================== 提示消息 ====================
 function showToast(message, type = 'info') {
   const container = document.getElementById('toastContainer');
@@ -2364,10 +2401,14 @@ function renderDashboard() {
   const recent = [...activities].sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 5);
   const recentHtml = recent.length ? recent.map(a => {
     const presentCount = a.attendees.filter(att => att.status === '出席' || att.status === '替补' || att.status === '迟到').length;
+    // REQ-100（任务书 #32 F1）：状态徽标一级可见——判定来源 = 既有 activities.status（REQ-020），禁新造语义；
+    // 已取消条目整体灰化降饱和 + 「已取消」高对比实色徽标
+    const isCancelled = a.status === 'cancelled';
+    // REQ-100（任务书 #32 F2）：区域纯预览——条目无操作按钮，点击跳转考勤 tab 定位高亮（不再开考勤详情弹窗）
     return `
-      <div class="recent-item" onclick="openAttendanceDetail('${a.id}')">
+      <div class="recent-item${isCancelled ? ' recent-cancelled' : ''}" onclick="gotoActivityInAttendance('${a.id}')">
         <div>
-          <div class="recent-date">${a.date}</div>
+          <div class="recent-date">${a.date} <span class="tag ${isCancelled ? 'recent-status-cancelled' : 'tag-green'}">${isCancelled ? '已取消' : '正常'}</span></div>
           <div class="recent-raid">${a.raid_name}</div>
         </div>
         <div class="recent-count">${presentCount} 人</div>
@@ -4014,7 +4055,7 @@ function renderActivityList() {
       : '';
 
     return `
-      <div class="activity-item${isCancelled ? ' activity-cancelled' : ''}${conflicts.length ? ' activity-conflict' : ''}"${conflictTitle ? ` title="${conflictTitle}"` : ''} onclick="openAttendanceDetail('${a.id}')">
+      <div class="activity-item${isCancelled ? ' activity-cancelled' : ''}${conflicts.length ? ' activity-conflict' : ''}" data-activity-id="${a.id}"${conflictTitle ? ` title="${conflictTitle}"` : ''} onclick="openAttendanceDetail('${a.id}')">
         <input type="checkbox" class="activity-select-checkbox" title="选择" ${activitySelectedIds.has(a.id) ? 'checked' : ''}
                onclick="event.stopPropagation()" onchange="activityToggleSelect('${a.id}', this.checked)">
         <div class="activity-info">
@@ -6792,6 +6833,20 @@ function lootFillAssignedTo(name) {
 // ==================== 初始化 ====================
 // ==================== 更新日志 ====================
 const changelogData = [
+  {
+    id: 'v3.2.0-req100-dashboard-recent',
+    version: 'v3.2.0',
+    date: '2026-08-11',
+    type: 'improve',
+    typeLabel: '功能优化',
+    title: '仪表盘「最近活动」状态徽标 + 只读预览跳转考勤（任务书 #32，REQ-100）',
+    summary: '仪表盘「最近活动」每个条目一级显示状态徽标（正常/已取消，取消判定用既有 activities.status 字段），已取消条目整体灰化降饱和、徽标高对比实色；条目改为纯预览（原点击开考勤详情弹窗已移除），点击跳转考勤记录 tab 并滚动定位、高亮该活动 1.8s；活动已删除时落考勤 tab 顶部并提示「该活动已被删除」。',
+    details: [
+      '跳转当次自动勾选「含已取消」并清空其余筛选（只动当次筛选态），强制列表视图渲染定位但不改写用户视图偏好记忆',
+      '删除活动后 dashboard 条目联动消失（既有刷新链完整，删除→重读→切页重渲），本包实测闭环含 F5',
+      '只动显示层与跳转：考勤业务逻辑、数据表、RLS 零改动'
+    ]
+  },
   {
     id: 'v3.2.0-req096-force-relogin',
     version: 'v3.2.0',
