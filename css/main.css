@@ -3824,6 +3824,23 @@ body.viewer-mode #memberSelectAll {
   white-space: nowrap;
 }
 
+/* BUG-071（任务书 #33）：报表「已删除」伪行徽标折行致行高 59px（正常行 45-46px）。
+   根因 = 1366 档表格 auto 布局分给名字列的宽度 < 名字+空格+徽标 min-content，
+   td 默认 white-space:normal 于名字与徽标间的空格处折行（徽标掉第二行，实测 top 差 16px=一整行）。
+   修法（最小选择器，只作用伪行名字单元格 .rank-deleted-name，正常行零触及）：
+   ① td nowrap 保徽标与名字同行；② 徽标紧凑化（字号/内距收紧）+ 名字与徽标间折行空格改 4px 外边距，
+   压回名字列 min-content，保 BUG-058 的 468=468 无横滚（verify-bug071.js 逐值断言兜底）。 */
+#page-reports .stats-rank-table td.rank-deleted-name {
+  white-space: nowrap;
+  padding-right: 0; /* 右内距让位（徽标是本行最后元素，左缘对齐不变） */
+}
+#page-reports .stats-rank-table td.rank-deleted-name .tag-grey {
+  height: 17px;
+  padding: 0 3px;
+  font-size: 10px;
+  margin-left: 3px;
+}
+
 /* ==================== 任务书 #13 REQ-045：冲突信息直显 ==================== */
 .activity-conflict-line {
   color: var(--warning);

@@ -4927,13 +4927,15 @@ function renderReports() {
     tbody.innerHTML = rankings.map((item, i) => {
       const cls = classMap[item.member.class] || '';
       // 已删除伪成员：名字灰色黯淡 + 「已删除」小徽标，职业列无数据
+      // BUG-071（任务书 #33）：伪行名字 td 加 rank-deleted-name 专属类（徽标折行修最小选择器锚点，文案/语义零改动）；
+      // 名字与徽标间的折行空格去掉（间距由徽标 margin-left 承担，压缩名字列 min-content 保 468 无横滚）
       const nameHtml = item.member.deleted
-        ? `<span class="member-departed" style="font-weight:500">${item.member.name}</span> <span class="tag tag-grey">已删除</span>`
+        ? `<span class="member-departed" style="font-weight:500">${item.member.name}</span><span class="tag tag-grey">已删除</span>`
         : `<span style="font-weight:500">${item.member.name}</span>`;
       return `
         <tr>
           <td><div class="rank-num" style="margin:auto">${i + 1}</div></td>
-          <td class="class-${cls}">${nameHtml}</td>
+          <td class="class-${cls}${item.member.deleted ? ' rank-deleted-name' : ''}">${nameHtml}</td>
           <td>${item.member.class || '—'}</td>
           <td style="color:var(--success)">${item.present}</td>
           <td style="color:var(--info)">${item.sub}</td>
@@ -6833,6 +6835,20 @@ function lootFillAssignedTo(name) {
 // ==================== 初始化 ====================
 // ==================== 更新日志 ====================
 const changelogData = [
+  {
+    id: 'v3.2.0-bug071-reports-deleted-row-height',
+    version: 'v3.2.0',
+    date: '2026-08-11',
+    type: 'fix',
+    typeLabel: '修复BUG',
+    title: '报表「已删除」伪行行高修正（任务书 #33，BUG-071）',
+    summary: '统计报表出勤率排名表中，已删除角色伪行的「已删除」徽标不再折行：伪行行高与正常数据行一致（1366 档实测同高 45-46px），徽标与名字同行。',
+    details: [
+      '根因：1366 档表格自动布局分给名字列的宽度不足以同放名字与徽标，徽标在空格处折行使行高增高',
+      '修法仅限伪行最小选择器（rank-deleted-name）：名字单元格不折行 + 徽标紧凑化，正常数据行零触及，徽标文案与判定语义未动',
+      '1366 档表格无横向滚动条（BUG-058）、职业列两字单行（BUG-070）逐值复测零回退'
+    ]
+  },
   {
     id: 'v3.2.0-req100-dashboard-recent',
     version: 'v3.2.0',
