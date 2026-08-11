@@ -1,6 +1,8 @@
 // 任务书 #35 验证（BUG 包：BUG-074 批量工具条双功能 + BUG-073 公会卡服务器名竞态）：
 //   A. WP2 BUG-073：20 次混合采样（F5 reload ×6 / 切页往返 ×6 / 切换公会往返 ×8）#guildName 逐次恒定
-//      =「公会名 (服务器)」+ #guildBarName 同值 + §2 computed 可见性断言；
+//      =「公会名 (服务器)」+ §2 computed 可见性断言；
+//      （REQ-103，任务书 #36 WP4：#guildBarName 随侧栏公会行整行移除——采样断言改 #guildName 单点，
+//        元素移除零残留由 verify-task36 兜底，属裁定驱动适配）
 //   B. WP1 BUG-074：工具条三钮布局、全选覆盖全部渲染行（REQ-049 对齐口径）、批量离队活跃行生效+
 //      已离队跳过 toast 注明、批量真删混合行（输「彻底删除」四字解锁）→ 行消失 + 考勤/装备 SET NULL
 //      快照灰显「已删除」+ 心愿级联清空 + 垃圾桶逐行在案含 history_counts、未输四字按钮禁用；
@@ -169,7 +171,7 @@ async function cleanup() {
     const NAME_B = 'T35A公会乙 (回音山)';
     const readNames = () => page.evaluate(() => ({
       sub: document.getElementById('guildName').textContent,
-      bar: document.getElementById('guildBarName').textContent,
+      barGone: !document.getElementById('guildBarName'), // REQ-103（任务书 #36）：公会行已移除，元素应不存在
       subVisible: getComputedStyle(document.getElementById('guildName')).display !== 'none',
     }));
     const samples = [];
@@ -198,10 +200,10 @@ async function cleanup() {
       await sleep(1800);
       samples.push([`切会#${i + 1}`, await readNames(), await expectOf()]);
     }
-    const bad = samples.filter(([, n, exp]) => n.sub !== exp || n.bar !== exp || !n.subVisible);
-    check('A1 20 次混合采样（F5×5+切页×6+切会×8+首载）#guildName/#guildBarName 逐次恒定 =「公会名 (服务器)」',
+    const bad = samples.filter(([, n, exp]) => n.sub !== exp || !n.barGone || !n.subVisible);
+    check('A1 20 次混合采样（F5×5+切页×6+切会×8+首载）#guildName 逐次恒定 =「公会名 (服务器)」（REQ-103 后 #guildBarName 不存在）',
       samples.length === 20 && bad.length === 0,
-      bad.length ? `不一致: ${bad.map(([t, n, e]) => `${t}[${n.sub}|${n.bar}]期望${e}`).join(' ; ')}` : `20/20 恒定（§2 computed 可见性同步断言）`);
+      bad.length ? `不一致: ${bad.map(([t, n, e]) => `${t}[${n.sub}]期望${e}`).join(' ; ')}` : `20/20 恒定（§2 computed 可见性同步断言）`);
     await page.screenshot({ path: path.join(SHOT_DIR, 'a-guild-card.png') });
     // 确保回到甲公会进行 WP1
     await page.evaluate((gid) => handleSwitchGuild(gid), guildA);

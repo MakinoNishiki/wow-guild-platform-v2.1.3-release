@@ -4,12 +4,12 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>魔兽管家</title>
-<!-- 静态资源版本号：20260811.46（任务书 #22 WP3-②：凡改动 js/css 的 commit 必须同步递增此处与所有 ?v= 查询串，见 docs/开发规范.md 第五章） -->
+<!-- 静态资源版本号：20260811.47（任务书 #22 WP3-②：凡改动 js/css 的 commit 必须同步递增此处与所有 ?v= 查询串，见 docs/开发规范.md 第五章） -->
 <link rel="icon" type="image/png" sizes="32x32" href="assets/brand/favicon-32.png">
 <link rel="icon" type="image/png" sizes="16x16" href="assets/brand/favicon-16.png">
-<link rel="stylesheet" href="css/main.css?v=20260811.46">
-<link rel="stylesheet" href="css/data-public.css?v=20260811.46"><!-- 任务书 #28 WP5：副本掉落 tab（选择器全 .dp- 前缀 + #page-lootdrop 作用域，零泄漏） -->
-<script src="assets/vendor/supabase-js-2.js?v=20260811.46"></script>
+<link rel="stylesheet" href="css/main.css?v=20260811.47">
+<link rel="stylesheet" href="css/data-public.css?v=20260811.47"><!-- 任务书 #28 WP5：副本掉落 tab（选择器全 .dp- 前缀 + #page-lootdrop 作用域，零泄漏） -->
+<script src="assets/vendor/supabase-js-2.js?v=20260811.47"></script>
 </head>
 <body>
 
@@ -109,20 +109,8 @@
         <div class="sidebar-subtitle" id="guildName">未加入公会</div>
       </div>
     </div>
-    <!-- 公会信息栏 -->
-    <div class="guild-bar" id="guildBar" style="display:none">
-      <div class="guild-bar-info">
-        <span class="guild-bar-name" id="guildBarName"></span>
-        <span class="guild-bar-role" id="guildRole"></span>
-      </div>
-      <div class="guild-bar-actions">
-        <button class="user-center-btn" onclick="openUserCenter()" title="用户中心">
-          👤
-          <span class="notif-dot"></span>
-        </button>
-        <button class="guild-bar-btn" onclick="openGuildSettings()" title="公会设置">⚙</button>
-      </div>
-    </div>
+    <!-- REQ-103（任务书 #36 WP4）：侧栏公会行已整行移除——切换公会/公会设置唯一入口=用户中心公会卡；
+         左上角公会卡（品牌+#guildName 名称行）纯展示，无交互（WP3：现状即满足，零改动） -->
     <nav class="nav-menu">
       <div class="nav-item active" data-page="dashboard" onclick="switchPage('dashboard')">
         <span class="nav-icon">📊</span><span>仪表盘</span>
@@ -159,10 +147,11 @@
       </div>
       <div class="nav-item" onclick="openUserCenter()">
         <span class="nav-icon">👤</span><span>用户中心</span>
+        <!-- REQ-103（任务书 #36 WP4 附加）：未读通知点宿主迁自侧栏公会行 👤 按钮，显隐条件与数据源零变化 -->
+        <span class="notif-dot nav-notif-dot" id="navNotifDot"></span>
       </div>
     </nav>
     <div class="sidebar-footer">
-      <div id="sidebarUser"></div>
       <div style="margin-top:4px" id="appVersion">v3.2.0</div>
     </div>
   </aside>
@@ -193,14 +182,8 @@
             <span class="user-menu-caret">▾</span>
           </button>
           <div class="user-menu-dropdown" id="userMenuDropdown" style="display:none">
-            <!-- REQ-094（任务书 #29 WP1）：菜单头部——昵称 + 玩家ID 小字（放下拉内，topbar 触发行一行结构不动） -->
-            <div class="user-menu-head" id="userMenuHead" style="display:none">
-              <div class="user-menu-head-name" id="userMenuHeadName"></div>
-              <div class="user-menu-head-id" id="userMenuHeadId"></div>
-            </div>
-            <div class="user-menu-item" onclick="userMenuAction('center')">👤 用户中心</div>
-            <div class="user-menu-item" onclick="userMenuAction('switch')">🏰 切换公会</div>
-            <div class="user-menu-divider"></div>
+            <!-- REQ-103（任务书 #36 WP2）：菜单精简只留退出登录；REQ-094 头部与其他菜单项移除——
+                 玩家ID主展示=用户中心卡，用户中心/切换公会入口迁用户中心公会卡 -->
             <div class="user-menu-item user-menu-item-danger" onclick="userMenuAction('logout')">🚪 退出登录</div>
           </div>
         </div>
@@ -1710,6 +1693,18 @@
         <button class="modal-close" onclick="closeModal('userCenterModal')">&times;</button>
       </div>
       <div class="modal-body">
+        <!-- REQ-103（任务书 #36 WP1）：公会卡置顶——唯一入口（公会名+服务器复用 guildDisplayName 真源 · 我的角色徽标 ·
+             公会设置/切换公会两按钮复用现有 modal，零新造弹窗） -->
+        <div class="uc-guild-card" id="ucGuildCard" style="display:none">
+          <div class="uc-guild-card-info">
+            <span class="uc-guild-card-name" id="ucGuildCardName"></span>
+            <span class="role-badge" id="ucGuildCardRole" style="display:none"></span>
+          </div>
+          <div class="uc-guild-card-actions">
+            <button class="uc-btn uc-btn-secondary" onclick="openGuildSettings()">⚙ 公会设置</button>
+            <button class="uc-btn uc-btn-secondary" onclick="openGuildSwitcher()">🏰 切换公会</button>
+          </div>
+        </div>
         <!-- REQ-094（任务书 #29 WP1）：玩家ID 顶部卡片（昵称#5位数字 + 一键复制；数字段恒定、名字部分跟随改名） -->
         <div class="uc-playerid-card" id="ucPlayerIdCard" style="display:none">
           <span class="uc-playerid-label">玩家ID</span>
@@ -1929,14 +1924,14 @@
   </div>
 </div>
 
-<script src="js/cloud.js?v=20260811.46"></script>
+<script src="js/cloud.js?v=20260811.47"></script>
 <!-- 任务书 #14：主数据层（快照兜底 + 加载层），须在 app.js 之前 -->
-<script src="js/masterDataSnapshot.js?v=20260811.46"></script>
-<script src="js/masterData.js?v=20260811.46"></script>
+<script src="js/masterDataSnapshot.js?v=20260811.47"></script>
+<script src="js/masterData.js?v=20260811.47"></script>
 <!-- 任务书 #22 WP2：职业/专精/职责图标集中映射（全站唯一取图处） -->
-<script src="js/iconMap.js?v=20260811.46"></script>
+<script src="js/iconMap.js?v=20260811.47"></script>
 <!-- 任务书 #28 WP5：副本掉落渲染层（双壳同源；无 data-public-body 不自动启动，由 app.js 懒挂载，须在 app.js 之前） -->
-<script src="js/dataPublic.js?v=20260811.46"></script>
-<script src="js/app.js?v=20260811.46"></script>
+<script src="js/dataPublic.js?v=20260811.47"></script>
+<script src="js/app.js?v=20260811.47"></script>
 </body>
 </html>

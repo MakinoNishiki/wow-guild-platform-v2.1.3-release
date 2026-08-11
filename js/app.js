@@ -644,6 +644,25 @@ async function unclaimFromCenter(memberId, memberName) {
   await loadMyClaims();
 }
 
+// REQ-103（任务书 #36 WP1）：用户中心公会卡渲染——名称复用 guildDisplayName 真源（BUG-073），
+// 我的角色徽标复用 roleLabels/着色；两按钮复用现有 guildSettingsModal/guildSwitcherModal（modalStack 叠开置顶为既有机制）
+function renderUcGuildCard() {
+  const card = document.getElementById('ucGuildCard');
+  if (!card) return;
+  const guild = window.CloudSync && window.CloudSync.getCurrentGuild ? window.CloudSync.getCurrentGuild() : null;
+  const membership = window.CloudSync && window.CloudSync.getCurrentMembership ? window.CloudSync.getCurrentMembership() : null;
+  if (!guild) { card.style.display = 'none'; return; }
+  card.style.display = '';
+  document.getElementById('ucGuildCardName').textContent = guildDisplayName(guild);
+  const roleEl = document.getElementById('ucGuildCardRole');
+  if (roleEl && membership) {
+    const roleLabels = { owner: '会长', editor: '编辑', viewer: '浏览' };
+    roleEl.textContent = roleLabels[membership.role] || membership.role;
+    roleEl.className = `role-badge role-${membership.role}`;
+    roleEl.style.display = '';
+  }
+}
+
 // 加载用户资料
 async function loadUserProfile() {
   try {
@@ -657,6 +676,9 @@ async function loadUserProfile() {
     // user_profiles.display_name 仅为存量数据回退展示（不再写入）
     const metaName = user.user_metadata && user.user_metadata.display_name;
     document.getElementById('ucDisplayName').value = metaName || (profile && profile.display_name) || '';
+
+    // REQ-103（任务书 #36 WP1）：用户中心公会卡（置顶，唯一入口）
+    renderUcGuildCard();
 
     // REQ-094（任务书 #29 WP1）：玩家ID 顶部卡片（名字部分跟随改名、数字段恒定）
     const pid = window.CloudSync.getPlayerId ? window.CloudSync.getPlayerId() : '';
@@ -1158,8 +1180,9 @@ async function loadNotifications() {
       }
     }
     
-    // 更新侧边栏通知点
-    const notifDot = document.querySelector('.user-center-btn .notif-dot');
+    // 更新侧边栏通知点（REQ-103，任务书 #36 WP4 附加：宿主由侧栏公会行 👤 按钮迁至 nav「用户中心」项，
+    // 显隐条件与数据源零变化，只换宿主）
+    const notifDot = document.getElementById('navNotifDot');
     if (notifDot) {
       if (unreadCount > 0) {
         notifDot.classList.add('show');
@@ -1980,27 +2003,26 @@ function updatePermissionUI() {
 }
 
 // BUG-073（任务书 #35 WP2）：公会名称行单一拼接真源——server_name 空回退裸名（不出空括号）。
-// #guildName / #guildBarName 的全部写入点（本文件 updateCloudUI 两处 + cloud.js updateGuildUI）统一走它，
+// #guildName 的全部写入点（本文件 updateCloudUI + cloud.js updateGuildUI）统一走它，
 // 任何路径最后写入的都是同口径完整名，消除「裸名/完整名」双路径竞态。
+// REQ-103（任务书 #36 WP1）：用户中心公会卡名称同走此真源。
 function guildDisplayName(g) {
   if (!g) return '';
   return g.name + (g.server_name ? ` (${g.server_name})` : '');
 }
 
 // 更新云端模式 UI
+// REQ-103（任务书 #36）：侧栏公会行（guildBar）与头像菜单头部（userMenuHead）已移除——
+// 本函数不再写 #guildBar/#guildBarName/#guildRole/#userMenuHead*（元素不存在，零残留）
 function updateCloudUI() {
-  const guildBar = document.getElementById('guildBar');
   const userMenu = document.getElementById('userMenu');
-  const sidebarUser = document.getElementById('sidebarUser');
   const guildName = document.getElementById('guildName');
-  const userInfo = document.getElementById('userInfo');
 
   if (window.CloudSync && window.CloudSync.isCloudMode()) {
     const guild = window.CloudSync.getCurrentGuild();
     const membership = window.CloudSync.getCurrentMembership();
     const user = window.CloudSync.getCachedUser ? window.CloudSync.getCachedUser() : null;
 
-    if (guildBar) guildBar.style.display = guild ? '' : 'none';
     // REQ-044（任务书 #13）：头像菜单（昵称取显示名，缺省用邮箱前缀；头像=昵称首字圆形底）
     if (userMenu) {
       userMenu.style.display = '';
@@ -2010,16 +2032,6 @@ function updateCloudUI() {
       const avatarEl = document.getElementById('userAvatar');
       if (nickEl) nickEl.textContent = nickname;
       if (avatarEl) avatarEl.textContent = (nickname || '用').slice(0, 1);
-      // REQ-094（任务书 #29 WP1）：菜单下拉头部——昵称 + 玩家ID 小字（未分配时整头隐藏，不占布局）
-      const menuHead = document.getElementById('userMenuHead');
-      const playerId = window.CloudSync.getPlayerId ? window.CloudSync.getPlayerId() : '';
-      if (menuHead) {
-        menuHead.style.display = playerId ? '' : 'none';
-        if (playerId) {
-          document.getElementById('userMenuHeadName').textContent = nickname;
-          document.getElementById('userMenuHeadId').textContent = playerId;
-        }
-      }
     }
     if (guild && guildName) {
       // BUG-073：统一走 guildDisplayName 单一拼接真源（含服务器名，空回退裸名）
@@ -2027,12 +2039,6 @@ function updateCloudUI() {
     }
     if (membership) {
       const roleLabels = { owner: '会长', editor: '编辑', viewer: '浏览' };
-      const guildRole = document.getElementById('guildRole');
-      if (guildRole) {
-        guildRole.textContent = roleLabels[membership.role] || membership.role;
-        // BUG-018：按角色着色，一眼可见自己身份
-        guildRole.className = `guild-bar-role role-${membership.role}`;
-      }
       // BUG-020（任务书 #13-补遗）：头像菜单旁同步身份徽章
       const userRoleBadge = document.getElementById('userRoleBadge');
       if (userRoleBadge) {
@@ -2041,19 +2047,12 @@ function updateCloudUI() {
         userRoleBadge.style.display = '';
       }
     }
-    if (guild) {
-      const guildBarName = document.getElementById('guildBarName');
-      if (guildBarName) {
-        guildBarName.textContent = guildDisplayName(guild); // BUG-073：同一拼接真源
-      }
-    }
     const cloudSyncStatus = document.getElementById('cloudSyncStatus');
     if (cloudSyncStatus) cloudSyncStatus.textContent = '数据已云端同步';
     // 任务书 #14：数据中心 tab 仅超管可见（非超管不渲染）
     const navDc = document.getElementById('navDatacenter');
     if (navDc) navDc.style.display = (window.MasterData && MasterData.isSuperadmin()) ? '' : 'none';
   } else {
-    if (guildBar) guildBar.style.display = 'none';
     if (userMenu) userMenu.style.display = 'none';
   }
 }
@@ -2073,9 +2072,8 @@ function userMenuClose() {
 
 function userMenuAction(action) {
   userMenuClose();
-  if (action === 'center') openUserCenter();      // 用户中心（已有实页，直接接真实入口）
-  else if (action === 'switch') openGuildSwitcher(); // 逻辑不变，仅入口迁移
-  else if (action === 'logout') handleSignOut();     // 逻辑不变，仅入口迁移
+  // REQ-103（任务书 #36 WP2）：菜单只留退出登录；用户中心/切换公会入口迁用户中心公会卡
+  if (action === 'logout') handleSignOut();
 }
 
 // 点击外部关闭菜单
@@ -6973,6 +6971,20 @@ function lootFillAssignedTo(name) {
 // ==================== 初始化 ====================
 // ==================== 更新日志 ====================
 const changelogData = [
+  {
+    id: 'v3.2.0-req103-entry-consolidation',
+    version: 'v3.2.0',
+    date: '2026-08-11',
+    type: 'improve',
+    typeLabel: '功能优化',
+    title: '用户/公会入口整合：用户中心唯一入口·双卡同页（任务书 #36，REQ-103）',
+    summary: '用户中心页顶部新增公会卡：公会名（服务器）+ 我的角色徽标 +「公会设置」「切换公会」两入口（复用现有弹窗）；右上角头像菜单精简为仅「退出登录」；侧栏公会行整行移除，未读通知点迁至「用户中心」导航项；左上角品牌+公会名（服务器）保持纯展示。',
+    details: [
+      '玩家ID 主展示=用户中心卡（REQ-094 菜单头部口径随本包修订移除）',
+      '公会名显示统一走 BUG-073 归一的 guildDisplayName 真源；侧栏布局自然收拢零残留',
+      '通知点只换宿主（显隐条件与数据源零变化）'
+    ]
+  },
   {
     id: 'v3.2.0-bug074-batch-depart-delete',
     version: 'v3.2.0',

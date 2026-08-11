@@ -369,7 +369,9 @@ async function cleanup() {
       await page.waitForFunction(() => [...document.querySelectorAll('#toastContainer .toast')].some(t => t.textContent.includes('已复制')), undefined, { timeout: 8000 });
       check('C3 复制玩家ID → toast 含「已复制」', true, `toast 已复制 ${NICK}#${tag}`);
 
-      // C4 头像菜单：展开前后 trigger 高度不变 + 头部 昵称/玩家ID（先关用户中心弹窗，避免遮罩拦截点击）
+      // C4 头像菜单：展开前后 trigger 高度不变 + 下拉仅「退出登录」一项
+      // （REQ-103，任务书 #36 WP2 口径修订——菜单头部与用户中心/切换公会项已移除，玩家ID主展示=用户中心卡；
+      //   原「菜单头昵称+玩家ID」断言按新口径更新，属裁定驱动合法更新，非放宽）
       await page.evaluate(() => closeModal('userCenterModal'));
       await sleep(400);
       const h0 = await page.evaluate(() => document.getElementById('userMenuTrigger').offsetHeight);
@@ -378,32 +380,30 @@ async function cleanup() {
       const menu = await page.evaluate(() => ({
         h: document.getElementById('userMenuTrigger').offsetHeight,
         ddVisible: document.getElementById('userMenuDropdown').style.display === 'block',
-        headVisible: getComputedStyle(document.getElementById('userMenuHead')).display !== 'none',
-        name: document.getElementById('userMenuHeadName').textContent,
-        pid: document.getElementById('userMenuHeadId').textContent,
+        headGone: !document.getElementById('userMenuHead'),
+        items: [...document.querySelectorAll('#userMenuDropdown .user-menu-item')].map(i => i.textContent.trim()),
       }));
-      check('C4 头像菜单头：昵称+玩家ID 正确且 trigger 高度展开前后不变',
-        menu.ddVisible && menu.headVisible && menu.name === NICK && menu.pid === `${NICK}#${tag}` && menu.h === h0,
-        `name=${menu.name} pid=${menu.pid} h=${h0}→${menu.h}`);
+      check('C4 头像菜单：下拉仅「退出登录」一项（REQ-103）+ 头部已移除 + trigger 高度展开前后不变',
+        menu.ddVisible && menu.headGone && menu.items.length === 1 && menu.items[0].includes('退出登录') && menu.h === h0,
+        `items=${JSON.stringify(menu.items)} headGone=${menu.headGone} h=${h0}→${menu.h}`);
       await page.screenshot({ path: path.join(SHOT_DIR, 'avatar-menu.png') });
       await page.evaluate(() => userMenuClose());
 
-      // C5 改名：数字段不变、名字部分跟随——卡片 + 菜单头 + topbar 昵称
-      // （BUG-072，2026-08-11 验收修复小包：保存链路内即时刷新全部显示点，不再需手动 loadUserProfile/重进用户中心）
+      // C5 改名：数字段不变、名字部分跟随——卡片 + topbar trigger 昵称
+      // （BUG-072：保存链路内即时刷新全部显示点；REQ-103/任务书 #36：菜单头已移除，
+      //   跟随断言改 trigger 昵称（userNickname），玩家ID卡由 C2 兜底——裁定驱动更新，非放宽）
       await page.evaluate(async () => { await openUserCenter(); switchUserTab('profile'); });
       await sleep(600);
       await page.fill('#ucDisplayName', 'T29新名');
       await page.click('button[onclick="saveUserProfile()"]');
-      await sleep(2000); // alert 由 dialog 监听自动 accept；BUG-072 修复后保存即刷卡片/菜单头/topbar
+      await sleep(2000); // alert 由 dialog 监听自动 accept；BUG-072 修复后保存即刷卡片/topbar
       const c5 = await page.evaluate(() => ({
         card: document.getElementById('ucPlayerIdText').textContent,
-        menuPid: document.getElementById('userMenuHeadId').textContent,
-        menuName: document.getElementById('userMenuHeadName').textContent,
         topbar: document.getElementById('userNickname').textContent,
         input: document.getElementById('ucDisplayName').value,
       }));
-      check('C5 改名「T29新名」：卡片/菜单头/topbar/输入框即时跟随（BUG-072）、数字段不变',
-        c5.card === `T29新名#${tag}` && c5.menuPid === `T29新名#${tag}` && c5.menuName === 'T29新名' && c5.topbar === 'T29新名' && c5.input === 'T29新名', JSON.stringify(c5));
+      check('C5 改名「T29新名」：卡片/topbar trigger 昵称/输入框即时跟随（BUG-072+REQ-103）、数字段不变',
+        c5.card === `T29新名#${tag}` && c5.topbar === 'T29新名' && c5.input === 'T29新名', JSON.stringify(c5));
       await page.evaluate(() => { snapshotModalForm('userCenterModal'); closeModal('userCenterModal'); });
       await sleep(300);
 

@@ -1402,25 +1402,15 @@
 
   function updateGuildUI() {
     const guildNameEl = document.getElementById('guildName');
-    const guildRoleEl = document.getElementById('guildRole');
     const userInfoEl = document.getElementById('userInfo');
 
     if (guildNameEl && currentGuild) {
       // BUG-073（任务书 #35 WP2）：统一走 app.js guildDisplayName 单一拼接真源（含服务器名）——
       // 本函数原写裸名（无 server_name），与 updateCloudUI 完整名双口径竞态（BUG-073 根因）
-      const display = (typeof window.guildDisplayName === 'function')
+      // REQ-103（任务书 #36 WP4）：#guildBarName/#guildRole 随侧栏公会行整行移除，本函数不再写
+      guildNameEl.textContent = (typeof window.guildDisplayName === 'function')
         ? window.guildDisplayName(currentGuild)
         : currentGuild.name;
-      guildNameEl.textContent = display;
-      // 同族名称行 #guildBarName 同步（原只在 updateCloudUI 写，切会路径会滞留旧公会名）
-      const guildBarNameEl = document.getElementById('guildBarName');
-      if (guildBarNameEl) guildBarNameEl.textContent = display;
-    }
-    if (guildRoleEl && currentMembership) {
-      const roleLabels = { owner: '会长', editor: '编辑', viewer: '浏览' };
-      guildRoleEl.textContent = roleLabels[currentMembership.role] || currentMembership.role;
-      // BUG-018：按角色着色，一眼可见自己身份
-      guildRoleEl.className = `guild-bar-role role-${currentMembership.role}`;
     }
     if (userInfoEl && currentUser) {
       userInfoEl.textContent = currentUser.email;
