@@ -1979,6 +1979,14 @@ function updatePermissionUI() {
   document.body.classList.toggle('viewer-mode', isViewer);
 }
 
+// BUG-073（任务书 #35 WP2）：公会名称行单一拼接真源——server_name 空回退裸名（不出空括号）。
+// #guildName / #guildBarName 的全部写入点（本文件 updateCloudUI 两处 + cloud.js updateGuildUI）统一走它，
+// 任何路径最后写入的都是同口径完整名，消除「裸名/完整名」双路径竞态。
+function guildDisplayName(g) {
+  if (!g) return '';
+  return g.name + (g.server_name ? ` (${g.server_name})` : '');
+}
+
 // 更新云端模式 UI
 function updateCloudUI() {
   const guildBar = document.getElementById('guildBar');
@@ -2014,12 +2022,8 @@ function updateCloudUI() {
       }
     }
     if (guild && guildName) {
-      // 显示公会名称 + 服务器信息
-      let displayName = guild.name;
-      if (guild.server_name) {
-        displayName += ` (${guild.server_name})`;
-      }
-      guildName.textContent = displayName;
+      // BUG-073：统一走 guildDisplayName 单一拼接真源（含服务器名，空回退裸名）
+      guildName.textContent = guildDisplayName(guild);
     }
     if (membership) {
       const roleLabels = { owner: '会长', editor: '编辑', viewer: '浏览' };
@@ -2040,11 +2044,7 @@ function updateCloudUI() {
     if (guild) {
       const guildBarName = document.getElementById('guildBarName');
       if (guildBarName) {
-        let displayName = guild.name;
-        if (guild.server_name) {
-          displayName += ` (${guild.server_name})`;
-        }
-        guildBarName.textContent = displayName;
+        guildBarName.textContent = guildDisplayName(guild); // BUG-073：同一拼接真源
       }
     }
     const cloudSyncStatus = document.getElementById('cloudSyncStatus');
@@ -2309,6 +2309,8 @@ const modalDirtyChecks = {
   memberModal: () => isModalFormDirty('memberModal'),
   // 任务书 #27 WP2：彻底删除确认弹窗——输名输入框有内容即算未保存
   memberHardDeleteModal: () => isModalFormDirty('memberHardDeleteModal'),
+  // 任务书 #35 WP1（BUG-074）：批量彻底删除确认弹窗——确认词输入框有内容即算未保存
+  memberBatchHardDeleteModal: () => isModalFormDirty('memberBatchHardDeleteModal'),
   activityModal: () => isModalFormDirty('activityModal'),
   lootModal: () => isModalFormDirty('lootModal'),
   // REQ-094（任务书 #29 WP1）：用户中心含可编辑字段（显示名/修改密码表单），纳入防误关
@@ -2875,7 +2877,10 @@ function renderMembers() {
   memberSelectedIds.forEach(id => { if (!appData.members.some(m => m.id === id)) memberSelectedIds.delete(id); });
   const selectAllEl = document.getElementById('memberSelectAll');
   if (selectAllEl) {
-    const visibleIds = activeMembers.map(m => m.id); // REQ-049：全选只覆盖活跃区，离队组不参与批量删除
+    // REQ-049 口径对齐（任务书 #35 WP1 附加，行为零变）：全选实际覆盖全部渲染行——活跃区 +
+    // 「显示已离队」开启时的离队组行（memberToggleSelectAll 无差别勾选所有渲染行，运营 19 行离队成员即此路径）。
+    // 原 checked 判定按活跃区计算与真实行为不符，对齐为全部渲染行。
+    const visibleIds = displayList.filter(m => !m.__divider).map(m => m.id);
     selectAllEl.checked = visibleIds.length > 0 && visibleIds.every(id => memberSelectedIds.has(id));
   }
   memberUpdateBatchToolbar();
@@ -2891,6 +2896,7 @@ function memberToggleSelect(id, checked) {
 }
 
 function memberToggleSelectAll(checked) {
+  // REQ-049 口径对齐（任务书 #35 WP1 附加）：覆盖全部渲染行（活跃区 + 可见的离队组行），与工具条双功能配套
   document.querySelectorAll('.member-row-checkbox').forEach(cb => {
     cb.checked = checked;
     if (checked) memberSelectedIds.add(cb.value);
@@ -2911,41 +2917,132 @@ function memberUpdateBatchToolbar() {
   if (!toolbar) return;
   toolbar.style.display = memberSelectedIds.size > 0 ? 'flex' : 'none';
   if (countEl) countEl.textContent = `已选择 ${memberSelectedIds.size} 人`;
-  const btn = document.getElementById('memberBatchDeleteBtn');
-  if (btn) btn.textContent = `批量删除（${memberSelectedIds.size}）`;
 }
 
-function memberBatchDelete() {
-  const members = appData.members.filter(m => memberSelectedIds.has(m.id));
-  if (!members.length) { showToast('未选择任何成员', 'warning'); return; }
-  // REQ-042（软删除）：与单个 deleteMember 同语义——status 置「离队」，不再真删行
+// BUG-074（任务书 #35 WP1）：批量离队——REQ-042 软删语义改名归位（status 置「离队」，历史保留可恢复）。
+// 仅对选中中的活跃行生效；已离队行跳过并在结果 toast 注明。
+function memberBatchDepart() {
+  const selected = appData.members.filter(m => memberSelectedIds.has(m.id));
+  if (!selected.length) { showToast('未选择任何成员', 'warning'); return; }
+  const isDeparted = m => { const s = (m.status || '').trim(); return s === '离队' || s === 'inactive'; };
+  const active = selected.filter(m => !isDeparted(m));
+  const skipped = selected.length - active.length;
+  if (!active.length) { showToast('选中成员均已离队，无需操作', 'warning'); return; }
   openBatchDeleteModal({
-    title: `批量删除成员（${members.length}）`,
-    lines: members.map(m => `${m.name}（${m.class}）`),
+    title: `批量离队（${active.length}）`,
+    lines: active.map(m => `${m.name}（${m.class}）`),
     warning: '成员将标记为「离队」（编辑成员可恢复），其历史考勤/装备记录将保留并标记为已离队',
     onConfirm: async () => {
       // 规范 1.2.2 批处理例外：并发写库，完成后统一 reload 一次 + 单次 render
-      // BUG-029（任务书 #12 补丁）：同活动批量删除，串行改并发 + reload 失败报错误
       try {
         const results = await Promise.allSettled(
-          members.map(m => window.CloudSync.saveCloudData('members', 'update', { ...m, status: '离队', id: m.id }))
+          active.map(m => window.CloudSync.saveCloudData('members', 'update', { ...m, status: '离队', id: m.id }))
         );
         const ok = results.filter(r => r.status === 'fulfilled').length;
         const fail = results.length - ok;
-        results.forEach((r, i) => { if (r.status === 'rejected') console.error('批量删除成员失败:', members[i].id, r.reason); });
+        results.forEach((r, i) => { if (r.status === 'rejected') console.error('批量离队失败:', active[i].name, r.reason); });
         await window.CloudSync.reloadData('members');
         saveData();
         memberSelectedIds.clear();
         closeModal('batchDeleteModal');
         renderMembers();
-        if (fail) showToast(`删除完成：成功 ${ok} 人，失败 ${fail} 人`, 'warning');
-        else showToast(`已将 ${ok} 个成员标记为离队`, 'success');
+        const skipNote = skipped ? `，跳过 ${skipped} 名已离队成员` : '';
+        if (fail) showToast(`离队完成：成功 ${ok} 人，失败 ${fail} 人${skipNote}`, 'warning');
+        else showToast(`已将 ${ok} 个成员标记为离队${skipNote}`, 'success');
       } catch (e) {
-        console.error('批量删除成员后刷新失败:', e);
+        console.error('批量离队后刷新失败:', e);
         showToast('操作可能已提交，但刷新数据失败：' + (e.message || '请手动刷新页面'), 'error');
       }
     }
   });
+}
+
+// BUG-074（任务书 #35 WP1）：批量删除（真删）——选中行活跃+离队皆可，走 hardDelete 同链路：
+// 考勤/装备 member_id 置 NULL 快照灰显「已删除」、心愿单级联、逐行进垃圾桶（含 history_counts）。
+// 确认交互：可滚动名单（名字+职业+状态）+ 历史合计 + 红字警示 + 输「彻底删除」四字解锁。
+let pendingBatchHardDelete = null; // { rows: [{ member, counts }] }
+
+async function memberBatchHardDelete() {
+  const selected = appData.members.filter(m => memberSelectedIds.has(m.id));
+  if (!selected.length) { showToast('未选择任何成员', 'warning'); return; }
+  const client = window.CloudSync.getClient();
+  if (!client) { showToast('云端未连接，无法校验历史记录', 'error'); return; }
+  // 逐行历史计数（与单个 hardDeleteMember 同口径三路 count：考勤按 member_id、心愿按 member_id、
+  // 装备按 character_id 或 item_stats->>assignedTo 名字；逐行并发查询）
+  let rows;
+  try {
+    rows = await Promise.all(selected.map(async m => {
+      const nameFilter = String(m.name || '').replace(/"/g, '\\"');
+      const [att, wish, loot] = await Promise.all([
+        client.from('activity_attendance').select('id', { count: 'exact', head: true }).eq('member_id', m.id),
+        client.from('wishlists').select('id', { count: 'exact', head: true }).eq('member_id', m.id),
+        client.from('loot_records').select('id', { count: 'exact', head: true })
+          .or(`character_id.eq.${m.id},item_stats->>assignedTo.eq."${nameFilter}"`),
+      ]);
+      if (att.error || wish.error || loot.error) throw (att.error || wish.error || loot.error);
+      return { member: m, counts: { attendance: att.count || 0, wishlist: wish.count || 0, loot: loot.count || 0 } };
+    }));
+  } catch (e) {
+    console.error('批量历史计数失败:', e);
+    showToast('历史记录校验失败，已取消删除（安全起见请稍后重试）', 'error');
+    return;
+  }
+  pendingBatchHardDelete = { rows };
+  document.getElementById('batchHardDeleteTitle').textContent = `批量彻底删除成员（${rows.length}）`;
+  document.getElementById('batchHardDeleteList').innerHTML = rows.map(({ member: m, counts }) => {
+    const s = (m.status || '').trim();
+    const statusText = s === 'inactive' ? '离队' : (s || '—');
+    return `<div class="batch-delete-item">${m.name}（${m.class || '—'} · ${statusText}）—— 考勤 ${counts.attendance} / 装备 ${counts.loot} / 心愿 ${counts.wishlist}</div>`;
+  }).join('');
+  const totals = rows.reduce((acc, r) => ({
+    attendance: acc.attendance + r.counts.attendance,
+    wishlist: acc.wishlist + r.counts.wishlist,
+    loot: acc.loot + r.counts.loot,
+  }), { attendance: 0, wishlist: 0, loot: 0 });
+  document.getElementById('batchHardDeleteWarnText').textContent =
+    `⚠ 合计：考勤 ${totals.attendance} 条 / 装备记录 ${totals.loot} 条 / 心愿 ${totals.wishlist} 条。` +
+    '彻底删除后：心愿单随人删除，考勤与装备记录将保留并灰色显示「已删除」，成员数据进垃圾桶可查。此操作不可恢复。';
+  const input = document.getElementById('batchHardDeleteConfirmText');
+  input.value = '';
+  document.getElementById('batchHardDeleteConfirmBtn').disabled = true;
+  openModal('memberBatchHardDeleteModal');
+}
+
+function batchHardDeleteTextInput() {
+  const input = document.getElementById('batchHardDeleteConfirmText');
+  document.getElementById('batchHardDeleteConfirmBtn').disabled = input.value.trim() !== '彻底删除';
+}
+
+async function confirmBatchHardDelete() {
+  if (!pendingBatchHardDelete) return;
+  const input = document.getElementById('batchHardDeleteConfirmText');
+  if (input.value.trim() !== '彻底删除') return;
+  const btn = document.getElementById('batchHardDeleteConfirmBtn');
+  btn.disabled = true; btn.textContent = '删除中...';
+  try {
+    const rows = pendingBatchHardDelete.rows;
+    // 规范 1.2.2 批处理例外：Promise.allSettled 并发逐行（垃圾桶写入 + 删行两段同行原子），完成后统一 reload 一次
+    const results = await Promise.allSettled(rows.map(r => window.CloudSync.hardDeleteRaidMember(r.member, r.counts)));
+    const ok = results.filter(r => r.status === 'fulfilled').length;
+    const fail = results.length - ok;
+    results.forEach((r, i) => { if (r.status === 'rejected') console.error('批量彻底删除失败:', rows[i].member.name, r.reason); });
+    await window.CloudSync.reloadData('members');
+    await window.CloudSync.reloadData('activities');
+    await window.CloudSync.reloadData('wishlists');
+    await window.CloudSync.reloadData('loots');
+    saveData();
+    memberSelectedIds.clear();
+    pendingBatchHardDelete = null;
+    closeModal('memberBatchHardDeleteModal');
+    renderMembers();
+    if (fail) showToast(`彻底删除完成：成功 ${ok} 人，失败 ${fail} 人`, 'warning');
+    else showToast(`已彻底删除 ${ok} 个成员，历史记录已保全`, 'success');
+  } catch (e) {
+    console.error('批量彻底删除后刷新失败:', e);
+    showToast('删除可能已提交，但刷新数据失败：' + (e.message || '请手动刷新页面'), 'error');
+  } finally {
+    btn.disabled = false; btn.textContent = '彻底删除';
+  }
 }
 
 function getMemberAttendanceRate(memberId) {
@@ -6876,6 +6973,33 @@ function lootFillAssignedTo(name) {
 // ==================== 初始化 ====================
 // ==================== 更新日志 ====================
 const changelogData = [
+  {
+    id: 'v3.2.0-bug074-batch-depart-delete',
+    version: 'v3.2.0',
+    date: '2026-08-11',
+    type: 'fix',
+    typeLabel: '修复BUG',
+    title: '成员批量工具条双功能：批量离队 + 批量删除（任务书 #35 WP1，BUG-074）',
+    summary: '成员管理批量工具条升级为「已选择 N 人 [批量离队] [批量删除] [取消选择]」：批量离队 = 原批量删除的软语义改名归位（标记为离队、可恢复，仅对活跃行生效，已离队行跳过并注明）；批量删除 = 真删——考勤/装备历史保留灰色「已删除」、心愿单随人删、逐行进垃圾桶可查，确认需输入「彻底删除」四字。',
+    details: [
+      '批量删除确认弹窗：可滚动名单（名字+职业+状态）+ 考勤/装备/心愿历史合计 + 红字警示 + 四字解锁确认按钮',
+      '逐行并发执行、完成后统一刷新；成功/失败计数提示，失败名单记 console',
+      '全选行为不变（覆盖全部渲染行含可见离队组），REQ-049 注释与全选框判定已对齐真实口径'
+    ]
+  },
+  {
+    id: 'v3.2.0-bug073-guild-name-race',
+    version: 'v3.2.0',
+    date: '2026-08-11',
+    type: 'fix',
+    typeLabel: '修复BUG',
+    title: '左上角公会名服务器名间歇显示（任务书 #35 WP2，BUG-073）',
+    summary: '左上角公会卡名称行的服务器名不再时有时无：两条渲染路径（切换公会/改公会资料走裸名、首载登录走完整名）统一为同一拼接真源，任何路径最后写入都是同口径「公会名（服务器）」。',
+    details: [
+      '根因：cloud.js updateGuildUI 写裸名（无服务器名），app.js updateCloudUI 写完整名，最后写入者随路径不同而不同',
+      '修法：guildDisplayName 单一拼接函数（server_name 空回退裸名不出空括号），三处写入点归一；显示格式零改动'
+    ]
+  },
   {
     id: 'v3.2.0-req109-att-bulk-trim',
     version: 'v3.2.0',

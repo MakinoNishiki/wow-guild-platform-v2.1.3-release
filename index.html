@@ -4,12 +4,12 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>魔兽管家</title>
-<!-- 静态资源版本号：20260811.45（任务书 #22 WP3-②：凡改动 js/css 的 commit 必须同步递增此处与所有 ?v= 查询串，见 docs/开发规范.md 第五章） -->
+<!-- 静态资源版本号：20260811.46（任务书 #22 WP3-②：凡改动 js/css 的 commit 必须同步递增此处与所有 ?v= 查询串，见 docs/开发规范.md 第五章） -->
 <link rel="icon" type="image/png" sizes="32x32" href="assets/brand/favicon-32.png">
 <link rel="icon" type="image/png" sizes="16x16" href="assets/brand/favicon-16.png">
-<link rel="stylesheet" href="css/main.css?v=20260811.45">
-<link rel="stylesheet" href="css/data-public.css?v=20260811.45"><!-- 任务书 #28 WP5：副本掉落 tab（选择器全 .dp- 前缀 + #page-lootdrop 作用域，零泄漏） -->
-<script src="assets/vendor/supabase-js-2.js?v=20260811.45"></script>
+<link rel="stylesheet" href="css/main.css?v=20260811.46">
+<link rel="stylesheet" href="css/data-public.css?v=20260811.46"><!-- 任务书 #28 WP5：副本掉落 tab（选择器全 .dp- 前缀 + #page-lootdrop 作用域，零泄漏） -->
+<script src="assets/vendor/supabase-js-2.js?v=20260811.46"></script>
 </head>
 <body>
 
@@ -287,10 +287,11 @@
               <button class="btn btn-primary edit-only" onclick="showMemberModal()">+ 添加成员</button>
             </div>
           </div>
-          <!-- REQ-042：成员批量删除工具条（edit-only，勾选 ≥1 人时出现） -->
+          <!-- REQ-042 + BUG-074（任务书 #35 WP1）：成员批量工具条双功能（edit-only，勾选 ≥1 人时出现）——批量离队（软语义）/批量删除（真删） -->
           <div id="memberBatchToolbar" class="batch-toolbar edit-only" style="display:none">
             <span class="batch-toolbar-count" id="memberBatchCount">已选择 0 人</span>
-            <button class="btn btn-danger btn-sm" id="memberBatchDeleteBtn" onclick="memberBatchDelete()">批量删除</button>
+            <button class="btn btn-sm" id="memberBatchDepartBtn" onclick="memberBatchDepart()">批量离队</button>
+            <button class="btn btn-danger btn-sm" id="memberBatchDeleteBtn" onclick="memberBatchHardDelete()">批量删除</button>
             <button class="btn btn-sm" onclick="memberClearSelection()">取消选择</button>
           </div>
           <div class="table-container">
@@ -1118,6 +1119,26 @@
   </div>
 </div>
 
+<!-- ===== 弹窗：批量彻底删除成员（任务书 #35 WP1，BUG-074：可滚动名单+历史条数合计+红字警示+输「彻底删除」四字解锁） ===== -->
+<div class="modal-overlay" id="memberBatchHardDeleteModal">
+  <div class="modal" style="max-width:520px">
+    <div class="modal-header">
+      <div class="modal-title" id="batchHardDeleteTitle">批量彻底删除成员</div>
+      <div class="modal-close" onclick="requestCloseModal('memberBatchHardDeleteModal')">×</div>
+    </div>
+    <div class="modal-body">
+      <div class="batch-delete-list" id="batchHardDeleteList"></div>
+      <p id="batchHardDeleteWarnText" style="font-size:13px;line-height:1.8;color:var(--danger);background:rgba(248,81,73,0.08);border:1px solid rgba(248,81,73,0.35);border-radius:6px;padding:10px 12px"></p>
+      <p style="font-size:13px;color:var(--text-secondary);margin:12px 0 6px">请输入「<strong style="color:var(--text-primary)">彻底删除</strong>」四字以确认（与单个输名同为防误闸门）：</p>
+      <input type="text" id="batchHardDeleteConfirmText" class="form-input" style="width:100%" placeholder="输入「彻底删除」确认" oninput="batchHardDeleteTextInput()">
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="requestCloseModal('memberBatchHardDeleteModal')">取消</button>
+      <button class="btn btn-danger" id="batchHardDeleteConfirmBtn" disabled onclick="confirmBatchHardDelete()">彻底删除</button>
+    </div>
+  </div>
+</div>
+
 <!-- ===== 弹窗：WCL 导入 ===== -->
 <div class="modal-overlay" id="wclImportModal">
   <div class="modal">
@@ -1908,14 +1929,14 @@
   </div>
 </div>
 
-<script src="js/cloud.js?v=20260811.45"></script>
+<script src="js/cloud.js?v=20260811.46"></script>
 <!-- 任务书 #14：主数据层（快照兜底 + 加载层），须在 app.js 之前 -->
-<script src="js/masterDataSnapshot.js?v=20260811.45"></script>
-<script src="js/masterData.js?v=20260811.45"></script>
+<script src="js/masterDataSnapshot.js?v=20260811.46"></script>
+<script src="js/masterData.js?v=20260811.46"></script>
 <!-- 任务书 #22 WP2：职业/专精/职责图标集中映射（全站唯一取图处） -->
-<script src="js/iconMap.js?v=20260811.45"></script>
+<script src="js/iconMap.js?v=20260811.46"></script>
 <!-- 任务书 #28 WP5：副本掉落渲染层（双壳同源；无 data-public-body 不自动启动，由 app.js 懒挂载，须在 app.js 之前） -->
-<script src="js/dataPublic.js?v=20260811.45"></script>
-<script src="js/app.js?v=20260811.45"></script>
+<script src="js/dataPublic.js?v=20260811.46"></script>
+<script src="js/app.js?v=20260811.46"></script>
 </body>
 </html>

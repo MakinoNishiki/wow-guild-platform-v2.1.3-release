@@ -1406,7 +1406,15 @@
     const userInfoEl = document.getElementById('userInfo');
 
     if (guildNameEl && currentGuild) {
-      guildNameEl.textContent = currentGuild.name;
+      // BUG-073（任务书 #35 WP2）：统一走 app.js guildDisplayName 单一拼接真源（含服务器名）——
+      // 本函数原写裸名（无 server_name），与 updateCloudUI 完整名双口径竞态（BUG-073 根因）
+      const display = (typeof window.guildDisplayName === 'function')
+        ? window.guildDisplayName(currentGuild)
+        : currentGuild.name;
+      guildNameEl.textContent = display;
+      // 同族名称行 #guildBarName 同步（原只在 updateCloudUI 写，切会路径会滞留旧公会名）
+      const guildBarNameEl = document.getElementById('guildBarName');
+      if (guildBarNameEl) guildBarNameEl.textContent = display;
     }
     if (guildRoleEl && currentMembership) {
       const roleLabels = { owner: '会长', editor: '编辑', viewer: '浏览' };
