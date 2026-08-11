@@ -1372,7 +1372,7 @@ function mapAuthError(e) {
   if (lower.includes('invalid login credentials')) return '邮箱或密码错误';
   if (lower.includes('user already registered')) return '该邮箱已注册，请直接登录';
   if (lower.includes('email not confirmed')) return '邮箱尚未验证，请先完成邮箱验证';
-  if (lower.includes('password') && (lower.includes('at least') || lower.includes('too short') || lower.includes('weak'))) return '密码不符合要求（至少 6 位）';
+  if (lower.includes('password') && (lower.includes('at least') || lower.includes('too short') || lower.includes('weak'))) return '密码不符合要求（至少 8 位）'; // BUG-075：对齐 gotrue GOTRUE_PASSWORD_MIN_LENGTH=8
   if (lower.includes('unable to validate email') || lower.includes('invalid email') || lower.includes('email address') && lower.includes('invalid')) return '邮箱格式不正确';
   if (lower.includes('signups not allowed') || lower.includes('signup') && lower.includes('disabled')) return '当前未开放注册，请联系管理员';
   if (lower.includes('for security purposes') || lower.includes('rate limit') || lower.includes('too many requests')) return '操作过于频繁，请稍后再试';
@@ -2930,6 +2930,8 @@ function memberBatchDepart() {
     title: `批量离队（${active.length}）`,
     lines: active.map(m => `${m.name}（${m.class}）`),
     warning: '成员将标记为「离队」（编辑成员可恢复），其历史考勤/装备记录将保留并标记为已离队',
+    confirmLabel: '确认离队',
+    busyLabel: '离队中...',
     onConfirm: async () => {
       // 规范 1.2.2 批处理例外：并发写库，完成后统一 reload 一次 + 单次 render
       try {
@@ -4088,16 +4090,20 @@ function activityUpdateBatchToolbar() {
 // ==================== 通用批量删除二次确认弹窗（REQ-017-B 活动 / REQ-042 成员共用） ====================
 let batchDeleteBusy = false;
 let batchDeleteOnConfirm = null;
+// BUG-077（任务书 #38 WP1）：确认/忙碌按钮文案按入口参数化——批量离队=「确认离队/离队中...」，
+// 批量删除（活动/默认）=「确认删除/删除中...」；不传参维持默认删除语义。
+let batchDeleteLabels = { confirm: '确认删除', busy: '删除中...' };
 
-function openBatchDeleteModal({ title, lines, warning, onConfirm }) {
+function openBatchDeleteModal({ title, lines, warning, onConfirm, confirmLabel, busyLabel }) {
   document.getElementById('batchDeleteTitle').textContent = title;
   document.getElementById('batchDeleteList').innerHTML =
     lines.map(l => `<div class="batch-delete-item">${l}</div>`).join('');
   document.getElementById('batchDeleteWarning').textContent = warning;
   batchDeleteOnConfirm = onConfirm;
+  batchDeleteLabels = { confirm: confirmLabel || '确认删除', busy: busyLabel || '删除中...' };
   const btn = document.getElementById('batchDeleteConfirmBtn');
   btn.disabled = false;
-  btn.textContent = '确认删除';
+  btn.textContent = batchDeleteLabels.confirm;
   openModal('batchDeleteModal');
 }
 
@@ -4106,14 +4112,14 @@ async function confirmBatchDelete() {
   batchDeleteBusy = true;
   const btn = document.getElementById('batchDeleteConfirmBtn');
   btn.disabled = true;
-  btn.textContent = '删除中...';
+  btn.textContent = batchDeleteLabels.busy;
   try {
     await batchDeleteOnConfirm();
   } finally {
     batchDeleteBusy = false;
     batchDeleteOnConfirm = null;
     btn.disabled = false;
-    btn.textContent = '确认删除';
+    btn.textContent = batchDeleteLabels.confirm;
   }
 }
 
@@ -6971,6 +6977,43 @@ function lootFillAssignedTo(name) {
 // ==================== 初始化 ====================
 // ==================== 更新日志 ====================
 const changelogData = [
+  {
+    id: 'v3.2.0-bug077-batch-depart-label',
+    version: 'v3.2.0',
+    date: '2026-08-11',
+    type: 'fix',
+    typeLabel: '问题修复',
+    title: '批量离队弹窗按钮文案修正（任务书 #38 WP1，BUG-077）',
+    summary: '批量离队确认弹窗按钮由「确认删除」改为「确认离队」（忙碌态「离队中...」），与离队软语义一致；批量删除（活动）入口保持「确认删除」不变。弹窗按钮文案按入口参数化，全复用处逐一核对。',
+    details: [
+      'openBatchDeleteModal 全部 2 处调用点核查：成员批量离队（改「确认离队」）、活动批量删除（保持「确认删除」）',
+      '成员批量彻底删除为独立弹窗（四字解锁+「彻底删除」按钮），语义本已正确，未动'
+    ]
+  },
+  {
+    id: 'v3.2.0-bug075-password-8-chars',
+    version: 'v3.2.0',
+    date: '2026-08-11',
+    type: 'fix',
+    typeLabel: '问题修复',
+    title: '密码长度提示统一「至少 8 位」（任务书 #38 WP2，BUG-075）',
+    summary: '服务端 422 弱密码提示由「至少 6 位」修正为「至少 8 位」，与 gotrue 实际校验（GOTRUE_PASSWORD_MIN_LENGTH=8）对齐；注册页/修改密码占位符与前端校验提示本已为 8 位口径，全站逐处核查一致。',
+    details: [
+      'mapAuthError 422 文案为唯一错配点；注册/用户中心占位符「至少8位，需含字母和数字」、passwordRuleError「密码至少 8 位」原已正确'
+    ]
+  },
+  {
+    id: 'v3.2.0-bug076-dead-selectors',
+    version: 'v3.2.0',
+    date: '2026-08-11',
+    type: 'fix',
+    typeLabel: '问题修复',
+    title: 'main.css 死选择器清理（任务书 #38 WP3，BUG-076）',
+    summary: '清理侧栏公会行移除后的残留样式：.guild-bar 响应式规则 1 条、.guild-bar-role 组选择器 2 处；徽章族 .guild-member-role/.role-badge 仍有消费点，保留不动，渲染零变化。',
+    details: [
+      '删除前逐处核消费点：.guild-bar/.guild-bar-role 在 js/index.html 零引用；.guild-member-role（公会设置/切换公会）、.role-badge（topbar/公会卡）确认在用'
+    ]
+  },
   {
     id: 'v3.2.0-req110-venomcurse',
     version: 'v3.2.0',

@@ -230,10 +230,12 @@ async function clickSaveAndWaitToast(page) {
   check('A4 公示页 308 基线（S1 全部/团本/大秘境）', baseline.total === BASELINE.total && baseline.raid === BASELINE.raid && baseline.dungeon === BASELINE.dungeon,
     `实测=${baseline.total}/${baseline.raid}/${baseline.dungeon} 基线=${BASELINE.total}/${BASELINE.raid}/${BASELINE.dungeon}`);
 
-  // 版本串（14+2 口径：两壳资源引用与头部注释同步 .48）
+  // 版本串（14+2 口径：两壳资源引用同步；具体串号随后续任务递增，只断言两壳一致+单一串）
   const htmlData = await (await fetch(`${BASE}/data.html`)).text();
   const htmlIndex = await (await fetch(`${BASE}/`)).text();
-  check('A5 版本串两壳递增 20260811.48', !htmlData.includes('20260811.47') && !htmlIndex.includes('20260811.47') && htmlData.includes('20260811.48') && htmlIndex.includes('20260811.48'));
+  const verOf = h => [...new Set([...h.matchAll(/20260811\.\d+/g)].map(m => m[0]))];
+  const vD = verOf(htmlData), vI = verOf(htmlIndex);
+  check('A5 版本串两壳同步（单一串且两壳一致，当前 .49）', vD.length === 1 && vI.length === 1 && vD[0] === vI[0], `index=${vI} data=${vD}`);
 
   const browser = await chromium.launch({ headless: true, channel: process.env.PW_CHANNEL || 'chromium' });
   const pageErrors = [];

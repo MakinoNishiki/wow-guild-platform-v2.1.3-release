@@ -3388,7 +3388,6 @@ body {
 /* ==================== 响应式 ==================== */
 @media (max-width: 768px) {
   .auth-container { max-width: 100%; }
-  .guild-bar { padding: 6px 12px; }
 }
 
 /* ==================== BUG-012 viewer 权限门 ====================
@@ -4018,7 +4017,8 @@ body.viewer-mode #memberSelectAll {
 }
 
 /* ---------- BUG-020 身份徽章：盾形意象底 + 图标 + 文字 ---------- */
-.guild-bar-role,
+/* BUG-076（任务书 #38 WP3）：.guild-bar-role 死选择器移除（task#36 侧栏公会行删除后零消费点），
+   .guild-member-role（公会设置/切换公会成员列表在用）与 .role-badge（topbar/公会卡在用）保留 */
 .guild-member-role,
 .role-badge {
   display: inline-flex;
@@ -4033,7 +4033,6 @@ body.viewer-mode #memberSelectAll {
   white-space: nowrap;
   border: none;
 }
-.guild-bar-role::before,
 .guild-member-role::before,
 .role-badge::before {
   content: '';
