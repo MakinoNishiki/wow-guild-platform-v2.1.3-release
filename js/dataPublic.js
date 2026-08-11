@@ -87,23 +87,27 @@
   ];
   const CAT_CHIPS = {
     // P3（WP6 补丁）：部位增设「饰品」（slot 判定，S1 40 件）；套装兑换物维持无归属（预期行为）
-    slot: ['头部', '肩部', '胸部', '腕部', '手部', '腰部', '腿部', '脚部', '背部', '颈部', '手指', '饰品']
+    // 任务书 #31（REQ-097，D2）：词表统一改引用 js/lootTaxonomy.js（单一真源），映射定义不再本文件内联
+    slot: window.LootTaxonomy.SLOT_OPTIONS
       .map(s => ({ key: s, match: l => l.slot === s })),
     weapon: [
-      { key: '单手', match: l => ['单手剑', '单手锤', '单手斧', '匕首', '拳套', '战刃', '魔杖'].includes(l.item_type) }, // 魔杖按单手归口（法系魔杖+副手物品组合等效法杖）
-      { key: '双手', match: l => ['双手剑', '双手锤', '双手斧', '长柄武器', '法杖'].includes(l.item_type) }, // 法杖归双手；远程不并入双手
-      { key: '远程', match: l => ['弓', '弩', '枪械'].includes(l.item_type) }, // 服务远敏平砍职业；禁止 slot='远程' 一刀切（含魔杖，已归单手）
-      { key: '主手', match: l => l.slot === '主手' || l.item_type === '主手' }, // 全库 0 命中：chip 保留定义不渲染
-      { key: '副手', match: l => l.slot === '副手物品' },
+      ...window.LootTaxonomy.WEAPON_GROUPS.map(g => ({
+        key: g.key,
+        match: g.types
+          ? (l => g.types.includes(l.item_type))
+          : (l => l.slot === g.slot)
+      })),
+      { key: window.LootTaxonomy.WEAPON_MAIN_HAND.key, match: l => window.LootTaxonomy.WEAPON_MAIN_HAND.match(l.slot, l.item_type) }, // 全库 0 命中：chip 保留定义不渲染
     ],
-    armor: ['板甲', '锁甲', '皮甲', '布甲', '盾牌']
+    armor: window.LootTaxonomy.ARMOR_TYPES
       .map(t => ({ key: t, match: l => l.item_type === t })),
   };
   // 当前赛季掉落池（F1 chip 数据驱动可见性 / F2 实例计数共用）
   const seasonLoot = () => [...state.loot, ...state.dungeonLoot].filter(l => l.season_id === state.seasonId);
 
   // 杂项判定唯一口径（任务书 #28 WP2：数据层排除零渲染，装载时过滤；「排除杂项」开关已整块删除）：slot 为「杂项」
-  const isMisc = l => l.slot === '杂项';
+  // 任务书 #31（REQ-097，D2）：判定函数改引用 LootTaxonomy.isMiscSlot（单一真源），口径不变
+  const isMisc = l => window.LootTaxonomy.isMiscSlot(l.slot);
   // 修正项④：装备 → 套装兑换物（独立分类）→ 杂项（永远最后）；同组内按部位/名称稳定排序
   function sortLoot(items) {
     const rank = l => isMisc(l) ? 3 : l.slot === '套装兑换物' ? 2 : 1;

@@ -6978,6 +6978,20 @@ function lootFillAssignedTo(name) {
 // ==================== 更新日志 ====================
 const changelogData = [
   {
+    id: 'v3.2.0-req097-picker-taxonomy',
+    version: 'v3.2.0',
+    date: '2026-08-11',
+    type: 'improve',
+    typeLabel: '体验优化',
+    title: '装备库选择器默认排除杂项+下拉对齐公示页分类（任务书 #31，REQ-097）',
+    summary: '心愿单「添加心愿」与装备分配「添加装备」两处 picker（两面板同治）：列表恒定排除杂项与套装兑换物（不做切换入口）；部位下拉对齐公示页 12 项词汇（新增肩部/腕部，披风→背部、项链→颈部、戒指→手指），武器独立成下拉 4 项（单手/双手/远程/副手），护甲类型收敛 5 项（板甲/锁甲/皮甲/布甲/盾牌）。',
+    details: [
+      '词汇表单一真源：新建 js/lootTaxonomy.js，公示页三级 chips、picker 过滤、BUG-057 回填推导三处统一引用，禁第三份映射',
+      '过滤口径实证：杂项真实标记为 slot=杂项（51 行）+ 套装兑换物（1 行），保留 138 件装备全部可筛选归属',
+      'BUG-057 回填语义零改动：仅切换词表来源，表单大类/部位判定与旧表逐项一致'
+    ]
+  },
+  {
     id: 'v3.2.0-bug077-batch-depart-label',
     version: 'v3.2.0',
     date: '2026-08-11',
@@ -11606,6 +11620,7 @@ function openItemDbPicker(mode = 'wishlist') {
   document.getElementById('itemDbBossFilter').value = '';
   document.getElementById('itemDbBossFilter').disabled = true;
   document.getElementById('itemDbSlotFilter').value = '';
+  document.getElementById('itemDbWeaponFilter').value = ''; // 任务书 #31：武器独立下拉
   document.getElementById('itemDbArmorFilter').value = '';
   document.getElementById('itemDbStatFilter').value = '';
   document.getElementById('itemDbConfirmBtn').disabled = true;
@@ -11728,14 +11743,18 @@ function renderItemDbList() {
   const raidFilter = document.getElementById('itemDbRaidFilter').value;
   const bossFilter = document.getElementById('itemDbBossFilter').value;
   const slotFilter = document.getElementById('itemDbSlotFilter').value;
+  const weaponFilter = document.getElementById('itemDbWeaponFilter').value; // 任务书 #31
   const armorFilter = document.getElementById('itemDbArmorFilter').value;
   const statFilter = document.getElementById('itemDbStatFilter').value;
 
   // REQ-057（方案 B）：装备库只显示 boss_loot 主数据装备；
   // 回退开关关闭时（false）走旧逻辑：只显示所属团本存在于 game_raids 的内置装备
-  const base = MD_PICKER_MASTER_ONLY
+  const baseAll = MD_PICKER_MASTER_ONLY
     ? getMasterLootItems()
     : itemDatabase.filter(item => new Set(getGameRaidNames()).has(item.raidName));
+  // 任务书 #31 修正项①（REQ-097，D1 裁定）：恒定排除杂项（slot='杂项'）与套装兑换物，不做切换入口；
+  // 词表单一真源 = js/lootTaxonomy.js（PICKER_EXCLUDED_SLOTS）
+  const base = baseAll.filter(item => !window.LootTaxonomy.isPickerExcludedSlot(item.slot));
   itemDbPickerItems = base; // selectDbItem 查找池
 
   // 左侧团本筛选同步只列有掉落的主数据团本（每次渲染重建，保留当前选择）
@@ -11752,6 +11771,8 @@ function renderItemDbList() {
     if (raidFilter && item.raid !== raidFilter) return false;
     if (bossFilter && item.boss !== bossFilter) return false;
     if (slotFilter && item.slot !== slotFilter) return false;
+    // 任务书 #31：武器 4 项判定走词表（单手/双手=item_type 白名单、远程=弓弩枪、副手=slot'副手物品'）
+    if (weaponFilter && !window.LootTaxonomy.matchWeapon(weaponFilter, item.slot, item.armorType)) return false;
     if (armorFilter && item.armorType !== armorFilter) return false;
     if (statFilter && !item.stats.secondary.includes(statFilter)) return false;
     return true;
@@ -11867,16 +11888,12 @@ function resolvePickerCategorySlot(item) {
   const slot = ((item && item.slot) || '').trim();
   const type = ((item && item.armorType) || '').trim(); // 主数据路径 armorType = 库内 item_type
   // 部位 → 大类（REQ-060 口径：防具九部位 / 颈部手指=首饰 / 饰品 / 武器与副手=武器）
-  const slotCategoryMap = {
-    '武器': '武器', '副手': '武器', '单手': '武器', '双手': '武器', '远程': '武器', '副手物品': '武器',
-    '头部': '防具', '肩部': '防具', '胸部': '防具', '手腕': '防具', '腕部': '防具', '手部': '防具',
-    '腰部': '防具', '腿部': '防具', '脚部': '防具', '背部': '防具',
-    '颈部': '首饰', '手指': '首饰', '饰品': '饰品'
-  };
+  // 任务书 #31（REQ-097，D3）：词表来源切换为 js/lootTaxonomy.js slotCategoryOf（单一真源派生，判定语义不变；
+  // 原内联 slotCategoryMap 已移除，防第三份映射，词汇改动只改 lootTaxonomy.js）
   // 库内词汇 → 表单部位词汇（lootSlotMap）差异项归一
   const formSlotMap = { '手腕': '腕部', '项链': '颈部', '戒指': '手指', '披风': '背部', '长柄武器': '长柄', '枪': '枪械', '副手': '副手物品' };
   const norm = v => formSlotMap[v] || v;
-  let category = slotCategoryMap[slot] || '';
+  let category = window.LootTaxonomy.slotCategoryOf(slot);
   let formSlot = '';
   if (category === '武器') {
     // 武器/副手：部位取 item_type 细分（盾牌/副手物品同在表单「武器」大类下）；item_type 不可用时取 slot 本身

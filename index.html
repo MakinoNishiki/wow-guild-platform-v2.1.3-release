@@ -4,12 +4,12 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>魔兽管家</title>
-<!-- 静态资源版本号：20260811.49（任务书 #22 WP3-②：凡改动 js/css 的 commit 必须同步递增此处与所有 ?v= 查询串，见 docs/开发规范.md 第五章） -->
+<!-- 静态资源版本号：20260811.50（任务书 #22 WP3-②：凡改动 js/css 的 commit 必须同步递增此处与所有 ?v= 查询串，见 docs/开发规范.md 第五章） -->
 <link rel="icon" type="image/png" sizes="32x32" href="assets/brand/favicon-32.png">
 <link rel="icon" type="image/png" sizes="16x16" href="assets/brand/favicon-16.png">
-<link rel="stylesheet" href="css/main.css?v=20260811.49">
-<link rel="stylesheet" href="css/data-public.css?v=20260811.49"><!-- 任务书 #28 WP5：副本掉落 tab（选择器全 .dp- 前缀 + #page-lootdrop 作用域，零泄漏） -->
-<script src="assets/vendor/supabase-js-2.js?v=20260811.49"></script>
+<link rel="stylesheet" href="css/main.css?v=20260811.50">
+<link rel="stylesheet" href="css/data-public.css?v=20260811.50"><!-- 任务书 #28 WP5：副本掉落 tab（选择器全 .dp- 前缀 + #page-lootdrop 作用域，零泄漏） -->
+<script src="assets/vendor/supabase-js-2.js?v=20260811.50"></script>
 </head>
 <body>
 
@@ -1490,36 +1490,47 @@
           
           <div class="item-db-filter-group">
             <div class="item-db-filter-label">装备部位</div>
+            <!-- 任务书 #31（REQ-097）：部位 12 项对齐公示页词汇（js/lootTaxonomy.js SLOT_OPTIONS），
+                 库内 slot 等值命中；「武器/副手」移出为独立武器下拉 -->
             <select class="item-db-filter-select" id="itemDbSlotFilter" onchange="renderItemDbList()">
               <option value="">全部部位</option>
-              <option value="饰品">饰品</option>
-              <option value="武器">武器</option>
-              <option value="副手">副手</option>
-              <option value="戒指">戒指</option>
               <option value="头部">头部</option>
-              <option value="项链">项链</option>
-              <option value="背部">披风</option>
+              <option value="肩部">肩部</option>
               <option value="胸部">胸部</option>
+              <option value="腕部">腕部</option>
               <option value="手部">手部</option>
               <option value="腰部">腰部</option>
               <option value="腿部">腿部</option>
               <option value="脚部">脚部</option>
+              <option value="背部">背部</option>
+              <option value="颈部">颈部</option>
+              <option value="手指">手指</option>
+              <option value="饰品">饰品</option>
             </select>
           </div>
-          
+
+          <div class="item-db-filter-group">
+            <div class="item-db-filter-label">武器</div>
+            <!-- 任务书 #31（REQ-097）：武器独立 4 项，判定走 LootTaxonomy.matchWeapon（公示页终版口径） -->
+            <select class="item-db-filter-select" id="itemDbWeaponFilter" onchange="renderItemDbList()">
+              <option value="">全部武器</option>
+              <option value="单手">单手</option>
+              <option value="双手">双手</option>
+              <option value="远程">远程</option>
+              <option value="副手">副手</option>
+            </select>
+          </div>
+
           <div class="item-db-filter-group">
             <div class="item-db-filter-label">护甲类型</div>
+            <!-- 任务书 #31（REQ-097）：护甲 5 项对齐公示页词汇（LootTaxonomy.ARMOR_TYPES，item_type 等值） -->
             <select class="item-db-filter-select" id="itemDbArmorFilter" onchange="renderItemDbList()">
               <option value="">全部类型</option>
-              <option value="布甲">布甲</option>
-              <option value="皮甲">皮甲</option>
-              <option value="锁甲">锁甲</option>
               <option value="板甲">板甲</option>
-              <option value="饰品">饰品</option>
-              <option value="武器">武器</option>
-              <option value="戒指">戒指</option>
-              <option value="项链">项链</option>
-              <option value="副手">副手</option>
+              <option value="锁甲">锁甲</option>
+              <option value="皮甲">皮甲</option>
+              <option value="布甲">布甲</option>
+              <option value="盾牌">盾牌</option>
             </select>
           </div>
           
@@ -1924,14 +1935,16 @@
   </div>
 </div>
 
-<script src="js/cloud.js?v=20260811.49"></script>
+<script src="js/cloud.js?v=20260811.50"></script>
 <!-- 任务书 #14：主数据层（快照兜底 + 加载层），须在 app.js 之前 -->
-<script src="js/masterDataSnapshot.js?v=20260811.49"></script>
-<script src="js/masterData.js?v=20260811.49"></script>
+<script src="js/masterDataSnapshot.js?v=20260811.50"></script>
+<script src="js/masterData.js?v=20260811.50"></script>
 <!-- 任务书 #22 WP2：职业/专精/职责图标集中映射（全站唯一取图处） -->
-<script src="js/iconMap.js?v=20260811.49"></script>
+<script src="js/iconMap.js?v=20260811.50"></script>
+<!-- 任务书 #31（REQ-097）：装备分类词表单一真源（公示页 chips / picker 过滤 / BUG-057 回填三处消费，须在 dataPublic.js 与 app.js 之前） -->
+<script src="js/lootTaxonomy.js?v=20260811.50"></script>
 <!-- 任务书 #28 WP5：副本掉落渲染层（双壳同源；无 data-public-body 不自动启动，由 app.js 懒挂载，须在 app.js 之前） -->
-<script src="js/dataPublic.js?v=20260811.49"></script>
-<script src="js/app.js?v=20260811.49"></script>
+<script src="js/dataPublic.js?v=20260811.50"></script>
+<script src="js/app.js?v=20260811.50"></script>
 </body>
 </html>
