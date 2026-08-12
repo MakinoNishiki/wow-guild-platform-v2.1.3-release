@@ -287,15 +287,33 @@ async function cleanup() {
     check('A2 心愿单面板：之锤（slot=单手/item_type=单手锤）→ 大类=武器 部位=单手锤', f.cat === '武器' && f.slot === '单手锤', `cat=${f.cat} slot=${f.slot}`);
     await page.screenshot({ path: path.join(SHOT_DIR, 'wishlist-pick-hammer.png') });
 
-    // 负例：哨兵 首饰/颈部，选杂项后必须保持原值
-    await pickFromDb('wishlistShowModal', 'wishlist', 'T27P测试杂项', () => {
+    // 负例（任务书 #31/REQ-097 口径升级：picker 恒定排除杂项（slot='杂项'），杂项装备不再可选——
+    //  负例保证上移为两层：①UI 层杂项在 picker 列表不可见；②函数层 resolvePickerCategorySlot 对杂项仍返回空
+    //  （D3 判定语义零改动），表单保持哨兵原值。属裁定驱动适配，非放宽）
+    await page.evaluate(fn => window[fn](), 'wishlistShowModal');
+    await sleep(500);
+    await page.evaluate(() => {
       document.getElementById('wishlistCategory').value = '首饰';
       wishlistUpdateSlotOptions('颈部');
+      openItemDbPicker('wishlist');
     });
-    f = await readForm('wishlistCategory', 'wishlistSlot');
-    check('A3 心愿单面板负例：杂项/垃圾 不改动表单（保持哨兵 首饰/颈部）', f.cat === '首饰' && f.slot === '颈部', `cat=${f.cat} slot=${f.slot}`);
+    await sleep(1200);
+    await page.fill('#itemDbSearch', 'T27P');
+    await sleep(600);
+    const a3 = await page.evaluate(() => {
+      const names = [...document.querySelectorAll('#itemDbList .item-card .item-card-name')].map(c => c.textContent.trim());
+      const resolved = resolvePickerCategorySlot({ slot: '杂项', armorType: '垃圾' });
+      return {
+        miscVisible: names.includes('T27P测试杂项'),
+        resolvedEmpty: resolved.category === '' && resolved.slot === '',
+        cat: document.getElementById('wishlistCategory').value,
+        slot: document.getElementById('wishlistSlot').value,
+      };
+    });
+    check('A3 心愿单面板负例（#31 口径升级）：杂项 picker 不可见 + 解析返回空（表单保持哨兵 首饰/颈部）',
+      !a3.miscVisible && a3.resolvedEmpty && a3.cat === '首饰' && a3.slot === '颈部', JSON.stringify(a3));
     await page.screenshot({ path: path.join(SHOT_DIR, 'wishlist-pick-negative.png') });
-    await page.evaluate(() => closeModal('wishlistModal'));
+    await page.evaluate(() => { closeModal('itemDbModal'); closeModal('wishlistModal'); });
     await sleep(400);
 
     // ---- 装备分配面板 ----
@@ -309,14 +327,31 @@ async function cleanup() {
     check('A5 装备分配面板：之锤 → 大类=武器 部位=单手锤', f.cat === '武器' && f.slot === '单手锤', `cat=${f.cat} slot=${f.slot}`);
     await page.screenshot({ path: path.join(SHOT_DIR, 'loot-pick-hammer.png') });
 
-    await pickFromDb('lootShowModal', 'loot', 'T27P测试杂项', () => {
+    // 负例（任务书 #31 口径升级，同 A3：picker 不可见 + 解析返回空 + 表单保持哨兵 防具/头部）
+    await page.evaluate(fn => window[fn](), 'lootShowModal');
+    await sleep(500);
+    await page.evaluate(() => {
       document.getElementById('lootCategory').value = '防具';
       lootUpdateSlotOptions('头部');
+      openItemDbPicker('loot');
     });
-    f = await readForm('lootCategory', 'lootSlot');
-    check('A6 装备分配面板负例：杂项/垃圾 不改动表单（保持哨兵 防具/头部）', f.cat === '防具' && f.slot === '头部', `cat=${f.cat} slot=${f.slot}`);
+    await sleep(1200);
+    await page.fill('#itemDbSearch', 'T27P');
+    await sleep(600);
+    const a6 = await page.evaluate(() => {
+      const names = [...document.querySelectorAll('#itemDbList .item-card .item-card-name')].map(c => c.textContent.trim());
+      const resolved = resolvePickerCategorySlot({ slot: '杂项', armorType: '垃圾' });
+      return {
+        miscVisible: names.includes('T27P测试杂项'),
+        resolvedEmpty: resolved.category === '' && resolved.slot === '',
+        cat: document.getElementById('lootCategory').value,
+        slot: document.getElementById('lootSlot').value,
+      };
+    });
+    check('A6 装备分配面板负例（#31 口径升级）：杂项 picker 不可见 + 解析返回空（表单保持哨兵 防具/头部）',
+      !a6.miscVisible && a6.resolvedEmpty && a6.cat === '防具' && a6.slot === '头部', JSON.stringify(a6));
     await page.screenshot({ path: path.join(SHOT_DIR, 'loot-pick-negative.png') });
-    await page.evaluate(() => closeModal('lootModal'));
+    await page.evaluate(() => { closeModal('itemDbModal'); closeModal('lootModal'); });
     await sleep(400);
 
     // ==================== B. BUG-058 报表无横滚 ====================

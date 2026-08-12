@@ -140,7 +140,7 @@ function stripComments(src) {
   check('S3 BUG-076 main.css 剔注释后零 guild-bar 残留', !stripComments(mainCss).includes('guild-bar'));
   check('S4 BUG-076 徽章族保留：.guild-member-role 与 .role-badge 选择器在位',
     stripComments(mainCss).includes('.guild-member-role') && stripComments(mainCss).includes('.role-badge'));
-  check('S5 版本串两壳递增 20260811.49', !indexHtml.includes('20260811.48') && !dataHtml.includes('20260811.48') && indexHtml.includes('20260811.49') && dataHtml.includes('20260811.49'));
+  check('S5 版本串两壳递增 20260811.50（REQ-097/任务书 #31 于本包之后合入再递增一档，裁定驱动适配）', !indexHtml.includes('20260811.49') && !dataHtml.includes('20260811.49') && indexHtml.includes('20260811.50') && dataHtml.includes('20260811.50'));
   check('S6 BUG-077 成员批量彻底删除独立弹窗保持「彻底删除」按钮（未误改）', indexHtml.includes('id="batchHardDeleteConfirmBtn" disabled onclick="confirmBatchHardDelete()">彻底删除'));
 
   const browser = await chromium.launch({ headless: true, channel: process.env.PW_CHANNEL || 'chromium' });
