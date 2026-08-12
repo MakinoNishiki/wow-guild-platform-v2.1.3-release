@@ -142,6 +142,78 @@ body {
   color: var(--text-muted);
 }
 
+/* ==================== 任务书 #41（REQ-112）：问题反馈入口 + QQ 群悬浮卡 ==================== */
+/* 按钮：次级入口（视觉权重低于主导航）；hover 渐变高亮 = 深蓝底上金色微光扫过——
+   纯 CSS background-position 过渡，进出双向同一属性插值；reduced-motion 降级直呈终态 */
+.fb-btn {
+  display: block;
+  width: 100%;
+  padding: 7px 10px;
+  margin-bottom: 6px;
+  font-size: 12px;
+  text-align: center;
+  color: var(--text-secondary);
+  background: linear-gradient(115deg, rgba(58, 102, 190, 0.28) 0%, rgba(58, 102, 190, 0.28) 38%, rgba(255, 215, 0, 0.38) 50%, rgba(58, 102, 190, 0.28) 62%, rgba(58, 102, 190, 0.28) 100%);
+  background-size: 260% 100%;
+  background-position: 100% 0; /* 常态：金色段藏于右侧画外 */
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background-position 0.6s ease, color 0.3s ease, border-color 0.3s ease;
+}
+.fb-btn:hover, .fb-entry.open .fb-btn {
+  background-position: 0 0; /* hover：金色微光扫入 */
+  color: var(--text-primary);
+  border-color: rgba(255, 215, 0, 0.45);
+}
+/* 悬浮卡：fixed 定位（防侧栏 overflow 裁切），浮于侧栏与内容区之上、非 modal 不走 modalStack */
+.fb-card {
+  position: fixed;
+  left: 10px;
+  bottom: 78px; /* 按钮上方（footer 高约 70px），1366×768 档实测不出视口 */
+  width: 224px;
+  z-index: 60; /* ＞侧栏/内容区，＜topbar 操作区不重叠（位于左下） */
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  text-align: center;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(6px);
+  transition: opacity 0.2s ease-out, transform 0.2s ease-out, visibility 0.2s;
+}
+.fb-entry:hover .fb-card, .fb-entry.open .fb-card {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+}
+/* 浅色卡托：白底圆角 padding，深色主题下保扫码识别率 */
+.fb-qr-wrap {
+  background: #ffffff;
+  border-radius: 6px;
+  padding: 8px;
+}
+.fb-qr-wrap img { display: block; width: 100%; }
+.fb-group { margin-top: 8px; font-size: 13px; font-weight: 600; color: var(--text-primary); }
+.fb-qq {
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--gold);
+  background: none;
+  border: none;
+  padding: 2px 4px;
+  cursor: copy;
+}
+.fb-qq:hover { text-decoration: underline; }
+.fb-hint { margin-top: 6px; font-size: 11px; color: var(--text-muted); }
+/* reduced-motion 降级：动画关闭，hover/点击直接呈现终态 */
+@media (prefers-reduced-motion: reduce) {
+  .fb-btn { transition: none; }
+  .fb-card { transition: none; }
+}
+
 /* 主内容区 */
 .main-content {
   flex: 1;
@@ -1318,6 +1390,43 @@ body {
   color: var(--text-muted);
   margin-top: 2px;
 }
+
+/* ==================== 任务书 #42（REQ-105/107）：偏好包 ==================== */
+/* WP2：导航拖拽排序——桌面可拖（grab 光标），拖动中半透明占位（实时插入位重排） */
+.nav-menu .nav-item[draggable="true"] { cursor: grab; }
+.nav-menu .nav-item.nav-dragging { opacity: 0.4; }
+
+/* WP3：日历密度切换控件（紧凑/舒适两态，active 金色描边） */
+.cal-density { display: inline-flex; gap: 4px; }
+.cal-density-btn {
+  font-size: 12px;
+  padding: 4px 10px;
+  border-radius: 5px;
+  border: 1px solid var(--border-color);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: color 0.2s, border-color 0.2s, background 0.2s;
+}
+.cal-density-btn:hover { color: var(--text-primary); }
+.cal-density-btn.active {
+  color: var(--gold);
+  border-color: var(--gold);
+  background: rgba(240, 192, 96, 0.1);
+}
+/* 紧凑态：CSS 维度收密（方形格→固定小行高、字级梯度收小）；条目数守恒（渲染结构零改动），
+   一屏整月为目标（1366/1920 两档实测见 docs/TASK-042-修改报告.md）；
+   舒适态 = 现状方形格原样（不加类即原样） */
+.calendar-days.cal-compact { gap: 2px; }
+.calendar-days.cal-compact .calendar-day {
+  aspect-ratio: auto;
+  min-height: 52px;
+  padding: 2px;
+  font-size: 12px;
+}
+.calendar-days.cal-compact .calendar-day.has-activity .day-count { font-size: 9px; margin-top: 0; }
+.calendar-days.cal-compact .calendar-day.has-activity::after { bottom: 2px; }
+
 
 /* 列表视图 */
 .activity-list {

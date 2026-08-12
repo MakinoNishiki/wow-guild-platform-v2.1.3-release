@@ -137,6 +137,13 @@
     return !!(u && u.app_metadata && u.app_metadata.role === 'superadmin');
   };
 
+  // 任务书 #39（REQ-113）：副本掉落页脏标记——数据中心写成功即置位，DPLootDrop.activate() 检测后重拉。
+  // 掉落页消费表（侦察 2026-08-12，dataPublic.js boot 拉取清单）：game_seasons/game_raids/game_bosses/
+  // boss_loot/dungeon_loot（公开 RPC 合并两表）/tier_sets/game_dungeons/game_classes/game_specs——9 张全消费；
+  // 仅 game_patches 不被掉落页消费，不置脏。
+  const DP_LOOT_TABLES = new Set(['game_seasons', 'game_raids', 'game_bosses', 'boss_loot', 'dungeon_loot', 'tier_sets', 'game_dungeons', 'game_classes', 'game_specs']);
+  function markDpLootDirty(table) { if (DP_LOOT_TABLES.has(table)) window.__dpLootDirty = true; }
+
   // ---- 写助手：server.js 代理（仅超管，server.js 主数据分支校验） ----
   async function mdWrite(method, table, body, query) {
     const token = await window.CloudSync.getAccessToken();
@@ -159,6 +166,7 @@
       err.status = resp.status;
       throw err;
     }
+    markDpLootDirty(table); // 任务书 #39：写成功置脏（insert/update/delete 同口）
     return data;
   }
 
@@ -184,6 +192,7 @@
     let data = null;
     try { data = JSON.parse(text); } catch { data = text; }
     if (!resp.ok) throw new Error((data && data.message) || `导入失败 (${resp.status})`);
+    markDpLootDirty(table); // 任务书 #39：字典导入器 upsert 成功同置脏
     return data;
   }
 

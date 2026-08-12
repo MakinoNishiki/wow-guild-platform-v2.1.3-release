@@ -140,7 +140,11 @@ function stripComments(src) {
   check('S3 BUG-076 main.css 剔注释后零 guild-bar 残留', !stripComments(mainCss).includes('guild-bar'));
   check('S4 BUG-076 徽章族保留：.guild-member-role 与 .role-badge 选择器在位',
     stripComments(mainCss).includes('.guild-member-role') && stripComments(mainCss).includes('.role-badge'));
-  check('S5 版本串两壳递增 20260811.50（REQ-097/任务书 #31 于本包之后合入再递增一档，裁定驱动适配）', !indexHtml.includes('20260811.49') && !dataHtml.includes('20260811.49') && indexHtml.includes('20260811.50') && dataHtml.includes('20260811.50'));
+  // S5 演进驱动更新（2026-08-12，任务书 #39 起版本串逐任务递增）：不再钉死 .50——断言两壳单一串、两壳一致且 ≥.50（.50 为本包交付时点基线）
+  const vI38 = [...new Set([...indexHtml.matchAll(/20260811\.\d+/g)].map(m => m[0]))];
+  const vD38 = [...new Set([...dataHtml.matchAll(/20260811\.\d+/g)].map(m => m[0]))];
+  check('S5 版本串两壳同步且不低于本包基线 .50（后续任务递增为预期，演进驱动适配）',
+    vI38.length === 1 && vD38.length === 1 && vI38[0] === vD38[0] && parseInt(vI38[0].split('.')[1], 10) >= 50, `index=${vI38} data=${vD38}`);
   check('S6 BUG-077 成员批量彻底删除独立弹窗保持「彻底删除」按钮（未误改）', indexHtml.includes('id="batchHardDeleteConfirmBtn" disabled onclick="confirmBatchHardDelete()">彻底删除'));
 
   const browser = await chromium.launch({ headless: true, channel: process.env.PW_CHANNEL || 'chromium' });

@@ -1993,6 +1993,8 @@ function showAppView() {
   renderCurrentPage();
   // 任务书 #14：登录后加载主数据（并行拉取 + 5s 超时 + 快照兜底，不阻塞界面）
   if (window.MasterData) MasterData.init();
+  // 任务书 #42：登录/切公会后加载用户偏好（导航排序/日历密度，不阻塞界面）
+  loadUserPreferences();
 }
 
 // BUG-012：viewer 权限门。viewer 登录后隐藏/禁用全部写入口（界面收口，
@@ -2183,6 +2185,113 @@ const pageTitles = {
   datacenter: '数据中心',
   lootdrop: '副本掉落' // 任务书 #28 WP5（REQ-086）：原「数据公示」更名 + 双壳嵌入
 };
+
+// ==================== 任务书 #42（REQ-105/107）：用户偏好包 ====================
+// 服务端持久化（user_profiles.preferences jsonb 单列，sql/27），跨设备同步；
+// 键：nav_order（侧栏导航顺序，页签 key 数组）/ calendar_density（日历密度 compact=紧凑默认 / comfortable=舒适）。
+// 登录/切公会后加载偏好入内存并按偏好重排导航 + 刷日历密度（不阻塞界面，同 MasterData.init 先例）
+async function loadUserPreferences() {
+  if (!window.CloudSync || !CloudSync.loadPreferences) return;
+  await CloudSync.loadPreferences();
+  applyNavOrder();
+  paintCalendarDensity(getCalendarDensity());
+}
+
+// ---- WP2：REQ-105 侧栏导航拖拽排序（零依赖原生 HTML5 DnD） ----
+// nav key = data-page（页签项）；「用户中心」无 data-page，以 data-navkey="usercenter" 参与；
+// 「问题反馈」按钮与版本号区在 .sidebar-footer，非 .nav-menu .nav-item，不参与排序。
+// 默认序 = DOM 原序（无偏好时）；nav_order 数组外残留 key 忽略、缺失 key 追加尾部（防版本演进键对不上卡死）。
+function navKeyOf(item) { return item.dataset.page || item.dataset.navkey || ''; }
+function currentNavOrder() {
+  return [...document.querySelectorAll('.nav-menu .nav-item')].map(navKeyOf).filter(Boolean);
+}
+function applyNavOrder(forced) {
+  const menu = document.querySelector('.nav-menu');
+  if (!menu) return;
+  const pref = forced || (window.CloudSync && CloudSync.getPreference ? CloudSync.getPreference('nav_order', null) : null);
+  if (!Array.isArray(pref) || !pref.length) return; // 默认序 = DOM 原序
+  const items = [...menu.querySelectorAll('.nav-item')];
+  const byKey = {};
+  items.forEach(it => { const k = navKeyOf(it); if (k && !byKey[k]) byKey[k] = it; });
+  const used = new Set();
+  pref.forEach(k => { // 数组外残留 key（已下线页签）忽略
+    if (byKey[k] && !used.has(k)) { menu.appendChild(byKey[k]); used.add(k); }
+  });
+  items.forEach(it => { const k = navKeyOf(it); if (!used.has(k)) menu.appendChild(it); }); // 缺失 key 按 DOM 原序追加尾部
+}
+let navDragEl = null;
+let navOrderBeforeDrag = null;
+function refreshNavDraggable() {
+  // 移动端/触屏（<768px 或 hover 不可用）禁用拖拽，仅桌面
+  const desktop = window.innerWidth > 768 && !(window.matchMedia && window.matchMedia('(hover: none)').matches);
+  document.querySelectorAll('.nav-menu .nav-item').forEach(it => { it.draggable = desktop; });
+}
+function initNavDragSort() {
+  const menu = document.querySelector('.nav-menu');
+  if (!menu) return;
+  refreshNavDraggable();
+  window.addEventListener('resize', refreshNavDraggable);
+  menu.addEventListener('dragstart', (e) => {
+    const item = e.target.closest && e.target.closest('.nav-item');
+    if (!item || !item.draggable) { e.preventDefault(); return; }
+    navDragEl = item;
+    navOrderBeforeDrag = currentNavOrder(); // 写库失败回滚用
+    item.classList.add('nav-dragging'); // 半透明占位
+    e.dataTransfer.effectAllowed = 'move';
+    try { e.dataTransfer.setData('text/plain', navKeyOf(item)); } catch {}
+  });
+  menu.addEventListener('dragover', (e) => {
+    if (!navDragEl) return;
+    e.preventDefault(); // 允许 drop
+    e.dataTransfer.dropEffect = 'move';
+    const after = [...menu.querySelectorAll('.nav-item:not(.nav-dragging)')].find(it => {
+      const r = it.getBoundingClientRect();
+      return e.clientY < r.top + r.height / 2;
+    });
+    // 拖动中实时插入位重排（指示 = 半透占位 + 实时位移，零额外指示元素）
+    if (after) menu.insertBefore(navDragEl, after); else menu.appendChild(navDragEl);
+  });
+  menu.addEventListener('drop', (e) => { if (navDragEl) e.preventDefault(); });
+  menu.addEventListener('dragend', () => {
+    if (!navDragEl) return;
+    navDragEl.classList.remove('nav-dragging');
+    navDragEl = null;
+    persistNavOrder(); // 防抖口径：落定一次写，拖拽过程零打库
+  });
+}
+async function persistNavOrder() {
+  const order = currentNavOrder();
+  try {
+    await CloudSync.savePreference('nav_order', order);
+  } catch (e) {
+    console.error('导航顺序保存失败:', e);
+    showToast('导航顺序保存失败，已还原', 'error');
+    applyNavOrder(navOrderBeforeDrag); // 界面回滚到拖拽前序（禁假成功）
+  }
+}
+
+// ---- WP3：REQ-107 考勤日历密度切换（紧凑=默认 / 舒适=现状方形格原样） ----
+function getCalendarDensity() {
+  const v = window.CloudSync && CloudSync.getPreference ? CloudSync.getPreference('calendar_density', 'compact') : 'compact';
+  return v === 'comfortable' ? 'comfortable' : 'compact';
+}
+function paintCalendarDensity(d) {
+  const days = document.getElementById('calendarDays');
+  if (days) days.classList.toggle('cal-compact', d === 'compact');
+  document.querySelectorAll('.cal-density-btn').forEach(b => b.classList.toggle('active', b.dataset.density === d));
+}
+async function setCalendarDensity(d) {
+  const prev = getCalendarDensity();
+  if (d === prev) return;
+  paintCalendarDensity(d); // 切换即时生效免刷新（列表视图不受影响）
+  try {
+    await CloudSync.savePreference('calendar_density', d);
+  } catch (e) {
+    console.error('日历密度保存失败:', e);
+    paintCalendarDensity(prev); // 写失败界面回滚旧值（禁假成功）
+    showToast('日历密度保存失败，已还原', 'error');
+  }
+}
 
 function switchPage(pageName) {
   // 切换导航激活状态
@@ -12058,12 +12167,17 @@ function mdOpenEditor(title, fields, row, onSave) {
     const val = (row && row[f.key] !== undefined && row[f.key] !== null) ? row[f.key] : (f.default !== undefined ? f.default : '');
     let control = '';
     if (f.type === 'select') {
-      const opts = (f.options || []).map(o => {
+      // 任务书 #40（REQ-114）原值兜底：存量行原值不在选项表时作为额外选项插入并选中
+      // （显示原值、不强制改写、不报错）；选项对象/原始值两形态兼容
+      const baseOpts = f.options || [];
+      const hasVal = baseOpts.some(o => String(typeof o === 'object' ? o.value : o) === String(val));
+      const effOpts = (val !== '' && val !== null && val !== undefined && !hasVal) ? [...baseOpts, val] : baseOpts;
+      const opts = effOpts.map(o => {
         const v = typeof o === 'object' ? o.value : o;
         const l = typeof o === 'object' ? o.label : o;
         return `<option value="${v}" ${String(v) === String(val) ? 'selected' : ''}>${l}</option>`;
       }).join('');
-      control = `<select class="form-select" id="mdField_${f.key}">${opts}</select>`;
+      control = `<select class="form-select" id="mdField_${f.key}"${f.onchange ? ` onchange="${f.onchange}"` : ''}>${opts}</select>`;
     } else if (f.type === 'textarea') {
       control = `<textarea class="form-textarea" id="mdField_${f.key}" style="height:80px" placeholder="${f.placeholder || ''}">${String(val).replace(/</g, '&lt;')}</textarea>`;
     } else if (f.type === 'tags') {
@@ -12381,15 +12495,14 @@ function mdEditBoss(id, raidId) {
 // ---------- 5. 掉落池（两级导航 + 批量录入） ----------
 // REQ-054：部位/类型下拉+手输兜底，特效多行文本，主/副属性标签多选
 // REQ-060：部位↔类型联动（映射表任务书给定，照此实现）；类型按上表细分单手/双手
-// 任务书 #14-补丁3：「其他」项合并——下拉只保留「其他（手动输入）」兜底（selectCustom __custom__），
-// 不再单列「其他」选项；历史已存"其他"值编辑时自动落入手输框、列表显示原值，兼容不报错
-const MD_LOOT_SLOTS = ['武器', '头部', '颈部', '肩部', '背部', '胸部', '手腕', '手部', '腰部', '腿部', '脚部', '手指', '饰品', '副手'];
-const MD_LOOT_TYPES = ['板甲', '锁甲', '皮甲', '布甲', '披风', '项链', '戒指', '饰品',
-  '单手剑', '双手剑', '单手斧', '双手斧', '单手锤', '双手锤', '匕首', '拳套', '长柄武器', '法杖', '弓', '枪', '弩', '魔杖', '战刃',
-  '盾牌', '副手物品'];
+// 任务书 #40（REQ-114，2026-08-12）：slot/item_type 改纯 select 词表下拉——选项唯一真源 =
+// js/lootTaxonomy.js（DC_SLOT_OPTIONS 19 项 / DC_ITEM_TYPE_OPTIONS 33 项，库内全量现存值覆盖），
+// selectCustom 手输兜底退役（MD_LOOT_SLOTS/MD_LOOT_TYPES 旧内联词表删除，禁第三份词表）；
+// 原值兜底由 mdOpenEditor select 分支通用承担（词表外旧值作额外选项插入并选中，不强制改写）。
 const MD_ARMOR_TYPES = ['板甲', '锁甲', '皮甲', '布甲'];
 const MD_SLOT_TYPE_MAP = {
   '头部': MD_ARMOR_TYPES, '肩部': MD_ARMOR_TYPES, '胸部': MD_ARMOR_TYPES, '手腕': MD_ARMOR_TYPES,
+  '腕部': MD_ARMOR_TYPES, // 任务书 #40：词表新词（REQ-097「腕部」）同映射；旧词「手腕」保留兼容批量录入旧数据
   '手部': MD_ARMOR_TYPES, '腰部': MD_ARMOR_TYPES, '腿部': MD_ARMOR_TYPES, '脚部': MD_ARMOR_TYPES,
   '背部': ['披风'],
   '颈部': ['项链'],
@@ -12398,23 +12511,19 @@ const MD_SLOT_TYPE_MAP = {
   '武器': ['单手剑', '双手剑', '单手斧', '双手斧', '单手锤', '双手锤', '匕首', '拳套', '长柄武器', '法杖', '弓', '枪', '弩', '魔杖', '战刃'],
   '副手': ['盾牌', '副手物品']
 };
-// 部位变化 → 类型下拉只保留合法项；不合法已选值自动清空
-function mdLootSlotChanged() {
+// 部位变化 → 类型下拉只保留合法项（映射表外部位给词表全量）
+// 任务书 #40：纯 select 化。init=true（打开表单初始化）原值兜底——当前值不在候选清单时保留为额外选项
+// 并选中（编辑存量行旧值不强制改写）；用户主动改部位（init 缺省）不合法已选清空回落首项（REQ-060 语义不变）
+function mdLootSlotChanged(init) {
   const slotEl = document.getElementById('mdField_slot');
   const typeEl = document.getElementById('mdField_item_type');
   if (!slotEl || !typeEl) return;
-  const slot = slotEl.value === '__custom__'
-    ? (document.getElementById('mdField_slot_custom') || { value: '' }).value.trim()
-    : slotEl.value;
-  const legal = MD_SLOT_TYPE_MAP[slot];
+  const legal = MD_SLOT_TYPE_MAP[slotEl.value];
+  const base = legal ? [...legal] : [...window.LootTaxonomy.DC_ITEM_TYPE_OPTIONS];
   const current = typeEl.value;
-  const options = legal ? [...legal, '__custom__'] : [...MD_LOOT_TYPES, '__custom__'];
-  typeEl.innerHTML = options.map(o => `<option value="${o}">${o === '__custom__' ? '其他（手动输入）' : o}</option>`).join('');
-  if (legal && legal.includes(current)) typeEl.value = current;
-  else if (!legal) typeEl.value = MD_LOOT_TYPES.includes(current) ? current : typeEl.value;
-  // 不合法已选值自动清空（选回第一项或留空）
-  if (legal && current && !legal.includes(current)) typeEl.value = legal[0];
-  mdSelectCustomToggle('item_type');
+  const options = (init && current && !base.includes(current)) ? [...base, current] : base;
+  typeEl.innerHTML = options.map(o => `<option value="${o}">${o}</option>`).join('');
+  typeEl.value = (current && options.includes(current)) ? current : options[0];
 }
 const MD_PRIMARY_STATS = ['力量', '敏捷', '智力'];
 const MD_SECONDARY_STATS = ['爆击', '急速', '精通', '全能']; // 官方用字（任务书 #23-补丁3-附），写库枚举与游戏口径一致
@@ -12453,14 +12562,15 @@ function mdEditLootItem(id) {
   const row = id ? MasterData.getLoot(mdLootNav.bossId).find(l => l.id === id) : null;
   mdOpenEditor(id ? '编辑掉落' : '新增掉落', [
     { key: 'item_name', label: '装备名', required: true },
-    { key: 'slot', label: '部位', type: 'selectCustom', options: MD_LOOT_SLOTS, onchange: 'mdLootSlotChanged()' },
-    { key: 'item_type', label: '类型', type: 'selectCustom', options: MD_LOOT_TYPES },
+    // 任务书 #40（REQ-114）：纯 select 词表下拉，选项唯一真源 = LootTaxonomy（禁内联第三份词表）
+    { key: 'slot', label: '部位', type: 'select', options: window.LootTaxonomy.DC_SLOT_OPTIONS, onchange: 'mdLootSlotChanged()' },
+    { key: 'item_type', label: '类型', type: 'select', options: window.LootTaxonomy.DC_ITEM_TYPE_OPTIONS },
     { key: 'primary_stats', label: '主属性（可多选）', type: 'tags', options: MD_PRIMARY_STATS },
     { key: 'secondary_stats', label: '副属性（可多选）', type: 'tags', options: MD_SECONDARY_STATS },
     { key: 'effect', label: '特效', type: 'textarea', placeholder: '装备：……（可空，多行）' },
-    { key: 'venomcurse', label: '毒咒', type: 'select', options: [{ value: '', label: '无' }, { value: '毒咒', label: '毒咒' }] }
+    { key: 'venomcurse', label: '毒咒', type: 'select', options: [{ value: '', label: '无' }, { value: window.LootTaxonomy.VENOMCURSE_LABEL, label: window.LootTaxonomy.VENOMCURSE_LABEL }] }
   ], row, async (out) => {
-    // REQ-060：手输非法组合保存前弹提示确认（兜底优先，不硬拦；取消则中止保持弹窗）
+    // REQ-060：非法组合保存前弹提示确认（兜底优先，不硬拦；取消则中止保持弹窗）
     if (out.slot && out.item_type && MD_SLOT_TYPE_MAP[out.slot] && !MD_SLOT_TYPE_MAP[out.slot].includes(out.item_type)) {
       if (!confirm(`部位「${out.slot}」与类型「${out.item_type}」不是常见组合，仍要保存吗？`)) {
         throw new Error('已取消保存');
@@ -12474,14 +12584,7 @@ function mdEditLootItem(id) {
     renderDatacenter();
     showToast('已保存', 'success');
   });
-  mdLootSlotChanged(); // 初始化：按当前部位过滤类型选项（编辑已有值合法则保留）
-  // 编辑场景恢复原有类型值（若合法）
-  if (row && row.item_type) {
-    const typeEl = document.getElementById('mdField_item_type');
-    const opts = [...typeEl.options].map(o => o.value);
-    if (opts.includes(row.item_type)) typeEl.value = row.item_type;
-    else { typeEl.value = '__custom__'; mdSelectCustomToggle('item_type'); const c = document.getElementById('mdField_item_type_custom'); if (c) c.value = row.item_type; }
-  }
+  mdLootSlotChanged(!!(row && row.item_type)); // 初始化：编辑行原值兜底（旧值保留为额外选项并选中）；新增行不保留浏览器默认选中，按部位收拢
 }
 // 批量录入模式：多行文本「装备名,部位,类型」→ 解析预览 → 确认入库
 let mdLootBatchRows = null;
@@ -12595,12 +12698,13 @@ function mdEditDungeonLootItem(id) {
   const row = id ? MasterData.getDungeonLoot(mdDungeonLootNav.dungeonId).find(l => l.id === id) : null;
   mdOpenEditor(id ? '编辑大秘境掉落' : '新增大秘境掉落', [
     { key: 'item_name', label: '装备名', required: true },
-    { key: 'slot', label: '部位', type: 'selectCustom', options: MD_LOOT_SLOTS, onchange: 'mdLootSlotChanged()' },
-    { key: 'item_type', label: '类型', type: 'selectCustom', options: MD_LOOT_TYPES },
+    // 任务书 #40（REQ-114）：纯 select 词表下拉，与团本掉落表单同词表（LootTaxonomy 单一真源）
+    { key: 'slot', label: '部位', type: 'select', options: window.LootTaxonomy.DC_SLOT_OPTIONS, onchange: 'mdLootSlotChanged()' },
+    { key: 'item_type', label: '类型', type: 'select', options: window.LootTaxonomy.DC_ITEM_TYPE_OPTIONS },
     { key: 'primary_stats', label: '主属性（可多选）', type: 'tags', options: MD_PRIMARY_STATS },
     { key: 'secondary_stats', label: '副属性（可多选）', type: 'tags', options: MD_SECONDARY_STATS },
     { key: 'effect', label: '特效', type: 'textarea', placeholder: '装备：……（可空，多行）' },
-    { key: 'venomcurse', label: '毒咒', type: 'select', options: [{ value: '', label: '无' }, { value: '毒咒', label: '毒咒' }] }
+    { key: 'venomcurse', label: '毒咒', type: 'select', options: [{ value: '', label: '无' }, { value: window.LootTaxonomy.VENOMCURSE_LABEL, label: window.LootTaxonomy.VENOMCURSE_LABEL }] }
   ], row, async (out) => {
     if (out.slot && out.item_type && MD_SLOT_TYPE_MAP[out.slot] && !MD_SLOT_TYPE_MAP[out.slot].includes(out.item_type)) {
       if (!confirm(`部位「${out.slot}」与类型「${out.item_type}」不是常见组合，仍要保存吗？`)) {
@@ -12619,13 +12723,7 @@ function mdEditDungeonLootItem(id) {
     renderDatacenter();
     showToast('已保存', 'success');
   });
-  mdLootSlotChanged();
-  if (row && row.item_type) {
-    const typeEl = document.getElementById('mdField_item_type');
-    const opts = [...typeEl.options].map(o => o.value);
-    if (opts.includes(row.item_type)) typeEl.value = row.item_type;
-    else { typeEl.value = '__custom__'; mdSelectCustomToggle('item_type'); const c = document.getElementById('mdField_item_type_custom'); if (c) c.value = row.item_type; }
-  }
+  mdLootSlotChanged(!!(row && row.item_type)); // 初始化：编辑行原值兜底（旧值保留为额外选项并选中）；新增行不保留浏览器默认选中，按部位收拢
 }
 // 批量录入（任务书 #23 WP1：首两列副本名/BOSS 名，BOSS 可留空 = 整体池；其余列格式与校验同 boss_loot）
 let mdDungeonLootBatchRows = null;
@@ -12955,3 +13053,46 @@ function zhWrapDateInput(input) {
 
 // 全站静态日期输入统一包裹（脚本位于 body 末尾，DOM 已就绪）
 document.querySelectorAll('input[type="date"]').forEach(zhWrapDateInput);
+
+// 任务书 #42：导航拖拽排序初始化（脚本位于 body 末尾，DOM 已就绪）+ 日历密度默认紧凑先刷
+initNavDragSort();
+paintCalendarDensity(getCalendarDensity());
+
+// ==================== 任务书 #41（REQ-112）：问题反馈悬浮卡交互 ====================
+// 桌面显隐纯 CSS（.fb-entry:hover）；此处只补移动端降级与群号复制：
+// 移动端（hover 不可用：粗指针或 ≤768px）点击按钮切换 .open，点卡片外/ESC 关闭。
+(function initFeedbackEntry() {
+  const entry = document.getElementById('feedbackEntry');
+  if (!entry) return;
+  const btn = document.getElementById('feedbackBtn');
+  const coarse = () => (window.matchMedia && window.matchMedia('(hover: none)').matches) || window.innerWidth <= 768;
+  btn.addEventListener('click', (e) => {
+    if (!coarse()) return; // 桌面走 CSS hover，点击不干预（防与 hover 态打架）
+    e.stopPropagation();
+    const open = entry.classList.toggle('open');
+    btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+  });
+  document.addEventListener('click', (e) => {
+    if (entry.classList.contains('open') && !entry.contains(e.target)) {
+      entry.classList.remove('open');
+      btn.setAttribute('aria-expanded', 'false');
+    }
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && entry.classList.contains('open')) {
+      entry.classList.remove('open');
+      btn.setAttribute('aria-expanded', 'false');
+    }
+  });
+  // 群号点按复制（非强制增强；剪贴板不可用回退 toast 展示）
+  const qq = document.getElementById('feedbackQqCopy');
+  if (qq) qq.addEventListener('click', async (e) => {
+    e.stopPropagation();
+    try {
+      await navigator.clipboard.writeText('1104273954');
+      showToast('群号已复制：1104273954', 'success');
+    } catch {
+      showToast('群号：1104273954', 'info');
+    }
+  });
+})();

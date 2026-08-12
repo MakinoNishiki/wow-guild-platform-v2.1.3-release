@@ -348,7 +348,7 @@ async function clickSaveAndWaitToast(page) {
     check('E1 表单「毒咒」=预设下拉（无/毒咒两选项，禁自由输入）', e1.isSelect && e1.noCustom && e1.opts.length === 2 && e1.opts[0] === ':无' && e1.opts[1] === '毒咒:毒咒', JSON.stringify(e1.opts));
 
     await pageE.fill('#mdField_item_name', ITEM_FORM);
-    await pageE.selectOption('#mdField_slot', '武器');
+    await pageE.selectOption('#mdField_slot', '单手'); // 演进驱动适配（任务书 #40 词表下拉化）：「武器」退出 slot 选项，单手剑归「单手」位
     await sleep(300);
     await pageE.selectOption('#mdField_item_type', '单手剑');
     await pageE.selectOption('#mdField_venomcurse', '毒咒');

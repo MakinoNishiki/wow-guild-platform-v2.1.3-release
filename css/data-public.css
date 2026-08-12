@@ -42,17 +42,19 @@
 
 /* 筛选规范 v2.0 §2（任务书 #28 WP2）：首行 = 搜索（置顶加宽 flex:1）+ 重置筛选按钮（不放任何 chip）；
    小类别自第二行起，每组 = 区头标题（独占一行）+ chips 行；部位/类型细粒度取消；「排除杂项」整块删除 */
+/* 任务书 #43（REQ-098）：首行追加 命中计数（恒显）+「筛选 ▾」折叠钮；两态一套 DOM */
 .dp-filter-rows { display: flex; flex-direction: column; gap: 10px; width: 100%; }
-.dp-top-row { display: flex; gap: 10px; align-items: center; width: 100%; }
+.dp-top-row { display: flex; gap: 10px; align-items: center; width: 100%; flex-wrap: wrap; }
 .dp-search-wrap { flex: 1; min-width: 200px; }
 .dp-top-row .search-input { width: 100%; box-sizing: border-box; padding-right: 36px; /* REQ-084：清除钮让位 */ }
 .dp-reset-btn { flex: none; }
+.dp-panel-title { display: none; /* 折叠顶栏态不显示（「筛选 ▾」钮承担）；≥1400 面板态显示 */ }
 .dp-group { display: flex; flex-direction: column; gap: 6px; width: 100%; }
 .dp-group-head { font-size: 12px; font-weight: 600; color: var(--text-secondary); letter-spacing: 0.02em; }
 .dp-group-note { font-size: 11px; font-weight: 400; color: var(--text-muted); margin-left: 6px; user-select: none; }
 
-/* 移动端（≤768px）筛选条整体折叠为「筛选 ▾」按钮（筛选规范 v2.0 §8），桌面恒展开 */
-.dp-filter-toggle { display: none; }
+/* 折叠顶栏态（<1400px）「筛选 ▾」按钮（#43 断点自 ≤768 上调至 <1400）；≥1400 面板态恒展开不显示 */
+.dp-filter-toggle { display: none; flex: none; }
 
 /* 筛选 chips（规范 v2 §4.3 + 筛选规范 v2.0 §3：24px 恒定高、12px 圆角、12px/500、line-height:1 中文光学居中
    （BUG-054 定稿）、深底；选中态金描边+金文字+10% 金底——多选/单选同一样式；chip 间 6px、
@@ -91,12 +93,14 @@
 .dp-cat-tab { font-weight: 600; letter-spacing: 0.02em; }
 .dp-instance-row { margin-top: 2px; }
 .dp-chip-inst .dp-count { margin-left: 5px; }
-/* P4-再补②（WP6 补丁三轮，2026-08-09）：命中计数并入吸顶筛选条末行恒可见（二选一裁定取「并入」——
-   旧位置在主内容流，滚动时被吸顶区半裁遮盖并停留）；随筛选条统一背景/统一 z-index，不再半裁 */
-.dp-flat-head { font-size: 13px; color: var(--text-secondary); width: 100%; padding: 0 2px; user-select: none; }
+/* 任务书 #43（REQ-098）：命中计数恒显——浏览态「共 N 件」/ 筛选态「命中 X 件 · N 项生效」；
+   移入首行（两态同行：面板态随首行 wrap、折叠顶栏态恒可见不随折叠隐藏） */
+.dp-flat-head { font-size: 13px; color: var(--text-secondary); padding: 0 2px; user-select: none; white-space: nowrap; flex: none; }
 .dp-empty-actions { margin-top: 12px; }
 
-@media (max-width: 768px) {
+/* 任务书 #43（REQ-098）：折叠顶栏态（<1400px）——首行恒显（搜索+重置+命中计数+筛选▾），
+   筛选组行折叠/展开双向 + sessionStorage 记忆（js/dataPublic.js） */
+@media (max-width: 1399px) {
   .dp-filter-toggle { display: inline-flex; align-items: center; }
   .dp-filterbar:not(.filters-open) .dp-filter-rows { display: none; }
   /* 筛选规范 v2.0 §7：展开收起动画 150–250ms ease-out，只动 transform/opacity */
@@ -104,6 +108,48 @@
   .dp-filter-rows.closing { opacity: 0; transform: translateY(-6px); transition: opacity 0.2s ease-out, transform 0.2s ease-out; }
 }
 @keyframes dpRowsIn { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
+
+/* 任务书 #43（REQ-098）：右栏悬浮筛选面板态（≥1400px）——框体完整四边闭合（四边框+底色+圆角+阴影），
+   面板内控件矩形零裁切；面板独立纵向滚动（深色细滚动条）；顶部偏移壳级变量 --dp-panel-top
+   （公开壳=.dp-header 页头高 / 登录壳=topbar 56+赛季行高，JS 实测写入）；
+   层级规约：面板 z=10 ＞ hover 展开卡 z=5 ＞ 普通卡（#dpChipToast z=2000 独立层不动）；
+   REQ-091 预留：组列表纵向天然可扩展（职业/专精组将来直接追加） */
+@media (min-width: 1400px) {
+  .dp-filterbar {
+    position: fixed;
+    top: calc(var(--dp-panel-top, 0px) + 12px);
+    right: 12px;
+    bottom: 12px;
+    left: auto;
+    width: 264px;
+    max-width: none;
+    height: auto;
+    margin: 0;
+    padding: 14px;
+    flex-direction: column;
+    flex-wrap: nowrap;
+    gap: 10px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+    overflow-y: auto;
+    z-index: 10;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-color) transparent;
+  }
+  .dp-filterbar::-webkit-scrollbar { width: 8px; }
+  .dp-filterbar::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 4px; }
+  .dp-filterbar::-webkit-scrollbar-track { background: transparent; }
+  .dp-panel-title { display: block; font-size: 15px; font-weight: 600; color: var(--text-primary); flex: none; }
+  .dp-filter-toggle { display: none; } /* 面板态无折叠钮（恒展开） */
+  .dp-top-row { flex-wrap: wrap; }
+  .dp-search-wrap { flex: 1 1 100%; min-width: 0; }
+  .dp-flat-head { flex: 1; text-align: right; }
+  /* 卡片区让位：内容容器 margin-right = 面板宽 + 间隙，卡片列数自适应重排
+     （提权压 .dp-main 的 margin:0 auto 基线规则——auto 左距吸收余量，右距恒定 292） */
+  .data-public-body .dp-main, #page-lootdrop .dp-main { margin-right: 292px; }
+}
 
 /* 筛选规范 v2.0 §7：筛选/搜索触发卡片重渲染入场 fade+轻微上浮（只动 transform/opacity，出场不做） */
 .dp-item.dp-enter { animation: dpCardIn 0.2s ease-out both; }
@@ -450,12 +496,19 @@
 }
 
 /* ==================== 任务书 #28 WP5：双壳嵌入——登录壳 tab（#page-lootdrop）作用域覆盖 ====================
-   仅 3 条、全部 #page-lootdrop 作用域，公开壳（data.html）零影响：
+   全部 #page-lootdrop 作用域，公开壳（data.html）零影响：
    ① 吸顶让位——主应用 topbar sticky top:0 高 56px z-50，tab 内筛选条吸顶点上移 56px 免于压盖
-      （公开壳无 topbar，top:0 不动）；层级规约不变：筛选条(10)＞hover卡(5)＜topbar(50)，无越层；
+      （公开壳无 topbar，top:0 不动）；层级规约不变：筛选条/面板(10)＞hover卡(5)＜topbar(50)，无越层；
    ② 池末缓冲——登录壳无 .dp-footer 的 200px 底部缓冲带，由 .dp-main 自补（末行溢出卡 hover
       向下生长 ≤260px 的 absolute 溢出被吸收，不撑滚动区）；
-   ③ 赛季行对齐——登录壳无 .dp-header，赛季行与筛选条/主内容同 1100px 版心对齐 */
-#page-lootdrop .dp-filterbar { top: 56px; }
+   ③ 赛季行对齐——登录壳无 .dp-header，赛季行与筛选条/主内容同 1100px 版心对齐。
+   任务书 #43：top 让位按两态拆分——折叠顶栏态（<1400）吸顶 56px；面板态（≥1400）走壳级变量
+   --dp-panel-top（= topbar 56 + 赛季行高，js/dataPublic.js syncPanelTop 实测写入） */
+@media (max-width: 1399px) {
+  #page-lootdrop .dp-filterbar { top: 56px; }
+}
+@media (min-width: 1400px) {
+  #page-lootdrop .dp-filterbar { top: calc(var(--dp-panel-top, 56px) + 12px); }
+}
 #page-lootdrop .dp-main { padding-bottom: 200px; }
 #page-lootdrop .dp-season { max-width: 1100px; margin: 0 auto 4px; padding: 0 20px; justify-content: flex-end; }

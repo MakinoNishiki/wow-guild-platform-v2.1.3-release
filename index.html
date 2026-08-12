@@ -4,12 +4,12 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>魔兽管家</title>
-<!-- 静态资源版本号：20260811.50（任务书 #22 WP3-②：凡改动 js/css 的 commit 必须同步递增此处与所有 ?v= 查询串，见 docs/开发规范.md 第五章） -->
+<!-- 静态资源版本号：20260811.55（任务书 #22 WP3-②：凡改动 js/css 的 commit 必须同步递增此处与所有 ?v= 查询串，见 docs/开发规范.md 第五章） -->
 <link rel="icon" type="image/png" sizes="32x32" href="assets/brand/favicon-32.png">
 <link rel="icon" type="image/png" sizes="16x16" href="assets/brand/favicon-16.png">
-<link rel="stylesheet" href="css/main.css?v=20260811.50">
-<link rel="stylesheet" href="css/data-public.css?v=20260811.50"><!-- 任务书 #28 WP5：副本掉落 tab（选择器全 .dp- 前缀 + #page-lootdrop 作用域，零泄漏） -->
-<script src="assets/vendor/supabase-js-2.js?v=20260811.50"></script>
+<link rel="stylesheet" href="css/main.css?v=20260811.55">
+<link rel="stylesheet" href="css/data-public.css?v=20260811.55"><!-- 任务书 #28 WP5：副本掉落 tab（选择器全 .dp- 前缀 + #page-lootdrop 作用域，零泄漏） -->
+<script src="assets/vendor/supabase-js-2.js?v=20260811.55"></script>
 </head>
 <body>
 
@@ -145,13 +145,25 @@
       <div class="nav-item" data-page="lootdrop" onclick="switchPage('lootdrop')">
         <span class="nav-icon">📖</span><span>副本掉落</span>
       </div>
-      <div class="nav-item" onclick="openUserCenter()">
+      <div class="nav-item" data-navkey="usercenter" onclick="openUserCenter()">
         <span class="nav-icon">👤</span><span>用户中心</span>
         <!-- REQ-103（任务书 #36 WP4 附加）：未读通知点宿主迁自侧栏公会行 👤 按钮，显隐条件与数据源零变化 -->
         <span class="notif-dot nav-notif-dot" id="navNotifDot"></span>
       </div>
     </nav>
     <div class="sidebar-footer">
+      <!-- 任务书 #41（REQ-112）：问题反馈入口——侧栏底部、版本号上方（版本号保持最底）。
+           次级入口非导航项（无 data-page，不参与 REQ-105 拖拽排序）；悬浮卡非 modal 不走 modalStack，
+           桌面纯 CSS hover 显隐，移动端（hover 不可用）点击切换（js/app.js initFeedbackEntry） -->
+      <div class="fb-entry" id="feedbackEntry">
+        <button type="button" class="fb-btn" id="feedbackBtn" aria-haspopup="true" aria-expanded="false">💬 问题反馈</button>
+        <div class="fb-card" id="feedbackCard" role="dialog" aria-label="QQ 群二维码">
+          <div class="fb-qr-wrap"><img src="assets/qq-group-qr.png" alt="魔兽管家用户群 QQ 群二维码"></div>
+          <div class="fb-group">魔兽管家用户群</div>
+          <button type="button" class="fb-qq" id="feedbackQqCopy" title="点击复制群号">群号：1104273954</button>
+          <div class="fb-hint">扫码或搜群号加入，反馈问题/建议</div>
+        </div>
+      </div>
       <div style="margin-top:4px" id="appVersion">v3.2.0</div>
     </div>
   </aside>
@@ -328,7 +340,14 @@
                   <div class="calendar-month" id="calendarMonth"></div>
                   <button class="icon-btn" onclick="changeMonth(1)">▶</button>
                 </div>
-                <button class="btn btn-sm" onclick="goToToday()">今天</button>
+                <!-- 任务书 #42 WP3（REQ-107）：日历密度切换（紧凑=默认一屏整月 / 舒适=原方形格），偏好服务端持久化 -->
+                <div style="display:flex;gap:8px;align-items:center">
+                  <div class="cal-density" role="group" aria-label="日历密度">
+                    <button type="button" class="cal-density-btn" data-density="compact" onclick="setCalendarDensity('compact')">紧凑</button>
+                    <button type="button" class="cal-density-btn" data-density="comfortable" onclick="setCalendarDensity('comfortable')">舒适</button>
+                  </div>
+                  <button class="btn btn-sm" onclick="goToToday()">今天</button>
+                </div>
               </div>
               <div class="calendar-weekdays">
                 <div class="calendar-weekday">日</div>
@@ -670,12 +689,15 @@
           <select id="dpSeasonSelect" class="form-select"></select>
         </div>
         <div class="dp-filterbar" id="dpFilterBar">
-          <button id="dpFilterToggle" class="btn btn-secondary dp-filter-toggle">筛选 ▾</button>
+          <div class="dp-panel-title">筛选</div>
+          <div class="dp-top-row">
+            <div class="uc-input-wrap dp-search-wrap"><input type="text" id="dpSearch" class="search-input" placeholder="搜索装备名…"><button type="button" id="dpSearchClear" class="uc-clear-btn" aria-label="清除搜索" title="清空" style="display:none">&times;</button></div>
+            <button type="button" id="dpResetFilters" class="btn btn-secondary dp-reset-btn">重置筛选</button>
+            <!-- 任务书 #43：命中计数恒显（浏览态「共 N 件」/ 筛选态「命中 X 件 · N 项生效」），两态同行 -->
+            <div class="dp-flat-head" id="dpFlatHead"></div>
+            <button id="dpFilterToggle" class="btn btn-secondary dp-filter-toggle">筛选 ▾</button>
+          </div>
           <div class="dp-filter-rows" id="dpFilterRows">
-            <div class="dp-top-row">
-              <div class="uc-input-wrap dp-search-wrap"><input type="text" id="dpSearch" class="search-input" placeholder="搜索装备名…"><button type="button" id="dpSearchClear" class="uc-clear-btn" aria-label="清除搜索" title="清空" style="display:none">&times;</button></div>
-              <button type="button" id="dpResetFilters" class="btn btn-secondary dp-reset-btn">重置筛选</button>
-            </div>
             <div class="dp-group" id="dpCategoryGroup">
               <div class="dp-group-head">分类<span class="dp-group-note">二级单选 · 三级多选</span></div>
               <div class="dp-cat-tabs" id="dpCatTabs"></div>
@@ -694,8 +716,13 @@
               <div class="dp-chips" id="dpSourceChips"></div>
               <div class="dp-chips dp-instance-row" id="dpInstanceChips" hidden></div>
             </div>
+            <!-- 任务书 #43 增补（REQ-110 定案②）：毒咒筛选组（单选 chips 全部/有毒咒；判定=行 venomcurse 非空；
+                 文案取自 LootTaxonomy.VENOMCURSE_LABEL 与 #37 录入下拉同源） -->
+            <div class="dp-group" id="dpVenomGroup">
+              <div class="dp-group-head">毒咒<span class="dp-group-note">单选</span></div>
+              <div class="dp-chips" id="dpVenomChips"></div>
+            </div>
           </div>
-          <div class="dp-flat-head" id="dpFlatHead" hidden></div>
         </div>
         <main class="dp-main" id="dpMain">
           <div class="dp-loading">数据加载中…</div>
@@ -1935,16 +1962,16 @@
   </div>
 </div>
 
-<script src="js/cloud.js?v=20260811.50"></script>
+<script src="js/cloud.js?v=20260811.55"></script>
 <!-- 任务书 #14：主数据层（快照兜底 + 加载层），须在 app.js 之前 -->
-<script src="js/masterDataSnapshot.js?v=20260811.50"></script>
-<script src="js/masterData.js?v=20260811.50"></script>
+<script src="js/masterDataSnapshot.js?v=20260811.55"></script>
+<script src="js/masterData.js?v=20260811.55"></script>
 <!-- 任务书 #22 WP2：职业/专精/职责图标集中映射（全站唯一取图处） -->
-<script src="js/iconMap.js?v=20260811.50"></script>
+<script src="js/iconMap.js?v=20260811.55"></script>
 <!-- 任务书 #31（REQ-097）：装备分类词表单一真源（公示页 chips / picker 过滤 / BUG-057 回填三处消费，须在 dataPublic.js 与 app.js 之前） -->
-<script src="js/lootTaxonomy.js?v=20260811.50"></script>
+<script src="js/lootTaxonomy.js?v=20260811.55"></script>
 <!-- 任务书 #28 WP5：副本掉落渲染层（双壳同源；无 data-public-body 不自动启动，由 app.js 懒挂载，须在 app.js 之前） -->
-<script src="js/dataPublic.js?v=20260811.50"></script>
-<script src="js/app.js?v=20260811.50"></script>
+<script src="js/dataPublic.js?v=20260811.55"></script>
+<script src="js/app.js?v=20260811.55"></script>
 </body>
 </html>

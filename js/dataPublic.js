@@ -1,3 +1,9 @@
+// 任务书 #43（2026-08-12，REQ-098 + REQ-110 定案②，= 任务书 #30 全文 + 增补合并施工）：
+// 右栏悬浮筛选面板（≥1400px，fixed 四边闭合框体、独立纵向滚动、--dp-panel-top 壳级顶偏、卡片区让位
+// margin-right）↔ 折叠顶栏（<1400px，复用 #dpFilterToggle/#dpFilterRows 一行装搜索+重置+命中计数+筛选▾，
+// sessionStorage 记忆）两态一套 DOM 同一份渲染 JS；层级规约：面板 z=10＞hover 卡 z=5＞普通卡；
+// 命中计数恒显（浏览态「共 N 件」/ 筛选态「命中 X 件 · N 项生效」）；毒咒筛选组（单选 全部/有毒咒，
+// 判定=行 venomcurse 非空，词表 LootTaxonomy.VENOMCURSE_LABEL 同源）与现有维度同构（AND/计数/重置复位）。
 // 任务书 #23 WP2：数据公示页（免登录公开，REQ-073）
 // 任务书 #28 WP2：筛选条重构（筛选规范 v2.0）——首行搜索+重置、主/副属性多选、来源单选、
 // 杂项数据层排除零渲染、「排除杂项」开关整块删除、卡片入场/筛选器展开收起动画（§7）。
@@ -48,6 +54,7 @@
     sourceInstance: '', // WP6 F2：来源实例级（实例 id，单选再点取消；仅 source=raid/dungeon 时可选）
     catL2: '', // WP6 F1：分类二级 tab（''=未选 / slot=部位 / weapon=武器 / armor=护甲）
     catSel: new Set(), // WP6 F1：分类三级已选（当前二级类目下多选 OR，与其他组 AND；切换二级清空）
+    venomOnly: false, // 任务书 #43 增补（REQ-110②）：毒咒单选（false=全部 / true=有毒咒；判定=行 venomcurse 非空）
     tierClassId: '', tierRole: '', tierSpecId: '', // 套装三维筛选（修正项②）
   };
 
@@ -164,6 +171,47 @@
     return res.json();
   }
 
+  // 任务书 #39（REQ-113）：数据拉取段独立成 loadData()——boot() 首载与 activate() 脏标记重拉共用；
+  // 重拉只换数据数组，筛选态（搜索/chips/来源/分类/赛季/视图）与折叠记忆（sessionStorage）全部守恒
+  async function loadData() {
+    const [seasons, raids, bosses, lootAll, tierSets, dungeons, classes, specs] = await Promise.all([
+      restGet('/game_seasons?select=*'),
+      restGet('/game_raids?select=*'),
+      restGet('/game_bosses?select=*'),
+      restRpc('get_public_loot_detail'), // WP3：boss_loot/dungeon_loot 两表收口 RPC（合并+实例/BOSS 预联查+杂项服务端排除，裁定③）
+      restGet('/tier_sets?select=*'),
+      restGet('/game_dungeons?select=*'),
+      restGet('/game_classes?select=*'),
+      restGet('/game_specs?select=*'),
+    ]);
+    // 杂项防线（裁定③：RPC 服务端已排除，前端过滤仅作防线）；_src 取 RPC source 字段（来源单选判定依据）
+    const lootRows = lootAll.filter(l => !isMisc(l));
+    const loot = lootRows.filter(l => l.source === 'raid').map(l => ({ ...l, _src: 'raid' }));
+    const dungeonLoot = lootRows.filter(l => l.source === 'dungeon').map(l => ({ ...l, _src: 'dungeon' }));
+    Object.assign(state, { seasons, raids, bosses, loot, tierSets, dungeons, dungeonLoot, classes, specs });
+  }
+
+  // 赛季下拉选项重渲染（选中态守恒）：原选中赛季仍在则保留，否则回落 is_current/最新（boot 首载 state.seasonId='' 自然落默认）
+  function renderSeasonOptions() {
+    const seasons = [...state.seasons].sort((a, b) => String(a.start_date || '').localeCompare(String(b.start_date || '')));
+    if (!seasons.some(s => s.id === state.seasonId)) {
+      const current = seasons.find(s => s.is_current) || seasons[seasons.length - 1];
+      state.seasonId = current ? current.id : '';
+    }
+    $('dpSeasonSelect').innerHTML = seasons.map(s =>
+      `<option value="${s.id}" ${s.id === state.seasonId ? 'selected' : ''}>${esc(s.name)}${s.is_current ? '（当前）' : ''}</option>`).join('');
+  }
+
+  // 任务书 #39（REQ-113）：脏标记重拉段——重跑数据拉取后按新数据重建数据驱动件（赛季选项/分类/来源 chips），
+  // 已选筛选 key 失效剔除由 renderCategory/renderSourceChips 自带逻辑承担；抛错由调用方兜底（保留旧数据）
+  async function reloadData() {
+    await loadData();
+    renderSeasonOptions();
+    renderCategory();
+    renderSourceChips();
+    render();
+  }
+
   async function boot() {
     main = $('dpMain'); // WP5：root 已由 mount 定，此处解析内容容器
     // 配置与登录页同源（/api/supabase-config 本为免登录端点）；失败给重试界面
@@ -181,37 +229,21 @@
     if (!state.url || !state.anon) { showError('服务配置不完整'); return; }
 
     try {
-      const [seasons, raids, bosses, lootAll, tierSets, dungeons, classes, specs] = await Promise.all([
-        restGet('/game_seasons?select=*'),
-        restGet('/game_raids?select=*'),
-        restGet('/game_bosses?select=*'),
-        restRpc('get_public_loot_detail'), // WP3：boss_loot/dungeon_loot 两表收口 RPC（合并+实例/BOSS 预联查+杂项服务端排除，裁定③）
-        restGet('/tier_sets?select=*'),
-        restGet('/game_dungeons?select=*'),
-        restGet('/game_classes?select=*'),
-        restGet('/game_specs?select=*'),
-      ]);
-      // 杂项防线（裁定③：RPC 服务端已排除，前端过滤仅作防线）；_src 取 RPC source 字段（来源单选判定依据）
-      const lootRows = lootAll.filter(l => !isMisc(l));
-      const loot = lootRows.filter(l => l.source === 'raid').map(l => ({ ...l, _src: 'raid' }));
-      const dungeonLoot = lootRows.filter(l => l.source === 'dungeon').map(l => ({ ...l, _src: 'dungeon' }));
-      Object.assign(state, { seasons, raids, bosses, loot, tierSets, dungeons, dungeonLoot, classes, specs });
+      await loadData();
     } catch (e) {
       showError(e.message || '数据加载失败');
       return;
     }
 
     // 赛季下拉：默认 is_current，无 is_current 取最新
-    const seasons = [...state.seasons].sort((a, b) => String(a.start_date || '').localeCompare(String(b.start_date || '')));
-    const current = seasons.find(s => s.is_current) || seasons[seasons.length - 1];
-    state.seasonId = current ? current.id : '';
-    $('dpSeasonSelect').innerHTML = seasons.map(s =>
-      `<option value="${s.id}" ${s.id === state.seasonId ? 'selected' : ''}>${esc(s.name)}${s.is_current ? '（当前）' : ''}</option>`).join('');
+    renderSeasonOptions();
     $('dpSeasonSelect').onchange = e => { state.seasonId = e.target.value; resetFilters(); renderSourceChips(); render(); };
 
-    // 筛选条（结构 = 筛选规范 v2.0 §2 唯一合法布局 + WP6：首行搜索+重置 → 分类组（第一组）→ 主属性组 → 副属性组 → 来源组（含实例级），区头标题层级）
+    // 筛选条（结构 = 筛选规范 v2.0 §2 布局 + 任务书 #43 两态一套 DOM：首行搜索+重置+命中计数+折叠钮 →
+    // 分类组（第一组）→ 主属性组 → 副属性组 → 来源组（含实例级）→ 毒咒组（#43 增补），区头标题层级）
     renderCategory();
     renderSourceChips();
+    renderVenomChips();
     // REQ-084（任务书 #23-补丁6）：搜索框清除钮——有内容才显示、点击/Esc 清空还原全集、焦点留输入框
     const searchInput = $('dpSearch'), searchClear = $('dpSearchClear');
     const syncSearchClear = () => { searchClear.style.display = searchInput.value ? 'block' : 'none'; };
@@ -223,19 +255,33 @@
     searchClear.onclick = clearSearch;
     // 重置筛选（任务书 #28 WP2：一键清空全部筛选 + 搜索词，还原默认全集）
     $('dpResetFilters').onclick = () => { resetFilters(); render(true); };
-    // 移动端（≤768px）筛选条整体折叠为「筛选 ▾」按钮（筛选规范 v2.0 §6）；
+    // 折叠顶栏态（<1400px，任务书 #43 断点自 ≤768 上调）：筛选组行折叠为「筛选 ▾」，首行恒显；
+    // 展开/收起双向 + sessionStorage 记忆（dp43:filterOpen）；≥1400 面板态恒展开无折叠钮；
     // 收起走 .closing 退出动画（0.2s ease-out，仅 opacity/transform），reduced-motion 直收
+    const FILTER_OPEN_KEY = 'dp43:filterOpen';
     $('dpFilterToggle').onclick = () => {
       const bar = $('dpFilterBar'), rows = $('dpFilterRows');
       const open = bar.classList.contains('filters-open');
       const reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-      if (!open) { bar.classList.add('filters-open'); $('dpFilterToggle').textContent = '筛选 ▴'; return; }
+      if (!open) {
+        bar.classList.add('filters-open'); $('dpFilterToggle').textContent = '筛选 ▴';
+        try { sessionStorage.setItem(FILTER_OPEN_KEY, '1'); } catch {}
+        return;
+      }
       $('dpFilterToggle').textContent = '筛选 ▾';
+      try { sessionStorage.setItem(FILTER_OPEN_KEY, '0'); } catch {}
       if (reduced) { bar.classList.remove('filters-open'); return; }
       if (rows.classList.contains('closing')) return; // 收起动画中防连点
       rows.classList.add('closing');
       setTimeout(() => { rows.classList.remove('closing'); bar.classList.remove('filters-open'); }, 200);
     };
+    // 折叠态记忆还原（仅折叠顶栏态生效——面板态 CSS 恒展开，类无影响）
+    try {
+      if (sessionStorage.getItem(FILTER_OPEN_KEY) === '1') {
+        $('dpFilterBar').classList.add('filters-open');
+        $('dpFilterToggle').textContent = '筛选 ▴';
+      }
+    } catch {}
 
     // 主/副属性多标签筛选（任务书 #23-补丁 修正项③：多标签 AND；
     // #23-补丁2 修正项③：筛选项为 WoW 封闭枚举固定全量——主：力量/敏捷/智力，副：爆击/急速/精通/全能，
@@ -249,10 +295,26 @@
     window.addEventListener('resize', () => {
       clearTimeout(fxResizeTimer);
       // WP5：tab 隐藏（display:none）时跳过——隐藏态量得 0 宽会污染溢出标记；回 tab 由 activate() 重测校正
-      fxResizeTimer = setTimeout(() => { if (main.getClientRects().length) measureEffectCards(); }, 150);
+      fxResizeTimer = setTimeout(() => { if (main.getClientRects().length) { measureEffectCards(); syncPanelTop(); } }, 150);
     });
 
+    syncPanelTop(); // 任务书 #43：面板顶部偏移壳级变量写入
     render();
+  }
+
+  // 任务书 #43（REQ-098）：面板顶部偏移壳级变量 ——公开壳 = .dp-header 页头高；
+  // 登录壳 = topbar 56px + 赛季行高（页头高）。实测写入 --dp-panel-top（CSS 面板态 top 消费）
+  function syncPanelTop() {
+    let top = 0;
+    if (root === document) {
+      const h = document.querySelector('.dp-header');
+      top = h ? h.offsetHeight : 0;
+      document.body.style.setProperty('--dp-panel-top', top + 'px');
+    } else {
+      const s = root.querySelector('.dp-season');
+      top = 56 + (s ? s.offsetHeight : 0);
+      if (root.style) root.style.setProperty('--dp-panel-top', top + 'px');
+    }
   }
 
   // chip 行选中态同步（值 chip 按 stateSet、全部 chip 仅当集合为空）
@@ -378,20 +440,48 @@
     state.primaryStats.clear(); state.secondaryStats.clear();
     state.source = ''; state.sourceInstance = '';
     state.catL2 = ''; state.catSel.clear();
+    state.venomOnly = false; // 任务书 #43：毒咒组一并复位
     state.tierClassId = ''; state.tierRole = ''; state.tierSpecId = '';
     $('dpSearch').value = ''; $('dpSearchClear').style.display = 'none';
     syncChipRow($('dpPrimaryChips'), state.primaryStats);
     syncChipRow($('dpSecondaryChips'), state.secondaryStats);
     renderCategory();
     renderSourceChips();
+    renderVenomChips();
+  }
+
+  // 任务书 #43 增补（REQ-110 定案②）：毒咒筛选组 chips——单选「全部 / 有毒咒」；
+  // 词表取自 LootTaxonomy.VENOMCURSE_LABEL（与 #37 数据中心录入下拉同源，禁第三份字面量）；
+  // 与现有维度同构：参与 AND 过滤、命中计数、N 项生效计数、重置复位
+  function renderVenomChips() {
+    const box = $('dpVenomChips');
+    if (!box) return;
+    const label = window.LootTaxonomy.VENOMCURSE_LABEL;
+    box.innerHTML =
+      `<span class="dp-chip dp-chip-all${state.venomOnly ? '' : ' active'}" data-v="">全部</span>` +
+      `<span class="dp-chip-divider"></span><span class="dp-chip-sub">` +
+      `<span class="dp-chip${state.venomOnly ? ' active' : ''}" data-v="1">有${esc(label)}</span>` +
+      `</span>`;
+    box.querySelectorAll('.dp-chip').forEach(ch => {
+      ch.onclick = () => {
+        state.venomOnly = ch.dataset.v === '1';
+        renderVenomChips();
+        render(true);
+      };
+    });
   }
 
   const hasLootFilter = () => !!(state.search || state.primaryStats.size || state.secondaryStats.size || state.source
-    || state.sourceInstance || state.catSel.size);
+    || state.sourceInstance || state.catSel.size || state.venomOnly);
 
-  // WP6 F3：筛选态平铺——内容类条件（搜索/分类三级/主属性/副属性）任一激活即平铺；
+  // 任务书 #43：生效条件计数（「N 项生效」）——搜索/来源/实例/毒咒各计 1，分类三级/主/副属性按已选 chip 逐个计
+  const activeFilterCount = () => (state.search ? 1 : 0) + state.catSel.size
+    + state.primaryStats.size + state.secondaryStats.size
+    + (state.source ? 1 : 0) + (state.sourceInstance ? 1 : 0) + (state.venomOnly ? 1 : 0);
+
+  // WP6 F3：筛选态平铺——内容类条件（搜索/分类三级/主属性/副属性/毒咒）任一激活即平铺；
   // 仅选来源（含实例级）保持浏览态；分类仅打开二级 tab 未选 chip 不算激活
-  const isFlatMode = () => !!(state.search || state.primaryStats.size || state.secondaryStats.size || state.catSel.size);
+  const isFlatMode = () => !!(state.search || state.primaryStats.size || state.secondaryStats.size || state.catSel.size || state.venomOnly);
 
   // ---- 筛选（搜索 AND；分类三级 OR（组内）AND（跨组）；主/副属性标签 AND；来源单选+实例级等值） ----
   // P4（WP6 补丁）：matchExcept(l, skip) 供联动置灰计算「除本组外」的命中数；skip=null 即全条件
@@ -405,6 +495,8 @@
       if (defs.length && !defs.some(d => d.match(l))) return false;
     }
     if (state.search && !String(l.item_name || '').toLowerCase().includes(state.search)) return false;
+    // 任务书 #43 增补：毒咒单选——「有毒咒」判定 = 行 venomcurse 非空（RPC 白名单透出，客户端筛选零 schema）
+    if (skip !== 'venom' && state.venomOnly && !String(l.venomcurse || '').trim()) return false;
     // 主/副属性：多标签 AND（选中标签必须全部出现在该装备对应数组中）
     if (skip !== 'primary' && state.primaryStats.size && ![...state.primaryStats].every(s => (l.primary_stats || []).includes(s))) return false;
     if (skip !== 'secondary' && state.secondaryStats.size && ![...state.secondaryStats].every(s => (l.secondary_stats || []).includes(s))) return false;
@@ -754,15 +846,13 @@
         ${secHead('sec:tiers', '套装一览', tierFiltersHtml)}
         ${tiersBody}
       </section>`;
-    // P4-再补②（WP6 补丁三轮）：「命中 N 件」并入吸顶筛选条末行恒可见（旧位置在主内容流，
-    // 滚动时被吸顶区半裁遮盖并停留）；浏览态隐藏
+    // 任务书 #43（REQ-098）：命中计数恒显——浏览态「共 N 件」/ 筛选态「命中 X 件 · N 项生效」（两态同行首行内）
     const flatHead = $('dpFlatHead');
     if (flat) {
-      // 平铺态：命中卡片直接铺满网格，命中计数在吸顶条末行（上方 flatHead）；0 命中空态 + 重置引导；
+      // 平铺态：命中卡片直接铺满网格；0 命中空态 + 重置引导；
       // 来源（含实例级）退化为纯过滤（matchItem 已收口，不触发折叠/分组）
       const items = flatOrderedItems();
-      flatHead.innerHTML = `命中 <span class="dp-count">${items.length}</span> 件`;
-      flatHead.hidden = false;
+      flatHead.innerHTML = `命中 <span class="dp-count">${items.length}</span> 件 · ${activeFilterCount()} 项生效`;
       main.innerHTML = `<section class="dp-section">
         ${items.length
           ? `<div class="dp-items">${items.map(itemCard).join('')}</div>`
@@ -771,7 +861,7 @@
       const emptyReset = $('dpEmptyReset');
       if (emptyReset) emptyReset.onclick = () => { resetFilters(); render(true); };
     } else {
-      flatHead.hidden = true;
+      flatHead.innerHTML = `共 <span class="dp-count">${seasonLoot().length}</span> 件`;
       // 浏览态：双池堆叠 + 实例/BOSS 分组 + R6 来源联动折叠（F2 实例级经 matchItem 收口，
       // 未选中实例的分组零命中自然不渲染 = 本池只剩该实例分组）
       const showRaids = state.source !== 'dungeon';
@@ -813,8 +903,12 @@
 
   // WP5：双宿主挂载入口——公开壳（data.html，body.data-public-body）自动挂 document 立即启动；
   // 登录壳 tab（index.html #page-lootdrop）由 app.js 首次切入时 mount(容器) 懒启动（每文档仅一次，幂等）；
-  // activate() 供 tab 再次切入时重测特效溢出（隐藏期间 resize 被可见性守卫跳过，归来校正）
+  // activate() 供 tab 再次切入时：①有脏标记（数据中心写成功置 window.__dpLootDirty，任务书 #39 REQ-113）
+  // → 重拉数据并重渲染（筛选态守恒；失败保留旧数据+toast，标记留待下次重试，不白屏）；②无脏标记 → 只重测
+  // 特效溢出（隐藏期间 resize 被可见性守卫跳过，归来校正），零额外请求。
+  // 公开壳无编辑入口、整页刷新即 boot，不在脏标记链路内。
   let started = false;
+  let reloading = false; // 重拉防重入（进行中的 activate 不再叠加请求）
   window.DPLootDrop = {
     mount(el) {
       if (started) return;
@@ -823,7 +917,20 @@
       boot();
     },
     activate() {
-      if (started && main && main.getClientRects().length) measureEffectCards();
+      if (!started || !main || !main.getClientRects().length) return;
+      if (window.__dpLootDirty) {
+        if (reloading) return;
+        reloading = true;
+        reloadData()
+          .then(() => { window.__dpLootDirty = false; })
+          .catch(e => {
+            console.warn('[diag] DPLootDrop 脏标记重拉失败，保留旧数据:', e && e.message);
+            if (typeof showToast === 'function') showToast('副本掉落数据刷新失败，已保留原数据', 'warning'); // 公开壳无 showToast，天然跳过
+          })
+          .finally(() => { reloading = false; });
+        return;
+      }
+      measureEffectCards();
     },
   };
   if (document.body.classList.contains('data-public-body')) window.DPLootDrop.mount(document);

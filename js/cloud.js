@@ -1457,6 +1457,44 @@
     }
   }
 
+  // ==================== 任务书 #42（REQ-105/107）：用户偏好统一列 preferences ====================
+  // user_profiles.preferences jsonb 单列（sql/27）：nav_order（侧栏导航顺序，页签 key 数组）/
+  // calendar_density（考勤日历密度 compact/comfortable）等 UI 偏好统装一列，逐键增量读写。
+  // 写 = DB-first：SDK 直连（RLS 限本人）→ 成功后更新内存缓存；失败抛错由调用方 toast + 界面回滚（禁假成功）。
+  let userPreferences = {};
+  async function loadPreferences() {
+    if (!isCloudMode || !currentUser) { userPreferences = {}; return userPreferences; }
+    try {
+      const { data, error } = await supabaseClient
+        .from('user_profiles').select('preferences').eq('user_id', currentUser.id).single();
+      if (error && error.code !== 'PGRST116') throw error;
+      const p = data && data.preferences;
+      userPreferences = (p && typeof p === 'object' && !Array.isArray(p)) ? p : {};
+    } catch (e) {
+      console.warn('[diag] 偏好加载失败，使用默认:', e && e.message);
+      userPreferences = {};
+    }
+    return userPreferences;
+  }
+  function getPreference(key, dflt) {
+    const v = userPreferences[key];
+    return v === undefined ? dflt : v;
+  }
+  // 单键增量写：先读最新（防跨设备/多标签覆盖其它键）→ 合并单键 → upsert → 更新内存
+  async function savePreference(key, value) {
+    if (!isCloudMode || !currentUser) throw new Error('未登录');
+    const { data, error } = await supabaseClient
+      .from('user_profiles').select('preferences').eq('user_id', currentUser.id).maybeSingle();
+    if (error) throw error;
+    const cur = (data && data.preferences && typeof data.preferences === 'object' && !Array.isArray(data.preferences)) ? data.preferences : {};
+    const next = { ...cur, [key]: value };
+    const { error: e2 } = await supabaseClient
+      .from('user_profiles').upsert({ user_id: currentUser.id, preferences: next }, { onConflict: 'user_id' });
+    if (e2) throw e2;
+    userPreferences = next;
+    return next;
+  }
+
   // 保存用户资料
   // 任务书 #21 WP1-④：账号显示名唯一真源 = auth user_metadata.display_name，禁止第二写入点——
   // 不再写 user_profiles.display_name；保存后立即更新本地缓存用户，右上角等读取处即时生效。
@@ -1728,6 +1766,9 @@
     // 用户中心
     getUserProfile: getUserProfile,
     saveUserProfile: saveUserProfile,
+    loadPreferences: loadPreferences, // 任务书 #42
+    getPreference: getPreference,
+    savePreference: savePreference,
     getUserCharacters: getUserCharacters,
     saveUserCharacter: saveUserCharacter,
     deleteUserCharacter: deleteUserCharacter,

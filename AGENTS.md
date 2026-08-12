@@ -89,7 +89,7 @@
 
 11. **更新日志**（page:changelog） - 版本历史
 
-12. **副本掉落**（page:lootdrop + data.html） - REQ-086 收官（任务书 #28 WP5，原「数据公示」更名）：双壳同一渲染层 js/dataPublic.js（window.DPLootDrop，单一真源禁复制）——登录壳 = 主应用 #page-lootdrop 页签（app.js ensureLootdropMounted 懒挂载，切回 activate 重测；筛选条吸顶 top:56px 让开 topbar，层级规约 筛选条10＞hover卡5 同效），公开壳 = data.html 免登录可分享（body.data-public-body 自动挂载，URL 不动）；anon 直连 PostgREST（字典表 + 公开 RPC get_public_loot_detail，**显式字段白名单——boss_loot/dungeon_loot 加列须 CREATE OR REPLACE 才透出**），全角色只读；毒咒徽标（REQ-110，任务书 #37：venomcurse 列非空时装备卡 meta 行渲染绿色 .dp-tag-venom，sql/26；数据中心录入=预设下拉 无/毒咒 禁自由输入；插件采集与筛选项为后续批次）
+12. **副本掉落**（page:lootdrop + data.html） - REQ-086 收官（任务书 #28 WP5，原「数据公示」更名）：双壳同一渲染层 js/dataPublic.js（window.DPLootDrop，单一真源禁复制）——登录壳 = 主应用 #page-lootdrop 页签（app.js ensureLootdropMounted 懒挂载，切回 activate 重测；筛选条吸顶 top:56px 让开 topbar，层级规约 筛选条10＞hover卡5 同效），公开壳 = data.html 免登录可分享（body.data-public-body 自动挂载，URL 不动）；anon 直连 PostgREST（字典表 + 公开 RPC get_public_loot_detail，**显式字段白名单——boss_loot/dungeon_loot 加列须 CREATE OR REPLACE 才透出**），全角色只读；毒咒徽标（REQ-110，任务书 #37：venomcurse 列非空时装备卡 meta 行渲染绿色 .dp-tag-venom，sql/26；数据中心录入=预设下拉 无/毒咒 禁自由输入；插件采集为后续批次）；任务书 #39（REQ-113）：脏标记即时刷新——MasterData 写成功统一口置 window.__dpLootDirty（9 张被消费字典表），activate() 脏则重拉数据段（筛选态/折叠记忆守恒、失败保旧数据+toast+标记留存重试）、不脏零请求只重测溢出；任务书 #43（REQ-098+REQ-110②，=#30 全文+增补）：右栏悬浮筛选面板（≥1400px fixed 四边闭合、独立滚动、--dp-panel-top 壳级顶偏、卡片区让位 margin-right:292px）↔ 折叠顶栏（<1400px 首行恒显+dp43:filterOpen 记忆）两态一套 DOM、命中计数恒显（共 N 件/命中 X 件 · N 项生效）、毒咒筛选组（单选 全部/有毒咒=行 venomcurse 非空，词表 LootTaxonomy.VENOMCURSE_LABEL 与 #37 录入下拉同源）、层级规约 面板 z=10＞hover 卡 z=5
 
 ## 云端架构
 
@@ -167,7 +167,7 @@
 
 * 加载层 `js/masterData.js`（window.MasterData）：登录后并行拉 9 表 + 5s 超时 + `js/masterDataSnapshot.js` 内置快照兜底（失败 toast 不白屏）；访问函数 getRaids/getBosses/getClasses/getSpecs/getCurrentSeason/getDungeons/getLoot/getTierSets；写助手 mdInsert/mdUpdate/mdDelete/mdUpsert
 
-* 维护页「数据中心」（侧边栏 tab，仅超管可见 + switchPage 守卫）：9 区块 CRUD + 字典导入器（数据源=内置快照 masterDataSnapshot.js，幂等 upsert，BUG-046 起不再依赖外部文件）+ 掉落批量录入
+* 维护页「数据中心」（侧边栏 tab，仅超管可见 + switchPage 守卫）：9 区块 CRUD + 字典导入器（数据源=内置快照 masterDataSnapshot.js，幂等 upsert，BUG-046 起不再依赖外部文件）+ 掉落批量录入；掉落双表单 slot/item_type 为纯 select 词表下拉（任务书 #40 / REQ-114：选项唯一真源 = js/lootTaxonomy.js 的 DC_SLOT_OPTIONS 19 项/DC_ITEM_TYPE_OPTIONS 33 项，库内全量现存值覆盖；mdOpenEditor select 分支通用原值兜底——词表外存量值作额外选项插入并选中不强制改写）
 
 * 消费方统一走 app.js 访问层：getGameRaidNames/getGameBossNames/getGameSpecs/getGameRaidType/getGameCurrentSeasonStart（MasterData 优先，常量回退）；REQ-018 本赛季口径读 game_seasons.is_current
 
@@ -212,6 +212,10 @@
 * server.js 启动时解析项目根目录 .env（手写解析，零依赖），提供 `/api/supabase-config` 返回 Supabase URL 和 Anon Key
 
 * server.js 提供 `/api/db/rest/v1/*` 代理写入接口（JWT 验证 + 公会级鉴权后，用 service_role key 写入）
+
+* 用户偏好统一列（任务书 #42，REQ-105/107，sql/27）：`user_profiles.preferences` jsonb 单列装全部 UI 偏好（nav_order=侧栏导航拖拽排序页签 key 数组 / calendar_density=考勤日历密度 compact 默认紧凑/comfortable 舒适）；CloudSync.loadPreferences/getPreference/savePreference（单键增量写=先读最新合并再 upsert，失败抛错调用方 toast+界面回滚禁假成功）；登录/切公会后 showAppView 挂 loadUserPreferences；导航拖拽=零依赖原生 HTML5 DnD（落定一次写、<768px 或触屏禁拖、残留 key 忽略+缺失 key 追加尾部、「问题反馈」按钮与版本号区在 .sidebar-footer 不参与）；日历紧凑=纯 CSS 收密（.calendar-days.cal-compact），条目数守恒硬约束
+
+* 问题反馈入口（任务书 #41，REQ-112）：侧栏 footer 版本号上方「💬 问题反馈」按钮（渐变高亮 hover 双向纯 CSS+reduced-motion 降级），hover 悬浮 QQ 群卡（assets/qq-group-qr.png 浅色卡托+群名+群号复制）；粗指针/≤768 点击切换、点外/ESC 关闭（app.js initFeedbackEntry）；真手机侧栏 display:none 属移动封存已知取舍
 
 * cloud.js 中写入操作通过 `dbInsert/dbUpdate/dbDelete` 代理函数，读取操作直接使用 Supabase SDK
 
