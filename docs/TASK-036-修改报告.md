@@ -74,7 +74,7 @@
 | notif-dot 迁 nav | **显隐条件/数据源零变化**（同一 loadNotifications 同一 unreadCount），仅宿主与定位样式 | D2 computed 断言 | 无（运营放行附加项） |
 | #sidebarUser 死元素移除 | 无任何写入点（updateCloudUI 原为死读），空 div 无渲染 | grep + 截图 | 无 |
 | 左上角公会卡 | **WP3 零改动**：侦察即确认无交互；#guildName 仍走 BUG-073 真源 | C1 + task35 A1 采样回归 | 无 |
-| task29/task35 断言更新 | **裁定驱动非放宽**：C4/C5/A1 新口径断言更贴近现行规格（菜单仅退出、trigger 昵称跟随、采样单点恒定） | 两脚本复跑全绿 | 无 |
+| task29/task35 断言更新 | **裁定驱动非放宽**：C4/C5/A1 新口径断言更贴近现行规格（菜单仅退出、trigger 昵称跟随、采样单点恒定）；task35 A1（#guildBarName 随 WP4 移除失效）超出原放行 C4/C5 字面范围，属同一裁定必然延伸，**运营 2026-08-11 追认放行** | 两脚本复跑全绿 | 无 |
 
 ## 五、§4 数据样本前提声明
 
