@@ -2201,6 +2201,9 @@ async function loadUserPreferences() {
 // nav key = data-page（页签项）；「用户中心」无 data-page，以 data-navkey="usercenter" 参与；
 // 「问题反馈」按钮与版本号区在 .sidebar-footer，非 .nav-menu .nav-item，不参与排序。
 // 默认序 = DOM 原序（无偏好时）；nav_order 数组外残留 key 忽略、缺失 key 追加尾部（防版本演进键对不上卡死）。
+// BUG-078（任务书 #44 WP1）：DOM 原序须在任何重排前快照——「无偏好=当前 DOM 序」在拖拽重排后已失真
+// （DOM 残留上一账号的序，同浏览器换号登录被当成默认序，即导航串号病灶）；无偏好时回快照默认序。
+let defaultNavOrder = null;
 function navKeyOf(item) { return item.dataset.page || item.dataset.navkey || ''; }
 function currentNavOrder() {
   return [...document.querySelectorAll('.nav-menu .nav-item')].map(navKeyOf).filter(Boolean);
@@ -2209,15 +2212,17 @@ function applyNavOrder(forced) {
   const menu = document.querySelector('.nav-menu');
   if (!menu) return;
   const pref = forced || (window.CloudSync && CloudSync.getPreference ? CloudSync.getPreference('nav_order', null) : null);
-  if (!Array.isArray(pref) || !pref.length) return; // 默认序 = DOM 原序
+  // 无偏好 → 回默认序快照（不再早退：DOM 可能残留上一账号的序，BUG-078）
+  const order = (Array.isArray(pref) && pref.length) ? pref : defaultNavOrder;
+  if (!Array.isArray(order) || !order.length) return;
   const items = [...menu.querySelectorAll('.nav-item')];
   const byKey = {};
   items.forEach(it => { const k = navKeyOf(it); if (k && !byKey[k]) byKey[k] = it; });
   const used = new Set();
-  pref.forEach(k => { // 数组外残留 key（已下线页签）忽略
+  order.forEach(k => { // 数组外残留 key（已下线页签）忽略
     if (byKey[k] && !used.has(k)) { menu.appendChild(byKey[k]); used.add(k); }
   });
-  items.forEach(it => { const k = navKeyOf(it); if (!used.has(k)) menu.appendChild(it); }); // 缺失 key 按 DOM 原序追加尾部
+  items.forEach(it => { const k = navKeyOf(it); if (!used.has(k)) menu.appendChild(it); }); // 缺失 key 按原序追加尾部
 }
 let navDragEl = null;
 let navOrderBeforeDrag = null;
@@ -2229,6 +2234,7 @@ function refreshNavDraggable() {
 function initNavDragSort() {
   const menu = document.querySelector('.nav-menu');
   if (!menu) return;
+  defaultNavOrder = currentNavOrder(); // BUG-078：任何重排前快照 DOM 原序（本函数在脚本末尾执行，早于一切登录/拖拽）
   refreshNavDraggable();
   window.addEventListener('resize', refreshNavDraggable);
   menu.addEventListener('dragstart', (e) => {
@@ -7087,6 +7093,45 @@ function lootFillAssignedTo(name) {
 // ==================== 更新日志 ====================
 const changelogData = [
   {
+    id: 'v3.2.0-bug078-nav-cross-account',
+    version: 'v3.2.0',
+    date: '2026-08-13',
+    type: 'fix',
+    typeLabel: '问题修复',
+    title: '侧栏导航跨账号串号修复（任务书 #44 WP1，BUG-078）',
+    summary: '同浏览器 A 账号拖拽调序→退出→B 账号登录，侧栏串了 A 的序。根因在前端换号残留：导航 DOM 重排后不还原、「无偏好=当前 DOM 序」把残留序当默认序、偏好内存态登出不清。修复：登出清偏好内存态与本地数据缓存、导航回默认序快照、登录后以当前用户 nav_order 为准（加载完成前默认序不抢跑）。',
+    details: [
+      'DOM 原序在任何重排前快照为默认序（initNavDragSort），无偏好时主动回快照而非沿用当前 DOM',
+      '「上次公会」localStorage 键加用户维度（wow_raid_last_guild:{userId}），旧全局键不迁移、开键即删自然废弃',
+      '服务端隔离本正常（任务书 #42 B14 口径），本修为纯前端收口，零 schema 零依赖'
+    ]
+  },
+  {
+    id: 'v3.2.0-bug079-back-to-today',
+    version: 'v3.2.0',
+    date: '2026-08-13',
+    type: 'fix',
+    typeLabel: '问题修复',
+    title: '考勤日历「今天」按钮更名「回到今天」（任务书 #44 WP2，BUG-079）',
+    summary: '考勤日历视图翻页后回当月的按钮文案由「今天」改为「回到今天」，语义更明确。全站 grep 同义按钮扫齐，仅此一处（仪表盘「今日出勤」为统计标签非按钮，不动）。',
+    details: [
+      'goToToday() 逻辑零改动，纯文案；点击回当月主链路真浏览器实测'
+    ]
+  },
+  {
+    id: 'v3.2.0-req115-panel-slim',
+    version: 'v3.2.0',
+    date: '2026-08-13',
+    type: 'improve',
+    typeLabel: '体验优化',
+    title: '副本掉落右栏筛选面板减重（任务书 #44 WP3，REQ-115）',
+    summary: '≥1400px 悬浮筛选面板由「贴顶拉满到 viewport 底部」改为高度随内容收缩：height:auto + max-height（100vh − 顶部偏移 − 底部余量），内容超出才内部滚动。框体四边闭合、264px 宽、z=10 层级、两态一套 DOM 全部不动。',
+    details: [
+      '公开壳（data.html）与登录壳（#page-lootdrop）同一条公式，壳级 --dp-panel-top 变量回退值各自兜底',
+      '1366（折叠顶栏态 sticky）/1920（面板态）双分辨率双壳实测入报告'
+    ]
+  },
+  {
     id: 'v3.2.0-req097-picker-taxonomy',
     version: 'v3.2.0',
     date: '2026-08-11',
@@ -8775,7 +8820,7 @@ async function init() {
         await window.CloudSync.loadUserGuilds();
         const guilds = window.CloudSync.getUserGuilds();
         if (guilds.length > 0) {
-          const lastGuildId = localStorage.getItem('wow_raid_last_guild');
+          const lastGuildId = window.CloudSync.getLastGuildId ? window.CloudSync.getLastGuildId() : null; // BUG-078：用户维度键
           const guild = guilds.find(g => g.id === lastGuildId) || guilds[0];
           if (guild) {
             await window.CloudSync.selectGuild(guild.id);

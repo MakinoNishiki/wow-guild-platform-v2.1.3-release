@@ -119,11 +119,11 @@
     position: fixed;
     top: calc(var(--dp-panel-top, 0px) + 12px);
     right: 12px;
-    bottom: 12px;
     left: auto;
     width: 264px;
     max-width: none;
-    height: auto;
+    height: auto; /* REQ-115（任务书 #44 WP3）：面板减重——高度随内容收缩，不再 bottom 拉满全高 */
+    max-height: calc(100vh - var(--dp-panel-top, 0px) - 24px); /* 顶部偏移+上 12 间距+下 12 底部余量，超出才内部滚动 */
     margin: 0;
     padding: 14px;
     flex-direction: column;
@@ -508,7 +508,8 @@
   #page-lootdrop .dp-filterbar { top: 56px; }
 }
 @media (min-width: 1400px) {
-  #page-lootdrop .dp-filterbar { top: calc(var(--dp-panel-top, 56px) + 12px); }
+  /* REQ-115：登录壳 max-height 回退值同步（var 未写入前按 topbar 56 兜底，JS 实测写入后两壳同一条公式） */
+  #page-lootdrop .dp-filterbar { top: calc(var(--dp-panel-top, 56px) + 12px); max-height: calc(100vh - var(--dp-panel-top, 56px) - 24px); }
 }
 #page-lootdrop .dp-main { padding-bottom: 200px; }
 #page-lootdrop .dp-season { max-width: 1100px; margin: 0 auto 4px; padding: 0 20px; justify-content: flex-end; }

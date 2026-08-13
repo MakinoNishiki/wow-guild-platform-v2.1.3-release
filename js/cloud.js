@@ -340,11 +340,22 @@
     return currentTagNum ? `${name}#${currentTagNum}` : '';
   }
 
+  // BUG-078（任务书 #44 WP1）：「上次公会」键加用户维度——旧全局键 wow_raid_last_guild 同浏览器
+  // 跨账号共用，A 退出后 B 登录读到 A 的公会 id（前端换号残留之一）。旧全局键不迁移（跨账号
+  // 迁移正是病灶），各读写点开键即删，自然废弃。
+  function lastGuildStorageKey() {
+    return `wow_raid_last_guild:${(currentUser && currentUser.id) || 'anonymous'}`;
+  }
+  function getLastGuildId() {
+    return localStorage.getItem(lastGuildStorageKey());
+  }
+
   // ---- 清除当前公会上下文（BUG-015：退出公会后调用，不登出） ----
   function clearCurrentGuild() {
     currentGuild = null;
     currentMembership = null;
-    localStorage.removeItem('wow_raid_last_guild');
+    localStorage.removeItem(lastGuildStorageKey());
+    localStorage.removeItem('wow_raid_last_guild'); // 旧全局键废弃清理（BUG-078）
   }
 
   // ---- 获取当前用户 ----
@@ -370,7 +381,8 @@
       ensureTagNum().then((tn) => {
         if (tn && typeof updateCloudUI === 'function') updateCloudUI();
       }).catch(() => {});
-      const lastGuildId = localStorage.getItem('wow_raid_last_guild');
+      localStorage.removeItem('wow_raid_last_guild'); // 旧全局键不迁移，读前清除（BUG-078）
+      const lastGuildId = getLastGuildId();
       const guild = userGuilds.find(g => g.id === lastGuildId) || userGuilds[0];
       if (guild) {
         await selectGuild(guild.id);
@@ -388,6 +400,12 @@
   // ---- 用户登出后 ----
   function onUserSignedOut() {
     isCloudMode = false;
+    // BUG-078（任务书 #44 WP1）：登出清偏好内存态与本地数据缓存——否则同浏览器换号后，
+    // 新账号在自身偏好加载完成前沿用上一账号的 nav_order/calendar_density（导航串号病灶）。
+    userPreferences = {};
+    try { localStorage.removeItem('wow_raid_attendance_data'); } catch { /* 忽略 */ }
+    // 侧栏导航回默认序（无偏好 → applyNavOrder 落 DOM 原序快照，见 app.js BUG-078 段）
+    if (typeof window.applyNavOrder === 'function') window.applyNavOrder();
     // BUG-012：登出时清除 viewer 权限门状态
     if (typeof document !== 'undefined') document.body.classList.remove('viewer-mode');
     showAuthView();
@@ -439,7 +457,7 @@
     if (memberError) throw memberError;
     currentMembership = memberData;
 
-    localStorage.setItem('wow_raid_last_guild', guildId);
+    localStorage.setItem(lastGuildStorageKey(), guildId); // BUG-078：用户维度键，跨账号不串
 
     await loadCloudData();
     updateGuildUI();
@@ -1743,6 +1761,7 @@
     updateMemberRole: updateMemberRole,
     removeGuildMember: removeGuildMember,
     clearCurrentGuild: clearCurrentGuild,
+    getLastGuildId: getLastGuildId, // BUG-078（任务书 #44 WP1）：用户维度「上次公会」读取
     deleteGuild: deleteGuildCloud,
     leaveGuild: leaveGuildCloud,
     resetGuildData: resetGuildDataCloud,

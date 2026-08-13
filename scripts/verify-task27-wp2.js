@@ -78,9 +78,16 @@ function assert(cond, label, detail) {
   const M4 = byName('零历史', '正式'), M5 = byName('离队回归', '正式');
 
   // 活动 A1/A2 + 考勤（member_name 快照按应用行为一并写入）
+  // 2026-08-13 维护（任务书 #44 回归期）：活动日期由硬编码 2026-08-05/06 改动态（昨天/今天）——
+  // 报表页默认 7 天范围（BUG-014 口径），硬编码日期随时间漂移出窗致「排名表含已删除伪行」断言
+  // 假性失败（HEAD 基线同证：产品行为正确，纯脚本日期漂移）。
+  const fmtD = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const nowD = new Date();
+  const dateA1 = fmtD(new Date(nowD.getFullYear(), nowD.getMonth(), nowD.getDate() - 1));
+  const dateA2 = fmtD(nowD);
   const acts = await svc('POST', '/rest/v1/activities', [
-    { guild_id: guildId, name: 'T27活动一', activity_date: '2026-08-05', raid: '虚影尖塔', boss: '', status: 'normal' },
-    { guild_id: guildId, name: 'T27活动二', activity_date: '2026-08-06', raid: '虚影尖塔', boss: '', status: 'normal' },
+    { guild_id: guildId, name: 'T27活动一', activity_date: dateA1, raid: '虚影尖塔', boss: '', status: 'normal' },
+    { guild_id: guildId, name: 'T27活动二', activity_date: dateA2, raid: '虚影尖塔', boss: '', status: 'normal' },
   ]);
   if (acts.status !== 201) throw new Error('活动插入失败: ' + JSON.stringify(acts.body));
   const A1 = acts.body.find(a => a.name === 'T27活动一'), A2 = acts.body.find(a => a.name === 'T27活动二');
