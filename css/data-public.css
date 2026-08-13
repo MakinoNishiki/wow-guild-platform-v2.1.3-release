@@ -270,6 +270,7 @@
 /* P1（WP6 补丁，运营 2026-08-09 体验终审）：hover 形态重构——卡片本体（含边框）向下生长，
    外层 .dp-item 仅作网格占位（JS 对溢出卡预设折叠态 minHeight，hover 时 inner 转 absolute 不塌网格） */
 .dp-item-inner {
+  position: relative; /* REQ-092（任务书 #46 WP3）：图标 absolute 定位锚点；has-effect 卡 :417 改 absolute 时仍是定位祖先后代锚定不变，叠加默认值不冲突 */
   background: var(--bg-card);
   border: 1px solid var(--border-color);
   border-radius: 8px;
@@ -280,8 +281,19 @@
   height: 100%;
   box-sizing: border-box;
 }
-/* 任务书 #28 WP3-v3（R3）：名称行单行截断、内容驱动（废恒占行高） */
-.dp-item-name { font-size: 13px; font-weight: 600; color: var(--gold); margin-bottom: 6px; line-height: 18px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* REQ-092（任务书 #46 WP3）：装备图标——inner 右上角，随卡 hover 生长一并移动；
+   空值/加载失败由渲染层保证不渲染/隐藏，此处无占位态 */
+.dp-item-icon {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 22px;
+  height: 22px;
+  border-radius: 4px;
+}
+/* 任务书 #28 WP3-v3（R3）：名称行单行截断、内容驱动（废恒占行高）；
+   REQ-092（任务书 #46 WP3）：padding-right 给右上角图标留位，防长名压图 */
+.dp-item-name { font-size: 13px; font-weight: 600; color: var(--gold); margin-bottom: 6px; line-height: 18px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-right: 26px; }
 /* meta 行单行（部位/类型，溢出隐藏不换行；无星标，overflow 保留） */
 .dp-item-meta { display: flex; flex-wrap: nowrap; overflow: hidden; gap: 4px; }
 /* 装备/套装 meta 标签同并轨：几何同 .tag（字重 400→600、圆角 4→5、高 18→20），

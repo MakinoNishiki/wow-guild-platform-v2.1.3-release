@@ -169,7 +169,7 @@ async function panelSnapshot(page, scope) {
   const htmlIndex = await (await fetch(`${BASE}/`)).text();
   const verOf = h => [...new Set([...h.matchAll(/20260811\.\d+/g)].map(m => m[0]))];
   const vD = verOf(htmlData), vI = verOf(htmlIndex);
-  check('A1 版本串两壳同步（单一串且两壳一致；本包 .56）', vD.length === 1 && vI.length === 1 && vD[0] === vI[0] && vI[0] === '20260811.56', `index=${vI} data=${vD}`);
+  check('A1 版本串两壳同步（单一串且两壳一致；本包 .56 起）', vD.length === 1 && vI.length === 1 && vD[0] === vI[0] && parseInt(vI[0].split('.')[1], 10) >= 56, `index=${vI} data=${vD}`);
   const a2 = htmlIndex.includes('onclick="goToToday()">回到今天</button>') && !htmlIndex.includes('onclick="goToToday()">今天</button>');
   check('A2 BUG-079 静态：日历按钮「回到今天」且旧文案零残留', a2);
   const cloudSrc = fs.readFileSync(path.join(ROOT, 'js', 'cloud.js'), 'utf8');

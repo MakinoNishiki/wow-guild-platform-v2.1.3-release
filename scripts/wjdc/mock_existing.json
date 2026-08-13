@@ -6,6 +6,7 @@
       "slot": "头部",
       "item_type": "布甲",
       "official_item_id": 240001,
+      "icon_id": 463518,
       "effect": "装备：你的暗影法术有几率召唤一只织影蛛为你作战。",
       "primary_stats": ["智力"],
       "secondary_stats": ["爆击", "急速"]
@@ -39,6 +40,8 @@
       "slot": "手指",
       "item_type": "戒指",
       "official_item_id": "250001",
+      "icon_id": 237274,
+      "venomcurse": "毒咒",
       "effect": "装备：站立不动时每秒恢复 1% 生命值。",
       "primary_stats": null,
       "secondary_stats": ["急速", "全能"]

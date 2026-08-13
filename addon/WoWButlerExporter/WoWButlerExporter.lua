@@ -14,8 +14,17 @@
 --   （{lfr/normal/heroic/mythic} 枚举 key，只记存在的档）；
 --   切档通道不可用自动回退单档采集（tiers 不产出）并红字报告；
 --   大秘境无四难度（钥石层数缩放）不产 tiers；原字段格式零改动、向后兼容）
+-- （1.0.8：跳号——追平登记口径，无功能变更）
+-- （1.0.9：四合一（任务书 #46）——
+--   ①特效补采 REQ-088：装备/使用特效行匹配前剥离行首色码 |cffRRGGBB、
+--     图标码 |T..|t 与前导空白（纯文本行零影响），修复色码个体级致 effect 空串；
+--   ②毒咒采集 REQ-110③：tooltip 品质行下绿字独立行，剥色码后整行恰为「毒咒」
+--     → loot 行新增 venomcurse 字段（无毒咒为空串）；
+--   ③iconID REQ-092：GetItemInfo 第 10 返回值（icon fileID）透传，loot 行新增 iconID；
+--   ④probe 物品级诊断加 tooltip 全行原样 dump（| 转义 || 可见化），供真机定论 REQ-088 取证；
+--   原字段格式零改动、向后兼容）
 -- ============================================================
-local ADDON_VERSION = "1.0.7"
+local ADDON_VERSION = "1.0.9"
 
 local function msg(s) DEFAULT_CHAT_FRAME:AddMessage("|cffffd200[wjdc]|r " .. s) end
 local function err(s) DEFAULT_CHAT_FRAME:AddMessage("|cffff4040[wjdc]|r " .. s) end
@@ -77,7 +86,24 @@ local function addUnique(list, v)
 end
 
 -- 属性行解析（1.0.7 抽公共）："+1,234 爆击" → 名 + 数值（千分位逗号剥离）；
--- d.effect 字段缺省时跳过特效提取（四档重扫只取数值，不重复解析特效）
+-- d.effect 字段缺省时跳过特效提取（四档重扫只取数值，不重复解析特效）；
+-- d.venomcurse 同理（1.0.9）：缺省跳过毒咒标签识别
+-- 行首码剥离（1.0.9，REQ-088）：WoW 文本行内联码——开色码 |cffRRGGBB / 收色码 |r /
+-- 图标码 |T..|t；特效行首带码时 ^ 锚定失配致 effect 空串（同版本 3 件采到证明色码个体级）。
+-- 匹配前剥离行首码与前导空白、行尾收色码，对纯文本行零影响
+local function stripLineCodes(t)
+  local prev
+  repeat
+    prev = t
+    t = t:gsub("^%s+", "")                  -- 前导空白
+    t = t:gsub("^|[Tt][^|]*|[tT]", "")      -- 行首图标码 |T..|t
+    t = t:gsub("^|[Cc]%x+", "")             -- 行首开色码 |cffRRGGBB
+    t = t:gsub("^|[Rr]", "")                -- 行首收色码 |r
+  until t == prev
+  t = t:gsub("%s*|[Rr]%s*$", "")            -- 行尾收色码 |r
+  return t
+end
+
 local function parseStatLines(lines, d)
   for _, t in ipairs(lines) do
     local num, stat = t:match("^%+([%d,]+)%s*(.+)$")
@@ -92,14 +118,21 @@ local function parseStatLines(lines, d)
         if v then d.secondary_values[stat] = v end
       end
     end
-    if d.effect == "" then
-      d.effect = t:match("^(装备：.+)$") or t:match("^(使用：.+)$") or ""
+    if d.effect == "" or d.venomcurse == "" then
+      local plain = stripLineCodes(t)
+      if d.effect == "" then
+        d.effect = plain:match("^(装备：.+)$") or plain:match("^(使用：.+)$") or ""
+      end
+      -- 毒咒标签行（1.0.9，REQ-110③）：品质行下绿字独立行，剥色码后整行恰为「毒咒」
+      if d.venomcurse == "" and plain == "毒咒" then
+        d.venomcurse = "毒咒"
+      end
     end
   end
 end
 
 local function parseItemDetail(itemID)
-  local d = { primary = {}, secondary = {}, effect = "", primary_values = {}, secondary_values = {} }
+  local d = { primary = {}, secondary = {}, effect = "", venomcurse = "", primary_values = {}, secondary_values = {} }
   local lines = scanLines(itemID)
   if lines then parseStatLines(lines, d) end
   return d
@@ -127,12 +160,13 @@ local function statValuesFromApi(itemID)
 end
 
 -- 诊断模块共享（1.0.6，/wjdc probe <物品ID> 物品级诊断用，任务书 #28 WP1-fix；
--- 1.0.7 增 scanLink/parseStatLines 供四档实证诊断）
+-- 1.0.7 增 scanLink/parseStatLines 供四档实证诊断；1.0.9 增 stripLineCodes 供 REQ-088 取证对照）
 WJDCShared.scanLines = scanLines
 WJDCShared.scanLink = scanLink
 WJDCShared.parseItemDetail = parseItemDetail
 WJDCShared.parseStatLines = parseStatLines
 WJDCShared.statValuesFromApi = statValuesFromApi
+WJDCShared.stripLineCodes = stripLineCodes
 
 -- ---------- 四难度档采集（1.0.7，任务书 #29 WP1） ----------
 -- 侦察结论（2026-08-08 桌面研究，warcraft.wiki.gg + 12.0 客户端 Blizzard UI 源码交叉验证）：
@@ -213,15 +247,17 @@ end
 
 -- 物品详情通道（任务书 #26-fix4）：名称/部位/类型/装等一律走 GetItemInfo（装等=第 4 返回值）；
 -- GetDetailedItemLevelInfo / C_EncounterJournal.GetLootInfo 已死，废弃；
--- 未缓存先 RequestLoadItemDataByID 重试一次，仍拿不到或装等非法 → 返回 nil 走 failed（禁 ilvl=44 类错位值）
+-- 未缓存先 RequestLoadItemDataByID 重试一次，仍拿不到或装等非法 → 返回 nil 走 failed（禁 ilvl=44 类错位值）；
+-- 1.0.9（REQ-092）：第 10 返回值 = icon fileID，透传 iconID 字段
 local function getItemBasics(itemID)
-  local name, _, _, ilvl, _, _, subType, _, equipLoc = GetItemInfo(itemID)
+  local name, _, _, ilvl, _, _, subType, _, equipLoc, iconID = GetItemInfo(itemID)
   if not name and C_Item and C_Item.RequestLoadItemDataByID then
     pcall(C_Item.RequestLoadItemDataByID, itemID)
-    name, _, _, ilvl, _, _, subType, _, equipLoc = GetItemInfo(itemID)
+    name, _, _, ilvl, _, _, subType, _, equipLoc, iconID = GetItemInfo(itemID)
   end
   if not name or type(ilvl) ~= "number" or ilvl <= 0 then return nil end
-  return { name = name, ilvl = ilvl, type = subType or "", slot = (equipLoc and _G[equipLoc]) or "" }
+  return { name = name, ilvl = ilvl, type = subType or "", slot = (equipLoc and _G[equipLoc]) or "",
+           iconID = iconID }
 end
 
 local function exportInstances(isRaid, label, tierOn)
@@ -255,10 +291,10 @@ local function exportInstances(isRaid, label, tierOn)
           local pv, sv = statValuesFromApi(itemID)
           if not pv then pv, sv = d.primary_values, d.secondary_values end
           loot[#loot + 1] = { id = itemID, name = basics.name, slot = basics.slot,
-                              type = basics.type, ilvl = basics.ilvl,
+                              type = basics.type, ilvl = basics.ilvl, iconID = basics.iconID,
                               primary = d.primary, secondary = d.secondary,
                               primary_values = pv, secondary_values = sv,
-                              effect = d.effect,
+                              effect = d.effect, venomcurse = d.venomcurse,
                               li = li }  -- li 仅四档重扫用，出库前抹除
         else
           failed[#failed + 1] = itemID  -- 禁静默：记入 boss.failed 并红字报告

@@ -423,7 +423,12 @@ async function cleanup() {
       await page.evaluate(() => lootShowModal());
       await sleep(500);
       await page.fill('#lootName', itemName);
-      if (assignee) await page.selectOption('#lootAssignedTo', assignee);
+      if (assignee) await page.evaluate((name) => { // REQ-095（任务书 #45 WP5）维护：下拉 value 已 id 化，按名解析 id 再选
+        const m = (appData.members || []).find(x => x.name === name);
+        const sel = document.getElementById('lootAssignedTo');
+        sel.value = m ? m.id : name;
+        lootUpdateMemberInfo();
+      }, assignee);
       await page.click('#lootSaveBtn');
       await page.waitForSelector('.toast.success', { timeout: 15000 }); // 保存成功 toast（装备已添加/已更新）
       await sleep(1500); // cloudCrud reload + render

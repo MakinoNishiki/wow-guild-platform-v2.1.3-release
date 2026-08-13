@@ -675,6 +675,7 @@
     const members = (data || []).map(m => ({
       id: m.id,
       name: m.name,
+      server: m.server || '', // REQ-095（任务书 #45）：服务器（可空，空=同服/未填）
       class: m.class,
       main_spec: m.spec || '',
       spec: m.spec || '',
@@ -864,7 +865,21 @@
   }
 
   // ---- 同步成员 (写入走代理) ----
+  // REQ-095（任务书 #45）：server 列由 sql/28 迁移提供。迁移执行前的部署窗口内，带 server
+  // 键的写入会被 PostgREST 拒（PGRST204 列不在 schema cache）——登录后探测一次列可用性，
+  // 不可用时写路径自动摘掉 server 键降级（成员 CRUD 不断），迁移执行后自然恢复全量写。
+  let serverColumnReady = null;
+  async function probeServerColumn() {
+    if (serverColumnReady !== null) return serverColumnReady;
+    try {
+      const { error } = await supabaseClient.from('raid_members').select('server').limit(1);
+      serverColumnReady = !error;
+    } catch { serverColumnReady = false; }
+    if (!serverColumnReady) console.warn('[diag] raid_members.server 列未就绪（sql/28 待执行），成员写入降级为不带服务器');
+    return serverColumnReady;
+  }
   async function syncMember(guildId, operation, item) {
+    const withServer = await probeServerColumn(); // REQ-095：列未就绪则写路径降级摘除 server 键
     switch (operation) {
       case 'add': {
         const row = {
@@ -879,6 +894,7 @@
           join_date: item.join_date || formatDate(new Date()),
           notes: item.notes || '',
         };
+        if (withServer) row.server = item.server || ''; // REQ-095：服务器（可空，空存 ''，与唯一键 COALESCE 口径对齐）
         // 任务书 #18 WP2：认领人（user_id）仅在显式携带时写入，新增默认未认领。
         // 旧行为（无条件写当前用户 id）会把认领人覆盖成最后一次编辑者，已堵。
         if (item.user_id !== undefined) row.user_id = item.user_id;
@@ -899,6 +915,7 @@
           join_date: item.join_date || formatDate(new Date()),
           notes: item.notes || '',
         };
+        if (withServer) row.server = item.server || ''; // REQ-095：服务器（可空，空存 ''）
         // 任务书 #18 WP2：user_id 仅在显式携带时更新（认领/解除/指定认领人）；
         // 普通编辑、离队、恢复等调用方经 appData 成员对象扩散时自带原值，等同保留。
         if (item.user_id !== undefined) row.user_id = item.user_id;
@@ -1762,6 +1779,7 @@
     removeGuildMember: removeGuildMember,
     clearCurrentGuild: clearCurrentGuild,
     getLastGuildId: getLastGuildId, // BUG-078（任务书 #44 WP1）：用户维度「上次公会」读取
+    isServerColumnReady: () => serverColumnReady, // REQ-095（任务书 #45）：sql/28 迁移就绪探测（null=未探测）
     deleteGuild: deleteGuildCloud,
     leaveGuild: leaveGuildCloud,
     resetGuildData: resetGuildDataCloud,

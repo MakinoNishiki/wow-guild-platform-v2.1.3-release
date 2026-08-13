@@ -18,8 +18,8 @@ python scripts/wjdc_convert.py \
 | 文件 | 说明 |
 |---|---|
 | `核对表.md` | 团本/大秘境分区 BOSS→装备行 + 统计行；缺部位/缺类型/特效为空标黄（`<mark>`）；套装段含 failed 专精标黄 |
-| `boss_loot_load.json` | 字段对齐 `boss_loot` 表（boss_id 由 BOSS 名匹配），official_item_id 为整数；1.0.5 导出含 `primary_values`/`secondary_values` 数值表（jsonb，sql/19），旧格式导出两列留空（null）；1.0.7 导出另含 `primary_tiers`/`secondary_tiers` 四难度档数值表（jsonb，sql/20，`{lfr/normal/heroic/mythic: {属性名: 整数}}`，只记存在的档），旧格式导出 tiers 留 null |
-| `dungeon_loot_load.json` | 字段对齐 `dungeon_loot` 表（dungeon_id + boss_id），official_item_id 为字符串（该列 text）；数值列同上；**大秘境无四难度（钥石层数缩放），tiers 恒 null**，`primary_values`/`secondary_values`（副本手册预览口径）是其唯一数值来源 |
+| `boss_loot_load.json` | 字段对齐 `boss_loot` 表（boss_id 由 BOSS 名匹配），official_item_id 为整数；1.0.5 导出含 `primary_values`/`secondary_values` 数值表（jsonb，sql/19），旧格式导出两列留空（null）；1.0.7 导出另含 `primary_tiers`/`secondary_tiers` 四难度档数值表（jsonb，sql/20，`{lfr/normal/heroic/mythic: {属性名: 整数}}`，只记存在的档），旧格式导出 tiers 留 null；1.0.9 导出另含 `venomcurse`（text，sql/26，毒咒标签，无毒咒留 null）与 `icon_id`（int，sql/29，图标 fileID，REQ-092），旧格式导出两列留 null；effect 自 1.0.9 起为剥离行首色码后采集（REQ-088），转换器一律原样透传不清洗 |
+| `dungeon_loot_load.json` | 字段对齐 `dungeon_loot` 表（dungeon_id + boss_id），official_item_id 为字符串（该列 text）；数值列同上；**大秘境无四难度（钥石层数缩放），tiers 恒 null**，`primary_values`/`secondary_values`（副本手册预览口径）是其唯一数值来源；venomcurse / icon_id 口径同上 |
 | `待匹配清单.md` | 匹配不到 game_bosses / game_dungeons 的行单列（含原因），**禁止自动创建字典条目** |
 | `对账差异.md` | 仅 `--existing` 时生成：新增 / 变更 / 缺失 三类 |
 | `character.json` | 仅导出含 `me` 段时生成，字段对齐用户中心「我的角色」（armory_url 恒空） |
@@ -64,6 +64,11 @@ python scripts/wjdc_convert.py \
 mock 覆盖三态：正常行 / 缺字段行（核对表标黄）/ 未知 BOSS 与未知副本行（进待匹配清单）；
 另含套装 failed 专精与 `/wjdc me` 角色档案段。产物目录 `scripts/wjdc/out*` 不入库（.gitignore）。
 
+1.0.9 四合一字段回归（任务书 #46，冻结声明 v4）：mock 三件套（主 mock / values / tiers）均已带
+`iconID` 字段；主 mock 另含 REQ-088 现场残留形态行（行首色码特效，转换器原样透传不清洗）与
+毒咒行（守望者指环 `venomcurse = "毒咒"`）；`mock_existing.json` 中与之匹配的行已带同值
+`icon_id`/`venomcurse`，对账差异八键比对（`_CMP_FIELDS` 新增 venomcurse/icon_id）对未变行零丢失。
+
 数值字段回归（任务书 #28 WP1，1.0.5 新格式 + 旧格式兼容双跑）：
 
 ```bash
@@ -92,9 +97,10 @@ python scripts/wjdc_convert.py \
 
 ## 赛季录入 SOP（任务书 #29 WP1 定稿）
 
-- **S2（8.13 翻牌）起，掉落采集一律用插件 1.0.7 四档采集**：游戏内 `/wjdc all` → `/reload` →
+- **S2（8.13 翻牌）起，掉落采集一律用插件 1.0.9 四档采集**（含 REQ-088 特效补采 / REQ-110③ 毒咒 /
+  REQ-092 iconID 四合一）：游戏内 `/wjdc all` → `/reload` →
   SavedVariables 发顾问侧 → 本转换器出 load JSON → 服务通道装载/回填。
-- 转换器入库 JSON 格式自 **2026-08-12 冻结（冻结声明 v2，见 wjdc_convert.py 文首与任务书 #29 WP1 修改报告）**：
-  既有字段 + values 两列 + tiers 两列；冻结期内不变更字段名、类型与空值口径。
+- 转换器入库 JSON 格式自 **2026-08-13 冻结（冻结声明 v4，见 wjdc_convert.py 文首；自 v2 直升 v4，v3 跳号追平登记口径）**：
+  既有字段 + values 两列 + tiers 两列 + venomcurse + icon_id；冻结期内不变更字段名、类型与空值口径。
 - 大秘境 tiers 恒 null 为口径特性而非缺数据；团本 tiers 非空率（排除杂项/纯特效饰品口径）应 ≥95%，
   低于该线先查导出文件的 failed 段与切档回退提示再录入。

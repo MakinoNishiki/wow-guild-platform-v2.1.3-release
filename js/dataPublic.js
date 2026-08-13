@@ -600,9 +600,13 @@
     // 来源行：实例 · BOSS（空=整体池）· 套装归属并入同行末尾（确认点 C）
     const srcParts = [l.instance_name, l.boss_name || '整体池'];
     if (l.slot === '套装兑换物') srcParts.push('可兑换本赛季套装');
+    // REQ-092（任务书 #46 WP3）：装备图标——icon_id 纯数字校验后直拼规则路径 assets/icons/items/{id}.png
+    // （与职业图标 IconMap 体系隔离）；空值不渲染、加载失败隐藏不占位（先例：套装行 :781 同款 onerror 回退）
+    const iconId = (l.icon_id != null && /^\d+$/.test(String(l.icon_id))) ? String(l.icon_id) : '';
     // P1（WP6 补丁）：卡盒样式挂 .dp-item-inner——hover 时 inner 转 absolute 向下生长，
     // 外层 .dp-item 由 JS 预设折叠态 minHeight 占位（仅溢出卡），网格不塌、生长部分覆盖下方卡片
     return `<div class="dp-item"><div class="dp-item-inner">
+      ${iconId ? `<img class="dp-item-icon" src="assets/icons/items/${iconId}.png" loading="lazy" alt="" onerror="this.style.display='none'">` : ''}
       <div class="dp-item-name">${esc(l.item_name)}</div>
       <div class="dp-item-meta">
         ${l.slot ? `<span class="dp-tag">${esc(l.slot)}</span>` : ''}

@@ -2,6 +2,8 @@
 -- 诊断模块（任务书 #26-fix3）：/wjdc probe [团本序号，默认 1]
 -- 1.0.6 新增物品级诊断：/wjdc probe <物品ID>（数值采集链核验，任务书 #28 WP1-fix）
 -- 1.0.7 新增四难度档通道诊断（任务书 #29 WP1）：切档函数存在性/试切读回/link 字段/同件两档缩放实证
+-- 1.0.9 物品级诊断加 tooltip 全行原样 dump（任务书 #46，REQ-088 取证）：
+--   | 转义为 || 使色码/图标码以可见文本输出，对照剥离后形态定论特效行失配原因
 -- 只读诊断，不改导出逻辑；输出全部走聊天框，请完整截图反馈顾问侧
 -- ============================================================
 local msg = WJDCShared.msg
@@ -103,6 +105,16 @@ local function probeItem(itemID)
         msg("  | " .. t)
       end
     end
+    -- ③+ tooltip 全行原样 dump（1.0.9，REQ-088 取证）：| 转义为 || 使 |cffRRGGBB/|r/|T..|t
+    -- 以可见文本输出；每行附剥离后形态（stripLineCodes）对照，定论特效行失配形态
+    msg("tooltip 全行原样 dump（| 已转义 ||，共 " .. #lines .. " 行）：")
+    for i, t in ipairs(lines) do
+      msg("  [" .. i .. "] " .. t:gsub("|", "||"))
+      if WJDCShared.stripLineCodes then
+        local plain = WJDCShared.stripLineCodes(t)
+        if plain ~= t then msg("      剥离后 → " .. plain:gsub("|", "||")) end
+      end
+    end
   else
     msg("tooltip 扫描失败（物品未缓存？/reload 后重试）")
   end
@@ -110,6 +122,7 @@ local function probeItem(itemID)
   local d = WJDCShared.parseItemDetail(itemID)
   msg("parseItemDetail：primary=" .. retstr(d.primary) .. " ｜ secondary=" .. retstr(d.secondary))
   msg("  tooltip 数值：primary_values=" .. kv(d.primary_values) .. " secondary_values=" .. kv(d.secondary_values))
+  msg("  effect=" .. tostring(d.effect) .. " ｜ venomcurse=" .. tostring(d.venomcurse))
   msg("  API 数值：primary_values=" .. kv(pv or {}) .. " secondary_values=" .. kv(sv or {}))
   msg("===== probe 物品结束，请把聊天框完整截图反馈顾问侧 =====")
 end

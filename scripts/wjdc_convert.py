@@ -14,13 +14,19 @@
 字典（--dict）与存量（--existing）均为 JSON 导出文件，格式见 scripts/wjdc/README.md。
 零第三方依赖，Python 3.8+ 标准库即可运行。
 
-冻结声明 v2（任务书 #29 WP1，2026-08-12 冻结，8.13 S2 翻牌按此录入）：
-入库 JSON 字段 = 既有字段（item_name/slot/item_type/official_item_id/note/effect/
-primary_stats/secondary_stats + boss_id 或 dungeon_id+boss_id）
-+ primary_values/secondary_values（sql/19，jsonb 或 null，键=中文属性名，值=整数）
-+ primary_tiers/secondary_tiers（sql/20，jsonb 或 null；{lfr/normal/heroic/mythic: {属性名: 整数}}，
-只记存在的档；大秘境恒 null——大秘境无四难度，values 两列是其唯一数值口径）。
-冻结期内不再变更字段名、类型与空值口径。旧格式导出（无 values/tiers 字段）照常转换、相应列留 null。
+冻结声明 v4（任务书 #46，2026-08-13 冻结，自 v2 直升 v4——v3 跳号追平登记口径）：
+入库 JSON 字段 = v2 字段（item_name/slot/item_type/official_item_id/note/effect/
+primary_stats/secondary_stats + boss_id 或 dungeon_id+boss_id
++ primary_values/secondary_values（sql/19）+ primary_tiers/secondary_tiers（sql/20））
++ 四合一新增三字段（插件 1.0.9 起产出，旧格式导出照常转换、相应列留 null）：
+  ① effect 补采源口径（REQ-088）：插件 1.0.9 修复特效行匹配——行首色码 |cffRRGGBB /
+     图标码 |T..|t / 前导空白先剥离再锚定匹配，effect 非空率修复属采集端口径，
+     转换器只透传不清洗；
+  ② venomcurse（sql/26，text 或 null）：tooltip 绿字「毒咒」标签行，存「毒咒」，
+     无毒咒/旧格式导出 → null；
+  ③ icon_id（sql/29，int 或 null）：GetItemInfo 第 10 返回值 icon fileID 透传，
+     旧格式导出 → null。
+冻结期内不再变更字段名、类型与空值口径。
 """
 import argparse
 import json
@@ -249,6 +255,9 @@ def norm_items(dump, section):
                     "primary_tiers": tier_map(it.get("primary_tiers")),
                     "secondary_tiers": tier_map(it.get("secondary_tiers")),
                     "effect": s(it.get("effect")),
+                    # 任务书 #46：毒咒标签（REQ-110③）与 icon fileID（REQ-092）透传，旧格式导出 → ""/None
+                    "venomcurse": s(it.get("venomcurse")),
+                    "iconID": it.get("iconID"),
                 })
     return rows
 
@@ -436,6 +445,11 @@ def build_load_rows(rows, matcher):
             # 任务书 #29 WP1：四难度档数值透传（jsonb 列，sql/20）；旧格式导出/大秘境 → None 留空
             "primary_tiers": r["primary_tiers"],
             "secondary_tiers": r["secondary_tiers"],
+            # 任务书 #46：毒咒标签透传（text 列，sql/26）；旧格式导出/无毒咒 → None 留空
+            "venomcurse": r["venomcurse"] or None,
+            # 任务书 #46（REQ-092）：图标 fileID 透传（int 列，sql/29）；旧格式导出 → None 留空
+            "icon_id": (int(r["iconID"]) if isinstance(r["iconID"], (int, float))
+                        and not isinstance(r["iconID"], bool) and float(r["iconID"]).is_integer() else None),
         }
         key = (entry.get("id"), r["name"])
         if key in seen:  # 同 BOSS 同名去重（与 dungeon_loot 唯一约束同口径）
@@ -466,7 +480,9 @@ def _cmp_key(r, kind):
     return (r.get("dungeon_id"), r.get("boss_id"), s(r.get("item_name")))
 
 
-_CMP_FIELDS = ["slot", "item_type", "effect", "primary_stats", "secondary_stats", "official_item_id"]
+# 任务书 #46：六键 → 八键，新增 venomcurse（REQ-110③）/ icon_id（REQ-092）——零丢失比对口径延续
+_CMP_FIELDS = ["slot", "item_type", "effect", "primary_stats", "secondary_stats", "official_item_id",
+               "venomcurse", "icon_id"]
 
 
 def _norm_field(v):

@@ -1,6 +1,6 @@
 WJDCDump = {
 	["meta"] = {
-		["addon"] = "1.0.5",
+		["addon"] = "1.0.9",
 		["client"] = "12.0.0",
 		["build"] = "62001",
 		["interface"] = 120000,
@@ -21,6 +21,7 @@ WJDCDump = {
 							["slot"] = "头部",
 							["type"] = "布甲",
 							["ilvl"] = 250,
+							["iconID"] = 463518,
 							["primary"] = { "智力" },
 							["secondary"] = { "爆击", "急速" },
 							["primary_values"] = { ["智力"] = 512 },
@@ -34,6 +35,7 @@ WJDCDump = {
 							["slot"] = "背部",
 							["type"] = "布甲",
 							["ilvl"] = 250,
+							["iconID"] = 133751,
 							["primary"] = { "智力" },
 							["secondary"] = { "精通" },
 							["primary_values"] = { },
@@ -47,6 +49,7 @@ WJDCDump = {
 							["slot"] = "双手",
 							["type"] = "双手锤",
 							["ilvl"] = 250,
+							["iconID"] = 236317,
 							["primary"] = { "力量" },
 							["secondary"] = { "精通" },
 							["primary_values"] = { ["力量"] = 1234 },
@@ -66,16 +69,19 @@ WJDCDump = {
 					["boss"] = "裂隙守望者",
 					["loot"] = {
 						{
+							-- 毒咒行（1.0.9，REQ-110③）：与数值字段并存的组合形态
 							["id"] = 250001,
 							["name"] = "守望者指环",
 							["slot"] = "手指",
 							["type"] = "戒指",
 							["ilvl"] = 246,
+							["iconID"] = 237274,
 							["primary"] = { },
 							["secondary"] = { "急速", "全能" },
 							["primary_values"] = { },
 							["secondary_values"] = { ["急速"] = 176, ["全能"] = 176 },
 							["effect"] = "装备：站立不动时每秒恢复 1% 生命值。",
+							["venomcurse"] = "毒咒",
 						},
 					},
 				},

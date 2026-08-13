@@ -75,7 +75,7 @@
 
 4. **仪表盘**（page:dashboard） - 出勤率统计、排行、活动概览
 
-5. **成员管理**（page:members） - 13个职业、专精/职责联动、职责列（按专精推导）、出勤详情、智能导入（REQ-023：双宏教程、多格式解析+时间戳清洗、名字/名字-服务器双形态查重、预览确认，专精占位"待补充"；REQ-032：「从 WCL 链接导入」标签页，复用同一预览确认链路，subType→中文职业映射、server 参与同服查重）、软删除与恢复（REQ-042：单个/批量删除 = status 置「离队」不真删行，历史考勤/心愿/装备记录全保留；列表默认隐藏离队成员，「显示已离队」开关灰显；REQ-002 查重只针对活跃成员，撞离队同名弹确认恢复优先于新建——DB 有 (guild_id,name) 唯一索引无法新建同名；装备分配/考勤详情中离队成员灰色「已离队」标记；任务书 #18：行操作拆分「离队/彻底删除」——真删除带三表历史计数护栏（考勤/心愿/装备任一 >0 只拦截不强删）；raid_members.user_id = 认领人（一用户同公会可认领多角色，先到先得，owner/editor 可指定；编辑不再覆盖认领人；用户中心「我的认领」跨公会展示+解绑；心愿单/装备列表「认领人」标签由 guilds.show_claimer_label 公会开关控制，sql/14 迁移；任务书 #21 WP1：认领需二次确认弹窗（四要点说明）、未认领行「待认领」明示标签、账号显示名唯一真源 = user_metadata.display_name；任务书 #21 WP2：认领治理三档开关 guilds.claim_mode（free 默认/approval 审核制走 claim_requests 申请+审核区块/assign 仅管理者分配，仅 owner 可改，sql/15 迁移））
+5. **成员管理**（page:members） - 13个职业、专精/职责联动、职责列（按专精推导）、出勤详情、智能导入（REQ-023：双宏教程、多格式解析+时间戳清洗、名字/名字-服务器双形态查重、预览确认，专精占位"待补充"；REQ-032：「从 WCL 链接导入」标签页，复用同一预览确认链路，subType→中文职业映射、server 参与同服查重）、软删除与恢复（REQ-042：单个/批量删除 = status 置「离队」不真删行，历史考勤/心愿/装备记录全保留；列表默认隐藏离队成员，「显示已离队」开关灰显；REQ-002 查重只针对活跃成员，撞离队同名弹确认恢复优先于新建——DB 唯一索引无法新建同键；REQ-095（任务书 #45，sql/28）：成员加 server 可空字段（存量不回填），唯一键升 (guild_id,name,COALESCE(server,'')) 活跃 partial=同服同名拦/跨服放行（BUG-060 根治），匹配统一 matchMemberByNameServer（单候选宽松/多候选精确）、同名展示 memberDisplayName 消歧、装备分配人下拉 id 化（WP5）、cloud.js probeServerColumn 迁移窗口降级；装备分配/考勤详情中离队成员灰色「已离队」标记；任务书 #18：行操作拆分「离队/彻底删除」——真删除带三表历史计数护栏（考勤/心愿/装备任一 >0 只拦截不强删）；raid_members.user_id = 认领人（一用户同公会可认领多角色，先到先得，owner/editor 可指定；编辑不再覆盖认领人；用户中心「我的认领」跨公会展示+解绑；心愿单/装备列表「认领人」标签由 guilds.show_claimer_label 公会开关控制，sql/14 迁移；任务书 #21 WP1：认领需二次确认弹窗（四要点说明）、未认领行「待认领」明示标签、账号显示名唯一真源 = user_metadata.display_name；任务书 #21 WP2：认领治理三档开关 guilds.claim_mode（free 默认/approval 审核制走 claim_requests 申请+审核区块/assign 仅管理者分配，仅 owner 可改，sql/15 迁移））
 
 6. **考勤记录**（page:attendance） - 默认列表视图/日历视图（按 userId+guildId 记忆，BUG-023）、活动CRUD、BOSS选择、WCL 日志链接（REQ-014）、WCL 同步考勤（REQ-033：已挂 WCL 链接的活动可一键同步，预览三分区——全勤绿/部分参战黄默认出席/未匹配红，不覆盖手动标记，幂等，成功后写 activities.wcl_snapshot 快照）、筛选条（REQ-018：成员/状态多选/时间范围/含已取消开关+出勤率小计，本赛季=最近90天）、考勤详情勾选批量标记（REQ-017-A）、活动列表勾选批量删除（REQ-017-B）、WCL 已导入提示条（REQ-037：快照存在且非全员已标记时显示，N 取快照 imported 字段）、活动状态（REQ-020：正常/已取消，已取消灰显+徽标、考勤区禁编辑、其考勤不计入任何出勤率，可恢复；status 服务端白名单 normal/cancelled）、团队标签与冲突检测（REQ-028：同标签同日时段交叉只警告不禁止，冲突活动列表黄色高亮；REQ-064 起旧 team_tag 字段并入 team_label 并删列，冲突分组键同步切为团号）、团号徽章（REQ-062：team_label 可空，纯数字显示「N 团」、文字显示「团号：X」、空不显示）、团本下拉（REQ-029：datalist 可手输，最近 3 个按公会置顶，清单为 js 常量待 REQ-003 主数据切换）
 
@@ -89,7 +89,7 @@
 
 11. **更新日志**（page:changelog） - 版本历史
 
-12. **副本掉落**（page:lootdrop + data.html） - REQ-086 收官（任务书 #28 WP5，原「数据公示」更名）：双壳同一渲染层 js/dataPublic.js（window.DPLootDrop，单一真源禁复制）——登录壳 = 主应用 #page-lootdrop 页签（app.js ensureLootdropMounted 懒挂载，切回 activate 重测；筛选条吸顶 top:56px 让开 topbar，层级规约 筛选条10＞hover卡5 同效），公开壳 = data.html 免登录可分享（body.data-public-body 自动挂载，URL 不动）；anon 直连 PostgREST（字典表 + 公开 RPC get_public_loot_detail，**显式字段白名单——boss_loot/dungeon_loot 加列须 CREATE OR REPLACE 才透出**），全角色只读；毒咒徽标（REQ-110，任务书 #37：venomcurse 列非空时装备卡 meta 行渲染绿色 .dp-tag-venom，sql/26；数据中心录入=预设下拉 无/毒咒 禁自由输入；插件采集为后续批次）；任务书 #39（REQ-113）：脏标记即时刷新——MasterData 写成功统一口置 window.__dpLootDirty（9 张被消费字典表），activate() 脏则重拉数据段（筛选态/折叠记忆守恒、失败保旧数据+toast+标记留存重试）、不脏零请求只重测溢出；任务书 #43（REQ-098+REQ-110②，=#30 全文+增补）：右栏悬浮筛选面板（≥1400px fixed 四边闭合、独立滚动、--dp-panel-top 壳级顶偏、卡片区让位 margin-right:292px）↔ 折叠顶栏（<1400px 首行恒显+dp43:filterOpen 记忆）两态一套 DOM、命中计数恒显（共 N 件/命中 X 件 · N 项生效）、毒咒筛选组（单选 全部/有毒咒=行 venomcurse 非空，词表 LootTaxonomy.VENOMCURSE_LABEL 与 #37 录入下拉同源）、层级规约 面板 z=10＞hover 卡 z=5
+12. **副本掉落**（page:lootdrop + data.html） - REQ-086 收官（任务书 #28 WP5，原「数据公示」更名）：双壳同一渲染层 js/dataPublic.js（window.DPLootDrop，单一真源禁复制）——登录壳 = 主应用 #page-lootdrop 页签（app.js ensureLootdropMounted 懒挂载，切回 activate 重测；筛选条吸顶 top:56px 让开 topbar，层级规约 筛选条10＞hover卡5 同效），公开壳 = data.html 免登录可分享（body.data-public-body 自动挂载，URL 不动）；anon 直连 PostgREST（字典表 + 公开 RPC get_public_loot_detail，**显式字段白名单——boss_loot/dungeon_loot 加列须 CREATE OR REPLACE 才透出**），全角色只读；毒咒徽标（REQ-110，任务书 #37：venomcurse 列非空时装备卡 meta 行渲染绿色 .dp-tag-venom，sql/26；数据中心录入=预设下拉 无/毒咒 禁自由输入；插件采集已随任务书 #46 插件 1.0.9 落地）；物品图标（REQ-092，任务书 #46：boss_loot/dungeon_loot 加 icon_id（sql/29）+ RPC 白名单透出，卡片右上角 img.dp-item-icon 规则路径 assets/icons/items/{icon_id}.png、lazy+onerror 隐藏、空值不渲染；素材管道 scripts/import-item-icons.js 运营源图入库）；REQ-089 兑换物展开=规则表送审中（docs/REQ-089-兑换物展开规则表-送审.md），308/104/204 基线须运营确认后才准改断言；任务书 #39（REQ-113）：脏标记即时刷新——MasterData 写成功统一口置 window.__dpLootDirty（9 张被消费字典表），activate() 脏则重拉数据段（筛选态/折叠记忆守恒、失败保旧数据+toast+标记留存重试）、不脏零请求只重测溢出；任务书 #43（REQ-098+REQ-110②，=#30 全文+增补）：右栏悬浮筛选面板（≥1400px fixed 四边闭合、独立滚动、--dp-panel-top 壳级顶偏、卡片区让位 margin-right:292px）↔ 折叠顶栏（<1400px 首行恒显+dp43:filterOpen 记忆）两态一套 DOM、命中计数恒显（共 N 件/命中 X 件 · N 项生效）、毒咒筛选组（单选 全部/有毒咒=行 venomcurse 非空，词表 LootTaxonomy.VENOMCURSE_LABEL 与 #37 录入下拉同源）、层级规约 面板 z=10＞hover 卡 z=5
 
 ## 云端架构
 
@@ -99,7 +99,7 @@
 
 * `guild_members` - 公会成员权限（user_id, guild_id, role: owner/editor/viewer）
 
-* `raid_members` - WoW 角色成员（guild_id, name, class, spec, role）
+* `raid_members` - WoW 角色成员（guild_id, name, server[REQ-095 可空，唯一键=(guild_id,name,COALESCE(server,'')) 活跃 partial，sql/28], class, spec, role）
 
 * `activities` - 考勤活动（guild_id, name, activity_date, raid, boss, wcl_url, wcl_report_code, wcl_snapshot, status, team_label）
 

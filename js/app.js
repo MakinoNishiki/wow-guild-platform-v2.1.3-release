@@ -49,8 +49,9 @@ const wowClassEnToCn = {
   'EVOKER': '唤魔师'
 };
 
-// REQ-023：解析单行名单为 {name, cls}，无法识别返回 null。
+// REQ-023：解析单行名单为 {name, cls, server}，无法识别返回 null。
 // 支持：宏输出（名字-服务器,英文类名）、名字,职业、名字-职业、名字 职业、纯名字（cls 为空）
+// REQ-095（任务书 #45）：宏格式与「名字-服务器」形态拆出 server（此前宏格式丢弃、无职业形态整行并入 name）
 function parseMemberRosterLine(line) {
   const raw = (line || '').trim();
   if (!raw) return null;
@@ -67,9 +68,14 @@ function parseMemberRosterLine(line) {
     const last = parts[parts.length - 1];
     let name = parts.slice(0, -1).join(',');
     if (isEnClass(last)) {
-      // 宏格式：名字带 -服务器 后缀，去掉
-      if (name.indexOf('-') !== -1) name = name.split('-')[0].trim();
-      return name ? { name, cls: wowClassEnToCn[last.toUpperCase()] } : null;
+      // 宏格式：名字-服务器，拆出 server（REQ-095，不再丢弃）
+      let server = '';
+      if (name.indexOf('-') !== -1) {
+        const sIdx = name.lastIndexOf('-');
+        server = name.slice(sIdx + 1).trim();
+        name = name.slice(0, sIdx).trim();
+      }
+      return name ? { name, cls: wowClassEnToCn[last.toUpperCase()], server } : null;
     }
     if (isCnClass(last)) return name ? { name, cls: last } : null;
     return null;
@@ -83,8 +89,10 @@ function parseMemberRosterLine(line) {
       const name = text.slice(0, idx).trim();
       return name ? { name, cls: tail } : null;
     }
-    // ③ '-' 后非职业（如 名字-服务器）：整行按纯名字保留，预览页人工修正
-    return { name: text, cls: '' };
+    // ③ '-' 后非职业（如 名字-服务器）：拆出 name+server（REQ-095，不再整行并入 name）；
+    // 名字段为空（如 "-白银之手"）则整行按纯名字保留，预览页人工修正
+    const nm = text.slice(0, idx).trim();
+    return nm ? { name: nm, cls: '', server: tail } : { name: text, cls: '' };
   }
 
   // ④ 空白分隔（含全角空格）：尾段是中文职业 → 名字 职业
@@ -95,43 +103,40 @@ function parseMemberRosterLine(line) {
   return { name: text, cls: '' };
 }
 
-// 任务书 #9：查重同时匹配"名字"与"名字-服务器"两种形态（existingNames 为库中已存成员名数组）
-function isDupMemberName(pastedName, existingNames) {
-  return existingNames.some(n => n === pastedName ||
-    n.startsWith(pastedName + '-') || pastedName.startsWith(n + '-'));
-}
-
-// REQ-032：带 server 维度的同服唯一查重（REQ-002）。库中名为"名字-服务器"形态时，
-// 仅当服务器一致才算重复（跨服同名按 WCL server 归属，不视为重复）；裸名相同仍算重复。
-function isDupMemberNameWithServer(name, server, existingNames) {
-  return existingNames.some(n => {
-    if (n === name) return true;
-    if (n.startsWith(name + '-')) return !server || n === name + '-' + server;
-    return false;
-  });
-}
-
-// REQ-002（软删除）：与 isDupMemberName 同口径，返回匹配的「已离队」成员（无则 null）。
-// 撞活跃成员判重；撞离队成员不判重、走恢复链路（恢复优先于新建）。
-// BUG-037（任务书 #12 补丁4）：兼容历史英文状态 'inactive'；名字先 trim 再比对（与 DB/索引口径对齐）
+// BUG-037（任务书 #12 补丁4）：兼容历史英文状态 'inactive'
 function isDepartedStatus(s) { return s === '离队' || s === 'inactive'; }
-function findDepartedByName(name) {
+
+// REQ-095（任务书 #45）：同名匹配统一口径（导入查重/WCL 对照/撞离队查找共用，替代旧
+// isDupMemberName(WithServer)/findDepartedByName(WithServer) 的"名字-服务器"前缀形态匹配）。
+// 候选集合先按 name 精确过滤：恰好 1 个候选 → 视为匹配（宽松，兼容存量成员 server 全空 +
+// WCL/导入带服务器的常态）；≥2 个同名候选 → 必须 (name, server) 精确相等才匹配，否则不匹配
+// （走未匹配/添加为成员流）。名字与 server 均先 trim 再比对（与 DB 唯一键 COALESCE(server,'') 口径对齐）。
+function matchMemberByNameServer(members, name, server) {
   const n = (name || '').trim();
-  return appData.members.find(m => {
-    if (!isDepartedStatus(m.status)) return false;
-    const mn = (m.name || '').trim();
-    return mn === n || mn.startsWith(n + '-') || n.startsWith(mn + '-');
-  }) || null;
+  const s = (server || '').trim();
+  if (!n) return null;
+  const sameName = (members || []).filter(m => (m.name || '').trim() === n);
+  if (sameName.length === 1) return sameName[0];
+  if (sameName.length > 1) return sameName.find(m => (m.server || '').trim() === s) || null;
+  return null;
 }
 
-// REQ-002（软删除）：与 isDupMemberNameWithServer 同口径的已离队成员查找（WCL 来源用）
-function findDepartedByNameWithServer(name, server) {
-  const n = (name || '').trim();
-  return appData.members.find(m => {
-    if (!isDepartedStatus(m.status)) return false;
-    const mn = (m.name || '').trim();
-    return mn === n || (mn.startsWith(n + '-') && (!server || mn === n + '-' + server));
-  }) || null;
+// REQ-002（软删除）：撞「已离队」成员查找——与 matchMemberByNameServer 同口径（候选=离队成员）。
+// 撞活跃成员判重；撞离队成员不判重、走恢复链路（恢复优先于新建）。
+function findDepartedByNameServer(name, server) {
+  return matchMemberByNameServer(appData.members.filter(m => isDepartedStatus(m.status)), name, server);
+}
+
+// REQ-095（任务书 #45）：同名消歧显示——活跃成员中存在同名（同名键 = name 相同，不限 server）
+// 的其他成员时返回「名字（服务器）」；server 空或无同名并存时返回裸名。纯展示层纯函数，不改数据。
+function memberDisplayName(m) {
+  if (!m) return '';
+  const name = m.name || '';
+  const server = (m.server || '').trim();
+  if (!server) return name;
+  const hasNameClash = (appData.members || []).some(x =>
+    x.id !== m.id && !isDepartedStatus(x.status) && (x.name || '') === name);
+  return hasNameClash ? `${name}（${server}）` : name;
 }
 
 // 职业-专精映射
@@ -207,7 +212,8 @@ function specChipHtml(cnClass, cnSpec, extraClass) {
 function memberChipHtml(member, fallbackName) {
   if (!member) return `<span>${fallbackName || '-'}</span>`;
   const cc = window.IconMap && window.IconMap.classColor(member.class);
-  return wowChipHtml(cc, classIconHtml(member.class), member.name);
+  // REQ-095：tag 内名字走同名消歧显示（同名并存时「名字（服务器）」）
+  return wowChipHtml(cc, classIconHtml(member.class), memberDisplayName(member));
 }
 
 // REQ-009：专精 → 职责推导表（未列出的专精一律视为输出）
@@ -2635,7 +2641,7 @@ function renderRankList(containerId, limit, activities) {
   const html = top.length ? top.map((item, i) => `
     <div class="rank-item">
       <div class="rank-num">${i + 1}</div>
-      <div class="rank-name class-${classMap[item.member.class] || ''}">${item.member.name}</div>
+      <div class="rank-name class-${classMap[item.member.class] || ''}">${memberDisplayName(item.member)}</div>
       <div class="rank-rate">${item.rate}%</div>
     </div>
   `).join('') : `<div class="empty-state"><div class="empty-icon">📊</div><div class="empty-text">暂无数据</div></div>`;
@@ -2801,7 +2807,7 @@ function renderClaimReviewBlock() {
       const m = (appData.members || []).find(x => x.id === r.member_id);
       const applicant = (claimerNames.map && claimerNames.map.get(r.user_id)) || '（已退会用户）';
       return `<div class="claim-review-row">
-        <span class="claim-review-text"><b>${applicant}</b> 申请认领 <b>${m ? m.name : '（成员已删除）'}</b></span>
+        <span class="claim-review-text"><b>${applicant}</b> 申请认领 <b>${m ? memberDisplayName(m) : '（成员已删除）'}</b></span>
         <span class="claim-review-actions">
           <button class="btn btn-sm btn-primary" onclick="approveClaimRequest('${r.id}')">批准</button>
           <button class="btn btn-sm btn-danger" onclick="rejectClaimRequest('${r.id}')">拒绝</button>
@@ -2911,14 +2917,14 @@ function renderMembers() {
   const tbody = document.getElementById('membersTableBody');
 
   if (!displayList.length) {
-    tbody.innerHTML = `<tr><td colspan="10"><div class="empty-state"><div class="empty-icon">👥</div><div class="empty-text">暂无成员数据</div><button class="btn btn-primary" onclick="showMemberModal()">+ 添加第一个成员</button></div></td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="11"><div class="empty-state"><div class="empty-icon">👥</div><div class="empty-text">暂无成员数据</div><button class="btn btn-primary" onclick="showMemberModal()">+ 添加第一个成员</button></div></td></tr>`;
     memberUpdateBatchToolbar();
     return;
   }
 
   tbody.innerHTML = displayList.map((m, i) => {
     // REQ-049：离队分组分隔标题行
-    if (m.__divider) return '<tr class="member-divider-row"><td colspan="10">—— 已离队成员 ——</td></tr>';
+    if (m.__divider) return '<tr class="member-divider-row"><td colspan="11">—— 已离队成员 ——</td></tr>';
     // BUG-034：行级防御——单行异常降级为提示行，不拖垮整表（否则整表停在旧渲染，出勤率列全是旧值）
     try {
     const cls = classMap[m.class] || '';
@@ -2944,9 +2950,10 @@ function renderMembers() {
         <td><input type="checkbox" class="member-row-checkbox" value="${m.id}" ${memberSelectedIds.has(m.id) ? 'checked' : ''} onchange="memberToggleSelect('${m.id}', this.checked)"></td>
         <td class="num">${i + 1}</td>
         <td class="class-${cls}">
-          <div style="font-weight:500">${m.name}</div>
+          <div style="font-weight:500">${memberDisplayName(m)}</div>
           ${m.user_id ? claimerLabelHtml(m) : ''}
         </td>
+        <td style="color:var(--text-secondary)">${(m.server || '').trim() || '—'}</td>
         <td>
           ${classChipHtml(m.class)}
         </td>
@@ -2982,7 +2989,7 @@ function renderMembers() {
     `;
     } catch (err) {
       console.error('成员行渲染失败（已降级为提示行）:', m && m.id, err);
-      return `<tr><td colspan="10" style="color:var(--danger)">该行数据异常，渲染失败（${(m && (m.name || m.id)) || '未知成员'}），请检查数据</td></tr>`;
+      return `<tr><td colspan="11" style="color:var(--danger)">该行数据异常，渲染失败（${(m && (m.name || m.id)) || '未知成员'}），请检查数据</td></tr>`;
     }
   }).join('');
 
@@ -3043,7 +3050,7 @@ function memberBatchDepart() {
   if (!active.length) { showToast('选中成员均已离队，无需操作', 'warning'); return; }
   openBatchDeleteModal({
     title: `批量离队（${active.length}）`,
-    lines: active.map(m => `${m.name}（${m.class}）`),
+    lines: active.map(m => `${memberDisplayName(m)}（${m.class}）`),
     warning: '成员将标记为「离队」（编辑成员可恢复），其历史考勤/装备记录将保留并标记为已离队',
     confirmLabel: '确认离队',
     busyLabel: '离队中...',
@@ -3107,7 +3114,7 @@ async function memberBatchHardDelete() {
   document.getElementById('batchHardDeleteList').innerHTML = rows.map(({ member: m, counts }) => {
     const s = (m.status || '').trim();
     const statusText = s === 'inactive' ? '离队' : (s || '—');
-    return `<div class="batch-delete-item">${m.name}（${m.class || '—'} · ${statusText}）—— 考勤 ${counts.attendance} / 装备 ${counts.loot} / 心愿 ${counts.wishlist}</div>`;
+    return `<div class="batch-delete-item">${memberDisplayName(m)}（${m.class || '—'} · ${statusText}）—— 考勤 ${counts.attendance} / 装备 ${counts.loot} / 心愿 ${counts.wishlist}</div>`;
   }).join('');
   const totals = rows.reduce((acc, r) => ({
     attendance: acc.attendance + r.counts.attendance,
@@ -3169,6 +3176,7 @@ function showMemberModal(member = null) {
   editingMemberId = member ? member.id : null;
   document.getElementById('memberModalTitle').textContent = member ? '编辑成员' : '添加成员';
   document.getElementById('memberName').value = member ? member.name : '';
+  document.getElementById('memberServer').value = member ? (member.server || '') : ''; // REQ-095：服务器回填/清空
   document.getElementById('memberClass').value = member ? member.class : '';
   document.getElementById('memberStatus').value = member ? member.status : '正式';
   document.getElementById('memberJoinDate').value = member ? member.join_date || '' : formatDate(new Date());
@@ -3372,15 +3380,17 @@ async function saveMember() {
   if (saveBtn) { saveBtn.dataset.originalText = saveBtn.textContent; saveBtn.disabled = true; saveBtn.textContent = '保存中...'; }
 
   const name = document.getElementById('memberName').value.trim();
+  const server = (document.getElementById('memberServer').value || '').trim(); // REQ-095：服务器（可空，空存 ''）
   const cls = document.getElementById('memberClass').value;
 
   if (!name) { showToast('请输入角色名', 'error'); memberSaving = false; if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = saveBtn.dataset.originalText || '保存'; } return; }
   if (!cls) { showToast('请选择职业', 'error'); memberSaving = false; if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = saveBtn.dataset.originalText || '保存'; } return; }
 
-  // REQ-002①：公会绑定单服务器，公会内角色名唯一（即服务器内唯一），编辑时排除自身。
-  // 软删除后查重只针对活跃成员；撞「离队」成员走下方恢复链路（DB 有 (guild_id,name) 唯一索引，无法新建同名行）
-  const nameClash = appData.members.find(m => m.name === name && m.id !== editingMemberId);
-  if (nameClash && nameClash.status !== '离队') { showToast(`公会内已存在同名角色「${name}」`, 'error'); memberSaving = false; if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = saveBtn.dataset.originalText || '保存'; } return; }
+  // REQ-002① + REQ-095（任务书 #45）：唯一口径升级为 (name, server) 双键——同服同名拦、跨服同名放行，
+  // 与 DB 唯一索引 (guild_id, name, COALESCE(server,'')) 活跃 partial 对齐；编辑时排除自身。
+  // 软删除后查重只针对活跃成员；撞「离队」成员走下方恢复链路（同 (name,server) 键无法新建同名行）
+  const nameClash = appData.members.find(m => m.name === name && (m.server || '') === server && m.id !== editingMemberId);
+  if (nameClash && !isDepartedStatus(nameClash.status)) { showToast(`同服务器已存在同名角色「${name}」（跨服同名请填写服务器区分）`, 'error'); memberSaving = false; if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = saveBtn.dataset.originalText || '保存'; } return; }
 
   const mainSpec = document.getElementById('memberMainSpec') ? document.getElementById('memberMainSpec').value : '';
   // 副专精从全局变量取（多选数组）
@@ -3388,6 +3398,7 @@ async function saveMember() {
 
   const memberData = {
     name,
+    server, // REQ-095：服务器（可空，空存 ''）
     class: cls,
     main_spec: mainSpec,
     off_spec: offSpecs.length > 0 ? offSpecs[0] : '', // 兼容：第一个副专精
@@ -3407,9 +3418,9 @@ async function saveMember() {
     memberData.user_id = document.getElementById('memberClaimUser').value || null;
   }
 
-  // REQ-002（软删除）：新增时撞同名已离队成员 → 不判重、不新建，确认后恢复优先于新建
-  // （恢复 = status 改回「正式」，顺带更新本次输入的职业/专精/职责等字段，加入日期保留原值）
-  if (!editingMemberId && nameClash && nameClash.status === '离队') {
+  // REQ-002（软删除）：新增时撞同 (name,server) 已离队成员 → 不判重、不新建，确认后恢复优先于新建
+  // （恢复 = status 改回「正式」，顺带更新本次输入的职业/专精/职责/服务器等字段，加入日期保留原值）
+  if (!editingMemberId && nameClash && isDepartedStatus(nameClash.status)) {
     if (!confirm(`存在同名已离队成员「${name}」，是否恢复？\n确认后不新建成员，该成员将恢复为「正式」并更新为本次输入的职业/专精等信息。`)) {
       memberSaving = false;
       if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = saveBtn.dataset.originalText || '保存'; }
@@ -3428,8 +3439,8 @@ async function saveMember() {
     }
     return;
   }
-  // 编辑改名撞上已离队同名成员：唯一索引同样会拦，提前给出明确提示
-  if (editingMemberId && nameClash && nameClash.status === '离队') {
+  // 编辑改名撞上已离队同 (name,server) 成员：唯一索引同样会拦，提前给出明确提示
+  if (editingMemberId && nameClash && isDepartedStatus(nameClash.status)) {
     showToast(`已存在同名已离队成员「${name}」，请先恢复该成员或改用其他名字`, 'error');
     memberSaving = false;
     if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = saveBtn.dataset.originalText || '保存'; }
@@ -3704,11 +3715,12 @@ async function importParseWcl() {
     if (!players.length) { showToast('该报告中未找到玩家名单', 'error'); return; }
     importWclTitle = data.title || '';
     // REQ-002（软删除）：dup 判定只针对活跃成员；撞已离队成员不判重，确认导入时走恢复链路
-    const existingNames = appData.members.filter(m => m.status !== '离队').map(m => m.name);
+    // REQ-095：查重走 matchMemberByNameServer 统一口径（server 参与同服查重）
+    const activeMembers = appData.members.filter(m => !isDepartedStatus(m.status));
     importPreviewRows = players.map(p => {
       const cls = wowClassEnToCn[(p.subType || '').toUpperCase()] || '';
       // 未识别职业按现有 bad 状态处理（预览页可人工修正）
-      const dup = cls ? isDupMemberNameWithServer(p.name, p.server || '', existingNames) : false;
+      const dup = cls ? !!matchMemberByNameServer(activeMembers, p.name, p.server || '') : false;
       const status = !cls ? 'bad' : (dup ? 'dup' : 'ok');
       return { name: p.name, cls, server: p.server || '', include: status === 'ok', status };
     });
@@ -3734,13 +3746,14 @@ function importParseRoster() {
   const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
   if (!lines.length) { showToast('请先粘贴名单', 'error'); return; }
   // REQ-002（软删除）：dup 判定只针对活跃成员；撞已离队成员不判重，确认导入时走恢复链路
-  const existingNames = appData.members.filter(m => m.status !== '离队').map(m => m.name);
+  // REQ-095：查重走 matchMemberByNameServer 统一口径（单候选宽松匹配，多候选须 (name,server) 精确相等）
+  const activeMembers = appData.members.filter(m => !isDepartedStatus(m.status));
   importPreviewRows = lines.map(line => {
     const parsed = parseMemberRosterLine(line);
-    if (!parsed) return { name: line, cls: '', include: false, status: 'bad' };
-    const dup = isDupMemberName(parsed.name, existingNames);
+    if (!parsed) return { name: line, cls: '', server: '', include: false, status: 'bad' };
+    const dup = !!matchMemberByNameServer(activeMembers, parsed.name, parsed.server);
     const status = !parsed.cls ? 'bad' : (dup ? 'dup' : 'ok');
-    return { name: parsed.name, cls: parsed.cls, include: status === 'ok', status };
+    return { name: parsed.name, cls: parsed.cls, server: parsed.server || '', include: status === 'ok', status };
   });
   showImportPreviewStep();
 }
@@ -3816,12 +3829,11 @@ async function importConfirmRoster() {
 
   // REQ-048（任务书 #12 补丁3）：撞已离队同名成员的行聚合确认——一次弹窗列全、默认全选恢复，
   // 替代原逐个浏览器 confirm。未勾选的跳过不导入，预览页标"已离队同名，未恢复"。
-  // （恢复优先于新建：DB (guild_id,name) 唯一索引下不恢复则无法新建）
+  // （恢复优先于新建：DB (guild_id,name,COALESCE(server,'')) 唯一索引下不恢复则无法新建同键成员）
   const collisions = [];
   for (const r of picked) {
-    const departed = importSource === 'wcl'
-      ? findDepartedByNameWithServer(r.name.trim(), r.server || '')
-      : findDepartedByName(r.name.trim());
+    // REQ-095：两种来源同一口径——撞离队查找统一走 matchMemberByNameServer（候选=离队成员）
+    const departed = findDepartedByNameServer(r.name.trim(), r.server || '');
     if (departed) collisions.push({ row: r, departed });
   }
   if (collisions.length) {
@@ -3890,6 +3902,7 @@ async function importExecute(toAdd, toRestore, skipped) {
       try {
         await window.CloudSync.saveCloudData('members', 'add', {
           name: r.name.trim(),
+          server: r.server || '', // REQ-095：服务器随导入写库（此前解析出但丢弃）
           class: r.cls,
           main_spec: '待补充',
           spec: '待补充', // 向后兼容
@@ -3910,6 +3923,7 @@ async function importExecute(toAdd, toRestore, skipped) {
         await window.CloudSync.saveCloudData('members', 'update', {
           ...t.departed,
           class: t.row.cls || t.departed.class, // 顺带更新本次输入的职业，其余字段保留原值
+          server: t.row.server || '', // REQ-095：恢复顺带写入本次输入的服务器（与 saveMember 恢复链路同口径）
           status: '正式',
           id: t.departed.id
         });
@@ -3950,7 +3964,7 @@ async function importExecute(toAdd, toRestore, skipped) {
       wclSyncRows.forEach(r => {
         if (!r._pendingAdd) return;
         r._pendingAdd = false;
-        const member = activeMembers.find(m => m.name === r.name);
+        const member = matchMemberByNameServer(activeMembers, r.name, r.server || ''); // REQ-095：重匹配走统一口径
         if (member) {
           r.memberId = member.id;
           r.zone = r.bossFights >= (wclSyncMeta ? wclSyncMeta.bossFightTotal : 0) ? 'full' : 'partial';
@@ -4283,7 +4297,7 @@ function renderActivityList() {
   if (memberSel) {
     const cur = memberSel.value;
     memberSel.innerHTML = '<option value="">全部成员</option>' +
-      appData.members.filter(m => m.status !== '离队').map(m => `<option value="${m.id}">${m.name}</option>`).join('');
+      appData.members.filter(m => m.status !== '离队').map(m => `<option value="${m.id}">${memberDisplayName(m)}</option>`).join('');
     memberSel.value = cur;
     if (memberSel.value !== cur) { attFilter.memberId = ''; }
   }
@@ -4600,7 +4614,7 @@ function renderAttendanceMembers(activity) {
                ${checked ? 'checked' : ''} ${isCancelled ? 'disabled' : ''}
                onchange="toggleAttendStatus(this, '${m.id}')">
         <div class="attend-name">
-          <span class="class-${cls}" style="font-weight:500">${m.name}</span>${departed ? ' <span class="member-departed">（已离队）</span>' : ''}
+          <span class="class-${cls}" style="font-weight:500">${memberDisplayName(m)}</span>${departed ? ' <span class="member-departed">（已离队）</span>' : ''}
           <span style="color:var(--text-muted);font-size:11px;margin-left:8px">${classIconHtml(m.class)}${m.class}${mainSpec ? '·' + mainSpec : ''}</span>
           ${roleTagsHtml ? `<span style="margin-left:6px">${roleTagsHtml}</span>` : ''}
         </div>
@@ -4871,8 +4885,9 @@ function buildWclSyncPreview(activity, reportCode, data) {
       name: p.name, server: p.server || '', subType: p.subType || '', cls,
       bossFights: p.bossFights || 0, memberId: null, status: '出席', ignored: false
     };
-    // 按角色名逐一精确匹配，同一人多个号各算各的，不做合并
-    const member = members.find(m => m.name === p.name);
+    // 按角色名逐一匹配（REQ-095 统一口径：单候选宽松、多候选须 (name,server) 精确相等），
+    // 同一人多个号各算各的，不做合并
+    const member = matchMemberByNameServer(members, p.name, p.server || '');
     if (!member) return { ...base, zone: 'unmatched' };
     // 已手动标记（非占位"缺席"）的成员不进预览，同步一律不动
     const att = activity.attendees.find(a => a.member_id === member.id);
@@ -5000,8 +5015,9 @@ function wclSyncAddAsMember(i) {
   if (!r || r.added || r._pendingAdd) return; // 防重复点击
   try {
     // REQ-002（软删除）：dup 判定只针对活跃成员；撞已离队成员不判重，确认导入时走恢复链路
-    const existingNames = appData.members.filter(m => m.status !== '离队').map(m => m.name);
-    const dup = r.cls ? isDupMemberNameWithServer(r.name, r.server, existingNames) : false;
+    // REQ-095：查重走 matchMemberByNameServer 统一口径
+    const activeMembers = appData.members.filter(m => !isDepartedStatus(m.status));
+    const dup = r.cls ? !!matchMemberByNameServer(activeMembers, r.name, r.server) : false;
     const status = !r.cls ? 'bad' : (dup ? 'dup' : 'ok');
     importPreviewRows = [{ name: r.name, cls: r.cls, server: r.server, include: status === 'ok', status }];
     importSource = 'wcl';
@@ -5188,7 +5204,7 @@ function renderReports() {
       // 名字与徽标间的折行空格去掉（间距由徽标 margin-left 承担，压缩名字列 min-content 保 468 无横滚）
       const nameHtml = item.member.deleted
         ? `<span class="member-departed" style="font-weight:500">${item.member.name}</span><span class="tag tag-grey">已删除</span>`
-        : `<span style="font-weight:500">${item.member.name}</span>`;
+        : `<span style="font-weight:500">${memberDisplayName(item.member)}</span>`;
       return `
         <tr>
           <td><div class="rank-num" style="margin:auto">${i + 1}</div></td>
@@ -5210,7 +5226,7 @@ function renderReports() {
   const absentHtml = absentRank.filter(r => r.absent > 0).map((item, i) => `
     <div class="rank-item">
       <div class="rank-num" style="background:rgba(248,81,73,0.3);color:var(--danger)">${i + 1}</div>
-      <div class="rank-name class-${classMap[item.member.class] || ''}">${item.member.name}${item.member.deleted ? ' <span class="tag tag-grey">已删除</span>' : ''}</div>
+      <div class="rank-name class-${classMap[item.member.class] || ''}">${item.member.deleted ? item.member.name : memberDisplayName(item.member)}${item.member.deleted ? ' <span class="tag tag-grey">已删除</span>' : ''}</div>
       <div class="rank-rate" style="color:var(--danger)">${item.absent} 次</div>
     </div>
   `).join('');
@@ -5925,10 +5941,12 @@ function lootRender() {
 }
 
 // 初始化装备分配-成员下拉选择
-function lootInitMemberSelect(selectedName = '') {
+// REQ-095（任务书 #45 WP5）：option value = 成员 id（同名歧义根治），显示文本走 memberDisplayName 消歧；
+// 名单外自定义名仍允许（无 id，value 原样存名字）——selectedId 为成员 id，customName 为无 id 的存量/手输名
+function lootInitMemberSelect(selectedId = '', customName = '') {
   const select = document.getElementById('lootAssignedTo');
   if (!select) return;
-  
+
   const classColors = {
     '战士': '#C79C6E', '法师': '#69CCF0', '牧师': '#FFFFFF',
     '盗贼': '#FFF569', '猎人': '#ABD473', '圣骑士': '#F58CBA',
@@ -5936,35 +5954,32 @@ function lootInitMemberSelect(selectedName = '') {
     '武僧': '#00FF96', '恶魔猎手': '#A330C9', '死亡骑士': '#C41E3A',
     '唤魔师': '#33937F'
   };
-  
+
   const members = appData.members || [];
   // 按名字排序
   const sortedMembers = [...members].sort((a, b) => a.name.localeCompare(b.name, 'zh-CN'));
-  
+
   let optionsHtml = '<option value="">请选择成员</option>';
   sortedMembers.forEach(m => {
     const mainSpec = m.main_spec || m.spec || '';
-    const displayText = mainSpec ? `${m.name} · ${m.class} · ${mainSpec}` : `${m.name} · ${m.class}`;
-    const selected = selectedName && m.name === selectedName ? 'selected' : '';
+    const dispName = memberDisplayName(m);
+    const displayText = mainSpec ? `${dispName} · ${m.class} · ${mainSpec}` : `${dispName} · ${m.class}`;
+    const selected = selectedId && m.id === selectedId ? 'selected' : '';
     const color = classColors[m.class] || 'var(--text-primary)';
-    optionsHtml += `<option value="${m.name}" ${selected} style="color:${color}">${displayText}</option>`;
+    optionsHtml += `<option value="${m.id}" ${selected} style="color:${color}">${displayText}</option>`;
   });
-  
-  // 如果有自定义输入的名字（不在成员列表中），也加上
-  if (selectedName && !members.find(m => m.name === selectedName)) {
-    optionsHtml += `<option value="${selectedName}" selected>${selectedName} · （自定义）</option>`;
+
+  // 如果有自定义输入的名字（不在成员列表中 / 无 id 的存量行），也加上
+  if (customName && !members.find(m => m.id === selectedId)) {
+    optionsHtml += `<option value="${customName}" selected>${customName} · （自定义）</option>`;
   }
-  
+
   select.innerHTML = optionsHtml;
-  
+
   // 设置选中项的文字颜色（职业色）
-  if (selectedName) {
-    const member = members.find(m => m.name === selectedName);
-    if (member && classColors[member.class]) {
-      select.style.color = classColors[member.class];
-    } else {
-      select.style.color = 'var(--text-primary)';
-    }
+  const selMember = selectedId ? members.find(m => m.id === selectedId) : null;
+  if (selMember && classColors[selMember.class]) {
+    select.style.color = classColors[selMember.class];
   } else {
     select.style.color = 'var(--text-primary)';
   }
@@ -5976,7 +5991,8 @@ function lootUpdateMemberInfo() {
   const infoDiv = document.getElementById('lootMemberInfo');
   if (!select || !infoDiv) return;
   
-  const memberName = select.value;
+  // REQ-095（WP5）：下拉值 = 成员 id（名单内）或自定义名（名单外）
+  const selectVal = select.value;
   
   const classColors = {
     '战士': '#C79C6E', '法师': '#69CCF0', '牧师': '#FFFFFF',
@@ -5987,13 +6003,13 @@ function lootUpdateMemberInfo() {
   };
   
   // 更新select选中项的文字颜色
-  if (!memberName) {
+  if (!selectVal) {
     infoDiv.style.display = 'none';
     select.style.color = 'var(--text-primary)';
     return;
   }
-  
-  const member = (appData.members || []).find(m => m.name === memberName);
+
+  const member = (appData.members || []).find(m => m.id === selectVal);
   if (member && classColors[member.class]) {
     select.style.color = classColors[member.class];
   } else {
@@ -6024,7 +6040,7 @@ function lootUpdateMemberInfo() {
     <div class="lmi-class-bar" style="background:${classColor}"></div>
     <div class="lmi-content">
       <div class="lmi-row">
-        <span class="lmi-name" style="color:${classColor}">${member.name}</span>
+        <span class="lmi-name" style="color:${classColor}">${memberDisplayName(member)}</span>
         <span class="lmi-value">${member.class}</span>
         ${roleTags}
       </div>
@@ -6093,8 +6109,8 @@ function lootShowModal(lootId = null) {
         tag.classList.toggle('active', lootSelectedSecondaryStats.includes(tag.dataset.stat));
       });
       document.getElementById('lootSpecialEffect').value = loot.specialEffect || '';
-      // 初始化成员下拉并选中
-      lootInitMemberSelect(loot.assignedTo || '');
+      // 初始化成员下拉并选中（REQ-095/WP5：character_id 优先；无 id 存量行走自定义名兜底）
+      lootInitMemberSelect(loot.character_id || '', loot.assignedTo || '');
       document.getElementById('lootStatus').value = loot.status || '待分配';
       document.getElementById('lootPriority').value = loot.priority || 'P2';
       document.getElementById('lootDate').value = loot.date || '';
@@ -6121,7 +6137,7 @@ function lootShowModal(lootId = null) {
     });
     document.getElementById('lootSpecialEffect').value = '';
     // 初始化成员下拉
-    lootInitMemberSelect('');
+    lootInitMemberSelect();
     document.getElementById('lootStatus').value = '待分配';
     document.getElementById('lootPriority').value = 'P2';
     document.getElementById('lootDate').value = formatDate(new Date());
@@ -6173,6 +6189,14 @@ async function lootSave() {
     saveBtn.textContent = '保存中...';
   }
 
+  // REQ-095（任务书 #45 WP5）：分配人下拉 value = 成员 id（名单内）或自定义名（名单外，无 id）。
+  // 是 id 则 character_id=id + assignedTo=该成员裸名（名字快照语义不变）；自定义名则 character_id=null。
+  const assignedVal = document.getElementById('lootAssignedTo').value.trim();
+  const assignedMemberRow = assignedVal
+    ? (appData.members || []).find(m => m.id === assignedVal)
+    : null;
+  const lootCharacterId = assignedMemberRow ? assignedMemberRow.id : null;
+
   const lootData = {
     name: name,
     raid: document.getElementById('lootRaid').value,
@@ -6183,7 +6207,7 @@ async function lootSave() {
     primaryStat: document.getElementById('lootPrimaryStat').value,
     secondaryStats: [...lootSelectedSecondaryStats],
     specialEffect: document.getElementById('lootSpecialEffect').value.trim(),
-    assignedTo: document.getElementById('lootAssignedTo').value.trim(),
+    assignedTo: assignedMemberRow ? assignedMemberRow.name : assignedVal,
     status: document.getElementById('lootStatus').value,
     priority: document.getElementById('lootPriority').value,
     date: document.getElementById('lootDate').value,
@@ -6200,21 +6224,13 @@ async function lootSave() {
   const isEdit = !!lootEditingId;
   const oldLoot = isEdit ? (appData.loots || []).find(l => l.id === lootEditingId) : null;
 
-  // BUG-059（任务书 #27-补丁2 方案 C-A）：保存补写 character_id（既有列、仅填列，非 schema 变更）——
-  // 分配人下拉值为成员名，按当前公会活跃成员解析 id；解析不到（自定义名/同名仅命中离队）时
-  // 编辑态保留原 id、新建写 null，不阻断保存；分配人选择 UI 流程零变化
-  const assignedMemberRow = lootData.assignedTo
-    ? (appData.members || []).find(m => m.name === lootData.assignedTo && m.status !== '离队')
-    : null;
-  const lootCharacterId = assignedMemberRow ? assignedMemberRow.id : ((oldLoot && oldLoot.character_id) || null);
-
   // 严格 DB-first（Save DB -> Load DB -> Update State -> Render）
   try {
     const payload = { ...lootData, character_id: lootCharacterId, id: lootEditingId || undefined };
     await cloudCrud('loots', isEdit ? 'update' : 'add', payload, { renderFn: lootRender });
 
-    // 联动心愿单：将分配状态变化同步到数据库
-    await syncWishlistLinkages(lootData, oldLoot);
+    // 联动心愿单：将分配状态变化同步到数据库（REQ-095/WP5：携 character_id，联动按 id 优先匹配）
+    await syncWishlistLinkages({ ...lootData, character_id: lootCharacterId }, oldLoot);
 
     closeModal('lootModal');
     showToast(isEdit ? '装备已更新' : '装备已添加', 'success');
@@ -6235,6 +6251,11 @@ async function syncWishlistLinkages(newLoot, oldLoot) {
   const isAssigned = newLoot.status === '已分配' && newLoot.assignedTo;
   let hasChanges = false;
 
+  // REQ-095（任务书 #45 WP5）：心愿行匹配——有 character_id 按 id 匹配 memberId（同名零碰撞）；
+  // 无 id 的存量/自定义名行保留按名回退
+  const wishMemberMatch = (w, loot) =>
+    loot.character_id ? w.memberId === loot.character_id : w.memberName === loot.assignedTo;
+
   try {
     // 1. 从已分配变为非已分配：取消对应心愿单的已获取标记
     if (wasAssigned && !isAssigned) {
@@ -6242,7 +6263,7 @@ async function syncWishlistLinkages(newLoot, oldLoot) {
       const toUnmark = (appData.wishlist || []).filter(w =>
         w.obtained &&
         w.itemName.toLowerCase() === oldLoot.name.toLowerCase() &&
-        w.memberName === oldLoot.assignedTo
+        wishMemberMatch(w, oldLoot)
       );
       for (const w of toUnmark) {
         await cloudCrud('wishlists', 'update', {
@@ -6265,7 +6286,7 @@ async function syncWishlistLinkages(newLoot, oldLoot) {
       const toMark = (appData.wishlist || []).filter(w =>
         !w.obtained &&
         w.itemName.toLowerCase() === newLoot.name.toLowerCase() &&
-        w.memberName === newLoot.assignedTo
+        wishMemberMatch(w, newLoot)
       );
       for (const w of toMark) {
         const note = w.note ? w.note + '\n' + obtainInfo : obtainInfo;
@@ -6287,10 +6308,13 @@ async function syncWishlistLinkages(newLoot, oldLoot) {
       if (newLoot.is_wishlist) {
         const existsAny = (appData.wishlist || []).some(w =>
           w.itemName.toLowerCase() === newLoot.name.toLowerCase() &&
-          w.memberName === newLoot.assignedTo
+          wishMemberMatch(w, newLoot)
         );
         if (!existsAny) {
-          const member = appData.members.find(m => m.name === newLoot.assignedTo);
+          // REQ-095（WP5）：有 character_id 按 id 定位成员，无 id（自定义名）按名回退
+          const member = newLoot.character_id
+            ? appData.members.find(m => m.id === newLoot.character_id)
+            : appData.members.find(m => m.name === newLoot.assignedTo);
           if (member) {
             await cloudCrud('wishlists', 'add', {
               id: genId(),
@@ -6440,7 +6464,7 @@ function wishlistRender() {
   if (memberFilter && memberFilter.options.length <= 1) {
     const currentVal = memberFilter.value;
     memberFilter.innerHTML = '<option value="">全部成员</option>' +
-      appData.members.map(m => `<option value="${m.id}">${m.name}</option>`).join('');
+      appData.members.map(m => `<option value="${m.id}">${memberDisplayName(m)}</option>`).join('');
     memberFilter.value = currentVal;
   }
 
@@ -6642,7 +6666,7 @@ function wishlistShowModal(wishId = null, presetData = null) {
   // 填充成员下拉（编辑模式用）
   const memberSelect = document.getElementById('wishlistMember');
   memberSelect.innerHTML = '<option value="">请选择成员</option>' +
-    appData.members.map(m => `<option value="${m.id}">${m.name} (${m.class})</option>`).join('');
+    appData.members.map(m => `<option value="${m.id}">${memberDisplayName(m)} (${m.class})</option>`).join('');
 
   // 渲染成员多选列表（添加模式用）
   wishlistRenderMemberCheckboxes();
@@ -6775,10 +6799,10 @@ function wishlistRenderMemberCheckboxes() {
     return `
       <label class="wishlist-member-checkbox" data-name="${m.name.toLowerCase()}" data-roles="${roles}" 
              style="--class-color: ${classColor}" 
-             title="${m.name} · ${m.class}${mainSpec ? ' · ' + mainSpec : ''}${offSpecs.length ? ' · 副：' + offSpecs.join('、') : ''}">
+             title="${memberDisplayName(m)} · ${m.class}${mainSpec ? ' · ' + mainSpec : ''}${offSpecs.length ? ' · 副：' + offSpecs.join('、') : ''}">
         <input type="checkbox" value="${m.id}" onchange="wishlistUpdateMemberCount()">
         <div class="wm-content">
-          <div class="wm-name ${cls ? 'class-' + cls : ''}">${m.name}</div>
+          <div class="wm-name ${cls ? 'class-' + cls : ''}">${memberDisplayName(m)}</div>
           <div class="wm-spec">
             ${roleTags}
             <span>${mainSpec || m.class}</span>
@@ -7058,9 +7082,10 @@ function lootUpdateWishlistMatches() {
   matchList.innerHTML = matches.map(w => {
     const specText = wishlistSpecTextMap[w.spec] || w.spec;
     const member = appData.members.find(m => m.id === w.memberId);
-    const memberName = member ? member.name : w.memberName;
+    // REQ-095（WP5）：点击按成员 id 填充下拉（同名零碰撞）；成员已删（伪行）回退按名填自定义项
+    const memberName = member ? memberDisplayName(member) : w.memberName;
     return `
-      <span class="wish-match-member" onclick="lootFillAssignedTo('${memberName}')">
+      <span class="wish-match-member" onclick="lootFillAssignedTo('${member ? member.id : w.memberName}')">
         <span class="match-priority">${w.priority}</span>
         <span>${memberName}</span>
         <span style="font-size:10px;opacity:0.7">(${specText})</span>
@@ -7069,20 +7094,21 @@ function lootUpdateWishlistMatches() {
   }).join('');
 }
 
-// 自动填充分配给谁
-function lootFillAssignedTo(name) {
+// 自动填充分配给谁（REQ-095/WP5：入参为成员 id 或名单外自定义名——下拉 option value 已 id 化，
+// id 直接命中既有选项；自定义名按旧逻辑追加「（自定义）」兜底项，随后走既有 change 逻辑）
+function lootFillAssignedTo(idOrName) {
   const select = document.getElementById('lootAssignedTo');
   if (select) {
     // 检查下拉中是否有这个选项
-    const optionExists = Array.from(select.options).some(o => o.value === name);
+    const optionExists = Array.from(select.options).some(o => o.value === idOrName);
     if (!optionExists) {
       // 没有则添加
       const opt = document.createElement('option');
-      opt.value = name;
-      opt.textContent = name + ' · （自定义）';
+      opt.value = idOrName;
+      opt.textContent = idOrName + ' · （自定义）';
       select.appendChild(opt);
     }
-    select.value = name;
+    select.value = idOrName;
     lootUpdateMemberInfo();
   }
   lootUpdateWishlistMatches();
@@ -7092,6 +7118,72 @@ function lootFillAssignedTo(name) {
 // ==================== 初始化 ====================
 // ==================== 更新日志 ====================
 const changelogData = [
+  {
+    id: 'v3.2.0-req092-item-icons',
+    version: 'v3.2.0',
+    date: '2026-08-13',
+    type: 'feature',
+    typeLabel: '新增功能',
+    title: '副本掉落卡片物品图标（任务书 #46 WP3，REQ-092 落地半）',
+    summary: '副本掉落页（登录壳+公开壳双壳同源）装备卡片右上角渲染物品图标：数据中心掉落表单/列表/批量录入支持「图标ID」（可空），公开 RPC 白名单透出 icon_id（sql/29 待运营执行），图标按 assets/icons/items/{图标ID}.png 规则路径加载——懒加载不卡首屏，无图标ID或图片缺失时不显示、不占位、不破版。',
+    details: [
+      '素材管道 scripts/import-item-icons.js：运营供源图（纯数字 iconID.png）零依赖入库，首库约 300 枚待素材到位后执行',
+      '迁移窗口防护：sql/29 执行前数据中心保存自动不携带 icon_id 键，录入链路不断'
+    ]
+  },
+  {
+    id: 'v3.2.0-addon-109-venom-icon',
+    version: 'v3.2.0',
+    date: '2026-08-13',
+    type: 'feature',
+    typeLabel: '新增功能',
+    title: '插件 1.0.9 毒咒+iconID 采集与转换器 v4（任务书 #46，REQ-110③/REQ-092 采集半）',
+    summary: 'WoWButlerExporter 插件 1.0.7→1.0.9（1.0.8 跳号追平登记口径）：tooltip 绿字「毒咒」标签行采集进导出（venomcurse 字段），物品图标 iconID 经 GetItemInfo 第 10 返回值透传；转换器 wjdc_convert.py 冻结声明升 v4，venomcurse/icon_id 进 load rows 与零丢失比对集（_CMP_FIELDS 八键）。',
+    details: [
+      '诊断件 Probe 新增 tooltip 全行原样 dump（色码可见化），供真机取证',
+      'REQ-089 兑换物展开：规则表送审件 docs/REQ-089-兑换物展开规则表-送审.md 待运营逐格确认，未施工——展开将改变 308 基线，确认前禁止动基线断言'
+    ]
+  },
+  {
+    id: 'v3.2.0-req088-effect-recollect',
+    version: 'v3.2.0',
+    date: '2026-08-13',
+    type: 'fix',
+    typeLabel: '问题修复',
+    title: '插件饰品特效补采修复（任务书 #46 WP1，REQ-088）',
+    summary: 'S1 池 40 件饰品 39 件特效空串的根因修复：tooltip 特效行（「装备：…」绿字）行首带内联颜色码时，旧版行首锚定匹配失配。1.0.9 起匹配前先剥离行首色码/图标码/前导空白（纯文本行零影响），特效正常入导出。',
+    details: [
+      '根因经代码级排他论证（换行/多段落形态被排除，同版本 3 件采到证明色码个体级），真机终验走 Probe 全行 dump 取证',
+      '修复后游戏内导出→converter 转换的特效非空率实测待 B 表 B1/B2 真机链路确认'
+    ]
+  },
+  {
+    id: 'v3.2.0-req095-member-server',
+    version: 'v3.2.0',
+    date: '2026-08-13',
+    type: 'feature',
+    typeLabel: '新增功能',
+    title: '成员服务器字段+同名口径升级（任务书 #45，REQ-095）',
+    summary: '成员新增/编辑弹窗加「服务器」字段（可空=同服/未填），成员列表常驻服务器列（空显「—」）；同名唯一口径升级为「同服同名拦、跨服同名放行」——同公会跨服同名不再误拦。同名并存时全站成员名展示自动消歧为「名字（服务器）」。智能导入/WCL 导入解析出的服务器随导入落库，匹配按（名字+服务器）双键。',
+    details: [
+      '数据库迁移 sql/28（待运营执行）：raid_members 加 server 可空列，唯一索引重建为 (公会,名字,服务器) 活跃成员生效；迁移执行前产品自动降级（服务器不读写、成员功能不断链），执行后全量生效',
+      '匹配统一口径：同名只有一个候选时宽松匹配（兼容存量成员未填服务器），同名并存时必须服务器精确相等',
+      '装备分配「分配给谁」下拉内部改用成员 id（同名零碰撞），自定义名字输入保留'
+    ]
+  },
+  {
+    id: 'v3.2.0-bug060-cross-server-same-name',
+    version: 'v3.2.0',
+    date: '2026-08-13',
+    type: 'fix',
+    typeLabel: '问题修复',
+    title: '同名跨服成员创建被误拦修复（任务书 #45 并入，BUG-060）',
+    summary: '同名不同服务器角色创建被拦「公会内已存在同名角色」——游戏现行设定同公会允许同名、前提不同服务器。随 REQ-095 服务器字段与三键唯一索引落地根治；撞离队同名「是否恢复」语义不变。',
+    details: [
+      '修复前根因：唯一索引停在 (公会,名字)，无服务器维度',
+      '同服同名仍正确拦截并提示「同服务器已存在同名角色（跨服同名请填写服务器区分）」'
+    ]
+  },
   {
     id: 'v3.2.0-bug078-nav-cross-account',
     version: 'v3.2.0',
@@ -12591,7 +12683,7 @@ function mdRenderLoot(panel) {
       ${boss ? `<button class="btn btn-primary btn-sm" onclick="mdEditLootItem(null)">+ 新增掉落</button>
       <button class="btn btn-sm" onclick="mdOpenLootBatch()">📋 批量录入</button>` : ''}
     </div>
-    ${boss ? mdTable('<th>装备名</th><th>部位</th><th>类型</th><th>主属性</th><th>副属性</th><th>特效</th><th>毒咒</th><th class="center">操作</th>',
+    ${boss ? mdTable('<th>装备名</th><th>部位</th><th>类型</th><th>主属性</th><th>副属性</th><th>特效</th><th>毒咒</th><th>图标ID</th><th class="center">操作</th>',
       loot.map(l => `<tr>
         <td style="font-weight:500">${l.item_name}</td>
         <td>${l.slot || '-'}</td>
@@ -12600,6 +12692,7 @@ function mdRenderLoot(panel) {
         <td>${(l.secondary_stats || []).join('、') || '-'}</td>
         <td style="font-size:12px;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${(l.effect || '').replace(/"/g, '&quot;')}">${l.effect ? `<span class="loot-effect-green">${l.effect}</span>` : '-'}</td>
         <td>${l.venomcurse || '-'}</td>
+        <td>${l.icon_id != null ? l.icon_id : '-'}</td>
         ${mdActionBtns(`mdEditLootItem('${l.id}')`, `mdDeleteRow('boss_loot','${l.id}','${l.item_name}','')`)}
       </tr>`).join('')) : '<div style="color:var(--text-muted)">该团本暂无 BOSS，请先到「BOSS」区新增</div>'}`;
 }
@@ -12613,7 +12706,9 @@ function mdEditLootItem(id) {
     { key: 'primary_stats', label: '主属性（可多选）', type: 'tags', options: MD_PRIMARY_STATS },
     { key: 'secondary_stats', label: '副属性（可多选）', type: 'tags', options: MD_SECONDARY_STATS },
     { key: 'effect', label: '特效', type: 'textarea', placeholder: '装备：……（可空，多行）' },
-    { key: 'venomcurse', label: '毒咒', type: 'select', options: [{ value: '', label: '无' }, { value: window.LootTaxonomy.VENOMCURSE_LABEL, label: window.LootTaxonomy.VENOMCURSE_LABEL }] }
+    { key: 'venomcurse', label: '毒咒', type: 'select', options: [{ value: '', label: '无' }, { value: window.LootTaxonomy.VENOMCURSE_LABEL, label: window.LootTaxonomy.VENOMCURSE_LABEL }] },
+    // REQ-092（任务书 #46 WP3）：图标ID（可空，空串由 mdEditorSave 统一转 NULL）；素材入库走 scripts/import-item-icons.js
+    { key: 'icon_id', label: '图标ID', type: 'number' }
   ], row, async (out) => {
     // REQ-060：非法组合保存前弹提示确认（兜底优先，不硬拦；取消则中止保持弹窗）
     if (out.slot && out.item_type && MD_SLOT_TYPE_MAP[out.slot] && !MD_SLOT_TYPE_MAP[out.slot].includes(out.item_type)) {
@@ -12623,6 +12718,9 @@ function mdEditLootItem(id) {
     }
     // REQ-110：venomcurse 预设下拉（无/毒咒，禁自由输入），空串由 mdEditorSave 统一转 NULL
     const payload = { item_name: out.item_name, slot: out.slot, item_type: out.item_type, effect: out.effect, primary_stats: out.primary_stats, secondary_stats: out.secondary_stats, venomcurse: out.venomcurse };
+    // REQ-092（任务书 #46）：icon_id 仅非空时携带——sql/29 迁移执行前（列不存在）保存链路保持可用（PGRST204 防护）；
+    // 迁移后正常写入；「清空既有图标ID」需迁移执行后处理（登记遗留）
+    if (out.icon_id !== null && out.icon_id !== undefined && out.icon_id !== '') payload.icon_id = out.icon_id;
     if (id) await MasterData.mdUpdate('boss_loot', payload, `id=eq.${id}`);
     else await MasterData.mdInsert('boss_loot', { boss_id: mdLootNav.bossId, ...payload });
     await MasterData.refresh('boss_loot');
@@ -12635,11 +12733,11 @@ function mdEditLootItem(id) {
 let mdLootBatchRows = null;
 function mdOpenLootBatch() {
   mdEditorCtx = { fields: [], row: {}, onSave: async () => {} };
-  document.getElementById('mdEditorTitle').textContent = '批量录入掉落（每行：装备名,部位,类型,主属性,副属性,特效）';
+  document.getElementById('mdEditorTitle').textContent = '批量录入掉落（每行：装备名,部位,类型,主属性,副属性,特效,图标ID）';
   document.getElementById('mdEditorBody').innerHTML = `
     <div class="form-group">
-      <label class="form-label">掉落清单（REQ-054 扩展格式：后三列可空，主/副属性多值用「、」分隔）</label>
-      <textarea class="form-textarea" id="mdField__batch" style="height:160px" placeholder="烈毒巨剑,武器,剑,力量,爆击、急速,装备：攻击附带剧毒&#10;毒牙项坠,颈部,饰品,智力,,"></textarea>
+      <label class="form-label">掉落清单（REQ-054 扩展格式：后四列可空，主/副属性多值用「、」分隔；REQ-092 第 7 列图标ID 纯数字可空）</label>
+      <textarea class="form-textarea" id="mdField__batch" style="height:160px" placeholder="烈毒巨剑,武器,剑,力量,爆击、急速,装备：攻击附带剧毒,20451&#10;毒牙项坠,颈部,饰品,智力,,"></textarea>
     </div>
     <div id="mdLootBatchPreview"></div>`;
   const btn = document.getElementById('mdEditorSaveBtn');
@@ -12661,20 +12759,27 @@ function mdLootBatchParse() {
       bad.push(`${i + 1}（部位「${parts[1]}」与类型「${parts[2]}」不匹配）`);
       return;
     }
-    rows.push({
+    // REQ-092（任务书 #46 WP3）：第 7 列图标ID（可空；非空必须纯数字，否则报行号跳过）
+    if (parts[6] && !/^\d+$/.test(parts[6])) {
+      bad.push(`${i + 1}（图标ID「${parts[6]}」非纯数字）`);
+      return;
+    }
+    const row = {
       item_name: parts[0],
       slot: parts[1] || '',
       item_type: parts[2] || '',
       primary_stats: (parts[3] || '').split('、').map(s => s.trim()).filter(Boolean),
       secondary_stats: (parts[4] || '').split('、').map(s => s.trim()).filter(Boolean),
       effect: parts[5] || ''
-    });
+    };
+    if (parts[6]) row.icon_id = Number(parts[6]); // REQ-092：仅提供时携带（sql/29 迁移窗口 PGRST204 防护）
+    rows.push(row);
   });
   if (!rows.length) { showToast('没有可解析的有效行', 'error'); return; }
   mdLootBatchRows = rows;
   document.getElementById('mdLootBatchPreview').innerHTML =
-    `<div style="margin-top:12px;max-height:200px;overflow-y:auto">${mdTable('<th>装备名</th><th>部位</th><th>类型</th><th>主属性</th><th>副属性</th><th>特效</th>',
-      rows.map(r => `<tr><td>${r.item_name}</td><td>${r.slot || '-'}</td><td>${r.item_type || '-'}</td><td>${r.primary_stats.join('、') || '-'}</td><td>${r.secondary_stats.join('、') || '-'}</td><td style="font-size:12px;color:var(--text-muted)">${r.effect || '-'}</td></tr>`).join(''))}</div>
+    `<div style="margin-top:12px;max-height:200px;overflow-y:auto">${mdTable('<th>装备名</th><th>部位</th><th>类型</th><th>主属性</th><th>副属性</th><th>特效</th><th>图标ID</th>',
+      rows.map(r => `<tr><td>${r.item_name}</td><td>${r.slot || '-'}</td><td>${r.item_type || '-'}</td><td>${r.primary_stats.join('、') || '-'}</td><td>${r.secondary_stats.join('、') || '-'}</td><td style="font-size:12px;color:var(--text-muted)">${r.effect || '-'}</td><td>${r.icon_id != null ? r.icon_id : '-'}</td></tr>`).join(''))}</div>
     ${bad.length ? `<div style="color:var(--warning);font-size:12px;margin-top:6px">第 ${bad.join('、')} 行无法识别，已跳过</div>` : ''}`;
   const btn = document.getElementById('mdEditorSaveBtn');
   btn.textContent = `确认入库（${rows.length} 条）`;
@@ -12726,7 +12831,7 @@ function mdRenderDungeonLoot(panel) {
       ${navBoss !== '__all__' ? `<button class="btn btn-primary btn-sm" onclick="mdEditDungeonLootItem(null)">+ 新增掉落</button>` : ''}
       <button class="btn btn-sm" onclick="mdOpenDungeonLootBatch()">📋 批量录入</button>
     </div>
-    ${mdTable('<th>装备名</th><th>BOSS 归属</th><th>部位</th><th>类型</th><th>主属性</th><th>副属性</th><th>特效</th><th>毒咒</th><th class="center">操作</th>',
+    ${mdTable('<th>装备名</th><th>BOSS 归属</th><th>部位</th><th>类型</th><th>主属性</th><th>副属性</th><th>特效</th><th>毒咒</th><th>图标ID</th><th class="center">操作</th>',
       loot.map(l => `<tr>
         <td style="font-weight:500">${l.item_name}</td>
         <td>${bossName(l.boss_id)}</td>
@@ -12736,6 +12841,7 @@ function mdRenderDungeonLoot(panel) {
         <td>${(l.secondary_stats || []).join('、') || '-'}</td>
         <td style="font-size:12px;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${(l.effect || '').replace(/"/g, '&quot;')}">${l.effect ? `<span class="loot-effect-green">${l.effect}</span>` : '-'}</td>
         <td>${l.venomcurse || '-'}</td>
+        <td>${l.icon_id != null ? l.icon_id : '-'}</td>
         ${mdActionBtns(`mdEditDungeonLootItem('${l.id}')`, `mdDeleteRow('dungeon_loot','${l.id}','${l.item_name}','')`)}
       </tr>`).join(''))}`;
 }
@@ -12749,7 +12855,9 @@ function mdEditDungeonLootItem(id) {
     { key: 'primary_stats', label: '主属性（可多选）', type: 'tags', options: MD_PRIMARY_STATS },
     { key: 'secondary_stats', label: '副属性（可多选）', type: 'tags', options: MD_SECONDARY_STATS },
     { key: 'effect', label: '特效', type: 'textarea', placeholder: '装备：……（可空，多行）' },
-    { key: 'venomcurse', label: '毒咒', type: 'select', options: [{ value: '', label: '无' }, { value: window.LootTaxonomy.VENOMCURSE_LABEL, label: window.LootTaxonomy.VENOMCURSE_LABEL }] }
+    { key: 'venomcurse', label: '毒咒', type: 'select', options: [{ value: '', label: '无' }, { value: window.LootTaxonomy.VENOMCURSE_LABEL, label: window.LootTaxonomy.VENOMCURSE_LABEL }] },
+    // REQ-092（任务书 #46 WP3）：图标ID（可空，空串由 mdEditorSave 统一转 NULL）；素材入库走 scripts/import-item-icons.js
+    { key: 'icon_id', label: '图标ID', type: 'number' }
   ], row, async (out) => {
     if (out.slot && out.item_type && MD_SLOT_TYPE_MAP[out.slot] && !MD_SLOT_TYPE_MAP[out.slot].includes(out.item_type)) {
       if (!confirm(`部位「${out.slot}」与类型「${out.item_type}」不是常见组合，仍要保存吗？`)) {
@@ -12758,6 +12866,8 @@ function mdEditDungeonLootItem(id) {
     }
     // REQ-110：venomcurse 预设下拉（无/毒咒，禁自由输入），空串由 mdEditorSave 统一转 NULL
     const payload = { item_name: out.item_name, slot: out.slot, item_type: out.item_type, effect: out.effect, primary_stats: out.primary_stats, secondary_stats: out.secondary_stats, venomcurse: out.venomcurse };
+    // REQ-092（任务书 #46）：icon_id 仅非空时携带（sql/29 迁移窗口 PGRST204 防护，同 boss_loot 口径）
+    if (out.icon_id !== null && out.icon_id !== undefined && out.icon_id !== '') payload.icon_id = out.icon_id;
     if (id) await MasterData.mdUpdate('dungeon_loot', payload, `id=eq.${id}`);
     else await MasterData.mdInsert('dungeon_loot', {
       dungeon_id: mdDungeonLootNav.dungeonId,
