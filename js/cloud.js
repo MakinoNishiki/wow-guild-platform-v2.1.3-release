@@ -980,21 +980,13 @@
             status: mapStatusToDb(att.status),
           }));
           if (attRows.length > 0) {
-            // 批量插入通过代理 - 使用数组 body
-            const token = await getAccessToken();
-            if (!token) throw new Error('未登录');
-            const resp = await fetch('/api/db/rest/v1/activity_attendance', {
-              method: 'POST',
-              headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json',
-                'Prefer': 'return=representation',
-              },
-              body: JSON.stringify(attRows),
-            });
-            if (!resp.ok) {
-              const errText = await resp.text();
-              throw new Error(`出勤记录同步失败: ${errText}`);
+            // 批量插入走 dbInsert 代理 wrapper（数组 body 由 dbWrite 原样透传）——
+            // 门禁收口（修复清单终案 2026-08-13）：此处原为 REQ-033 时代直 fetch /api/db 的
+            // 既存写点，不在 verify-task47 A7 计数面（A7 只 grep app.js），按清单纳入收口
+            try {
+              await dbInsert('activity_attendance', attRows);
+            } catch (e) {
+              throw new Error(`出勤记录同步失败: ${e.message}`);
             }
           }
         }

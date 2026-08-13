@@ -133,6 +133,13 @@ async function login(page) {
   const directDbOps = (appSrc.match(/[^.]db(?:Insert|Update|Delete)\(/g) || []).length;
   check('A7 WP4 门禁锁数：app.js 直调 saveCloudData=16（批处理例外白名单）/fetch(/api/db)=1（wclAttendanceWrite 登记例外）/直连 dbInsert|Update|Delete=0——新增绕过即超限报警',
     directWrites === 16 && directApiDb === 1 && directDbOps === 0, `saveCloudData=${directWrites} apiDb=${directApiDb} dbOps=${directDbOps}`);
+  // A7b（修复清单终案 2026-08-13 扩锁）：cloud.js 同样纳入门禁——syncActivity 内 REQ-033 时代
+  // 裸 fetch('/api/db…') 既存写点已收口走 dbInsert wrapper，cloud.js 字面量直 fetch('/api/db 锁 0
+  // （dbWrite/dbQuery 两个 wrapper 走 fetch(url,…) 变量形式，不计入）
+  const cloudSrc = fs.readFileSync(path.join(ROOT, 'js', 'cloud.js'), 'utf8');
+  const cloudApiDb = (cloudSrc.match(/fetch\('\/api\/db/g) || []).length;
+  check('A7b WP4 门禁扩锁：cloud.js 裸 fetch(/api/db)=0（syncActivity 既存写点已收口 dbInsert）',
+    cloudApiDb === 0, `cloudApiDb=${cloudApiDb}`);
 
   const browser = await chromium.launch({ headless: true, channel: process.env.PW_CHANNEL || 'chromium' });
   const pageErrors = [];

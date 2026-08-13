@@ -7176,6 +7176,20 @@ function lootFillAssignedTo(idOrName) {
 // ==================== 更新日志 ====================
 const changelogData = [
   {
+    id: 'v3.2.0-addon-1011-s2-fix',
+    version: 'v3.2.0',
+    date: '2026-08-13',
+    type: 'fix',
+    typeLabel: '问题修复',
+    title: '插件 1.0.11：冷缓存污染根治+特效/毒咒难度档通道（BUG-082/REQ-088 终案，S2 录库前修复包）',
+    summary: '两轮 probe 实锤：EJ 预览态装备的平面 tooltip（SetItemByID/裸链接）天生缺特效/毒咒绿字段落，1.0.10 双通道回退无效；且 1.0.9 冷缓存物品数据未加载完即解析，致 31 件武器/护甲主属性缺损、3 件毒锻兑换物类型错标武器。1.0.11：①未缓存物品自动排队等数据就绪（Item:ContinueOnItemLoad），不再拿占位数据解析；②团本特效/毒咒改按难度档链接读取，导出特效存史诗档文本、毒咒按史诗档判定；③属性数值 API 换 C_Item.GetItemStats（12.1 旧函数已移除）；④probe 新增悬停直读（/wjdc probe hover）。',
+    details: [
+      '待运营真机重导回验：271876 effect=「装备：…爆击提高377…降低62，持续12秒。」+venomcurse=毒咒、后二同类 3 件同判、31 件缺损件主属性补齐、毒锻 3 件 type 归位（步骤卡 Q1-Q4）',
+      'REQ-089 备案订正：S2 兑换物基数 5 件→20 件（毒咒/毒织/毒铸/毒锻 4 族 × 5 部位），送审件第七节已修正',
+      '内部：WCL 考勤链路既存裸写点 syncActivity 收口 dbInsert，A7 写点门禁扩锁 cloud.js（wclAttendanceWrite 为既有登记例外不变）'
+    ]
+  },
+  {
     id: 'v3.2.0-addon-1010-tooltip-fix',
     version: 'v3.2.0',
     date: '2026-08-13',
