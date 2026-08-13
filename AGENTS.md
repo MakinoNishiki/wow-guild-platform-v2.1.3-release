@@ -129,6 +129,8 @@
 
 * **写操作**：统一走 `cloudCrud()` 入口（Save DB → Load DB → Update State → Render），底层经 server.js 代理（`/api/db/rest/v1/*`）
 
+  * 写后自检哨兵+新增写点门禁（任务书 #47 WP4，运营裁定 b 先行+轻量门禁）：cloudCrud 内置写后哨兵——reload 后校验缓存含新值（cloudCrudSentinelCheck：add=id 在/delete=id 消失/update=同名标量键值一致），不满足自动二次 reload+console 告警 `[BUG-080 哨兵]`；**新增写操作必须走 cloudCrud**（批处理例外注释自引规范 1.2.2），禁止新增绕过直调——verify-task47 A7 grep 锁数（直调 saveCloudData=16/fetch('/api/db=1/直连 dbOps=0），超限即红；收口 wrapper（方案 a）记长期演进不实施
+
   * 代理先验证用户 JWT（调用 `/auth/v1/user`），再做公会级鉴权（owner/editor 可写业务表，viewer 只读；个人表限本人），最后用 service_role key 写入
 
   * 性能缓存（任务书 #10）：JWT 按 token 缓存 60s、公会角色按 user+guild 缓存 120s；guild_members/guilds 写成功即清空角色缓存（即时生效）；行归属联查不缓存

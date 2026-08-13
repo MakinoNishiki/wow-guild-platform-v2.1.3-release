@@ -429,8 +429,13 @@ async function cleanup() {
         sel.value = m ? m.id : name;
         lootUpdateMemberInfo();
       }, assignee);
+      // 任务书 #47 回归期维护：清旧 toast 再保存——成功 toast 文本两次保存相同，
+      // 残留 toast 会让 waitForSelector 提前命中（并行高负载下第二次保存尚未完成）
+      await page.evaluate(() => { const t = document.getElementById('toastContainer'); if (t) t.innerHTML = ''; });
       await page.click('#lootSaveBtn');
       await page.waitForSelector('.toast.success', { timeout: 15000 }); // 保存成功 toast（装备已添加/已更新）
+      // 按钮复位（finally）在 toast 后同帧完成，等它真正可点再走人，防下次点击撞上「保存中...」
+      await page.waitForFunction(() => !document.getElementById('lootSaveBtn').disabled, null, { timeout: 15000 });
       await sleep(1500); // cloudCrud reload + render
     }
     async function svcGetLoot(itemName) {
@@ -449,8 +454,10 @@ async function cleanup() {
     // d2 编辑该行（不改分配人）→ character_id 保留不丢
     await page.evaluate(() => { const l = appData.loots.find(x => x.name === 'T27P装备-UI新增'); lootEdit(l.id); });
     await sleep(600);
+    await page.evaluate(() => { const t = document.getElementById('toastContainer'); if (t) t.innerHTML = ''; }); // 同防残留 toast 竞态
     await page.click('#lootSaveBtn');
     await page.waitForSelector('.toast.success', { timeout: 15000 });
+    await page.waitForFunction(() => !document.getElementById('lootSaveBtn').disabled, null, { timeout: 15000 });
     await sleep(1500);
     const d2Row = await svcGetLoot('T27P装备-UI新增');
     check('C(d2) 编辑保存（不改分配人）→ character_id 保留不丢',

@@ -1325,6 +1325,17 @@ async function cloudCrud(dataType, operation, payload, options = {}) {
 
     // 3. 缓存到 localStorage（仅作为缓存）
     saveData();
+
+    // 3.5 BUG-080 哨兵（任务书 #47 WP4，运营裁定 b 先行）：写后自检——reload 后缓存必须已含新值，
+    // 不满足自动二次 reload + console 告警（verify 断言触发/不触发两态）；二次仍不一致升级 error
+    if (!cloudCrudSentinelCheck(dataType, operation, payload)) {
+      console.warn(`[BUG-080 哨兵] cloudCrud ${dataType}/${operation} 写后缓存未含新值，自动二次 reload`);
+      await window.CloudSync.reloadData(dataType);
+      saveData();
+      if (!cloudCrudSentinelCheck(dataType, operation, payload)) {
+        console.error(`[BUG-080 哨兵] ${dataType}/${operation} 二次 reload 后缓存仍不一致（id=${payload && payload.id}）`);
+      }
+    }
     const perfReload = performance.now();
 
     // 4. 渲染当前模块
@@ -1344,6 +1355,32 @@ async function cloudCrud(dataType, operation, payload, options = {}) {
 // V2.1 数据持久化稳定性（兼容旧调用，已委托给 cloudCrud）
 async function syncToCloudAndReload(dataType, operation, item, extra, renderFn) {
   return cloudCrud(dataType, operation, item, { renderFn });
+}
+
+// ---- BUG-080 哨兵校验函数（任务书 #47 WP4）----
+// 校验口径（宁稳勿误报）：add=新 id 在集合；delete=id 已消失；update=id 在集合且 payload 中与行
+// 同名的标量键值逐一相等（对象/数组键如 attendees/off_specs/item_stats 因前后端结构映射差异不比对，
+// payload 缺 id 或未知数据类型不校验）。appData 集合映射：members/loots/wishlist(s)/activities。
+function cloudCrudSentinelCheck(dataType, operation, payload) {
+  const coll = dataType === 'members' ? appData.members
+    : dataType === 'loots' ? appData.loots
+    : (dataType === 'wishlist' || dataType === 'wishlists') ? appData.wishlist
+    : dataType === 'activities' ? appData.activities : null;
+  if (!Array.isArray(coll)) return true;
+  const id = payload && payload.id;
+  if (!id) return true;
+  const row = coll.find(r => r.id === id);
+  if (operation === 'delete') return !row;
+  if (!row) return false;
+  if (operation === 'add') return true;
+  if (operation !== 'update') return true;
+  for (const k of Object.keys(payload)) {
+    if (k === 'id') continue;
+    const v = payload[k];
+    if (v === undefined || v === null || typeof v === 'object') continue;
+    if (k in row && row[k] !== v) return false;
+  }
+  return true;
 }
 
 function genId() {
@@ -1905,6 +1942,11 @@ async function handleLeaveGuild() {
     const guilds = await window.CloudSync.loadUserGuilds();
     if (guilds.length > 0) {
       await window.CloudSync.selectGuild(guilds[0].id);
+      // BUG-080 同族实锤（任务书 #47 WP2-#1）：自愈切换公会后必须重渲——selectGuild 已全量换 appData，
+      // 不 render 则当前页停留旧公会数据，此时编辑/删除会以新公会 id 走代理（脏操作）
+      updateCloudUI();
+      updatePermissionUI();
+      renderCurrentPage();
       showToast('已退出公会', 'success');
     } else {
       // 回"创建/加入公会"页（保持在登录态）
@@ -4477,13 +4519,13 @@ async function saveActivity() {
       rememberRecentRaidName(raidName); // REQ-029
       showToast('活动已创建', 'success');
     }
+    closeModal('activityModal'); // BUG-080 同族（任务书 #47 WP2-#3）：成功才关弹窗——失败保弹窗留输入便于重试（与 saveMember 口径对齐）
   } catch (e) {
     console.error('活动保存失败:', e);
   } finally {
     activitySaving = false;
     if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = saveBtn.dataset.originalText || '保存'; }
   }
-  closeModal('activityModal');
 }
 
 function openAttendanceDetail(activityId) {
@@ -4761,13 +4803,13 @@ async function saveAttendance() {
     const payload = { ...activity, attendees, id: activity.id };
     await cloudCrud('activities', 'update', payload, { renderFn: renderAttendance });
     showToast('考勤已保存', 'success');
+    closeModal('attendanceDetailModal'); // 任务书 #47 WP2-#3：成功才关弹窗（失败保弹窗便于重试）
   } catch (e) {
     console.error('考勤保存失败:', e);
   } finally {
     attendanceSaving = false;
     if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = saveBtn.dataset.originalText || '保存考勤'; }
   }
-  closeModal('attendanceDetailModal');
 }
 
 let activityDeleting = false;
@@ -4786,13 +4828,13 @@ async function deleteCurrentActivity() {
       await cloudCrud('activities', 'delete', { id: activity.id }, { renderFn: renderAttendance });
     }
     showToast('活动已删除', 'success');
+    closeModal('attendanceDetailModal'); // 任务书 #47 WP2-#3：成功才关弹窗（失败保弹窗便于重试）
   } catch (e) {
     console.error('活动删除失败:', e);
   } finally {
     activityDeleting = false;
     if (delBtn) { delBtn.disabled = false; delBtn.textContent = delBtn.dataset.originalText || '删除活动'; }
   }
-  closeModal('attendanceDetailModal');
 }
 
 // ==================== REQ-033：WCL 同步考勤（任务书 #11） ====================
@@ -5115,6 +5157,13 @@ async function wclSyncConfirm() {
   } catch (e) {
     console.error('WCL 同步考勤写入失败:', e);
     showToast('同步失败：' + (e.message || '云端同步出错'), 'error');
+    // 任务书 #47 WP2-#4：循环写中途抛错 = 前 N-1 行已落库的部分写——必须 reload 让界面与库一致，
+    // 否则考勤详情停留旧状态（同族「写成功（部分）但 UI 不刷新」）
+    try {
+      await window.CloudSync.reloadData('activities');
+      saveData();
+      renderAttendance();
+    } catch (e2) { console.error('同步失败后 reload 失败:', e2); }
   } finally {
     wclSyncWriting = false;
     btn.disabled = false;
@@ -6350,7 +6399,15 @@ async function syncWishlistLinkages(newLoot, oldLoot) {
       if (typeof wishlistRender === 'function') wishlistRender();
     }
   } catch (e) {
+    // 任务书 #47 WP2-#5：联动失败禁止静默（规范 §4.5）——主对象（装备）确已保存，
+    // 联动可能半同步（部分心愿行已更新、收尾 reload 被跳过）；warning 级明示 + 尝试兜底刷新心愿缓存
     console.error('心愿单联动同步失败:', e);
+    showToast('装备已保存，但心愿单联动同步失败——请核对心愿单「已获取」状态', 'warning');
+    try {
+      await window.CloudSync.reloadData('wishlists');
+      saveData();
+      if (typeof wishlistRender === 'function') wishlistRender();
+    } catch (e2) { console.error('联动失败后 reload 失败:', e2); }
   }
 }
 
@@ -7118,6 +7175,46 @@ function lootFillAssignedTo(idOrName) {
 // ==================== 初始化 ====================
 // ==================== 更新日志 ====================
 const changelogData = [
+  {
+    id: 'v3.2.0-bug080-sentinel-gate',
+    version: 'v3.2.0',
+    date: '2026-08-13',
+    type: 'improve',
+    typeLabel: '体验优化',
+    title: '写后自检哨兵+新增写点门禁（任务书 #47 WP4，BUG-080 预防机制落地）',
+    summary: '所有经 cloudCrud 的写操作在 reload 后自动自检缓存已含新值（新增=id 在列/删除=id 消失/更新=字段值一致），不一致即自动二次 reload 并 console 告警——「写成功但界面不刷新」从机制上自愈+留痕。新增写操作必须走 cloudCrud 的门禁立规入 AGENTS.md 与开发规范 §1.2，回归脚本以计数断言锁死现状白名单，新增绕过直调即红。',
+    details: [
+      '哨兵两态经真浏览器实证：正常写零误报；注入陈旧 reload 时告警并自动二次 reload 自愈，列表仍即时可见',
+      '收口 wrapper（方案 a）按运营裁定记入长期演进，本批不实施'
+    ]
+  },
+  {
+    id: 'v3.2.0-bug081-season-align',
+    version: 'v3.2.0',
+    date: '2026-08-13',
+    type: 'fix',
+    typeLabel: '问题修复',
+    title: '副本掉落页赛季选择器对齐归位（任务书 #47 WP3，BUG-081）',
+    summary: '≥1400 宽屏面板态下，赛季下拉留在 1100px 版心、右缘与右栏筛选面板/卡片区不对齐（悬浮错位）。两壳（登录页签+公开 data.html）赛季行所在轨道并入卡片区同一 292px 右偏移，右缘对齐归位；1366 折叠顶栏态零变动。',
+    details: [
+      '公开壳页头与登录壳赛季行分别并入卡片区偏移轨道（margin-left auto 吸收余量，与卡片区同机制）',
+      'computed 实测：双壳 1920 右缘偏差 ≤2px、双壳 1366 零裁切零回退'
+    ]
+  },
+  {
+    id: 'v3.2.0-bug080-write-chain-audit',
+    version: 'v3.2.0',
+    date: '2026-08-13',
+    type: 'fix',
+    typeLabel: '问题修复',
+    title: '写链路刷新断裂系统排查+同族修复（任务书 #47，BUG-080）',
+    summary: '「添加成员 toast 成功但列表不显示」系统排查：主链路（成员表单/导入/连加/切 tab）在当前构建逐环实证完好（写库→reload→缓存→渲染四环 dump 全通）；全站写路径对照排查（成员/考勤/装备/心愿/数据中心九区块/认领/公会/用户/偏好共 40+ 写点）发现同族实锤 1 处与边缘瑕疵 4 处，本包一并修复。预防机制方案（写路径收口 wrapper / 写后自检断言）已出方案书送运营裁定后施工。',
+    details: [
+      '实锤修复：退出公会后自愈切换到其他公会时当前页不重渲（停留旧公会数据，此时编辑会脏操作）——补 updateCloudUI+权限门+整页重渲',
+      '瑕疵修复：活动保存/考勤保存/活动删除写失败时弹窗照关输入丢失→成功才关弹窗；WCL 同步考勤循环写中途失败（部分行已落库）不刷新→catch 兜底 reload；装备保存的心愿单联动失败静默→warning 明示+兜底刷新',
+      '预防机制待运营定稿后落地，落地前回归 verify-task47 锁定主链路即时可见'
+    ]
+  },
   {
     id: 'v3.2.0-req092-item-icons',
     version: 'v3.2.0',

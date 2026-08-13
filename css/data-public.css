@@ -149,6 +149,11 @@
   /* 卡片区让位：内容容器 margin-right = 面板宽 + 间隙，卡片列数自适应重排
      （提权压 .dp-main 的 margin:0 auto 基线规则——auto 左距吸收余量，右距恒定 292） */
   .data-public-body .dp-main, #page-lootdrop .dp-main { margin-right: 292px; }
+  /* 任务书 #47 WP3（BUG-081）：赛季选择器右缘与卡片区右缘对齐归位——面板态卡片区右让 292，
+     赛季行（公开壳在页头内 / 登录壳独立行）留在 1100 版心致右缘悬空未对齐；
+     修法=两壳赛季行所在轨道并入卡片区同一右偏移（margin-left auto 吸收余量，与 .dp-main 同机制）；
+     登录壳赛季行规则见文件尾登录壳作用域段（层叠须晚于 #page-lootdrop .dp-season 基线规则） */
+  .data-public-body .dp-header { margin-right: 292px; }
 }
 
 /* 筛选规范 v2.0 §7：筛选/搜索触发卡片重渲染入场 fade+轻微上浮（只动 transform/opacity，出场不做） */
@@ -525,3 +530,7 @@
 }
 #page-lootdrop .dp-main { padding-bottom: 200px; }
 #page-lootdrop .dp-season { max-width: 1100px; margin: 0 auto 4px; padding: 0 20px; justify-content: flex-end; }
+/* 任务书 #47 WP3（BUG-081）：面板态（≥1400）赛季行右缘并入卡片区右偏移轨道（须在上方基线规则之后层叠） */
+@media (min-width: 1400px) {
+  #page-lootdrop .dp-season { margin-right: 292px; }
+}
