@@ -7176,6 +7176,19 @@ function lootFillAssignedTo(idOrName) {
 // ==================== 更新日志 ====================
 const changelogData = [
   {
+    id: 'v3.2.0-addon-1010-tooltip-fix',
+    version: 'v3.2.0',
+    date: '2026-08-13',
+    type: 'fix',
+    typeLabel: '问题修复',
+    title: '插件 1.0.10：特效/毒咒漏读双通道修复+版本打印修正（REQ-088 真机报障）',
+    summary: 'S2 实采真机终验发现：部分装备（EJ 手册预览态，如觉醒恐牙胸甲）tooltip 有毒咒标签行/特效行但导出为空——1.0.9 的行首色码修复未根治。1.0.10 起采集端改双通道：SetItemByID 扫不到特效/毒咒行时自动回退物品链接 SetHyperlink 通道补扫；Probe 诊断加双通道对照输出。另修正导出启动语版本号硬编码（显示「1.0.7」→跟随实际版本）。',
+    details: [
+      '待运营真机回验：/wjdc probe 271876 取证对照 + 重导后 effect 非空、venomcurse=毒咒（步骤卡 Q1-Q4）',
+      'REQ-089 备案情报：S2 兑换物正体=毒咒神像/残骸/圣像/遗物/雕像 5 件（导出 type 标「垃圾」），已入送审件附录'
+    ]
+  },
+  {
     id: 'v3.2.0-bug080-sentinel-gate',
     version: 'v3.2.0',
     date: '2026-08-13',

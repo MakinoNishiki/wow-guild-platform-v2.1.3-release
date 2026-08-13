@@ -107,13 +107,48 @@ local function probeItem(itemID)
     end
     -- ③+ tooltip 全行原样 dump（1.0.9，REQ-088 取证）：| 转义为 || 使 |cffRRGGBB/|r/|T..|t
     -- 以可见文本输出；每行附剥离后形态（stripLineCodes）对照，定论特效行失配形态
-    msg("tooltip 全行原样 dump（| 已转义 ||，共 " .. #lines .. " 行）：")
+    -- 1.0.10 加完整性计数：NumLines vs 实际读到的非空行 vs 缺失字体串序号（漏读通道取证）
+    local nTotal = 0
+    do
+      local tipFrame = _G["WJDCScanTip"]
+      nTotal = tipFrame and tipFrame:NumLines() or -1
+    end
+    msg("tooltip 全行原样 dump（A 通道=SetItemByID，| 已转义 ||，NumLines=" .. nTotal .. " 读到非空 " .. #lines .. " 行）：")
     for i, t in ipairs(lines) do
-      msg("  [" .. i .. "] " .. t:gsub("|", "||"))
+      msg("  A[" .. i .. "] " .. t:gsub("|", "||"))
       if WJDCShared.stripLineCodes then
         local plain = WJDCShared.stripLineCodes(t)
         if plain ~= t then msg("      剥离后 → " .. plain:gsub("|", "||")) end
       end
+    end
+    -- ③++ 双通道对照（1.0.10，REQ-088 真机报障取证）：B 通道 = SetHyperlink(GetItemInfo 物品链接)——
+    -- A 通道缺特效/毒咒行而 B 通道有 = 手册预览与实物 tooltip 来源差异实锤，导出 1.0.10 起已自动双通道回退
+    local _, itemLink = GetItemInfo(itemID)
+    if itemLink and WJDCShared.scanLink then
+      local blines = WJDCShared.scanLink(itemLink)
+      if blines then
+        local function hasFx(ls)
+          local fx, vc = false, false
+          for _, t in ipairs(ls) do
+            local p = WJDCShared.stripLineCodes and WJDCShared.stripLineCodes(t) or t
+            if p:match("^(装备：") or p:match("^(使用：") then fx = true end
+            if p == "毒咒" then vc = true end
+          end
+          return fx, vc
+        end
+        local afx, avc = hasFx(lines)
+        local bfx, bvc = hasFx(blines)
+        msg(string.format("通道判定：A(SetItemByID) 特效行=%s 毒咒行=%s ｜ B(SetHyperlink) 特效行=%s 毒咒行=%s",
+          tostring(afx), tostring(avc), tostring(bfx), tostring(bvc)))
+        msg("tooltip 全行原样 dump（B 通道=SetHyperlink 物品链接，共 " .. #blines .. " 行）：")
+        for i, t in ipairs(blines) do
+          msg("  B[" .. i .. "] " .. t:gsub("|", "||"))
+        end
+      else
+        msg("B 通道 SetHyperlink 扫描失败")
+      end
+    else
+      msg("B 通道：GetItemInfo 未返回物品链接")
     end
   else
     msg("tooltip 扫描失败（物品未缓存？/reload 后重试）")

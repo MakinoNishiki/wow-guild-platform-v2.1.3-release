@@ -23,8 +23,16 @@
 --   ③iconID REQ-092：GetItemInfo 第 10 返回值（icon fileID）透传，loot 行新增 iconID；
 --   ④probe 物品级诊断加 tooltip 全行原样 dump（| 转义 || 可见化），供真机定论 REQ-088 取证；
 --   原字段格式零改动、向后兼容）
+-- （1.0.10：1.0.9 真机终验报障修复（S2 实采 360 件：觉醒恐牙胸甲 id=271876 tooltip 有毒咒
+--   绿字行+特效行但导出双空；全库 venomcurse 360 空、饰品特效 43 件仅 1 非空）——
+--   ①parseItemDetail 双通道：SetItemByID 通道扫不到特效/毒咒行时，回退 GetItemInfo
+--     物品链接的 SetHyperlink 通道补扫（EJ 预览态/实物 tooltip 来源差异嫌疑面的对冲，
+--     属性行两通道同值经 addUnique 去重、首条命中守卫语义不变）；
+--   ②probe 物品级诊断加双通道对照 dump（A=SetItemByID / B=SetHyperlink）+ NumLines
+--     完整性计数，一次取证定位漏读通道；
+--   ③启动语版本硬编码「1.0.7」修正为跟随 ADDON_VERSION）
 -- ============================================================
-local ADDON_VERSION = "1.0.9"
+local ADDON_VERSION = "1.0.10"
 
 local function msg(s) DEFAULT_CHAT_FRAME:AddMessage("|cffffd200[wjdc]|r " .. s) end
 local function err(s) DEFAULT_CHAT_FRAME:AddMessage("|cffff4040[wjdc]|r " .. s) end
@@ -135,6 +143,16 @@ local function parseItemDetail(itemID)
   local d = { primary = {}, secondary = {}, effect = "", venomcurse = "", primary_values = {}, secondary_values = {} }
   local lines = scanLines(itemID)
   if lines then parseStatLines(lines, d) end
+  -- 双通道回退（1.0.10，REQ-088 真机报障）：SetItemByID 通道对 EJ 预览态装备可能缺特效/毒咒行
+  -- （冒险手册预览与实物 tooltip 来源差异嫌疑面），回退 GetItemInfo 物品链接的 SetHyperlink 通道补扫；
+  -- 属性行两通道同值经 addUnique 去重，effect/venomcurse 首条命中守卫语义不变
+  if d.effect == "" or d.venomcurse == "" then
+    local _, link = GetItemInfo(itemID)
+    if link then
+      local l2 = scanLink(link)
+      if l2 then parseStatLines(l2, d) end
+    end
+  end
   return d
 end
 
@@ -396,7 +414,7 @@ local function doExport(kind)
     tierOn = tierChannelAvailable()
     dump.meta.tier_channel = tierOn and "ej-link" or "unavailable"
     if tierOn then
-      msg("四难度档采集已启用（1.0.7）：随机/普通/英雄/史诗逐档切档重扫，时长约为单档 4 倍属预期，请耐心等待")
+      msg("四难度档采集已启用（插件 v" .. ADDON_VERSION .. "）：随机/普通/英雄/史诗逐档切档重扫，时长约为单档 4 倍属预期，请耐心等待")
     else
       err("四档采集通道不可用（EJ_SetDifficulty/EJ_GetDifficulty 或 GetLootInfoByIndex 缺失），本次回退单档采集，tiers 不产出——请截图反馈顾问侧")
     end

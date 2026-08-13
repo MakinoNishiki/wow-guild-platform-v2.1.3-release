@@ -1,7 +1,7 @@
 ## Interface: 120000
 ## Title: 魔兽管家数据导出器 WoWButler Data Exporter
 ## Notes: 一键导出当前资料片副本手册掉落 / 套装效果 / 本人角色档案，供魔兽管家平台数据管道使用
-## Version: 1.0.9
+## Version: 1.0.10
 ## Author: 魔兽管家项目组
 ## SavedVariables: WJDCDump
 WoWButlerExporter.lua
