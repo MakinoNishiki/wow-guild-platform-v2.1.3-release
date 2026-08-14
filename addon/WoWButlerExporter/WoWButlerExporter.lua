@@ -126,8 +126,20 @@
 --   ④毒咒两行形态（真机取证「史诗↵毒咒」）：跨行匹配——上一行以「史诗」收尾且本行剥码后
 --     为「毒咒」即判有，单行精确判定保留（判据不变）；
 --   导出字段新增（向后兼容）：skipped_instances（仅非空产出）/boss.selectFail/meta.abnormal）
+-- （1.0.19：1.0.18 冒烟红打回修（BUG-096 转码——弃读回、改显式枚举；顾问调研三信源在案：
+--   暴雪官方 APIDocumentation 生成件 encounterIndex luaIndex Nilable（省略才回落「当前选中
+--   encounter」）、暴雪自用实证 Mainline :226 传字面 2、wiki 同载）——
+--   ①备案现形特征逐字应验：鲁阿夏尔/拉维 selectFail 三连=无参 EJ_GetEncounterInfo() 读回
+--     此路不通；读回校验链整体拆除（encounterSelectReadback/重试 3 次/selectFail 空占位全撤），
+--     EJ_SelectEncounter 选中态退出掉落归因关键路径（阶段二仍保留选中调用——collectTiers
+--     档扫单参取数语义依赖之，BUG-094 链不动）；
+--   ②阶段一枚举改显式传参 GetLootInfoByIndex(li, bossIndex)（bossIndex=该 BOSS 在当前选中
+--     实例内的序号，与 EJ_GetEncounterInfoByIndex 同源），nil 终止（MayReturnNothing 明载）
+--     + 硬上限 60；单 BOSS>40 sanity 守卫保留作纯保险；
+--   ③冒烟文案按实态修正（实例在册已钉档，实态=采集 0 件判空跳过，非「未在手册枚举到」）；
+--   导出字段：boss.selectFail 随读回链整撤退役（1.0.18 新增字段未出过正式数据，零消费方））
 -- ============================================================
-local ADDON_VERSION = "1.0.18"
+local ADDON_VERSION = "1.0.19"
 
 local function msg(s) DEFAULT_CHAT_FRAME:AddMessage("|cffffd200[wjdc]|r " .. s) end
 local function err(s) DEFAULT_CHAT_FRAME:AddMessage("|cffff4040[wjdc]|r " .. s) end
@@ -503,7 +515,7 @@ local function collectTiers(loot, tiers, opts, done)
   local function scanTierBody(tier, attempt)
     local map, total, staleHit = {}, 0, 0
     local li = 1
-    while li <= 500 do  -- 与阶段一枚举同防呆：GetLootInfoByIndex 取到 nil 为止，500 封顶
+    while li <= 500 do  -- 档扫重取防呆：GetLootInfoByIndex 取到 nil 为止，500 封顶（单参语义依赖当前选中 BOSS，与 1.0.19 阶段一显式传参路径无关）
       local okQ, info = pcall(C_EncounterJournal.GetLootInfoByIndex, li)
       if not okQ or type(info) ~= "table" or not info.itemID then break end
       total = total + 1
@@ -609,28 +621,24 @@ local function collectTiers(loot, tiers, opts, done)
 end
 
 -- ---------- 副本手册遍历（团本 / 大秘境共用） ----------
--- 掉落枚举（任务书 #26-fix4）：EJ_SelectEncounter 后只许单参调用（实测双参全 nil）；
+-- 掉落枚举：1.0.19（BUG-096 转码）起显式双参 GetLootInfoByIndex(i, encounterIndex)——
+--   官方 APIDocumentation：encounterIndex luaIndex Nilable，省略才回落「当前选中 encounter」；
+--   暴雪自用 Mainline :226 传字面 2；wiki 同载（任务书 #26-fix4「实测双参全 nil」旧论作废——
+--   彼时实态=选中态未生效致回落路径取空，非双参本身无效）。
 -- 12.x 返回稀疏表（仅 itemID/encounterID/稀有度标记），老函数为多元返回值
 -- （name, icon, slot, armorType, itemID, ...），归一化为只取 itemID——其余字段一律走 GetItemInfo
-local function getLootItemID(i)
+local function getLootItemID(i, encounterIndex)
   local fn = (C_EncounterJournal and C_EncounterJournal.GetLootInfoByIndex) or EJ_GetLootInfoByIndex
   if type(fn) ~= "function" then return nil end
-  local ok, a, _, _, _, e5 = pcall(fn, i)  -- 单参；e5 = 老 tuple 第 5 位 itemID
+  local ok, a, _, _, _, e5 = pcall(fn, i, encounterIndex)  -- e5 = 老 tuple 第 5 位 itemID
   if not ok or a == nil then return nil end
   if type(a) == "table" then return a.itemID end
   return e5
 end
 
--- BUG-096①（1.0.18）：EJ_SelectEncounter 读回校验——无参 EJ_GetEncounterInfo 读当前选中态，
--- 第 3 返回值 = encounterID（暴雪 Mainline :3577 解构序 name,description,bossID,... 逐字复核）。
--- 返回 nil = 不可读回/读不出（不明，调用方走旧行为）；false = 明确不符
--- （选中未生效，此时硬枚举会错配上一 BOSS 的掉落列表）
-local function encounterSelectReadback(encounterID)
-  if type(EJ_GetEncounterInfo) ~= "function" then return nil end
-  local ok, _, _, cur = pcall(EJ_GetEncounterInfo)
-  if not ok or cur == nil then return nil end
-  return cur == encounterID and true or false
-end
+-- BUG-096① 读回校验链 1.0.19 整撤：无参 EJ_GetEncounterInfo() 读回真机三连翻车（鲁阿夏尔/拉维
+-- selectFail，1.0.18 冒烟实证），此路不通；掉落归因改显式 encounterIndex 传参（见 getLootItemID），
+-- EJ_SelectEncounter 选中态退出归因关键路径
 
 -- ---------- 冷缓存就绪门（1.0.11，BUG-082，S2 录库前必修） ----------
 -- 1.0.9 S2 实采定损：物品数据未加载完即解析——GetItemInfo/tooltip 在冷缓存下返回
@@ -730,9 +738,10 @@ end
 --   同 BOSS 按 itemID 去重（F5/BUG-093，250459×4 实证）；过滤器清零改 EJ_ResetLootFilter +
 --   C_EncounterJournal.ResetSlotFilter/Enum.ItemSlotFilterType.NoFilter=15（F1：字面 0=Head 置毒实证）。
 -- 1.0.18（BUG-094/095/096）：钉档过合法性闸+锚档候选探测（首选 14/23 无效按序改钉合法档）、
---   实例全量台账 seenInstances 随 done 第二回参上报（gating 完整性校验用）、BOSS 选中读回校验
---   （不符记 selectFail 空占位防错配）、单 BOSS 件数 sanity 守卫（>40 判 abnormal）、
---   G1 重建钩子计数段尾汇总。
+--   实例全量台账 seenInstances 随 done 第二回参上报（gating 完整性校验用）、单 BOSS 件数
+--   sanity 守卫（>40 判 abnormal）、G1 重建钩子计数段尾汇总。
+-- 1.0.19（BUG-096 转码）：选中读回校验/selectFail 链整撤（无参读回真机三连翻车，此路不通），
+--   阶段一枚举改显式 GetLootInfoByIndex(li, bossIndex)，选中态退出掉落归因关键路径。
 -- 冒烟模式（1.0.17，顾问增补②）：可选第 7 参 smokeLimit={name, maxBosses}——只取指定实例的
 --   前 N 个 BOSS，其余实例跳过；采集/解析/档扫全链路不变，供真机小循环快验（3 分钟出数）。
 local function exportInstances(isRaid, label, tierOn, done, abortFlag, onProgress, smokeLimit)
@@ -775,12 +784,15 @@ local function exportInstances(isRaid, label, tierOn, done, abortFlag, onProgres
   local startPhase2, enumInstance, enumBossItems  -- 前向声明：阶段一异步链跑完自动续推阶段二
 
   -- F5（BUG-093）：同 BOSS 按 itemID 去重；F3：0 件过重建钩子重试，封顶 3 次仍 0 才红字记空
-  enumBossItems = function(iname, bosses, bname, encounterID, attempt, doneB)
+  -- 1.0.19（BUG-096 转码）：bossIndex 显式传入（该 BOSS 在当前选中实例内的序号，与
+  -- EJ_GetEncounterInfoByIndex 同源），枚举不再依赖 EJ_SelectEncounter 选中态
+  enumBossItems = function(iname, bosses, bname, encounterID, bossIndex, attempt, doneB)
     if aborted() then finalize() return end
-    -- 掉落计数不依赖 EJ_GetNumLoot（12.x 已死）：按 index 递增取到 nil 为止，500 封顶防呆
+    -- 掉落计数不依赖 EJ_GetNumLoot（12.x 已死）：按 index 递增取到 nil 为止
+    -- （MayReturnNothing 明载），硬上限 60（sanity 上限 40 之上留余量，纯防死循环保险）
     local items, seen, li = {}, {}, 1
-    while li <= 500 do
-      local itemID = getLootItemID(li)
+    while li <= 60 do
+      local itemID = getLootItemID(li, bossIndex)
       if not itemID then break end
       if not seen[itemID] then  -- EJ 同件可多 index 列出（250459×4 实证），按 itemID 去重
         seen[itemID] = true
@@ -789,7 +801,7 @@ local function exportInstances(isRaid, label, tierOn, done, abortFlag, onProgres
       li = li + 1
     end
     if #items == 0 and attempt < 3 then
-      whenLootListFresh(function() enumBossItems(iname, bosses, bname, encounterID, attempt + 1, doneB) end)
+      whenLootListFresh(function() enumBossItems(iname, bosses, bname, encounterID, bossIndex, attempt + 1, doneB) end)
       return
     end
     if #items == 0 then
@@ -868,26 +880,12 @@ local function exportInstances(isRaid, label, tierOn, done, abortFlag, onProgres
       bi = bi + 1
       local bname, _, encounterID = EJ_GetEncounterInfoByIndex(bi, instanceID)
       if not bname then finishInstance() return end
-      -- BUG-096①：选中后读回校验——不符过重建钩子重选重读，封顶 3 次；仍不符记 selectFail
-      -- 空占位跳过本 BOSS（读回不符时硬枚举会错配上一 BOSS 的掉落列表，宁空不错），不静默
-      local function trySelect(attempt)
-        local okS = pcall(EJ_SelectEncounter, encounterID)
-        local rb = okS and encounterSelectReadback(encounterID) or false
-        if okS and rb ~= false then
-          -- F2：选 BOSS 后列表异步重建，过钩子再枚举（0 件重试与 itemID 去重见 enumBossItems）
-          whenLootListFresh(function() enumBossItems(iname, bosses, bname, encounterID, 1, nextEnumBoss) end)
-          return
-        end
-        if attempt < 3 then
-          whenLootListFresh(function() trySelect(attempt + 1) end)
-          return
-        end
-        err(string.format("%s · %s：BOSS『%s』选中%s（重试 3 次）——记空占位跳过本 BOSS（防错配上一 BOSS 列表），恢复建议：/reload 后重跑，截图反馈顾问侧",
-          label, tostring(iname), tostring(bname), okS and "读回不符" or "异常"))
-        bosses[#bosses + 1] = { boss = bname, encounterID = encounterID, items = {}, selectFail = true }
-        nextEnumBoss()
-      end
-      trySelect(1)
+      -- 1.0.19（BUG-096 转码）：读回校验/重试 3 次/selectFail 空占位链整撤——枚举改显式
+      -- encounterIndex 传参，选中态退出归因关键路径；EJ_SelectEncounter 调用保留
+      -- （维持列表重建钩子时序与手册界面态，结果不再读回校验）
+      pcall(EJ_SelectEncounter, encounterID)
+      -- F2：选 BOSS 后列表异步重建，过钩子再枚举（0 件重试与 itemID 去重见 enumBossItems）
+      whenLootListFresh(function() enumBossItems(iname, bosses, bname, encounterID, bi, 1, nextEnumBoss) end)
     end
     -- F2：选本/钉档/清过滤器后先等列表重建完成，再进 BOSS 循环
     whenLootListFresh(nextEnumBoss)
@@ -905,7 +903,7 @@ local function exportInstances(isRaid, label, tierOn, done, abortFlag, onProgres
     local inst = instances[ii]
     if not inst then
       if smokeLimit and #instances == 0 then
-        err(string.format("%s段：冒烟目标实例「%s」未在手册枚举到——请核对实例名/资料片档位（截图反馈顾问侧）", label, tostring(smokeLimit.name)))
+        err(string.format("%s段：冒烟目标实例「%s」零产出——实态=实例在册已钉档但采集 0 件判空跳过（或实例名不匹配未枚举到），非正常，请截图反馈顾问侧", label, tostring(smokeLimit.name)))
       end
       if bossNoTier > 0 then
         msg(string.format("%s段难度档汇总：%d 个 BOSS 未出档值（逐件缺档计数见各 BOSS 黄/红字）", label, bossNoTier))
@@ -932,17 +930,11 @@ local function exportInstances(isRaid, label, tierOn, done, abortFlag, onProgres
         return
       end
       -- 重设 EJ 选中态：collectTiers 的 GetLootInfoByIndex 序号语义依赖当前选中 BOSS（1.0.12 补 pcall 防炸链）
-      -- BUG-096①：选中读回校验——不符视同设置失败跳过本 BOSS（防档扫错配上一 BOSS 列表）
-      local okS1 = pcall(EJ_SelectInstance, inst.instanceID)
-      local okS2 = pcall(EJ_SelectEncounter, b.encounterID)
-      local rb2 = (okS1 and okS2) and encounterSelectReadback(b.encounterID) or nil
-      if not (okS1 and okS2) or rb2 == false then
-        err(string.format("%s · %s：EJ 选中态%s——跳过本 BOSS，恢复建议：/reload 后重跑",
-          inst.instance, b.boss, (okS1 and okS2) and "读回不符（疑选中未生效）" or "设置失败"))
-        bossesOut[#bossesOut + 1] = { boss = b.boss, loot = {}, failed = {}, selectFail = true }
-        nextBoss()
-        return
-      end
+      -- 1.0.19（BUG-096 转码）：读回校验整撤——阶段一枚举已改显式 encounterIndex 传参不依赖
+      -- 选中态；此处选中仅为 collectTiers 档扫服务，结果不再校验（选中未生效时档扫由陈旧列表/
+      -- 缺席口径分案报错兜底，见 stats.staleSkip/absent 分支）
+      pcall(EJ_SelectInstance, inst.instanceID)
+      pcall(EJ_SelectEncounter, b.encounterID)
       local loot, failed = {}, {}
       local k = 0
       local function stepItem()
@@ -955,7 +947,7 @@ local function exportInstances(isRaid, label, tierOn, done, abortFlag, onProgres
             err(string.format("%s · %s：%d 件物品解析失败记 failed（1.0.12 就绪门重试后仍失败，导出链继续）", inst.instance, b.boss, #failed))
           end
           local function finishBoss()
-            bossesOut[#bossesOut + 1] = { boss = b.boss, loot = loot, failed = failed, selectFail = b.selectFail or nil }
+            bossesOut[#bossesOut + 1] = { boss = b.boss, loot = loot, failed = failed }
             nextBoss()
           end
           if not tierOn then finishBoss() return end
