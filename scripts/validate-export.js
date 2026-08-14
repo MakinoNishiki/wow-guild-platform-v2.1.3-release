@@ -1,7 +1,8 @@
-// scripts/validate-export.js — WoWButlerExporter 导出文件本地校验（任务书 #26 管道配套）
-// 判据口径：addon/WoWButlerExporter/运营测试步骤卡.md（V14-V17 + V3/V6 终审权威版）
-// 用法：node scripts/validate-export.js [导出文件路径] [--wow-dir <_retail_ 目录>]
+// scripts/validate-export.js — WoWButlerExporter 导出文件本地校验（任务书 #26 管道配套 / REQ-121）
+// 判据口径：addon/WoWButlerExporter/运营测试步骤卡.md（V1-V17 文件侧可判项，终审权威版）
+// 用法：node scripts/validate-export.js [跑A文件 跑B文件] [--wow-dir <_retail_ 目录>]
 //   省略路径时自动扫描游戏目录 WTF/Account/*/SavedVariables/WoWButlerExporter.lua，取最新一份。
+//   给两个文件时按同会话连跑 跑A/跑B 处理：V1 逐实例件数比对，其余判据跑在跑B（后跑文件）上。
 // 零第三方依赖，Node 18+ 直跑。退出码：任一文件侧判据 ❌ → 1，否则 0。
 // 判定图例：✅ 文件侧通过 / ❌ 文件侧判负 / ⚠️ 文件侧无法判定或存疑（需聊天框截图或人工佐证）
 'use strict';
@@ -27,11 +28,17 @@ const SMOKE_GATES = [
   { instance: '至暗之夜', boss: '鲁阿夏尔', items: 8 },
   { instance: '毒牙祭坛', boss: '拉维', items: 7 },
 ];
-// V3/V17：报障样本与 flavor 排除样本
-const VENOM_SAMPLE_ID = 271876; // 觉醒恐牙胸甲
+// V3/V17：毒咒逐件名单（2026-08-14 运营终裁提供，REQ-121 升级逐件核对）
+const VENOM_EQUIP_IDS = [268215, 268202, 268207, 271874, 271875, 268265, 271876, 271878]; // 装备八件：venomcurse 应=毒咒
+const VENOM_TOKEN_IDS = [270911, 270919, 270915, 270927, 270923]; // 兑换物五件（毒咒族）：venomcurse 应空，不误标
+const VENOM_SAMPLE_ID = 271876; // 觉醒恐牙胸甲（V3/V17 逐字判据件，在八件名单内）
 const VENOM_SAMPLE_EFFECT = '装备：你的法术和技能有几率使你的爆击提高377，但会使你的其他次要属性降低62，持续12秒。';
 const FLAVOR_SAMPLE_ID = 270165; // flavor 句「"毒咒如影随形。"」不得误判毒咒
-const VENOM_TARGET_COUNT = 8;   // V3 复验口径「毒咒八件全中」（名单在顾问侧，件数对账）
+// V2：大米 28 件缺席 + 4 件新增 ID 清单（docs/插件1.0.12-修法送审件.md 附录，2026-08-14 抄录入库；
+// 文件侧只供在场/缺席状态，「错档/去重/真缺数据」去向定性属顾问侧）
+const V2_ABSENT = [[159644, '盖蒂伊库，死界之伤'], [273777, '防毒踏靴'], [160216, '碎玉弯刀'], [273649, '达萨的束风纹章'], [273795, '盘卷牙石'], [239045, '晋升仪式披肩'], [159667, '临终仪式器皿'], [273785, '始源仪式法袍'], [159409, '防腐平稳护腕'], [239050, '迅猛龙之王头盔'], [159312, '干燥工的庇护手套'], [239051, '一统肩甲'], [159412, '金泥践踏者'], [159243, '睿智巫毒便鞋'], [159234, '绒线护腿'], [159418, '致命净化束腰'], [159300, '库拉的屠宰裹腕'], [159618, '姆沁巴的仪式绷带'], [239047, '第一帝国头饰'], [273793, '多头蛇刺双刃'], [159137, '金色风蛇之牙'], [159645, '恳求碎颅者'], [273780, '毒液蚀刻新月刃'], [159413, '鸟类守护者手套'], [159313, '神圣大厅马裤'], [159301, '原始恐龙统领的腰带'], [239048, '圣洁爱慕外衣'], [159304, '金羽长靴']];
+const V2_NEW = [[159921, '迅猛龙枯骨'], [160832, '完好的眼镜蛇蛋'], [268728, '迅叶龙药膏'], [276804, '扭缠群嗣']];
+const PSEUDO_INSTANCE = '史诗钥石地下城'; // V7：伪实例绝迹（BUG-087）
 const MPLUS_TRINKET_TARGET = 24; // V6：M+ 饰品 effect 非空 24/24
 const BOSS_ITEM_SANITY_MAX = 40; // BUG-096 sanity 守卫（与插件 BOSS_ITEM_SANITY_MAX 同步）
 
@@ -149,17 +156,20 @@ function allItems(dump) {
 // ---------- 主流程 ----------
 function main() {
   const args = process.argv.slice(2);
-  let fileArg = null, wowDir = process.env.WOW_RETAIL_DIR || DEFAULT_WOW_DIR;
+  const posArgs = [];
+  let wowDir = process.env.WOW_RETAIL_DIR || DEFAULT_WOW_DIR;
   for (let i = 0; i < args.length; i++) {
     if (args[i] === '--wow-dir') { wowDir = args[++i]; }
     else if (args[i] === '--help' || args[i] === '-h') {
-      console.log('用法：node scripts/validate-export.js [导出文件路径] [--wow-dir <_retail_ 目录>]\n省略路径时自动扫描游戏目录 WTF/Account/*/SavedVariables/ 取最新 WoWButlerExporter.lua。');
+      console.log('用法：node scripts/validate-export.js [跑A文件 跑B文件] [--wow-dir <_retail_ 目录>]\n省略路径时自动扫描游戏目录 WTF/Account/*/SavedVariables/ 取最新 WoWButlerExporter.lua。\n给两个文件时按同会话连跑处理：V1 逐实例件数比对，其余判据跑在跑B 上。');
       process.exit(0);
-    } else fileArg = args[i];
+    } else posArgs.push(args[i]);
   }
+  if (posArgs.length > 2) { console.error('❌ 至多两个文件参数（跑A 跑B）'); process.exit(2); }
+  const fileA = posArgs.length === 2 ? posArgs[0] : null;
 
-  // 定位导出文件
-  let file = fileArg;
+  // 定位导出文件（主判文件=跑B/单文件/自动最新）
+  let file = posArgs.length === 2 ? posArgs[1] : posArgs[0];
   if (!file) {
     const accRoot = path.join(wowDir, 'WTF', 'Account');
     let best = null;
@@ -225,6 +235,41 @@ function main() {
   const dungTotal = dungInsts.reduce((s, x) => s + x.items, 0);
   const skipped = asArr(tget(dump, 'skipped_instances'));
 
+  // ---- V13（BUG-088）：断链留痕——中断跑 meta.partial 在场 / 完整跑无 partial 键 ----
+  if (meta.partial) R('V13', '✅', '断链零留存：meta.partial 在场（中断跑产物留痕正确）', [`已扫实例 ${instances.length} 个已按段落表；注意：断链产物不可作验收全量`]);
+  else R('V13', '✅', '断链零留存：完整跑无 partial 键', meta.smoke ? ['冒烟产物，partial 口径同适用'] : []);
+
+  // ---- V7（BUG-087）：伪实例「史诗钥石地下城」绝迹 ----
+  {
+    const pseudo = instances.filter(x => String(x.name || '').includes(PSEUDO_INSTANCE));
+    R('V7', pseudo.length ? '❌' : '✅', `伪实例「${PSEUDO_INSTANCE}」绝迹`, pseudo.length ? [`命中 ${pseudo.length} 个：${pseudo.map(x => `${x.seg}/${x.name}`).join('、')}——伪实例过滤失效`] : ['导出文件两段均无伪实例']);
+  }
+
+  // ---- V1：同会话双跑一致性（双文件比对；跑A vs 跑B 同实例件数全等） ----
+  if (!meta.smoke) {
+    if (!fileA) {
+      R('V1', '⚠️', '双跑一致性：未提供跑A 文件，文件侧无法比对', ['用法：node scripts/validate-export.js 跑A.lua 跑B.lua（V16 行有 LastCounts 代理比对可参考）']);
+    } else {
+      const dumpA = parseLua(fs.readFileSync(fileA, 'utf8')).WJDCDump;
+      if (!dumpA) R('V1', '❌', '双跑一致性：跑A 文件无 WJDCDump', [fileA]);
+      else if (tget(tget(dumpA, 'meta') || {}, 'smoke')) R('V1', '⚠️', '双跑一致性：跑A 为冒烟产物，不可与全量比对', []);
+      else {
+        const instA = iterInstances(dumpA);
+        const mapA = {}, mapB = {};
+        instA.forEach(x => { mapA[`${x.seg}/${x.name}`] = x.items; });
+        instances.forEach(x => { mapB[`${x.seg}/${x.name}`] = x.items; });
+        const diffs = [];
+        for (const k of new Set([...Object.keys(mapA), ...Object.keys(mapB)])) {
+          const a = mapA[k], b = mapB[k];
+          if (a !== b) diffs.push(`${k} 跑A=${a === undefined ? '缺席' : a} → 跑B=${b === undefined ? '缺席' : b}`);
+        }
+        const sumA = { r: instA.filter(x => x.seg === '团本').reduce((s, x) => s + x.items, 0), d: instA.filter(x => x.seg === '大秘境').reduce((s, x) => s + x.items, 0) };
+        const head = `跑A（${fileA}）：团本 ${sumA.r} / 大米 ${sumA.d}；跑B（本文件）：团本 ${raidTotal} / 大米 ${dungTotal}`;
+        R('V1', diffs.length ? '❌' : '✅', `双跑一致性：同实例件数${diffs.length ? `有 ${diffs.length} 处差异` : '全等'}（跑A vs 跑B）`, [head].concat(diffs));
+      }
+    }
+  }
+
   if (meta.smoke) {
     // ================= 冒烟产物：V16 门槛 =================
     for (const g of SMOKE_GATES) {
@@ -238,7 +283,7 @@ function main() {
     }
     R('V16', '⚠️', '冒烟门槛：快照 slot=15 为聊天框判据，文件侧不可判', ['需冒烟跑聊天框「难度档快照」行截图佐证']);
   } else {
-    // ================= 全量产物：V14-V17 + V3/V6 =================
+    // ================= 全量产物：V1-V17 文件侧可判项 =================
     // ---- V14（BUG-094）：大米 8 本全出件、合计 225± ----
     {
       const zeroD = dungInsts.filter(x => x.items === 0).map(x => x.name);
@@ -288,9 +333,10 @@ function main() {
       if (meta.abnormal) R('V16', '❌', 'meta.abnormal 标记', ['sanity/完整性五源之一已触发，见 V15 明细']);
       R('V16', '⚠️', '冒烟门槛（slot=15 + 鲁阿夏尔 8/8 + 拉维 7/7）需冒烟产物判定', ['本文件为全量导出；冒烟结论见冒烟跑文件另跑本脚本，或直接对全量对账表核查两 BOSS 行']);
     }
-    // ---- V17 / V3：毒咒样本 ----
+    // ---- V17 / V3：毒咒逐件核对（2026-08-14 运营终裁名单） ----
     {
-      const sample = items.filter(r => Number(tget(r.item, 'id')) === VENOM_SAMPLE_ID);
+      const byId = id => items.filter(r => Number(tget(r.item, 'id')) === id);
+      const sample = byId(VENOM_SAMPLE_ID);
       if (!sample.length) {
         R('V17', '❌', `V17/V3：${VENOM_SAMPLE_ID}（觉醒恐牙胸甲）不在导出文件中`, ['样本件缺席，先查所属 BOSS/实例是否在场']);
         R('V3', '❌', `V3：${VENOM_SAMPLE_ID} effect 逐字判据`, ['样本件缺席，无法判定']);
@@ -301,12 +347,30 @@ function main() {
         const eff = tget(it, 'effect');
         R('V3', eff === VENOM_SAMPLE_EFFECT ? '✅' : '❌', 'V3：271876 effect 逐字命中（史诗档文本）', [eff === VENOM_SAMPLE_EFFECT ? '逐字一致' : `实采 effect=${JSON.stringify(eff ?? null)}`, `期望=${VENOM_SAMPLE_EFFECT}`].filter(Boolean));
       }
-      const venomRows = items.filter(r => isVenom(tget(r.item, 'venomcurse')));
-      const vList = venomRows.map(r => `${tget(r.item, 'id')} ${tget(r.item, 'name')}（${r.instance}/${r.boss}）`);
-      R('V3', venomRows.length === VENOM_TARGET_COUNT ? '✅' : '⚠️', `V3：毒咒八件全中——文件侧命中 ${venomRows.length}/${VENOM_TARGET_COUNT} 件`, vList.length ? vList.concat(venomRows.length === VENOM_TARGET_COUNT ? [] : ['件数与「八件」口径不符——对照顾问侧八件名单逐件销账']) : ['零命中——E2 毒咒残差特征现形（1.0.16 前病害）']);
-      const fl = items.filter(r => Number(tget(r.item, 'id')) === FLAVOR_SAMPLE_ID);
-      if (!fl.length) R('V3', '⚠️', 'V3：270165 flavor 不误判', ['270165 不在导出文件中，无法判定（若该件本就不掉可忽略）']);
-      else R('V3', isVenom(tget(fl[0].item, 'venomcurse')) ? '❌' : '✅', 'V3：270165 flavor 句「"毒咒如影随形。"」不误判', [`实采 venomcurse=${JSON.stringify(tget(fl[0].item, 'venomcurse') ?? null)}（应为空）`]);
+      // 装备八件：逐件应中
+      {
+        const det = []; let hit = 0, miss = 0, absent = 0;
+        for (const id of VENOM_EQUIP_IDS) {
+          const rows = byId(id);
+          if (!rows.length) { absent++; det.push(`${id}：缺席（不在导出文件）`); continue; }
+          const v = tget(rows[0].item, 'venomcurse');
+          if (isVenom(v)) { hit++; det.push(`${id} ${tget(rows[0].item, 'name')}（${rows[0].instance}/${rows[0].boss}）：命中 ✅`); }
+          else { miss++; det.push(`${id} ${tget(rows[0].item, 'name')}（${rows[0].instance}/${rows[0].boss}）：未采到，实采=${JSON.stringify(v ?? null)} ❌`); }
+        }
+        R('V3', (miss === 0 && absent === 0) ? '✅' : '❌', `V3：毒咒装备八件逐件核对——命中 ${hit}/8（未采到 ${miss}、缺席 ${absent}）`, det.concat((miss || absent) ? ['未采到=E2 毒咒残差现形；缺席=完整性问题先查 V14/V15'] : []));
+      }
+      // 兑换物五件 + flavor 干扰件：逐件应空不误标
+      {
+        const det = []; let clean = 0, dirty = 0, absent = 0;
+        for (const id of [...VENOM_TOKEN_IDS, FLAVOR_SAMPLE_ID]) {
+          const rows = byId(id);
+          if (!rows.length) { absent++; det.push(`${id}：缺席（不在导出文件，无法判定）`); continue; }
+          const v = tget(rows[0].item, 'venomcurse');
+          if (isVenom(v)) { dirty++; det.push(`${id} ${tget(rows[0].item, 'name')}：误标毒咒 ❌`); }
+          else { clean++; det.push(`${id} ${tget(rows[0].item, 'name')}：空值正确 ✅`); }
+        }
+        R('V3', dirty ? '❌' : (absent ? '⚠️' : '✅'), `V3：兑换物五件+flavor 干扰件（270165）不误标——干净 ${clean}/6（误标 ${dirty}、缺席 ${absent}）`, det);
+      }
     }
     // ---- V6：M+ 饰品 effect 24/24 ----
     {
@@ -318,6 +382,21 @@ function main() {
       R('V6', st, `M+ 饰品 effect 非空 ${ok.length}/${tr.length}（判据 ${MPLUS_TRINKET_TARGET}/${MPLUS_TRINKET_TARGET}）`,
         (tr.length !== MPLUS_TRINKET_TARGET ? [`饰品总数 ${tr.length} ≠ ${MPLUS_TRINKET_TARGET}——先确认大米段完整性（V14）再判 V6`] : [])
           .concat(bad.length ? ['effect 空件：' + bad.join('；')] : (tr.length ? ['全件 effect 非空'] : [])));
+    }
+    // ---- V2：大米 28 件缺席 + 4 件新增 ID 销账（文件侧只供在场状态，去向定性属顾问侧） ----
+    {
+      const byId = id => items.filter(r => Number(tget(r.item, 'id')) === id);
+      const line = ([id, name]) => {
+        const rows = byId(id);
+        return rows.length ? `${id} ${name}：在场（${rows[0].instance}/${rows[0].boss}）` : `${id} ${name}：缺席`;
+      };
+      const absentDet = V2_ABSENT.map(line);
+      const newDet = V2_NEW.map(line);
+      const absentPresent = V2_ABSENT.filter(([id]) => byId(id).length).length;
+      const newPresent = V2_NEW.filter(([id]) => byId(id).length).length;
+      R('V2', '⚠️', `大米 28 件缺席销账：本次在场 ${absentPresent}/28、缺席 ${28 - absentPresent}/28（清单=1.0.12 送审件附录）`,
+        ['「错档/去重/真缺数据」逐件去向定性属顾问侧职责，以下为文件侧在场状态：'].concat(absentDet));
+      R('V2', '⚠️', `大米 4 件新增销账：本次在场 ${newPresent}/4`, newDet);
     }
   }
 
@@ -347,8 +426,10 @@ function main() {
   if (failedRows.length) console.log(`failed 段（${failedRows.length} 条，按步骤卡第 9 步须与聊天框红字同时出现）：\n  ${failedRows.join('\n  ')}`);
 
   // ---------- 预判清单输出 ----------
-  console.log('\n---------------- V14-V17 + V3/V6 预判清单 ----------------');
-  for (const r of results) {
+  console.log('\n---------------- V 表预判清单（文件侧可判项，按编号排序） ----------------');
+  const ORDER = { VER: 0, V1: 1, V2: 2, V3: 3, V6: 6, V7: 7, V13: 13, V14: 14, V15: 15, V16: 16, V17: 17 };
+  const sorted = results.slice().sort((a, b) => (ORDER[a.id] ?? 99) - (ORDER[b.id] ?? 99));
+  for (const r of sorted) {
     console.log(`${r.status} ${r.id}  ${r.title}`);
     for (const d of r.details) console.log(`     ${d}`);
   }
