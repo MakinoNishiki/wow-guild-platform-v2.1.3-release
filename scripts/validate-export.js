@@ -12,22 +12,29 @@ const path = require('path');
 // ---------- 常量（判据口径，赛季更替时随步骤卡更新） ----------
 const DEFAULT_WOW_DIR = 'C:/Azeroth/World of Warcraft/_retail_';
 // V15：三团本实例基线（名称匹配=前缀包含；件数±容差，烈毒之渊为步骤卡明示 ±4）
+// 至暗之夜 1.0.22 起改 32±4：DB boss_loot 已录 4 首领各 8 件（合计 32）——12.1 EJ 四首领
+// 在册且各有掉落表，097 修复后应出件；旧 8±2 系「12.0 仅 1 encounter」时代口径（待运营裁定）
 const EXPECT_RAIDS = [
-  { match: '至暗之夜', expect: 8, tol: 2 },
+  { match: '至暗之夜', expect: 32, tol: 4 },
   { match: '潮缚', expect: 13, tol: 2 },   // DB 全名 潮缚石窟（巢穴）
   { match: '烈毒之渊', expect: 114, tol: 4 },
 ];
-const RAID_TOTAL = { expect: 135, tol: 10 };   // V1：团本合计 135±
+const RAID_TOTAL = { expect: 159, tol: 10 };   // V1：团本合计 159±（至暗 32 口径随上，待运营裁定）
 const DUNGEON_TOTAL = { expect: 225, tol: 10 }; // V14：大米 8 本合计 225±
 const EXPECT_DUNGEON_COUNT = 8;                 // BUG-095 期望实例集常量（与插件 EXPECTED_INSTANCE_COUNT 同步）
 const EXPECT_RAID_COUNT = 3;
 // S2 大米 8 本期望名单（2026-08-14 顾问侧按 DB game_dungeons 新赛季集登记；名单不符只 ⚠️ 不 ❌，硬闸=本数+合计）
 const EXPECT_DUNGEON_NAMES = ['毒牙祭坛', '虚空之痕竞技场', '纳洛拉克的洞穴', '密谋小径', '夺目谷', '诸王之眠', '塞塔里斯神庙', '红玉新生法池'];
-// V16 冒烟门槛（1.0.20 加严）：鲁阿夏尔 8/8 全带档 + 拉维 7/7 全带档
+// V16 冒烟门槛（1.0.22 堵 097 门洞）：烈毒之渊全 8 BOSS 合计 114±4（2 号位起枚举路径进网）+
+// 毒牙祭坛前 2 BOSS（拉维 7/7 全带档+扭缠盘蛇>0）；
+// 至暗之夜=无难度维世界首领类目，不进冒烟网，留全量验（见 V15）
+const SMOKE_RAID = { instance: '烈毒之渊', bosses: 8, items: 114, tol: 4 };
 const SMOKE_GATES = [
-  { instance: '至暗之夜', boss: '鲁阿夏尔', items: 8 },
-  { instance: '毒牙祭坛', boss: '拉维', items: 7 },
+  { instance: '毒牙祭坛', boss: '拉维', items: 7, tol: 0 },
+  { instance: '毒牙祭坛', boss: '扭缠盘蛇', items: 1, tol: 0, minOnly: true },  // 2 号位路径在网即达标，件数阈值首跑后校准
 ];
+// V15（1.0.21 终案）：至暗之夜=无难度维（世界首领整合类目）——4 首领、tiers 仅 normal 单档
+const NO_DIFF_INSTANCE = { match: '至暗之夜', bosses: 4 };
 // V3/V17：毒咒逐件名单（2026-08-14 运营终裁提供，REQ-121 升级逐件核对）
 const VENOM_EQUIP_IDS = [268215, 268202, 268207, 271874, 271875, 268265, 271876, 271878]; // 装备八件：venomcurse 应=毒咒
 const VENOM_TOKEN_IDS = [270911, 270919, 270915, 270927, 270923]; // 兑换物五件（毒咒族）：venomcurse 应空，不误标
@@ -271,15 +278,55 @@ function main() {
   }
 
   if (meta.smoke) {
-    // ================= 冒烟产物：V16 门槛 =================
+    // ================= 冒烟产物：V16 门槛（1.0.22 堵 097 门洞） =================
+    {
+      const inst = instances.find(x => String(x.name || '').includes(SMOKE_RAID.instance));
+      if (!inst) { R('V16', '❌', `冒烟门槛：${SMOKE_RAID.instance} 在文件中找不到`, []); }
+      else {
+        const det = [];
+        let st = '✅';
+        if (inst.bosses.length !== SMOKE_RAID.bosses) { st = '❌'; det.push(`BOSS 数 ${inst.bosses.length} ≠ ${SMOKE_RAID.bosses}`); }
+        if (Math.abs(inst.items - SMOKE_RAID.items) > SMOKE_RAID.tol) { st = '❌'; det.push(`合计 ${inst.items} 不在 ${SMOKE_RAID.items - SMOKE_RAID.tol}~${SMOKE_RAID.items + SMOKE_RAID.tol} 带域`); }
+        const zero = inst.bosses.filter(b => b.loot.length === 0).map(b => b.name);
+        if (zero.length) { st = '❌'; det.push(`零件 BOSS（097 特征）：${zero.join('、')}`); }
+        const tiered = inst.bosses.reduce((s, b) => s + b.loot.filter(hasTiers).length, 0);
+        det.push(`带档 ${tiered}/${inst.items}（档值抽验，归属人工核对）`);
+        R('V16', st, `冒烟门槛：${SMOKE_RAID.instance} 全 ${SMOKE_RAID.bosses} BOSS 合计 ${inst.items}/${SMOKE_RAID.items}±${SMOKE_RAID.tol} 件`, det);
+      }
+    }
     for (const g of SMOKE_GATES) {
       const inst = instances.find(x => String(x.name || '').includes(g.instance));
       const boss = inst && inst.bosses.find(b => String(b.name || '').includes(g.boss));
       if (!boss) { R('V16', '❌', `冒烟门槛：${g.instance}/${g.boss} 在文件中找不到`, []); continue; }
       const tiered = boss.loot.filter(hasTiers).length;
       const names = boss.loot.map(it => `${tget(it, 'id')} ${tget(it, 'name')}`).join('；');
-      const st = (boss.loot.length === g.items && tiered === g.items) ? '✅' : '❌';
-      R('V16', st, `冒烟门槛：${g.boss} ${boss.loot.length}/${g.items} 件、带档 ${tiered}/${g.items}`, [`物品清单（归属人工核对）：${names || '（空）'}`]);
+      if (g.minOnly) {
+        const st = boss.loot.length >= g.items ? '✅' : '❌';
+        R('V16', st, `冒烟门槛：${g.boss} ${boss.loot.length} 件（≥${g.items} 即达标，2 号位路径在网）、带档 ${tiered}/${boss.loot.length}`, [`物品清单（归属人工核对）：${names || '（空）'}`]);
+      } else {
+        const countOK = Math.abs(boss.loot.length - g.items) <= (g.tol || 0);
+        const st = (countOK && tiered === boss.loot.length) ? '✅' : '❌';
+        R('V16', st, `冒烟门槛：${g.boss} ${boss.loot.length}/${g.items}${g.tol ? '±' + g.tol : ''} 件、带档 ${tiered}/${boss.loot.length}`, [`物品清单（归属人工核对）：${names || '（空）'}`]);
+      }
+    }
+    // ---- V3（1.0.23，BUG-099）：毒咒八件全中=冒烟硬项（八件均在冒烟范围·烈毒之渊）；免疫侧在场件零误标 ----
+    {
+      const byId = id => items.filter(r => Number(tget(r.item, 'id')) === id);
+      const det = []; let hit = 0, bad = 0;
+      for (const id of VENOM_EQUIP_IDS) {
+        const rows = byId(id);
+        if (!rows.length) { bad++; det.push(`${id}：缺席（冒烟范围内未采到——先查 V16 件数门槛）`); continue; }
+        const v = tget(rows[0].item, 'venomcurse');
+        if (isVenom(v)) { hit++; det.push(`${id} ${tget(rows[0].item, 'name')}（${rows[0].instance}/${rows[0].boss}）：命中 ✅`); }
+        else { bad++; det.push(`${id} ${tget(rows[0].item, 'name')}（${rows[0].instance}/${rows[0].boss}）：未中标，实采=${JSON.stringify(v ?? null)} ❌`); }
+      }
+      R('V3', bad ? '❌' : '✅', `毒咒装备八件全中（冒烟硬项）——命中 ${hit}/8`, det.concat(bad ? ['未中标=BUG-099 残差现形：对聊天框「毒咒疑似行」转义 dump（\\n/| 逐字节显形）定字节形态'] : []));
+      const badImm = [];
+      for (const id of [...VENOM_TOKEN_IDS, FLAVOR_SAMPLE_ID]) {
+        const rows = byId(id);
+        if (rows.length && isVenom(tget(rows[0].item, 'venomcurse'))) badImm.push(`${id} ${tget(rows[0].item, 'name')}`);
+      }
+      R('V3', badImm.length ? '❌' : '✅', '免疫侧（兑换物五件+flavor 270165）不误标', badImm.length ? [`误标：${badImm.join('；')}`] : ['在场件零误标（缺席件不判）']);
     }
     R('V16', '⚠️', '冒烟门槛：快照 slot=15 为聊天框判据，文件侧不可判', ['需冒烟跑聊天框「难度档快照」行截图佐证']);
   } else {
@@ -306,6 +353,33 @@ function main() {
         const ok = Math.abs(inst.items - e.expect) <= e.tol;
         R('V15', ok ? '✅' : '❌', `三团本在场：${inst.name} ${inst.items} 件（判据 ${e.expect}±${e.tol}）`, ok ? [] : [`件数越界：${inst.items} 不在 ${e.expect - e.tol}~${e.expect + e.tol}`]);
       }
+      // 1.0.22（BUG-097）：零件 BOSS 硬闸——任何 0 件 BOSS=097 特征（1 号位出件、2 号起全 0），硬判负
+      {
+        const zb = [];
+        for (const x of instances) for (const b of x.bosses) if (b.loot.length === 0) zb.push(`${x.seg}/${x.name}/${b.name}`);
+        R('V15', zb.length ? '❌' : '✅', 'BUG-097：零件 BOSS 绝迹（多 BOSS 实例 2 号位起枚举路径）',
+          zb.length ? [`命中 ${zb.length} 个（097 特征现形）：${zb.slice(0, 8).join('；')}${zb.length > 8 ? ' …' : ''}`] : ['两段全 BOSS 均出件']);
+      }
+      // 1.0.21 终案：至暗之夜=无难度维（世界首领整合类目）——4 首领 + tiers 仅 normal 单档
+      {
+        const inst = raidInsts.find(x => String(x.name || '').includes(NO_DIFF_INSTANCE.match));
+        if (inst) {
+          const det = [];
+          let st = '✅';
+          if (inst.bosses.length !== NO_DIFF_INSTANCE.bosses) { st = '❌'; det.push(`首领数 ${inst.bosses.length} ≠ ${NO_DIFF_INSTANCE.bosses}`); }
+          const badKeys = {}, noTier = [];
+          for (const b of inst.bosses) for (const it of b.loot) {
+            const keys = [...hashKeys(tget(it, 'primary_tiers')), ...hashKeys(tget(it, 'secondary_tiers'))];
+            if (!keys.length) { noTier.push(`${tget(it, 'id')} ${tget(it, 'name')}`); continue; }
+            for (const k of keys) if (k !== 'normal') (badKeys[k] = badKeys[k] || []).push(`${tget(it, 'id')} ${tget(it, 'name')}（${b.name}）`);
+          }
+          const badNames = Object.keys(badKeys);
+          if (badNames.length) { st = '❌'; det.push(`出现 normal 以外档键 ${badNames.join('/')}——094 四档污染特征现形：`); for (const k of badNames) det.push(`  ${k}: ${badKeys[k].slice(0, 5).join('；')}${badKeys[k].length > 5 ? ' …' : ''}`); }
+          if (noTier.length) det.push(`无 tiers 件 ${noTier.length}（无数值品类天然不产档，仅提示）：${noTier.slice(0, 5).join('；')}${noTier.length > 5 ? ' …' : ''}`);
+          det.push('快照「无难度维（世界首领类）」注记为聊天框判据，需截图佐证');
+          R('V15', st, `至暗之夜终案形态：${NO_DIFF_INSTANCE.bosses} 首领 + tiers 仅 normal 单档`, det);
+        }
+      }
       if (skipped.length === 0) {
         R('V15', '✅', 'skipped_instances 留痕：文件无 skipped_instances（真空才出现，符合预期）', []);
       } else {
@@ -331,7 +405,7 @@ function main() {
       for (const inst of instances) for (const b of inst.bosses) if (b.loot.length > BOSS_ITEM_SANITY_MAX) over.push(`${inst.name}/${b.name} ${b.loot.length} 件`);
       R('V16', over.length ? '❌' : '✅', `单 BOSS 件数 sanity 守卫（>${BOSS_ITEM_SANITY_MAX} 即异常）`, over.length ? over : ['全 BOSS 件数 ≤' + BOSS_ITEM_SANITY_MAX + '，守卫零触发']);
       if (meta.abnormal) R('V16', '❌', 'meta.abnormal 标记', ['sanity/完整性五源之一已触发，见 V15 明细']);
-      R('V16', '⚠️', '冒烟门槛（slot=15 + 鲁阿夏尔 8/8 + 拉维 7/7）需冒烟产物判定', ['本文件为全量导出；冒烟结论见冒烟跑文件另跑本脚本，或直接对全量对账表核查两 BOSS 行']);
+      R('V16', '⚠️', '冒烟门槛（slot=15 + 烈毒之渊全 8 BOSS 114±4 + 拉维 7/7 + 扭缠盘蛇>0）需冒烟产物判定', ['本文件为全量导出；冒烟结论见冒烟跑文件另跑本脚本，或直接对全量对账表核查对应行']);
     }
     // ---- V17 / V3：毒咒逐件核对（2026-08-14 运营终裁名单） ----
     {

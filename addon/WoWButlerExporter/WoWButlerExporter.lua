@@ -148,8 +148,59 @@
 --   ②闸判否分支不静默：黄字印「IsValid(档)=false @ 当前实例=X」；
 --   ③「切档读回失败」信息增强三要素：当前实例名+IsValid 值+读回值；
 --   导出字段格式零改动）
+-- （1.0.21：BUG-094 二次翻转终案——运营截图实证：至暗之夜=资料片名借用的世界首领
+--   整合类目，无难度维（难度下拉不存在）；唯三真实例有下拉：毒牙祭坛=普通/英雄/史诗、
+--   潮缚石窟=世界/普通/英雄/史诗、烈毒之渊=随机团队/普通/英雄/史诗；「世界」档正身=
+--   暴雪 FrameXML 注释 "World"->PrimaryRaidLFR（行为同 LFR、显示为世界，下拉实际
+--   SetDifficulty(17)；DifficultyUtil：团本 LFR=17/普通=14/英雄=15/史诗=16，
+--   大米 普通=1/英雄=2/史诗=23/时空漫游=24，RaidWorld=250 行为挂 17）。
+--   档扫终版=按实例自适应有效档探测（替换定档表，吸收「按档跳过」小修）：
+--   ①钉档前逐候选过 EJ_IsValidInstanceDifficulty（团本 17/14/15/16、大米 1/2/23/24），
+--     只扫有效档；无效档跳过续扫并快照注记「跳过档=key」；
+--   ②零有效档=无难度维（世界首领类）：不钉不切，单趟基础采集，tiers 记 normal 单档
+--     （与 1.0.15 数据形态连续，converter 零改），快照注记「无难度维（世界首领类）」；
+--   ③有效档>0 而整 BOSS 0 带档降格判异常黄字（分案文案保留；通道真异常
+--     hardFail/switchFail 维持红字）；
+--   ④冒烟团本目标改烈毒之渊第 1 BOSS 盘魂者内克扎莉（四档全有效，lfr 路径进冒烟网；
+--     至暗之夜留全量验）；锚档候选常量退役（首选有效档即锚）；
+--   导出字段格式零改动、向后兼容）
+-- （1.0.22：BUG-097（P0）+BUG-098（P1）打回修+BUG-095 重开随修——1.0.21 全量双跑
+--   （run 234112/234352）每个多 BOSS 实例仅 1 号 BOSS 出件、2 号起全 0，A/B 逐实例件数
+--   全等=确定性缺陷——
+--   ①097 主根认领=1.0.19 双参化误读第二参语义：GetLootInfoByIndex(li, N) 的 N 不是
+--     「按 BOSS 序号取掉落」——暴雪 FrameXML 唯一双参调用点（Mainline :217-231）实证
+--     N=该件多掉落归属 BOSS 的第 N 归属序（numEncounters==2 时取第 2 归属拼展示文案）；
+--     单归属件（绝大多数）N>=2 恒 nil→2 号 BOSS 起枚举全 0；N=1 恒可用→1 号位全绿
+--     假象，冒烟只测 1 号位故 1.0.19~1.0.21 三版穿网。修法=回滚选中态单参枚举
+--     （1.0.17 健康路径），串 BOSS 防护改数据驱动：逐件读稀疏表自带 encounterID，
+--     非本 BOSS 条目剔除；整表皆串=选中未生效，重选+过重建钩子重试 3 次仍串/仍 0
+--     才红字记空占位（096①「宁空不错」口径延续，坏读回 API 不再用）；
+--   ②098 同根随修：阶段一 0 件重试与阶段二档扫陈旧/空表重试均补「重选 encounter+
+--     等重建」——旧重试原地空转（不重选、IsLootListOutOfDate 只跟踪过滤器态不跟踪
+--     encounter 选中变更，A 跑列表滞留 1 号形态=staleSkip/B 跑列表已空=absent 两形态
+--     同根）；冒烟残留=目标实例/encounter 选中态+暖缓存（无 deselect API 无法复位，
+--     鲁棒化后残留无害化，判据=冒烟/冷启动后首跑即全绿）；
+--   ③095 重开：件数量级闸——每实例件数低于期望下限（EXPECTED_INSTANCE_FLOOR，
+--     至暗 6/潮缚 11/烈毒 110/大米各本按 1.0.9 基线−10）即红字拒写基线+meta.abnormal；
+--     空掉落占位 BOSS 具名入违规源（097 现场 30 个空占位红字却零违规的洞就此堵上）；
+--     复盘：旧门只查「在场/零件」，空占位 BOSS 不入违规源、无量级概念故全放行；
+--     冒烟模式复核=gating/基线覆写整块不进入（kind~="smoke" 守卫在案），无侧路写；
+--   ④冒烟堵门洞（097 穿网口）：团本目标改烈毒之渊全 8 BOSS（判据 114±4，与 V15
+--     同口径），大米目标毒牙祭坛前 2 BOSS（拉维 7/7+扭缠盘蛇>0）——2 号位起枚举
+--     路径自此进冒烟网；
+--   导出字段：新增 rep.emptyBosses（段内空占位 BOSS 具名，gating 用，不落导出文件））
+-- （1.0.23：BUG-099（P1）毒咒跨行匹配 12.1 形态补丁——1.0.22 冒烟判绿（097 修复确认：
+--   烈毒全 8 BOSS 112 件全出件）但毒咒八件 0/8 未中；真机取证（run 20260815-005810）：
+--   八件 mythic 档疑似 dump 单元均为「史诗↵毒咒」合一格——主嫌疑=12.1 以单串内嵌 \n
+--   形态交付，「上一行+本行」跨行拼接够不到——
+--   ①匹配加第三级：单串内嵌换行形态（剥码后 ^史诗%s*\n%s*毒咒%s*$；免疫锚不变——
+--     名行以字续不命中、flavor 以「。」收尾不命中；免疫侧五件兑换物+270165 零改动）；
+--   ②疑似 dump 转义可见化：\r/\n 显形为字面 \r\n、| 转义 ||，字节形态一锤定音
+--     （即使主嫌疑修错也有取证兜底，零猜测）；
+--   ③毒咒八件全中列入冒烟硬项（步骤卡 Q4/V16+validator 冒烟分支 V3 硬闸）；
+--   导出字段格式零改动）
 -- ============================================================
-local ADDON_VERSION = "1.0.20"
+local ADDON_VERSION = "1.0.23"
 
 local function msg(s) DEFAULT_CHAT_FRAME:AddMessage("|cffffd200[wjdc]|r " .. s) end
 local function err(s) DEFAULT_CHAT_FRAME:AddMessage("|cffff4040[wjdc]|r " .. s) end
@@ -256,8 +307,13 @@ local function parseStatLines(lines, d)
       -- （1.0.16 E2/REQ-088 残差：容许行尾空白——真机全场零命中，精确等值疑似被尾随空白/残留码击穿）
       -- 1.0.18（毒咒两行形态，1.0.17 双跑真机取证「史诗↵毒咒」）：跨行匹配——上一行剥码后
       -- 以「史诗」收尾且与本行拼接恰成「史诗…毒咒」即判有（单行精确判定保留，判据不变）
+      -- 1.0.23（BUG-099，1.0.22 冒烟真机取证 run 20260815-005810）：12.1 以单串内嵌 \n 形态
+      -- 交付（疑似 dump 单元=「史诗↵毒咒」合一格，跨行拼接够不到）——加第三级：单串内嵌
+      -- 换行形态 ^史诗%s*\n%s*毒咒%s*$（免疫锚不变：名行以字续不命中、flavor 以「。」收尾不命中）
       if d.venomcurse == "" then
         if plain:match("^毒咒%s*$") then
+          d.venomcurse = "毒咒"
+        elseif plain:match("^史诗%s*\n%s*毒咒%s*$") then
           d.venomcurse = "毒咒"
         elseif prevPlain and (prevPlain .. plain):match("史诗%s*毒咒%s*$") then
           d.venomcurse = "毒咒"
@@ -392,11 +448,9 @@ local function ensureInstanceSelected(instanceID, iname)
   return false
 end
 
--- 锚档候选（首选在前）：单难度本（世界 BOSS 型等）首选档无效时按序改钉首个合法档；
+-- 1.0.21（BUG-094 终案）：锚档候选常量退役——调用方先做有效档自适应探测（逐候选过
+-- EJ_IsValidInstanceDifficulty），本函数入参=有效档 id 表（顺序即档位表序），钉首个钉得上的；
 -- 全部钉不上返回 nil，调用方按当前档枚举并明示（禁静默）
-local RAID_ANCHOR_CANDIDATES    = { 14, 15, 16, 17 }  -- 首选普通
-local DUNGEON_ANCHOR_CANDIDATES = { 23, 2, 1, 24 }    -- 首选史诗
-
 local function pinInstanceDifficulty(candidates)
   for _, d in ipairs(candidates) do
     local valid = isDifficultyValidForInstance(d)
@@ -419,6 +473,22 @@ local BOSS_ITEM_SANITY_MAX = 40
 
 -- BUG-095（1.0.18）：期望实例集口径（随赛季更替由运营/顾问更新；伪实例不计入大米数）
 local EXPECTED_INSTANCE_COUNT = { ["团本"] = 3, ["大秘境"] = 8 }
+
+-- BUG-095（1.0.22 重开）：件数量级闸——每实例件数低于下限即判异常（097 类「1 号位出件、
+-- 2 号起全 0」缺陷拦截：旧门只查在场/零件，烈毒 16 件照样放行覆写基线）。
+-- 团本下限=运营给定（判据容差下沿）；大米各本=1.0.9 基线−10——密谋小径 31/红玉新生法池 21
+-- 为 1.0.12 送审件实证基线，其余六本仓库无逐本基线在案，取保守下限 15（按合计 225、
+-- 已知两本 52 推余 173/6≈29，估 25−10）——**六本数值待运营按 1.0.9 基线对账逐本校准**。
+-- 名称匹配=前缀包含（与 validator EXPECT_RAIDS 同口径）；未登记的实例不判（新本先观察）
+local EXPECTED_INSTANCE_FLOOR = {
+  ["团本"] = { { match = "至暗之夜", floor = 6 }, { match = "潮缚", floor = 11 }, { match = "烈毒之渊", floor = 110 } },
+  ["大秘境"] = {
+    { match = "密谋小径", floor = 21 }, { match = "红玉新生法池", floor = 11 },
+    { match = "毒牙祭坛", floor = 15 }, { match = "纳洛拉克的洞穴", floor = 15 },
+    { match = "夺目谷", floor = 15 }, { match = "虚空之痕竞技场", floor = 15 },
+    { match = "诸王之眠", floor = 15 }, { match = "塞塔里斯神庙", floor = 15 },
+  },
+}
 
 -- BUG-091 v2（1.0.17，F1 调研前置落实——依据见完工报文「调研依据」节）：
 -- Blizzard 官方 API 文档实证：Enum.ItemSlotFilterType 0=Head…14=Other、15=NoFilter——
@@ -559,10 +629,18 @@ local function collectTiers(loot, tiers, opts, done)
     done(stats)
   end
   -- 单档扫描体（只抛给 scanTier 的 pcall）：帧后枚举当档列表 → 建索引 → 逐件扫
+  -- 1.0.22（BUG-098）：陈旧/空表重试统一口——重选 encounter+过重建钩子再扫（旧重试
+  -- C_Timer.After(0) 原地空转不重选：IsLootListOutOfDate 只跟踪过滤器态，不跟踪
+  -- encounter 选中变更，不重选列表永不归位）；空表（total=0）同样重试——A 跑滞留
+  -- 1 号形态（staleSkip）/B 跑列表直接空（absent）两形态同根，均为选中变更未生效窗
+  local function retryScanTier(tier, attempt)
+    if opts.encounterID then pcall(EJ_SelectEncounter, opts.encounterID) end
+    whenLootListFresh(function() scanTier(tier, attempt + 1) end)
+  end
   local function scanTierBody(tier, attempt)
     local map, total, staleHit = {}, 0, 0
     local li = 1
-    while li <= 500 do  -- 档扫重取防呆：GetLootInfoByIndex 取到 nil 为止，500 封顶（单参语义依赖当前选中 BOSS，与 1.0.19 阶段一显式传参路径无关）
+    while li <= 500 do  -- 档扫重取防呆：GetLootInfoByIndex 取到 nil 为止，500 封顶（单参语义依赖当前选中 BOSS）
       local okQ, info = pcall(C_EncounterJournal.GetLootInfoByIndex, li)
       if not okQ or type(info) ~= "table" or not info.itemID then break end
       total = total + 1
@@ -573,13 +651,17 @@ local function collectTiers(loot, tiers, opts, done)
       li = li + 1
     end
     if total > 0 and staleHit == total then
-      -- 整表陈旧：帧延迟重试至多 2 次，仍陈旧跳该档续扫（单档粒度，不跨 BOSS）
+      -- 整表陈旧：重选+等重建重试至多 2 次，仍陈旧跳该档续扫（单档粒度，不跨 BOSS）
       if attempt < 3 then
-        C_Timer.After(0, function() scanTier(tier, attempt + 1) end)
+        retryScanTier(tier, attempt)
       else
         stats.staleSkip = (stats.staleSkip and (stats.staleSkip .. ",") or "") .. tier.key
         nextTier()
       end
+      return
+    end
+    if total == 0 and attempt < 3 then
+      retryScanTier(tier, attempt)  -- 1.0.22：空表同为选中未生效窗形态，重选重试（旧直落 absent 全缺）
       return
     end
     for _, it in ipairs(loot) do
@@ -615,16 +697,18 @@ local function collectTiers(loot, tiers, opts, done)
           -- 1.0.16（E2/REQ-088 残差）：毒咒读取点不再只锚史诗档——任一档 tooltip 出现即采
           -- （毒咒行=史诗难度独有终案在案，则其他档天然无此行，全档读为安全超集，
           --   防史诗档被跳档/陈旧拦截时漏采）；史诗档未命中时做疑似行取证（剥码后含「毒咒」
-          -- 字样但非精确行的原行黄字 dump，| 转义 ||）——真机全场零命中的定位靠它一锤定音
+          -- 字样但非精确行的原行黄字 dump）——真机全场零命中的定位靠它一锤定音
+          -- 1.0.23（BUG-099）：疑似 dump 转义可见化——\r/\n 显形为字面 \r\n、| 转义 ||，
+          -- 字节形态一锤定音（即使第三级匹配修错也有取证兜底，零猜测）
           if opts.venomcurse then
             if d.venomcurse ~= "" then
               it.venomcurse = d.venomcurse
             elseif tier.key == opts.effectTier then
               for _, raw in ipairs(lines) do
                 local p = stripLineCodes(raw)
-                if p:find("毒咒") and not p:match("^毒咒%s*$") then
+                if p:find("毒咒") and not p:match("^毒咒%s*$") and not p:match("^史诗%s*\n%s*毒咒%s*$") then
                   msg(string.format("毒咒疑似行未精确命中（物品 %s，%s 档）：%s",
-                    tostring(it.id), tier.key, (raw:gsub("|", "||"))))
+                    tostring(it.id), tier.key, (raw:gsub("\r", "\\r"):gsub("\n", "\\n"):gsub("|", "||"))))
                 end
               end
             end
@@ -677,24 +761,28 @@ local function collectTiers(loot, tiers, opts, done)
 end
 
 -- ---------- 副本手册遍历（团本 / 大秘境共用） ----------
--- 掉落枚举：1.0.19（BUG-096 转码）起显式双参 GetLootInfoByIndex(i, encounterIndex)——
---   官方 APIDocumentation：encounterIndex luaIndex Nilable，省略才回落「当前选中 encounter」；
---   暴雪自用 Mainline :226 传字面 2；wiki 同载（任务书 #26-fix4「实测双参全 nil」旧论作废——
---   彼时实态=选中态未生效致回落路径取空，非双参本身无效）。
+-- 掉落枚举：1.0.22（BUG-097 转码回滚）选中态单参 GetLootInfoByIndex(i)——
+--   1.0.19 双参化误读第二参语义：暴雪 FrameXML 唯一双参调用点（Mainline :217-231）实证
+--   第二参=该件多掉落归属 BOSS 的第 N 归属序（EJ_GetNumEncountersForLootByIndex==2 时取第 2
+--   归属拼「BOSS甲、BOSS乙」展示文案），不是「按 BOSS 序号取掉落」——单归属件 N>=2 恒 nil，
+--   致 1.0.19~1.0.21 每个多 BOSS 实例仅 1 号位出件（097 全量双跑 A/B 确定性全等实证）。
+--   串 BOSS 防护（096①）改数据驱动：12.x 稀疏表自带 encounterID（归属 BOSS），
+--   枚举逐件比对本 BOSS encounterID，整表皆串=选中未生效（重选重试），混杂件剔除不录。
 -- 12.x 返回稀疏表（仅 itemID/encounterID/稀有度标记），老函数为多元返回值
 -- （name, icon, slot, armorType, itemID, ...），归一化为只取 itemID——其余字段一律走 GetItemInfo
-local function getLootItemID(i, encounterIndex)
+-- 返回 itemID, encounterID（老 tuple 无 encounterID 返回 nil=不可校验，调用方采信）
+local function getLootItemID(i)
   local fn = (C_EncounterJournal and C_EncounterJournal.GetLootInfoByIndex) or EJ_GetLootInfoByIndex
   if type(fn) ~= "function" then return nil end
-  local ok, a, _, _, _, e5 = pcall(fn, i, encounterIndex)  -- e5 = 老 tuple 第 5 位 itemID
+  local ok, a, _, _, _, e5 = pcall(fn, i)  -- e5 = 老 tuple 第 5 位 itemID
   if not ok or a == nil then return nil end
-  if type(a) == "table" then return a.itemID end
-  return e5
+  if type(a) == "table" then return a.itemID, a.encounterID end
+  return e5, nil
 end
 
 -- BUG-096① 读回校验链 1.0.19 整撤：无参 EJ_GetEncounterInfo() 读回真机三连翻车（鲁阿夏尔/拉维
--- selectFail，1.0.18 冒烟实证），此路不通；掉落归因改显式 encounterIndex 传参（见 getLootItemID），
--- EJ_SelectEncounter 选中态退出归因关键路径
+-- selectFail，1.0.18 冒烟实证），此路不通；1.0.19 替代方案（双参显式枚举）1.0.22 证实为
+-- 第二参语义误读（097），串 BOSS 防护最终形态=稀疏表 encounterID 逐件校验（见上）
 
 -- ---------- 冷缓存就绪门（1.0.11，BUG-082，S2 录库前必修） ----------
 -- 1.0.9 S2 实采定损：物品数据未加载完即解析——GetItemInfo/tooltip 在冷缓存下返回
@@ -825,14 +913,15 @@ local function exportInstances(isRaid, label, tierOn, done, abortFlag, onProgres
   local function aborted() return abortFlag and abortFlag.aborted end
 
   -- 档位配置：团本=四档+特效/毒咒读史诗档；大米=候选档逐档探测+特效读史诗档、免毒咒（REQ-118）
+  -- 1.0.21：tierSet 仅作候选池——逐实例有效档在阶段一自适应探测（见 enumInstance），阶段二按实例产物扫
   local tierSet = isRaid and RAID_TIERS or DUNGEON_TIERS
   local tierOpts = isRaid and { effectTier = "mythic", venomcurse = true }
                            or { effectTier = "mythic", venomcurse = false, skipBadTier = true }
-  local anchorCandidates = isRaid and RAID_ANCHOR_CANDIDATES or DUNGEON_ANCHOR_CANDIDATES  -- BUG-094：锚档候选探测
   resetLootFreshStats()  -- G1 查证（BUG-096③）：钩子计数器按段归零，段尾汇总
   local seenInstances = {}        -- BUG-095：阶段一实际枚举到的实例全量台账（含判空跳过/伪实例）
   local segmentAbnormal = false   -- BUG-096②：sanity 异常段级标记（gating 拒写基线用）
   local sanityNotes = {}
+  local emptyBosses = {}         -- BUG-095（1.0.22 重开）：空掉落占位 BOSS 具名（gating 违规源）
 
   -- 阶段一（1.0.17 起异步化）：枚举结构
   local instances = {}
@@ -840,29 +929,53 @@ local function exportInstances(isRaid, label, tierOn, done, abortFlag, onProgres
   local startPhase2, enumInstance, enumBossItems  -- 前向声明：阶段一异步链跑完自动续推阶段二
 
   -- F5（BUG-093）：同 BOSS 按 itemID 去重；F3：0 件过重建钩子重试，封顶 3 次仍 0 才红字记空
-  -- 1.0.19（BUG-096 转码）：bossIndex 显式传入（该 BOSS 在当前选中实例内的序号，与
-  -- EJ_GetEncounterInfoByIndex 同源），枚举不再依赖 EJ_SelectEncounter 选中态
-  enumBossItems = function(iname, bosses, bname, encounterID, bossIndex, attempt, doneB)
+  -- 1.0.22（BUG-097 转码回滚）：枚举回滚选中态单参（1.0.17 健康路径；1.0.19 双参 bossIndex
+  -- =第二参语义误读，2 号位起恒 nil 全灭）；串 BOSS 防护（096①）改数据驱动——逐件比对
+  -- 稀疏表自带 encounterID：整表皆串=选中未生效，重选 encounter+过重建钩子重试（1.0.22 起
+  -- 0 件重试同样先重选——旧重试原地空转，098 同根）；混杂串表件剔除不录+黄字计数；
+  -- 空掉落占位 BOSS 具名入 emptyBosses（BUG-095 重开：gating 违规源，堵 097 红字零违规洞）
+  enumBossItems = function(iname, bosses, bname, encounterID, attempt, doneB)
     if aborted() then finalize() return end
     -- 掉落计数不依赖 EJ_GetNumLoot（12.x 已死）：按 index 递增取到 nil 为止
     -- （MayReturnNothing 明载），硬上限 60（sanity 上限 40 之上留余量，纯防死循环保险）
-    local items, seen, li = {}, {}, 1
+    local items, seen, foreign, li = {}, {}, 0, 1
     while li <= 60 do
-      local itemID = getLootItemID(li, bossIndex)
+      local itemID, encID = getLootItemID(li)
       if not itemID then break end
-      if not seen[itemID] then  -- EJ 同件可多 index 列出（250459×4 实证），按 itemID 去重
+      if encID and encounterID and encID ~= encounterID then
+        foreign = foreign + 1  -- 串表件：归属其他 BOSS=选中未生效/列表残留，剔除不录（096① 宁空不错）
+      elseif not seen[itemID] then  -- EJ 同件可多 index 列出（250459×4 实证），按 itemID 去重
         seen[itemID] = true
         items[#items + 1] = { id = itemID }
       end
       li = li + 1
     end
-    if #items == 0 and attempt < 3 then
-      whenLootListFresh(function() enumBossItems(iname, bosses, bname, encounterID, bossIndex, attempt + 1, doneB) end)
+    -- 重试统一口：重选 encounter + 过重建钩子（IsLootListOutOfDate 只跟踪过滤器态、
+    -- 不跟踪 encounter 选中变更——重选是唯一能驱动列表归位的动作）
+    local function retry()
+      pcall(EJ_SelectEncounter, encounterID)
+      whenLootListFresh(function() enumBossItems(iname, bosses, bname, encounterID, attempt + 1, doneB) end)
+    end
+    if #items == 0 and foreign > 0 and attempt < 3 then
+      retry()  -- 整表皆串：选中未生效，重选重试
+      return
+    end
+    if #items == 0 and foreign == 0 and attempt < 3 then
+      retry()  -- 空表：重选重试（1.0.22 前为原地空转不重选，098）
       return
     end
     if #items == 0 then
-      err(string.format("%s · %s：BOSS『%s』枚举重试 3 次仍 0 件掉落——记空掉落占位（非正常默认，请截图反馈顾问侧）",
-        label, tostring(iname), tostring(bname)))
+      emptyBosses[#emptyBosses + 1] = tostring(iname) .. "·" .. tostring(bname)  -- BUG-095：空占位具名入 gating 违规源
+      if foreign > 0 then
+        err(string.format("%s · %s：BOSS『%s』枚举重试 3 次列表均滞留其他 BOSS（串表 %d 件次已拦截）——记空掉落占位（选中态未生效，请截图反馈顾问侧）",
+          label, tostring(iname), tostring(bname), foreign))
+      else
+        err(string.format("%s · %s：BOSS『%s』枚举重试 3 次仍 0 件掉落——记空掉落占位（非正常默认，请截图反馈顾问侧）",
+          label, tostring(iname), tostring(bname)))
+      end
+    elseif foreign > 0 then
+      msg(string.format("%s · %s：BOSS『%s』枚举剔除串表件 %d 件次（归属其他 BOSS，096① 防护）",
+        label, tostring(iname), tostring(bname), foreign))
     end
     -- BUG-096②：件数 sanity 守卫——超上限判列表异常（疑串 BOSS/串档），数据照录但标记
     -- abnormal（gating 拒写计数基线），不静默
@@ -886,15 +999,30 @@ local function exportInstances(isRaid, label, tierOn, done, abortFlag, onProgres
       if #instances > 0 then startPhase2() return end
       if iname ~= smokeLimit.name then enumInstance() return end
     end
-    -- 实例级 pcall 只兜同步段（选本/钉档/清过滤器），中断红字具名（实例名+原因+恢复建议），跳过本实例不拖垮整段
+    -- 实例级 pcall 只兜同步段（选本/探测/钉档/清过滤器），中断红字具名（实例名+原因+恢复建议），跳过本实例不拖垮整段
     local pinnedDiff
     local selFail = false
+    local validTiers, skipKeys = {}, {}  -- 1.0.21：本实例有效档/跳过档（自适应探测产物，随实例记录入阶段二）
     local okI, eI = pcall(function()
       -- 1.0.20①：钉档/判合法前保证 instance 选中成立（闸的判定对象=当前选中实例）；
       -- 选中明确不成立则不钉不判（防闸在错误对象上误判），pcall 外红字具名跳过本实例
       selFail = ensureInstanceSelected(instanceID, iname) == false
       if selFail then return end
-      pinnedDiff = pinInstanceDifficulty(anchorCandidates)  -- ②REQ-119①+BUG-094：合法性闸后钉首个合法锚档
+      -- 1.0.21（BUG-094 终案）：按实例自适应有效档探测——逐候选过合法性闸，只扫有效档；
+      -- 闸读不出（nil=不明）按有效对待交钉档读回兜底（API 缺位时行为同旧版）；通道不可用
+      -- （tierOn=false）时全量候选维持旧钉档回退路径；零有效档=无难度维（世界首领类），不钉不切
+      for _, t in ipairs(tierSet) do
+        if tierOn and isDifficultyValidForInstance(t.id) == false then
+          skipKeys[#skipKeys + 1] = t.key
+        else
+          validTiers[#validTiers + 1] = t
+        end
+      end
+      if #validTiers > 0 then
+        local ids = {}
+        for _, t in ipairs(validTiers) do ids[#ids + 1] = t.id end
+        pinnedDiff = pinInstanceDifficulty(ids)  -- ②REQ-119①+BUG-094：钉首个钉得上的有效档
+      end
       resetLootFilter()  -- BUG-091（E1）：每实例枚举前再清过滤器（段首已清，此处兜底防中段污染）
     end)
     if not okI then
@@ -903,7 +1031,7 @@ local function exportInstances(isRaid, label, tierOn, done, abortFlag, onProgres
       enumInstance()
       return
     end
-    if selFail then  -- 1.0.20①：选中读回明确不符——入台账跳过（显式枚举的 bossIndex 亦以当前选中实例为域，不硬采错对象）
+    if selFail then  -- 1.0.20①：选中读回明确不符——入台账跳过（1.0.22 起枚举回归选中态单参，实例选中更不可错，不硬采错对象）
       seenInstances[#seenInstances + 1] = { name = iname, items = 0, skipped = true, reason = "实例选中读回不符（重试 2 次）" }
       err(string.format("%s · %s：实例选中读回不符（当前选中=%s，重试 2 次）——跳过本实例（防闸/枚举判错对象），恢复建议：/reload 后重跑，截图反馈顾问侧",
         label, tostring(iname), tostring(currentInstanceName() or "?")))
@@ -911,15 +1039,21 @@ local function exportInstances(isRaid, label, tierOn, done, abortFlag, onProgres
       return
     end
     -- ②REQ-119①：钉档回读校验；快照读到什么印什么（BUG-091：过滤器态并入快照）
-    -- BUG-094：首选锚档无效改钉/全钉失败均明示（单难度本改钉属正常，全钉失败=非正常）
+    -- BUG-094（1.0.21 终案）：零有效档=无难度维（世界首领类）注记属正常态；有效档钉不上/
+    -- 改钉均明示；无效档附「跳过档=key」注记
     local okR, curD = pcall(EJ_GetDifficulty)
     local pinNote
-    if pinnedDiff == nil then
-      pinNote = "（锚档全部钉失败：按当前档 " .. tostring(okR and curD or "?") .. " 枚举——非正常，请截图反馈顾问侧）"
-    elseif pinnedDiff ~= anchorCandidates[1] then
-      pinNote = "（首选锚档 " .. anchorCandidates[1] .. " 无效，改钉 " .. pinnedDiff .. "）"
+    if tierOn and #validTiers == 0 then
+      pinNote = "（无难度维（世界首领类）：不钉档单趟基础采集，tiers 记 normal 单档——1.0.21 终案）"
+    elseif pinnedDiff == nil then
+      pinNote = "（有效档全部钉失败：按当前档 " .. tostring(okR and curD or "?") .. " 枚举——非正常，请截图反馈顾问侧）"
+    elseif pinnedDiff ~= validTiers[1].id then
+      pinNote = "（首选有效档 " .. validTiers[1].id .. " 钉不上，改钉 " .. pinnedDiff .. "）"
     else
       pinNote = ""
+    end
+    if #skipKeys > 0 then
+      pinNote = pinNote .. "（跳过档=" .. table.concat(skipKeys, "/") .. "）"  -- 1.0.21：无效档跳过注记
     end
     msg(string.format("%s · %s：难度档快照=%s 过滤器[%s]%s",
       label, tostring(iname), tostring(okR and curD or "?"), lootFilterSnapshotText(), pinNote))
@@ -936,7 +1070,9 @@ local function exportInstances(isRaid, label, tierOn, done, abortFlag, onProgres
         err(string.format("%s · %s：全 BOSS 枚举重试后仍 0 件掉落，判空实例跳过——非正常默认（若非预期请截图反馈顾问侧）", label, tostring(iname)))
       else
         seenInstances[#seenInstances + 1] = { name = iname, items = totalItems }
-        instances[#instances + 1] = { instanceID = instanceID, instance = iname, bosses = bosses }
+        instances[#instances + 1] = { instanceID = instanceID, instance = iname, bosses = bosses,
+                                      validTiers = (#validTiers > 0) and validTiers or nil,
+                                      noDiff = tierOn and (#validTiers == 0) or nil }  -- 1.0.21：有效档/无难度维随实例入阶段二
       end
       enumInstance()
     end
@@ -947,12 +1083,11 @@ local function exportInstances(isRaid, label, tierOn, done, abortFlag, onProgres
       bi = bi + 1
       local bname, _, encounterID = EJ_GetEncounterInfoByIndex(bi, instanceID)
       if not bname then finishInstance() return end
-      -- 1.0.19（BUG-096 转码）：读回校验/重试 3 次/selectFail 空占位链整撤——枚举改显式
-      -- encounterIndex 传参，选中态退出归因关键路径；EJ_SelectEncounter 调用保留
-      -- （维持列表重建钩子时序与手册界面态，结果不再读回校验）
+      -- 1.0.22（BUG-097 转码回滚）：枚举回滚选中态单参（1.0.19 双参=第二参语义误读，撤）；
+      -- EJ_SelectEncounter 重回归因关键路径，串 BOSS 防护=enumBossItems 内逐件 encounterID 比对
       pcall(EJ_SelectEncounter, encounterID)
-      -- F2：选 BOSS 后列表异步重建，过钩子再枚举（0 件重试与 itemID 去重见 enumBossItems）
-      whenLootListFresh(function() enumBossItems(iname, bosses, bname, encounterID, bi, 1, nextEnumBoss) end)
+      -- F2：选 BOSS 后列表异步重建，过钩子再枚举（0 件/串表重试与 itemID 去重见 enumBossItems）
+      whenLootListFresh(function() enumBossItems(iname, bosses, bname, encounterID, 1, nextEnumBoss) end)
     end
     -- F2：选本/钉档/清过滤器后先等列表重建完成，再进 BOSS 循环
     whenLootListFresh(nextEnumBoss)
@@ -978,7 +1113,7 @@ local function exportInstances(isRaid, label, tierOn, done, abortFlag, onProgres
       -- G1 查证（BUG-096③）：重建钩子健康度段尾汇总——超时放行占比≈100% 即坐实恒 true 嫌疑
       msg(string.format("%s段重建钩子统计（G1 查证）：%s", label, lootFreshStatsText()))
       finalize()
-      done(out, { seen = seenInstances, abnormal = segmentAbnormal, sanity = sanityNotes })
+      done(out, { seen = seenInstances, abnormal = segmentAbnormal, sanity = sanityNotes, emptyBosses = emptyBosses })
       return
     end
     local bossesOut = {}
@@ -991,7 +1126,8 @@ local function exportInstances(isRaid, label, tierOn, done, abortFlag, onProgres
         out[#out + 1] = { instance = inst.instance, bosses = bossesOut }
         local cnt = 0
         for _, b2 in ipairs(bossesOut) do cnt = cnt + #b2.loot end
-        msg(string.format("%s：%s（%d 个 BOSS，%d 件掉落）", label, inst.instance, #bossesOut, cnt))
+        msg(string.format("%s：%s（%d 个 BOSS，%d 件掉落）%s", label, inst.instance, #bossesOut, cnt,
+          inst.noDiff and "（无难度维·normal 单档）" or ""))  -- 1.0.21：世界首领类实例注记
         if onProgress then pcall(onProgress, out) end  -- 1.0.13（D7）：每实例收尾即落表，断链零留存
         nextInstance()
         return
@@ -1022,12 +1158,23 @@ local function exportInstances(isRaid, label, tierOn, done, abortFlag, onProgres
             nextBoss()
           end
           if not tierOn or instSelOK == false then finishBoss() return end  -- 1.0.20①：实例选中不成立跳过档扫（已红字具名）
+          if inst.noDiff then
+            -- 1.0.21（BUG-094 终案）：无难度维实例（世界首领类，如至暗之夜）——无档可切，
+            -- 阶段二单趟基础采集产物直接记 normal 单档（与 1.0.15 数据形态连续，converter 零改）；
+            -- 无数值品类（纯特效饰品/杂项）天然不产档，与档扫「只记有数值的档」口径一致
+            for _, it in ipairs(loot) do
+              if it.primary_values and next(it.primary_values) then it.primary_tiers = { normal = it.primary_values } end
+              if it.secondary_values and next(it.secondary_values) then it.secondary_tiers = { normal = it.secondary_values } end
+            end
+            finishBoss() return
+          end
           -- ④BUG-085：难度档重扫纳入就绪门——全件预热+逐件确认后才扫，未就绪件 notReady 单列
           whenAllReady(loot, function(notReady)
             if aborted() then finalize() return end
             tierOpts.encounterID = b.encounterID  -- 1.0.14（D4）：陈旧列表校验键逐 BOSS 注入
             -- 1.0.14：collectTiers 异步化（签名带 done 回调），扫描异常走 stats.hardFail 不再抛 pcall
-            collectTiers(loot, tierSet, tierOpts, function(stats)
+            -- 1.0.21：档表=本实例阶段一自适应探测产物（只扫有效档；无效档已快照注记「跳过档=key」）
+            collectTiers(loot, inst.validTiers or tierSet, tierOpts, function(stats)
               if aborted() then finalize() return end
               if stats.hardFail then
                 -- 硬失败（扫描体抛错）：保留 strip（档值可能半身不遂）但先报已带档件数留证
@@ -1044,17 +1191,19 @@ local function exportInstances(isRaid, label, tierOn, done, abortFlag, onProgres
               elseif stats.tiered == 0 and #loot > 0 then
                 bossNoTier = bossNoTier + 1
                 -- ⑤BUG-084 分案报错（1.0.14 口径更新）：陈旧列表跳档 / 稀疏表缺 link / 当档列表全缺席 / 0 档值
+                -- 1.0.21（BUG-094 终案）：有效档>0 而整 BOSS 0 带档降格黄字判异常（档已自适应
+                -- 探测只扫有效档，0 带档多为数据侧无静态值而非通道故障；hardFail/switchFail 维持红字）
                 if stats.staleSkip then
-                  err(string.format("%s · %s：档通道异常——切档后列表整表陈旧（重试 2 次仍残留，跳档=%s），本 BOSS 档值不产出（采集侧，请截图反馈顾问侧）",
+                  msg(string.format("%s · %s：整 BOSS 0 带档判异常（黄字）——切档后列表整表陈旧（重试 2 次仍残留，跳档=%s），本 BOSS 档值不产出（请截图反馈顾问侧）",
                     inst.instance, b.boss, stats.staleSkip))
                 elseif stats.scanned == 0 and stats.noLink > 0 then
-                  err(string.format("%s · %s：档通道异常——12.x 稀疏表缺 link 字段（%d 件次，数据源缺字段只能回退，物品 ID 见导出文件报顾问评估）",
+                  msg(string.format("%s · %s：整 BOSS 0 带档判异常（黄字）——12.x 稀疏表缺 link 字段（%d 件次，数据源缺字段只能回退，物品 ID 见导出文件报顾问评估）",
                     inst.instance, b.boss, stats.noLink))
                 elseif stats.scanned == 0 and stats.absent > 0 then
-                  err(string.format("%s · %s：档通道异常——当档掉落列表枚举到但本 BOSS 物品全不在列（absent=%d 件次，疑列表错位残留/数据源缺），请截图反馈顾问侧",
+                  msg(string.format("%s · %s：整 BOSS 0 带档判异常（黄字）——当档掉落列表枚举到但本 BOSS 物品全不在列（absent=%d 件次，疑列表错位残留/数据源缺），请截图反馈顾问侧",
                     inst.instance, b.boss, stats.absent))
                 else
-                  err(string.format("%s · %s：档通道 0 件出档值（scanned=%d 无静态值=%d 未就绪=%d scanFail=%d）——疑全为无静态属性品类或冷缓存空 tooltip",
+                  msg(string.format("%s · %s：整 BOSS 0 带档判异常（黄字）——0 件出档值（scanned=%d 无静态值=%d 未就绪=%d scanFail=%d）——疑全为无静态属性品类或冷缓存空 tooltip",
                     inst.instance, b.boss, stats.scanned, stats.noValue, notReady, stats.scanFail))
                 end
               else
@@ -1170,7 +1319,7 @@ local function doExport(kind)
     tierOn = tierChannelAvailable()
     dump.meta.tier_channel = tierOn and "ej-link" or "unavailable"
     if tierOn then
-      msg("四难度档采集已启用（插件 v" .. ADDON_VERSION .. "）：随机/普通/英雄/史诗逐档切档重扫，时长约为单档 4 倍属预期，请耐心等待")
+      msg("难度档采集已启用（插件 v" .. ADDON_VERSION .. "）：按实例自适应探测有效档（随机/普通/英雄/史诗），无效档跳过注记、无难度维实例（世界首领类）单趟采集记 normal 单档，时长数倍于单档属预期，请耐心等待")
     else
       err("四档采集通道不可用（EJ_SetDifficulty/EJ_GetDifficulty 或 GetLootInfoByIndex 缺失），本次回退单档采集，tiers 不产出——请截图反馈顾问侧")
     end
@@ -1184,7 +1333,7 @@ local function doExport(kind)
     dungeonTierOn = tierChannelAvailable()
     dump.meta.dungeon_tier_channel = dungeonTierOn and "ej-link" or "unavailable"
     if dungeonTierOn then
-      msg("大秘境难度档采集已启用（插件 v" .. ADDON_VERSION .. "，REQ-118）：普通/英雄/史诗/时空漫游逐档探测（因本而异），特效读史诗档，M+ 免毒咒判定")
+      msg("大秘境难度档采集已启用（插件 v" .. ADDON_VERSION .. "，REQ-118）：普通/英雄/史诗/时空漫游按实例有效档自适应探测（因本而异，无效档跳过注记），特效读史诗档，M+ 免毒咒判定")
     else
       err("大秘境难度档通道不可用，本次回退平面单档采集（特效/档值不产出）——请截图反馈顾问侧")
     end
@@ -1234,20 +1383,25 @@ local function doExport(kind)
         function(out) beat() dump.dungeons = out commitPartial() end)
     end }
   end
-  -- 冒烟模式（1.0.17，顾问增补②）：只扫至暗之夜第 1 BOSS + 毒牙祭坛第 1 BOSS，
-  -- 采集/解析/档扫/黄字全要素与全量同链，3 分钟出数——真机小循环：冒烟绿→全量 A/B，冒烟红→直接打回
+  -- 冒烟模式（1.0.17，顾问增补②）：采集/解析/档扫/黄字全要素与全量同链——真机小循环：
+  -- 冒烟绿→全量 A/B，冒烟红→直接打回
+  -- 1.0.21（BUG-094 终案）：团本目标至暗之夜→烈毒之渊——至暗之夜实证为无难度维世界首领
+  -- 整合类目（单趟 normal 单档，进不了档扫网），烈毒之渊四档全有效、lfr 路径进冒烟网
+  -- 1.0.22（BUG-097 堵门洞）：只测第 1 BOSS=097 穿网口（1.0.19~1.0.21 三版冒烟全绿全量全灭）——
+  -- 团本目标改烈毒之渊全 8 BOSS（判据 114±4 件，与 V15 同口径，2 号位起枚举路径进网），
+  -- 大米目标毒牙祭坛前 2 BOSS（拉维 7/7+扭缠盘蛇>0）
   if kind == "smoke" then
     local afs = {}
     segs[#segs + 1] = { label = "冒烟·团本", abortFlag = afs, run = function(next)
       exportInstances(true, "冒烟·团本", tierOn, function(out) beat() dump.raids = out next() end, afs,
         function(out) beat() dump.raids = out commitPartial() end,
-        { name = "至暗之夜", maxBosses = 1 })
+        { name = "烈毒之渊", maxBosses = 8 })
     end }
     local afs2 = {}
     segs[#segs + 1] = { label = "冒烟·大秘境", abortFlag = afs2, run = function(next)
       exportInstances(false, "冒烟·大秘境", dungeonTierOn, function(out) beat() dump.dungeons = out next() end, afs2,
         function(out) beat() dump.dungeons = out commitPartial() end,
-        { name = "毒牙祭坛", maxBosses = 1 })
+        { name = "毒牙祭坛", maxBosses = 2 })
     end }
   end
   local si = 0
@@ -1283,6 +1437,8 @@ local function doExport(kind)
         -- WJDCLastCounts+红字点名；判空跳过的实例不计入覆写集（含 F4 零件门，口径吸收）。
         -- 违规源：①段台账 0 件判空跳过 ②段实例数不足期望集（团本 3/大米 8）③基线具名实例本次缺席
         -- ④导出 0 件（解析全灭等）⑤BOSS 件数 sanity 异常；断链跑（meta.partial）同不覆写（1.0.13 口径）
+        -- 1.0.22（重开）：⑥空掉落占位 BOSS 具名（097 现场 30 个空占位红字却零违规的洞）
+        -- ⑦件数量级闸——每实例件数低于 EXPECTED_INSTANCE_FLOOR 下限即违规（097 类缺陷拦截）
         local violations = {}
         local skippedReport = {}
         for _, grp in ipairs({ { "团本", dump.raids }, { "大秘境", dump.dungeons } }) do
@@ -1299,6 +1455,18 @@ local function doExport(kind)
                     violations[#violations + 1] = "实例『" .. tostring(s.name) .. "』枚举 0 件（判空跳过）"
                     skippedReport[#skippedReport + 1] = { segment = segLabel, instance = s.name,
                       reason = s.reason or "全 BOSS 枚举重试后 0 件，判空跳过" }
+                  elseif s.items and s.items > 0 then
+                    -- ⑦量级闸：前缀匹配登记实例，低于下限即违规（未登记实例不判）
+                    local floors = EXPECTED_INSTANCE_FLOOR[segLabel]
+                    if floors then
+                      for _, f in ipairs(floors) do
+                        if tostring(s.name):find(f.match, 1, true) and s.items < f.floor then
+                          violations[#violations + 1] = "实例『" .. tostring(s.name) .. "』件数 " .. s.items
+                            .. " 低于量级闸下限 " .. f.floor .. "（097 类缺陷拦截）"
+                          break
+                        end
+                      end
+                    end
                   end
                 end
               end
@@ -1321,6 +1489,10 @@ local function doExport(kind)
                 violations[#violations + 1] = "BOSS 件数异常：" .. n
               end
             end
+            if rep and rep.emptyBosses and #rep.emptyBosses > 0 then
+              violations[#violations + 1] = segLabel .. "段空掉落占位 BOSS " .. #rep.emptyBosses
+                .. " 个：" .. table.concat(rep.emptyBosses, "、")
+            end
           end
         end
         for k, v in pairs(counts) do
@@ -1339,7 +1511,7 @@ local function doExport(kind)
         end
       end
       if kind == "smoke" then
-        msg("冒烟导出完成（至暗之夜第 1 BOSS + 毒牙祭坛第 1 BOSS；不落计数基线）——绿则连跑全量 A/B，红则截图打回")
+        msg("冒烟导出完成（烈毒之渊全 8 BOSS + 毒牙祭坛前 2 BOSS；不落计数基线）——绿则连跑全量 A/B，红则截图打回")
       end
       msg("已导出（run " .. tostring(dump.meta.run_id) .. "，" .. date("%Y-%m-%d %H:%M:%S") .. "），请 /reload 或退出游戏写入文件")
       msg("文件位置：WTF/Account/<你的账号名>/SavedVariables/WoWButlerExporter.lua")
@@ -1368,6 +1540,6 @@ SlashCmdList["WJDC"] = function(input)
   if cmd == "all" or cmd == "raid" or cmd == "mplus" or cmd == "tier" or cmd == "me" or cmd == "smoke" then
     doExport(cmd)
   else
-    msg("用法：/wjdc all（全量）| raid（团本）| mplus（大秘境）| smoke（冒烟：至暗之夜+毒牙祭坛各第 1 BOSS）| me（本人角色档案）| probe [团本序号|物品ID|hover]（诊断）")
+    msg("用法：/wjdc all（全量）| raid（团本）| mplus（大秘境）| smoke（冒烟：烈毒之渊全 8 BOSS+毒牙祭坛前 2 BOSS）| me（本人角色档案）| probe [团本序号|物品ID|hover]（诊断）")
   end
 end
