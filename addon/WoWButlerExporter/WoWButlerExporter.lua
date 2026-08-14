@@ -138,8 +138,18 @@
 --     + 硬上限 60；单 BOSS>40 sanity 守卫保留作纯保险；
 --   ③冒烟文案按实态修正（实例在册已钉档，实态=采集 0 件判空跳过，非「未在手册枚举到」）；
 --   导出字段：boss.selectFail 随读回链整撤退役（1.0.18 新增字段未出过正式数据，零消费方））
+-- （1.0.20：1.0.19 冒烟半红打回三修（096 根治确认绿——selectFail 绝迹、鲁阿夏尔 8 件/拉维 7 件
+--   精确；094 域回归伤：鲁阿夏尔「切档读回失败（lfr/17 档）」0/8 带档，对照 1.0.17 冒烟同 BOSS
+--   8/8 全带档，回归由 1.0.18 合法性闸引入）——
+--   ①钉档/判合法前保证 instance 选中成立：EJ_SelectInstance + 无参 EJ_GetInstanceInfo() 第 1
+--     返回值名比对（wiki 明载）——EJ_IsValidInstanceDifficulty 以当前选中实例为判定对象，
+--     而实例选中从不复位（无 deselect API），闸在错误对象上判 17 不合法即本回归根因
+--     （显式枚举不依赖选中态故件数全对、档值全丢，现形特征吻合）；
+--   ②闸判否分支不静默：黄字印「IsValid(档)=false @ 当前实例=X」；
+--   ③「切档读回失败」信息增强三要素：当前实例名+IsValid 值+读回值；
+--   导出字段格式零改动）
 -- ============================================================
-local ADDON_VERSION = "1.0.19"
+local ADDON_VERSION = "1.0.20"
 
 local function msg(s) DEFAULT_CHAT_FRAME:AddMessage("|cffffd200[wjdc]|r " .. s) end
 local function err(s) DEFAULT_CHAT_FRAME:AddMessage("|cffff4040[wjdc]|r " .. s) end
@@ -343,11 +353,43 @@ end
 -- Gethe/wow-ui-source live@12.1.0 逐字复核）；无该档实例被硬钉后掉落列表枚举全空
 -- （BUG-086 run2「团本无该档表全灭」同型；1.0.17 双跑至暗之夜/潮缚 0 件判空、大米段全灭）。
 -- 返回 nil = API 缺位/读不出（不明，调用方走旧行为）；true/false = 明确判定
+-- 1.0.20（094 域回归修）：本 API 以「当前选中实例」为判定对象——调用前必须保证 instance
+-- 选中成立（ensureInstanceSelected），否则闸在错误对象上误判（1.0.19 冒烟鲁阿夏尔 lfr/17
+-- 被误判不合法、0/8 带档实证）
 local function isDifficultyValidForInstance(diffID)
   if type(EJ_IsValidInstanceDifficulty) ~= "function" then return nil end
   local ok, valid = pcall(EJ_IsValidInstanceDifficulty, diffID)
   if not ok then return nil end
   return valid and true or false
+end
+
+-- 1.0.20（BUG-094 回归修三件套①②）：实例选中读回——EJ 实例选中从不复位（无 deselect API），
+-- 合法性闸/钉档的判定对象即当前选中实例，选中不成立则全链判错对象。
+-- 无参 EJ_GetInstanceInfo() 第 1 返回值 = 当前选中实例名（wiki 明载）。
+-- currentInstanceName 返回 nil = API 缺位/读不出；instanceSelectReadback 返回 nil = 读不出
+-- （不明，走旧行为）、true/false = 明确判定
+local function currentInstanceName()
+  if type(EJ_GetInstanceInfo) ~= "function" then return nil end
+  local ok, nm = pcall(EJ_GetInstanceInfo)
+  if not ok then return nil end
+  return nm
+end
+
+local function instanceSelectReadback(iname)
+  local nm = currentInstanceName()
+  if nm == nil then return nil end
+  return nm == iname and true or false
+end
+
+-- 钉档/判合法前保证选中成立：不符重选重读一次；true=选中成立，nil=读不出走旧行为，
+-- false=明确不符（调用方红字具名+按选中失败处置，不静默）
+local function ensureInstanceSelected(instanceID, iname)
+  for _ = 1, 2 do
+    pcall(EJ_SelectInstance, instanceID)
+    local rb = instanceSelectReadback(iname)
+    if rb ~= false then return rb end
+  end
+  return false
 end
 
 -- 锚档候选（首选在前）：单难度本（世界 BOSS 型等）首选档无效时按序改钉首个合法档；
@@ -357,7 +399,12 @@ local DUNGEON_ANCHOR_CANDIDATES = { 23, 2, 1, 24 }    -- 首选史诗
 
 local function pinInstanceDifficulty(candidates)
   for _, d in ipairs(candidates) do
-    if isDifficultyValidForInstance(d) ~= false then
+    local valid = isDifficultyValidForInstance(d)
+    if valid == false then  -- 1.0.20②：闸判否不静默——黄字具名判定对象（当前选中实例）
+      msg(string.format("IsValid(%d)=false @ 当前实例=%s——跳过该档钉设（1.0.20 闸否明示）",
+        d, tostring(currentInstanceName() or "?")))
+    end
+    if valid ~= false then
       local okSet = pcall(EJ_SetDifficulty, d)
       local okGet, cur = pcall(EJ_GetDifficulty)
       if okSet and okGet and cur == d then return d end
@@ -597,18 +644,27 @@ local function collectTiers(loot, tiers, opts, done)
     if not tier then finish() return end
     -- BUG-094（1.0.18）：切档合法性闸——该档对本实例无效时不发 EJ_SetDifficulty
     -- （暴雪 :768/:3564 同型守卫），视同读回不符走既有 tierSkip/switchFail 处置
-    local invalid = isDifficultyValidForInstance(tier.id) == false
-    local okSet, okGet, cur = true, true, nil
+    -- 1.0.20②③：闸判否黄字明示判定对象；读回证据闸否也取（只读无害）；
+    -- switchFail 携带三要素（当前实例名+IsValid 值+读回值）
+    local valid = isDifficultyValidForInstance(tier.id)
+    local invalid = valid == false
+    if invalid then
+      msg(string.format("IsValid(%s/%d)=false @ 当前实例=%s——该档视同读回不符（1.0.20 闸否明示）",
+        tier.key, tier.id, tostring(currentInstanceName() or "?")))
+    end
+    local okSet = true
     if not invalid then
       okSet = pcall(EJ_SetDifficulty, tier.id)
-      okGet, cur = pcall(EJ_GetDifficulty)
     end
+    local okGet, cur = pcall(EJ_GetDifficulty)
     if invalid or not okSet or not okGet or cur ~= tier.id then
       if opts.skipBadTier then
         stats.tierSkip = (stats.tierSkip and (stats.tierSkip .. ",") or "") .. tier.key  -- 大米档因本而异，跳过续扫
         nextTier()
       else
-        stats.switchFail = tier.key .. "/" .. tostring(tier.id)
+        stats.switchFail = string.format("%s/%d（当前实例=%s，IsValid=%s，读回=%s）",
+          tier.key, tier.id, tostring(currentInstanceName() or "?"),
+          tostring(valid), tostring(okGet and cur or "?"))
         finish()  -- 团本切档失败=通道异常，终止本 BOSS 余档但保留已采（BUG-083：不再整 BOSS 判死）
       end
       return
@@ -832,14 +888,25 @@ local function exportInstances(isRaid, label, tierOn, done, abortFlag, onProgres
     end
     -- 实例级 pcall 只兜同步段（选本/钉档/清过滤器），中断红字具名（实例名+原因+恢复建议），跳过本实例不拖垮整段
     local pinnedDiff
+    local selFail = false
     local okI, eI = pcall(function()
-      EJ_SelectInstance(instanceID)
+      -- 1.0.20①：钉档/判合法前保证 instance 选中成立（闸的判定对象=当前选中实例）；
+      -- 选中明确不成立则不钉不判（防闸在错误对象上误判），pcall 外红字具名跳过本实例
+      selFail = ensureInstanceSelected(instanceID, iname) == false
+      if selFail then return end
       pinnedDiff = pinInstanceDifficulty(anchorCandidates)  -- ②REQ-119①+BUG-094：合法性闸后钉首个合法锚档
       resetLootFilter()  -- BUG-091（E1）：每实例枚举前再清过滤器（段首已清，此处兜底防中段污染）
     end)
     if not okI then
       seenInstances[#seenInstances + 1] = { name = iname, items = 0, skipped = true, reason = "实例枚举中断（pcall 捕获）" }  -- BUG-095：中断实例同入台账，gating 点名不漏
       err(string.format("%s · %s：实例枚举中断（%s）——跳过本实例，恢复建议：/reload 后重跑", label, tostring(iname), tostring(eI)))
+      enumInstance()
+      return
+    end
+    if selFail then  -- 1.0.20①：选中读回明确不符——入台账跳过（显式枚举的 bossIndex 亦以当前选中实例为域，不硬采错对象）
+      seenInstances[#seenInstances + 1] = { name = iname, items = 0, skipped = true, reason = "实例选中读回不符（重试 2 次）" }
+      err(string.format("%s · %s：实例选中读回不符（当前选中=%s，重试 2 次）——跳过本实例（防闸/枚举判错对象），恢复建议：/reload 后重跑，截图反馈顾问侧",
+        label, tostring(iname), tostring(currentInstanceName() or "?")))
       enumInstance()
       return
     end
@@ -929,11 +996,15 @@ local function exportInstances(isRaid, label, tierOn, done, abortFlag, onProgres
         nextInstance()
         return
       end
-      -- 重设 EJ 选中态：collectTiers 的 GetLootInfoByIndex 序号语义依赖当前选中 BOSS（1.0.12 补 pcall 防炸链）
-      -- 1.0.19（BUG-096 转码）：读回校验整撤——阶段一枚举已改显式 encounterIndex 传参不依赖
-      -- 选中态；此处选中仅为 collectTiers 档扫服务，结果不再校验（选中未生效时档扫由陈旧列表/
-      -- 缺席口径分案报错兜底，见 stats.staleSkip/absent 分支）
-      pcall(EJ_SelectInstance, inst.instanceID)
+      -- 1.0.20①：档扫前保证 instance 选中成立（合法性闸判定对象=当前选中实例；1.0.19 冒烟
+      -- 鲁阿夏尔 lfr/17 闸误判 0/8 带档实证）；明确不符=本 BOSS 档值不产出（掉落照录），不静默
+      local instSelOK = ensureInstanceSelected(inst.instanceID, inst.instance)
+      if instSelOK == false then
+        err(string.format("%s · %s：实例选中读回不符（当前选中=%s，重试 2 次）——本 BOSS 档值不产出（掉落照录），恢复建议：/reload 后重跑，截图反馈顾问侧",
+          inst.instance, b.boss, tostring(currentInstanceName() or "?")))
+        bossNoTier = bossNoTier + 1
+      end
+      -- 重设 encounter 选中态：collectTiers 的 GetLootInfoByIndex 序号语义依赖当前选中 BOSS（1.0.12 补 pcall 防炸链）
       pcall(EJ_SelectEncounter, b.encounterID)
       local loot, failed = {}, {}
       local k = 0
@@ -950,7 +1021,7 @@ local function exportInstances(isRaid, label, tierOn, done, abortFlag, onProgres
             bossesOut[#bossesOut + 1] = { boss = b.boss, loot = loot, failed = failed }
             nextBoss()
           end
-          if not tierOn then finishBoss() return end
+          if not tierOn or instSelOK == false then finishBoss() return end  -- 1.0.20①：实例选中不成立跳过档扫（已红字具名）
           -- ④BUG-085：难度档重扫纳入就绪门——全件预热+逐件确认后才扫，未就绪件 notReady 单列
           whenAllReady(loot, function(notReady)
             if aborted() then finalize() return end
@@ -968,7 +1039,7 @@ local function exportInstances(isRaid, label, tierOn, done, abortFlag, onProgres
                 bossNoTier = bossNoTier + 1
               elseif stats.switchFail then
                 bossNoTier = bossNoTier + 1
-                err(string.format("%s · %s：切档读回失败（%s 档）——已采部分档值保留（%d 件带档），不再整 BOSS 回退（1.0.12）",
+                err(string.format("%s · %s：切档读回失败（%s）——已采部分档值保留（%d 件带档），不再整 BOSS 回退（1.0.12；1.0.20 起附当前实例/IsValid/读回三要素）",
                   inst.instance, b.boss, stats.switchFail, stats.tiered))
               elseif stats.tiered == 0 and #loot > 0 then
                 bossNoTier = bossNoTier + 1
