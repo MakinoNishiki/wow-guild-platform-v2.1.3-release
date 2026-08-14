@@ -221,3 +221,5 @@
 
 * cloud.js 中写入操作通过 `dbInsert/dbUpdate/dbDelete` 代理函数，读取操作直接使用 Supabase SDK
 
+* 插件真机验收工作流（2026-08-14 运营定，游戏目录 `C:\Azeroth\World of Warcraft\_retail_\`）：①每次验收前先 diff 游戏目录 `Interface\AddOns\WoWButlerExporter` 与仓库 `addon/WoWButlerExporter`，版本/内容不一致直接喊停，先同步再跑；②跑完直读 `WTF\Account\208457004#1\SavedVariables\WoWButlerExporter.lua`（多账号取最新落盘，免上传）；③本地校验 `node scripts/validate-export.js`（零依赖 Node 直跑，自动定位最新导出文件，输出 V14-V17+V3/V6 预判清单+件数对账表，判据口径=运营测试步骤卡；❌ 退出码 1）——插件验收类完工报告必须附该脚本预判结果；④报错栈取证=BugSack 数据文件 `WTF\Account\<账号>\SavedVariables\!BugGrabber.lua`（BugSack.lua 仅为设置）
+
