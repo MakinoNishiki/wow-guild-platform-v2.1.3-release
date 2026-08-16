@@ -5,16 +5,19 @@
 //      且旧版本串零残留；④changelog 四条新条目在场（dungeon-journal-ilvl/stat-tier-fix/loot-ilvl/
 //      darknight-rollback）+ 1026-final date=2026-08-16；
 //      ⑤node --check js/app.js / js/dataPublic.js。
-//   B. 公开壳真浏览器（data.html 免登录）：「物品等级」tag 数=320（当前赛季 S2 全量非空）；
-//      乌拉特克卡片区全为「物品等级 344」；任一「物品等级 292」在场（sql/28 大米对标冒险手册史诗显示档）；
-//      零 JS 报错/零 404（物品图标 assets/icons/items/*.png 未入本仓库为既有环境缺口，另行列示不计入）；
+//   B. 公开壳真浏览器（data.html 免登录）：「物品等级」tag 数=318（当前赛季 S2 全量非空；sql/29 删 2 件）；
+//      乌拉特克卡片区 13 卡=344×12+蛰伏盘蛇珍玩 324×1（sql/29 兑换物档轨订正）；
+//      任一「物品等级 292」在场（sql/28 大米对标冒险手册史诗显示档）；零 JS 报错/零 404
+//      （物品图标 assets/icons/items/*.png 未入本仓库为既有环境缺口，另行列示不计入）；
 //      B3b. BUG-101 数值同档订正（sql/27）：觉醒外衣卡片 chips=敏捷+162/智力+162/急速+130/精通+58
 //      （装等 318 配史诗档值，Frankenstein 态视觉闭环）；
-//      B6. sql/28 注行三态：a 每张 292 大米卡带注行（注文含「冒险手册史诗显示档」）、b 团本卡无注行
-//      （觉醒外衣/乌拉特克）、c 切 S1 赛季卡双无（无装等 tag/无注行）。
-//   C. RPC 层：get_public_loot_detail 每行带 ilvl 键；当前赛季 total/has_key/non_null=320/320/320；
-//      S1 行 ilvl 全 null；抽断 乌拉特克=344 / S2 大米=292（sql/28）；
-//      C5. BUG-101：RPC 觉醒外衣 primary/secondary_values=史诗档值（162/162/130/58）。
+//      B6. sql/28 注行三态：a 每张 292 大米卡带注行（205 张，注文含「冒险手册史诗显示档」）、
+//      b 团本卡无注行（觉醒外衣/乌拉特克）、c 切 S1 赛季卡双无（无装等 tag/无注行）；
+//      B7. sql/29 删除件绝迹（无防咬手套/黎明之刃的战刃卡片）。
+//   C. RPC 层：get_public_loot_detail 每行带 ilvl 键；当前赛季 total/has_key/non_null=318/318/318；
+//      S1 行 ilvl 全 null；抽断 乌拉特克=344×12+珍玩 324 / S2 大米=292×205（sql/28+29）；
+//      C5. BUG-101：RPC 觉醒外衣 primary/secondary_values=史诗档值（162/162/130/58）；
+//      C6. sql/29：尖牙头盔 RPC values 全值 + 7 件 OID 置换齐套（service REST，RPC 白名单无 OID）+ 删除件绝迹。
 //   D. 数据中心主链路真浏览器实测（超管）：团本掉落（烈毒之渊/乌拉特克）T116 行 填344保存读回 →
 //      填0拦截（toast「物品等级必须为正整数」+弹窗不关+库内不变）→ 清空保存读回 null；
 //      大秘境掉落（毒牙祭坛整体池）T116 行 填292保存读回。
@@ -32,7 +35,7 @@ const PORT = 15816;
 const BASE = `http://localhost:${PORT}`;
 const PWD = 'T116-Test-2026!';
 const EMAIL = 't116-admin@wowbutler.cn';
-const VER = '20260816.63';
+const VER = '20260816.64';
 const BOSS_ID_WULATAKE = 'b9b78e39-bc74-48e4-9206-367bb7a59836'; // 烈毒之渊 8号 乌拉特克
 const DUNGEON_ID_DUYA = 'cd8ed84e-637b-403e-a2f6-360eafc00cdf';  // 毒牙祭坛
 const ITEM_BOSS = 'T116装等验收项坠';
@@ -162,10 +165,10 @@ async function cleanup() {
     const i = appSrc.indexOf(`id: '${id}'`);
     return i === -1 ? null : (appSrc.slice(i, i + 400).match(/date: '([^']+)'/) || [])[1] || null;
   };
-  check('A4 changelog：s2-dungeon-journal-ilvl / s2-stat-tier-fix / s2-loot-ilvl / s2-darknight-rollback 四条在场 + 1026-final date=2026-08-16',
-    clDate('v3.2.0-s2-dungeon-journal-ilvl') === '2026-08-16' && clDate('v3.2.0-s2-stat-tier-fix') === '2026-08-16' && clDate('v3.2.0-s2-loot-ilvl') === '2026-08-16' && clDate('v3.2.0-s2-darknight-rollback') === '2026-08-16'
+  check('A4 changelog：s2-temple-remnant-fix / s2-dungeon-journal-ilvl / s2-stat-tier-fix / s2-loot-ilvl / s2-darknight-rollback 五条在场 + 1026-final date=2026-08-16',
+    clDate('v3.2.0-s2-temple-remnant-fix') === '2026-08-16' && clDate('v3.2.0-s2-dungeon-journal-ilvl') === '2026-08-16' && clDate('v3.2.0-s2-stat-tier-fix') === '2026-08-16' && clDate('v3.2.0-s2-loot-ilvl') === '2026-08-16' && clDate('v3.2.0-s2-darknight-rollback') === '2026-08-16'
     && clDate('v3.2.0-addon-1026-final') === '2026-08-16',
-    `dj=${clDate('v3.2.0-s2-dungeon-journal-ilvl')} fix=${clDate('v3.2.0-s2-stat-tier-fix')} ilvl=${clDate('v3.2.0-s2-loot-ilvl')} rollback=${clDate('v3.2.0-s2-darknight-rollback')} 1026=${clDate('v3.2.0-addon-1026-final')}`);
+    `temple=${clDate('v3.2.0-s2-temple-remnant-fix')} dj=${clDate('v3.2.0-s2-dungeon-journal-ilvl')} fix=${clDate('v3.2.0-s2-stat-tier-fix')} ilvl=${clDate('v3.2.0-s2-loot-ilvl')} rollback=${clDate('v3.2.0-s2-darknight-rollback')} 1026=${clDate('v3.2.0-addon-1026-final')}`);
   const nc1 = spawnSync(process.execPath, ['--check', path.join(ROOT, 'js', 'app.js')], { encoding: 'utf8' });
   const nc2 = spawnSync(process.execPath, ['--check', path.join(ROOT, 'js', 'dataPublic.js')], { encoding: 'utf8' });
   check('A5 node --check js/app.js + js/dataPublic.js 语法通过', nc1.status === 0 && nc2.status === 0, `${nc1.status}/${nc2.status}`);
@@ -198,6 +201,11 @@ async function cleanup() {
       const noteTextOk = withNote.every(c => c.querySelector('.dp-item-note').textContent.includes('冒险手册史诗显示档'));
       const jxHasNote = !!(jx && jx.querySelector('.dp-item-note'));
       const wlkHasNote = wlkCards.some(c => c.querySelector('.dp-item-note'));
+      // sql/29：珍玩卡（乌拉特克片区唯一 324）取证 + 删除件绝迹取证
+      const zw = cards.find(c => ((c.querySelector('.dp-item-name') || {}).textContent || '').trim() === '蛰伏盘蛇珍玩');
+      const zw324 = !!(zw && [...zw.querySelectorAll('.dp-tag')].some(t => t.textContent.trim() === '物品等级 324'));
+      const cardHas = name => cards.some(c => ((c.querySelector('.dp-item-name') || {}).textContent || '').trim() === name);
+      const deletedGone = !cardHas('防咬手套') && !cardHas('黎明之刃的战刃');
       return {
         cards: cards.length, tags: tags.length,
         wlk: wlkCards.length, wlk344: wlk344.length,
@@ -205,20 +213,22 @@ async function cleanup() {
         season: sel && sel.selectedOptions[0] ? sel.selectedOptions[0].textContent : '?',
         jxTags,
         c292: c292.length, withNote: withNote.length, note292: note292.length, noteTextOk,
-        jxHasNote, wlkHasNote,
+        jxHasNote, wlkHasNote, zw324, deletedGone,
       };
     });
-    check('B1 公开壳「物品等级」tag 数 = 320（当前赛季全量非空）', b.tags === 320, `tag=${b.tags} 卡=${b.cards} 赛季=${b.season}`);
-    check('B2 烈毒之渊 8号 乌拉特克 卡片区全为「物品等级 344」', b.wlk > 0 && b.wlk344 === b.wlk, `乌拉特克卡=${b.wlk} 含344=${b.wlk344}`);
+    check('B1 公开壳「物品等级」tag 数 = 318（当前赛季全量非空；sql/29 删 2 件后 320→318）', b.tags === 318, `tag=${b.tags} 卡=${b.cards} 赛季=${b.season}`);
+    check('B2 烈毒之渊 8号 乌拉特克 卡片区 13 卡=344×12 + 蛰伏盘蛇珍玩 324×1（sql/29 兑换物档轨订正）',
+      b.wlk === 13 && b.wlk344 === 12 && b.zw324, `乌拉特克卡=${b.wlk} 含344=${b.wlk344} 珍玩324=${b.zw324}`);
     check('B3 任一大米卡片出现「物品等级 292」（sql/28 对标冒险手册史诗显示档）', b.any292);
     check('B3b BUG-101 同档订正：觉醒外衣 chips=敏捷+162/智力+162/急速+130/精通+58',
       ['敏捷+162', '智力+162', '急速+130', '精通+58'].every(x => (b.jxTags || []).includes(x)),
       `实得=${(b.jxTags || []).join('/')}`);
-    check('B6a 大米注行：注行卡=292 卡一一对应（每张 292 大米卡带注、注文含「冒险手册史诗显示档」）',
-      b.c292 > 0 && b.withNote === b.c292 && b.note292 === b.c292 && b.noteTextOk,
+    check('B6a 大米注行：注行卡=292 卡一一对应（205 张全带注、注文含「冒险手册史诗显示档」；sql/29 后 207→205）',
+      b.c292 === 205 && b.withNote === 205 && b.note292 === 205 && b.noteTextOk,
       `292卡=${b.c292} 注行卡=${b.withNote} 注行且292=${b.note292} 注文=${b.noteTextOk}`);
     check('B6b 团本卡无注行（觉醒外衣/乌拉特克片区 .dp-item-note 零渲染）', !b.jxHasNote && !b.wlkHasNote,
       `觉醒外衣注=${b.jxHasNote} 乌拉特克注=${b.wlkHasNote}`);
+    check('B7 sql/29 删除件绝迹：公开壳无防咬手套/黎明之刃的战刃卡片', b.deletedGone, `绝迹=${b.deletedGone}`);
     // B6c：切 S1 赛季——S1 卡双无（无装等 tag、无注行）
     const s1Val = await pageB.evaluate(() => {
       const sel = document.getElementById('dpSeasonSelect');
@@ -261,20 +271,39 @@ async function cleanup() {
   const s2 = rows.filter(r => r.season_id === currentSeasonId);
   const s1 = rows.filter(r => r.season_id !== currentSeasonId);
   check('C1 RPC 每行带 ilvl 键（白名单透出）', rows.length > 0 && rows.every(r => 'ilvl' in r), `行=${rows.length}`);
-  check('C2 当前赛季 total/has_key/non_null = 320/320/320',
-    s2.length === 320 && s2.filter(r => 'ilvl' in r).length === 320 && s2.filter(r => r.ilvl != null).length === 320,
+  check('C2 当前赛季 total/has_key/non_null = 318/318/318（sql/29 删 2 件后 320→318）',
+    s2.length === 318 && s2.filter(r => 'ilvl' in r).length === 318 && s2.filter(r => r.ilvl != null).length === 318,
     `${s2.length}/${s2.filter(r => 'ilvl' in r).length}/${s2.filter(r => r.ilvl != null).length}`);
   check('C3 S1 赛季行 ilvl 全 null（存量不回填）', s1.length > 0 && s1.every(r => r.ilvl === null), `S1 行=${s1.length}`);
   const wlkRpc = s2.filter(r => r.boss_name === '乌拉特克');
   const dungRpc = s2.filter(r => r.source === 'dungeon');
-  check('C4 抽断：乌拉特克 ilvl 全 344 + S2 大米 ilvl 全 292（sql/28）',
-    wlkRpc.length === 13 && wlkRpc.every(r => r.ilvl === 344) && dungRpc.length > 0 && dungRpc.every(r => r.ilvl === 292),
-    `乌拉特克=${wlkRpc.length}行 大米=${dungRpc.length}行`);
+  check('C4 抽断：乌拉特克 ilvl 344×12+珍玩 324（sql/29）+ S2 大米 ilvl 全 292（205 行）',
+    wlkRpc.length === 13 && wlkRpc.filter(r => r.ilvl === 344).length === 12
+    && wlkRpc.some(r => r.item_name === '蛰伏盘蛇珍玩' && r.ilvl === 324)
+    && dungRpc.length === 205 && dungRpc.every(r => r.ilvl === 292),
+    `乌拉特克=${wlkRpc.length}行(344×${wlkRpc.filter(r => r.ilvl === 344).length}) 大米=${dungRpc.length}行`);
   const jxRpc = s2.find(r => r.item_name === '觉醒外衣');
   check('C5 BUG-101 同档订正 RPC 层：觉醒外衣 values=敏捷162/智力162/急速130/精通58（sql/27）',
     !!(jxRpc && jxRpc.primary_values && jxRpc.primary_values['敏捷'] === 162 && jxRpc.primary_values['智力'] === 162
       && jxRpc.secondary_values && jxRpc.secondary_values['急速'] === 130 && jxRpc.secondary_values['精通'] === 58),
     jxRpc ? `P=${JSON.stringify(jxRpc.primary_values)} S=${JSON.stringify(jxRpc.secondary_values)}` : '未找到行');
+  // C6 sql/29：塞塔里斯 7 件订正后 RPC 抽查（尖牙头盔全值）+ 删除件 RPC 绝迹；
+  // OID 置换齐套走 service REST（RPC 白名单不含 official_item_id）
+  const jyRpc = s2.find(r => r.item_name === '塞塔里斯的尖牙头盔');
+  const deletedGoneRpc = !rows.some(r => r.item_name === '防咬手套' || r.item_name === '黎明之刃的战刃');
+  const TEMPLE7 = { '塞塔里斯的尖牙头盔': '239035', '蛇行神灵兜帽': '239033', '克拉西斯封印者肩铠': '239037', '巢穴净化者护肩': '239031', '堕落妖术师法衣': '239034', '沙漠卫士胸甲': '239036', '重生巨蛇长袍': '239032' };
+  const inList = encodeURIComponent('("' + Object.keys(TEMPLE7).join('","') + '")');
+  const templeRows = await svc('GET', `/rest/v1/dungeon_loot?select=item_name,official_item_id&item_name=in.${inList}`);
+  const templeGot = Array.isArray(templeRows.body) ? templeRows.body : [];
+  const templeOidOk = templeGot.length === 7 && Object.entries(TEMPLE7).every(([n, oid]) => {
+    const row = templeGot.find(r => r.item_name === n);
+    return row && String(row.official_item_id) === oid;
+  });
+  check('C6 sql/29：尖牙头盔 RPC values=敏捷128/智力128/爆击66/精通101 + 7 件 OID 置换齐套（service REST）+ 删除件 RPC 绝迹',
+    !!(jyRpc && jyRpc.primary_values && jyRpc.primary_values['敏捷'] === 128 && jyRpc.primary_values['智力'] === 128
+      && jyRpc.secondary_values && jyRpc.secondary_values['爆击'] === 66 && jyRpc.secondary_values['精通'] === 101)
+    && templeOidOk && deletedGoneRpc,
+    `尖牙=${jyRpc ? JSON.stringify(jyRpc.primary_values) + '/' + JSON.stringify(jyRpc.secondary_values) : '缺行'} OID齐套=${templeOidOk}(${templeGot.length}行) 删除绝迹=${deletedGoneRpc}`);
 
   // ==================== D. 数据中心主链路真浏览器实测 ====================
   // T116 样本行（boss 挂乌拉特克 / dungeon 挂毒牙祭坛整体池 boss_id=null）
