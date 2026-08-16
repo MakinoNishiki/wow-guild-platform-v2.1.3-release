@@ -7176,6 +7176,20 @@ function lootFillAssignedTo(idOrName) {
 // ==================== 更新日志 ====================
 const changelogData = [
   {
+    id: 'v3.2.0-s2-dungeon-journal-ilvl',
+    version: 'v3.2.0',
+    date: '2026-08-16',
+    type: 'refactor',
+    typeLabel: '模块调整',
+    title: '大米卡片装等对标冒险手册史诗显示档（292）',
+    summary: '运营终裁：大米卡片装等+数值全面对标冒险手册史诗显示档。sql/28_s2_dungeon_journal_ilvl 将 S2 八本 dungeon_loot ilvl 由 311 订正为 292（勇士 1/6 显示档，游戏内两截图实证，UPDATE 207 行精确吻合；与 sql/27 已订正的史诗档数值同档）；大米卡片数值区下方新增灰色小注「装等/数值=冒险手册史诗显示档；实际掉落随钥石层数与宏伟宝库提升」。团本/巢穴维持现状（已同档准确）不加注，S1 大米无装等不带注。',
+    details: [
+      'boss_loot 零触碰（烈毒 318/321/324/344、潮缚 318 维持）；S1 大米 221 行保持 NULL 不回填',
+      '插件 1.0.27 ilvl_tiers 回流后逐本复核，若某本 ≠ 292 按本微调（另起小批）',
+      '备份落 backup/2026-08-16-sql28/（四表全量 pg_dump）；回滚语句见 sql 文件头注释段'
+    ]
+  },
+  {
     id: 'v3.2.0-s2-stat-tier-fix',
     version: 'v3.2.0',
     date: '2026-08-16',

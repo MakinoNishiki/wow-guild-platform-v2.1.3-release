@@ -338,6 +338,9 @@
    WP4（2026-08-09 灰色系对比度整改）：文字色 var(--text-muted)=rgb(110,118,129) → rgb(150,158,170)
    ——卡片底色合成对比度 3.36→5.71（WCAG AA 4.5 实测）；选择器级落地（--text-muted 主应用全站在用，不动变量） */
 .dp-item-src { margin-top: auto; padding-top: 6px; line-height: 16px; font-size: 11px; color: rgb(150, 158, 170); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* 大米对标手册档小注（2026-08-16 运营终裁，sql/28）：仅 dungeon 卡且 ilvl 非空渲染（JS 侧条件），
+   灰色小字一行、可换行（注文较长不截断）；颜色同 .dp-item-src 整改后口径（WCAG AA 实测 5.71） */
+.dp-item-note { margin-top: 4px; line-height: 15px; font-size: 10.5px; color: rgb(150, 158, 170); }
 .dp-item-effect { margin-top: 6px; font-size: 12px; color: #1eff00; }
 
 .dp-tiers { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 10px; }

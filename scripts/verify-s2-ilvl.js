@@ -1,21 +1,23 @@
 // S2-装等批次 子批A 验收（REQ-116）：boss_loot/dungeon_loot.ilvl 全链路
 // 覆盖（任务口径）：
 //   A. 静态断言：①dataPublic.js ilvl meta tag 渲染行+REQ-116 同档绑定注释；②app.js 双表单 ilvl 字段/
-//      正整数校验/payload 恒携带（各 ×2）；③两壳版本串 20260816.62 计数（index 11 / data 7，含顶部注释）
-//      且旧串 20260811.61 零残留；④changelog 三条新条目在场（stat-tier-fix/loot-ilvl/darknight-rollback）
-//      + 1026-final date=2026-08-16；
+//      正整数校验/payload 恒携带（各 ×2）；③两壳版本串 20260816.63 计数（index 11 / data 7，含顶部注释）
+//      且旧版本串零残留；④changelog 四条新条目在场（dungeon-journal-ilvl/stat-tier-fix/loot-ilvl/
+//      darknight-rollback）+ 1026-final date=2026-08-16；
 //      ⑤node --check js/app.js / js/dataPublic.js。
 //   B. 公开壳真浏览器（data.html 免登录）：「物品等级」tag 数=320（当前赛季 S2 全量非空）；
-//      乌拉特克卡片区全为「物品等级 344」；任一「物品等级 311」在场；零 JS 报错/零 404
-//      （物品图标 assets/icons/items/*.png 未入本仓库为既有环境缺口，另行列示不计入）；
+//      乌拉特克卡片区全为「物品等级 344」；任一「物品等级 292」在场（sql/28 大米对标冒险手册史诗显示档）；
+//      零 JS 报错/零 404（物品图标 assets/icons/items/*.png 未入本仓库为既有环境缺口，另行列示不计入）；
 //      B3b. BUG-101 数值同档订正（sql/27）：觉醒外衣卡片 chips=敏捷+162/智力+162/急速+130/精通+58
-//      （装等 318 配史诗档值，Frankenstein 态视觉闭环）。
+//      （装等 318 配史诗档值，Frankenstein 态视觉闭环）；
+//      B6. sql/28 注行三态：a 每张 292 大米卡带注行（注文含「冒险手册史诗显示档」）、b 团本卡无注行
+//      （觉醒外衣/乌拉特克）、c 切 S1 赛季卡双无（无装等 tag/无注行）。
 //   C. RPC 层：get_public_loot_detail 每行带 ilvl 键；当前赛季 total/has_key/non_null=320/320/320；
-//      S1 行 ilvl 全 null；抽断 乌拉特克=344 / S2 大米=311；
+//      S1 行 ilvl 全 null；抽断 乌拉特克=344 / S2 大米=292（sql/28）；
 //      C5. BUG-101：RPC 觉醒外衣 primary/secondary_values=史诗档值（162/162/130/58）。
 //   D. 数据中心主链路真浏览器实测（超管）：团本掉落（烈毒之渊/乌拉特克）T116 行 填344保存读回 →
 //      填0拦截（toast「物品等级必须为正整数」+弹窗不关+库内不变）→ 清空保存读回 null；
-//      大秘境掉落（毒牙祭坛整体池）T116 行 填311保存读回。
+//      大秘境掉落（毒牙祭坛整体池）T116 行 填292保存读回。
 //   E. T116 数据/测试用户/公会清零复核；逐项 ✓/✗ 汇总，任一 ✗ 退出码 1。
 // 用法: node scripts/verify-s2-ilvl.js（PW_CHANNEL=chrome 可选）
 // 截图输出 backup/2026-08-16-s2-ilvl/
@@ -30,7 +32,7 @@ const PORT = 15816;
 const BASE = `http://localhost:${PORT}`;
 const PWD = 'T116-Test-2026!';
 const EMAIL = 't116-admin@wowbutler.cn';
-const VER = '20260816.62';
+const VER = '20260816.63';
 const BOSS_ID_WULATAKE = 'b9b78e39-bc74-48e4-9206-367bb7a59836'; // 烈毒之渊 8号 乌拉特克
 const DUNGEON_ID_DUYA = 'cd8ed84e-637b-403e-a2f6-360eafc00cdf';  // 毒牙祭坛
 const ITEM_BOSS = 'T116装等验收项坠';
@@ -150,17 +152,20 @@ async function cleanup() {
     `字段=${cnt(appSrc, "{ key: 'ilvl', label: '物品等级', type: 'number' }")} 校验=${cnt(appSrc, '!Number.isInteger(out.ilvl) || out.ilvl <= 0')} payload=${cnt(appSrc, 'payload.ilvl = (out.ilvl === undefined) ? null : out.ilvl;')}`);
   const idxSrc = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
   const datSrc = fs.readFileSync(path.join(ROOT, 'data.html'), 'utf8');
-  const vIdx = (idxSrc.match(/20260816\.62/g) || []).length, vDat = (datSrc.match(/20260816\.62/g) || []).length;
-  check('A3 两壳版本串 20260816.62 计数（index=11 / data=7，含顶部注释）且旧串 .61 零残留',
-    vIdx === 11 && vDat === 7 && !idxSrc.includes('20260811.61') && !datSrc.includes('20260811.61'), `index=${vIdx} data=${vDat}`);
+  const vRe = new RegExp(VER.replace('.', '\\.'), 'g');
+  const vIdx = (idxSrc.match(vRe) || []).length, vDat = (datSrc.match(vRe) || []).length;
+  const staleIdx = (idxSrc.match(/\?v=\d{8}\.\d+/g) || []).filter(s => !s.includes(VER));
+  const staleDat = (datSrc.match(/\?v=\d{8}\.\d+/g) || []).filter(s => !s.includes(VER));
+  check(`A3 两壳版本串 ${VER} 计数（index=11 / data=7，含顶部注释）且旧版本串零残留`,
+    vIdx === 11 && vDat === 7 && staleIdx.length === 0 && staleDat.length === 0, `index=${vIdx} data=${vDat} 残留=${staleIdx.length}/${staleDat.length}`);
   const clDate = id => {
     const i = appSrc.indexOf(`id: '${id}'`);
     return i === -1 ? null : (appSrc.slice(i, i + 400).match(/date: '([^']+)'/) || [])[1] || null;
   };
-  check('A4 changelog：s2-stat-tier-fix / s2-loot-ilvl / s2-darknight-rollback 三条在场 + 1026-final date=2026-08-16',
-    clDate('v3.2.0-s2-stat-tier-fix') === '2026-08-16' && clDate('v3.2.0-s2-loot-ilvl') === '2026-08-16' && clDate('v3.2.0-s2-darknight-rollback') === '2026-08-16'
+  check('A4 changelog：s2-dungeon-journal-ilvl / s2-stat-tier-fix / s2-loot-ilvl / s2-darknight-rollback 四条在场 + 1026-final date=2026-08-16',
+    clDate('v3.2.0-s2-dungeon-journal-ilvl') === '2026-08-16' && clDate('v3.2.0-s2-stat-tier-fix') === '2026-08-16' && clDate('v3.2.0-s2-loot-ilvl') === '2026-08-16' && clDate('v3.2.0-s2-darknight-rollback') === '2026-08-16'
     && clDate('v3.2.0-addon-1026-final') === '2026-08-16',
-    `fix=${clDate('v3.2.0-s2-stat-tier-fix')} ilvl=${clDate('v3.2.0-s2-loot-ilvl')} rollback=${clDate('v3.2.0-s2-darknight-rollback')} 1026=${clDate('v3.2.0-addon-1026-final')}`);
+    `dj=${clDate('v3.2.0-s2-dungeon-journal-ilvl')} fix=${clDate('v3.2.0-s2-stat-tier-fix')} ilvl=${clDate('v3.2.0-s2-loot-ilvl')} rollback=${clDate('v3.2.0-s2-darknight-rollback')} 1026=${clDate('v3.2.0-addon-1026-final')}`);
   const nc1 = spawnSync(process.execPath, ['--check', path.join(ROOT, 'js', 'app.js')], { encoding: 'utf8' });
   const nc2 = spawnSync(process.execPath, ['--check', path.join(ROOT, 'js', 'dataPublic.js')], { encoding: 'utf8' });
   check('A5 node --check js/app.js + js/dataPublic.js 语法通过', nc1.status === 0 && nc2.status === 0, `${nc1.status}/${nc2.status}`);
@@ -186,20 +191,57 @@ async function cleanup() {
       const sel = document.getElementById('dpSeasonSelect');
       const jx = cards.find(c => ((c.querySelector('.dp-item-name') || {}).textContent || '').trim() === '觉醒外衣');
       const jxTags = jx ? [...jx.querySelectorAll('.dp-tag')].map(t => t.textContent.trim().replace(/\s+/g, '')) : [];
+      // 大米对标手册档（sql/28）：292 tag 卡 / 注行三态取证
+      const c292 = cards.filter(c => [...c.querySelectorAll('.dp-tag')].some(t => t.textContent.trim() === '物品等级 292'));
+      const withNote = cards.filter(c => c.querySelector('.dp-item-note'));
+      const note292 = withNote.filter(c => [...c.querySelectorAll('.dp-tag')].some(t => t.textContent.trim() === '物品等级 292'));
+      const noteTextOk = withNote.every(c => c.querySelector('.dp-item-note').textContent.includes('冒险手册史诗显示档'));
+      const jxHasNote = !!(jx && jx.querySelector('.dp-item-note'));
+      const wlkHasNote = wlkCards.some(c => c.querySelector('.dp-item-note'));
       return {
         cards: cards.length, tags: tags.length,
         wlk: wlkCards.length, wlk344: wlk344.length,
-        any311: tags.some(t => t.textContent.trim() === '物品等级 311'),
+        any292: tags.some(t => t.textContent.trim() === '物品等级 292'),
         season: sel && sel.selectedOptions[0] ? sel.selectedOptions[0].textContent : '?',
         jxTags,
+        c292: c292.length, withNote: withNote.length, note292: note292.length, noteTextOk,
+        jxHasNote, wlkHasNote,
       };
     });
     check('B1 公开壳「物品等级」tag 数 = 320（当前赛季全量非空）', b.tags === 320, `tag=${b.tags} 卡=${b.cards} 赛季=${b.season}`);
     check('B2 烈毒之渊 8号 乌拉特克 卡片区全为「物品等级 344」', b.wlk > 0 && b.wlk344 === b.wlk, `乌拉特克卡=${b.wlk} 含344=${b.wlk344}`);
-    check('B3 任一大米卡片出现「物品等级 311」', b.any311);
+    check('B3 任一大米卡片出现「物品等级 292」（sql/28 对标冒险手册史诗显示档）', b.any292);
     check('B3b BUG-101 同档订正：觉醒外衣 chips=敏捷+162/智力+162/急速+130/精通+58',
       ['敏捷+162', '智力+162', '急速+130', '精通+58'].every(x => (b.jxTags || []).includes(x)),
       `实得=${(b.jxTags || []).join('/')}`);
+    check('B6a 大米注行：注行卡=292 卡一一对应（每张 292 大米卡带注、注文含「冒险手册史诗显示档」）',
+      b.c292 > 0 && b.withNote === b.c292 && b.note292 === b.c292 && b.noteTextOk,
+      `292卡=${b.c292} 注行卡=${b.withNote} 注行且292=${b.note292} 注文=${b.noteTextOk}`);
+    check('B6b 团本卡无注行（觉醒外衣/乌拉特克片区 .dp-item-note 零渲染）', !b.jxHasNote && !b.wlkHasNote,
+      `觉醒外衣注=${b.jxHasNote} 乌拉特克注=${b.wlkHasNote}`);
+    // B6c：切 S1 赛季——S1 卡双无（无装等 tag、无注行）
+    const s1Val = await pageB.evaluate(() => {
+      const sel = document.getElementById('dpSeasonSelect');
+      const opt = sel ? [...sel.options].find(o => o.textContent.trim().startsWith('S1')) : null;
+      return opt ? opt.value : null;
+    });
+    if (!s1Val) {
+      check('B6c S1 卡双无（无装等 tag/无注行）', false, '赛季选择器无 S1 选项');
+    } else {
+      await pageB.selectOption('#dpSeasonSelect', s1Val);
+      await pageB.waitForSelector('#dpMain .dp-item', { state: 'visible', timeout: 20000 });
+      await sleep(1200);
+      const s1b = await pageB.evaluate(() => ({
+        cards: document.querySelectorAll('#dpMain .dp-item').length,
+        ilvlTags: [...document.querySelectorAll('#dpMain .dp-tag')].filter(t => t.textContent.trim().startsWith('物品等级')).length,
+        notes: document.querySelectorAll('#dpMain .dp-item-note').length,
+      }));
+      check('B6c S1 卡双无（无装等 tag/无注行）', s1b.cards > 0 && s1b.ilvlTags === 0 && s1b.notes === 0,
+        `S1卡=${s1b.cards} 装等tag=${s1b.ilvlTags} 注行=${s1b.notes}`);
+      // 切回 S2 供后续截图/取证（B4/B5 在 ctxB 关闭前另行评估，不受赛季影响，但保持现场纯净）
+      await pageB.selectOption('#dpSeasonSelect', { index: 0 }).catch(() => {});
+      await sleep(800);
+    }
     await pageB.screenshot({ path: path.join(SHOT_DIR, 'public-1366-ilvl-tags.png'), fullPage: false });
     // 乌拉特克分组滚动取证截图
     await pageB.evaluate(() => {
@@ -225,8 +267,8 @@ async function cleanup() {
   check('C3 S1 赛季行 ilvl 全 null（存量不回填）', s1.length > 0 && s1.every(r => r.ilvl === null), `S1 行=${s1.length}`);
   const wlkRpc = s2.filter(r => r.boss_name === '乌拉特克');
   const dungRpc = s2.filter(r => r.source === 'dungeon');
-  check('C4 抽断：乌拉特克 ilvl 全 344 + S2 大米 ilvl 全 311',
-    wlkRpc.length === 13 && wlkRpc.every(r => r.ilvl === 344) && dungRpc.length > 0 && dungRpc.every(r => r.ilvl === 311),
+  check('C4 抽断：乌拉特克 ilvl 全 344 + S2 大米 ilvl 全 292（sql/28）',
+    wlkRpc.length === 13 && wlkRpc.every(r => r.ilvl === 344) && dungRpc.length > 0 && dungRpc.every(r => r.ilvl === 292),
     `乌拉特克=${wlkRpc.length}行 大米=${dungRpc.length}行`);
   const jxRpc = s2.find(r => r.item_name === '觉醒外衣');
   check('C5 BUG-101 同档订正 RPC 层：觉醒外衣 values=敏捷162/智力162/急速130/精通58（sql/27）',
@@ -319,7 +361,7 @@ async function cleanup() {
     const rb3 = await readIlvl('boss_loot', ITEM_BOSS);
     check('D5 清空保存：toast「已保存」+ 读回 ilvl=null（清空=NULL 生效）', d5Toast && rb3 === null, `toast=${d5Toast} 读回=${JSON.stringify(rb3)}`);
 
-    // D6 大秘境掉落：毒牙祭坛整体池 T116 行 填 311 保存读回
+    // D6 大秘境掉落：毒牙祭坛整体池 T116 行 填 292 保存读回
     await page.click('#mdTabs .view-tab[data-mdtab="dungeonloot"]');
     await page.waitForSelector('#mdPanel select', { timeout: 15000 });
     await page.selectOption('#mdPanel select >> nth=0', { label: '毒牙祭坛' });
@@ -329,13 +371,13 @@ async function cleanup() {
     check('D6a 大秘境掉落列表定位 T116 行（毒牙祭坛/整体池）', bossSelVal === '' && dRowVisible === 1, `bossSel="${bossSelVal}" 行=${dRowVisible}`);
     await page.locator('#mdPanel tr', { hasText: ITEM_DUNG }).locator('button[title="编辑"]').click();
     await page.waitForFunction(modalOpen, null, { timeout: 10000 });
-    await page.fill('#mdField_ilvl', '311');
-    await page.screenshot({ path: path.join(SHOT_DIR, 'dc-dungeon-edit-311-modal.png'), fullPage: false });
+    await page.fill('#mdField_ilvl', '292');
+    await page.screenshot({ path: path.join(SHOT_DIR, 'dc-dungeon-edit-292-modal.png'), fullPage: false });
     await page.click('#mdEditorSaveBtn');
     const d6Toast = await toastSeen('已保存');
     await page.waitForFunction(() => !document.getElementById('mdEditorModal').classList.contains('show'), null, { timeout: 10000 }).catch(() => {});
     const rb4 = await readIlvl('dungeon_loot', ITEM_DUNG);
-    check('D6b 大米表单填 311 保存：toast「已保存」+ REST 读回 ilvl=311', d6Toast && rb4 === 311, `toast=${d6Toast} 读回=${rb4}`);
+    check('D6b 大米表单填 292 保存：toast「已保存」+ REST 读回 ilvl=292', d6Toast && rb4 === 292, `toast=${d6Toast} 读回=${rb4}`);
     await page.screenshot({ path: path.join(SHOT_DIR, 'dc-dungeon-after-save.png'), fullPage: false });
     await ctxD.close();
   } catch (e) {

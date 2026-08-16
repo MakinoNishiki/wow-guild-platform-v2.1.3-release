@@ -607,6 +607,9 @@
     // 【同档绑定（运营硬性前提，钉死）】装等显示档与 effect 数值必须同档——禁止「装等取 A 档、数值取 B 档」
     // 的混搭路径。当前单值结构天然满足（effect=史诗档实测文本、ilvl=史诗档静态表值）；日后若拆档
     // （多难度 ilvl_tiers），ilvl 取值档必须与 effect/tiers 取值档联动切换，单列单档语义不得走样。
+    // 2026-08-16 大米对标手册档（运营终裁，sql/28_s2_dungeon_journal_ilvl）：大米 ilvl=292=冒险手册
+    // 史诗显示档（勇士 1/6），数值区下方加灰色小注（.dp-item-note，source==='dungeon' 且 ilvl 非空才渲染，
+    // raid/lair 卡不加、S1 大米卡无装等不带注）；团本/巢穴维持现状已同档不加注。
     // P1（WP6 补丁）：卡盒样式挂 .dp-item-inner——hover 时 inner 转 absolute 向下生长，
     // 外层 .dp-item 由 JS 预设折叠态 minHeight 占位（仅溢出卡），网格不塌、生长部分覆盖下方卡片
     return `<div class="dp-item"><div class="dp-item-inner">
@@ -620,6 +623,7 @@
       </div>
       ${primHtml ? `<div class="dp-item-stats">${primHtml}</div>` : ''}
       ${secHtml ? `<div class="dp-item-stats">${secHtml}</div>` : ''}
+      ${(l.source === 'dungeon' && l.ilvl != null) ? `<div class="dp-item-note">装等/数值=冒险手册史诗显示档；实际掉落随钥石层数与宏伟宝库提升</div>` : ''}
       ${l.effect ? `<div class="dp-item-effect-wrap"><div class="dp-item-effect-preview">${esc(l.effect)}</div></div>` : ''}
       <div class="dp-item-src">${esc(srcParts.filter(Boolean).join(' · '))}</div>
     </div></div>`;
