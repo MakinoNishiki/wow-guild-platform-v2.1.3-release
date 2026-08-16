@@ -7176,9 +7176,50 @@ function lootFillAssignedTo(idOrName) {
 // ==================== 更新日志 ====================
 const changelogData = [
   {
+    id: 'v3.2.0-s2-stat-tier-fix',
+    version: 'v3.2.0',
+    date: '2026-08-16',
+    type: 'fix',
+    typeLabel: '问题修复',
+    title: 'S2 掉落卡片属性数值同档订正（BUG-101）',
+    summary: 'S2 掉落卡片属性 chips 原显示裸基底模板值（219 级，如觉醒外衣敏捷 65），与物品等级 318 混搭成 Frankenstein 态；正确史诗档值在 *_tiers->\'mythic\'。sql/27_s2_stat_tier_fix 四条 UPDATE 将主/副属性 *_values 订正为 *_tiers->\'mythic\'（mythic 键在场才动），范围仅 S2（烈毒之渊/潮缚石窟/S2 大米八本），UPDATE 80/83/181/173=主 261/副 256 与 dry-run 精确吻合；硬门复核：觉醒外衣=敏捷162/智力162/急速130/精通58、觉醒恐牙胸甲=敏捷207/智力207/爆击209。',
+    details: [
+      'effect/venomcurse/ilvl 字段零触碰；S1 行全库无 mythic 键（0/0）无档可回填，随批报备运营裁',
+      '跳过清单=塞塔里斯神庙 8 件（仅 legacy normal 档：防咬手套/克拉西斯封印者肩铠/堕落妖术师法衣/塞塔里斯的尖牙头盔/巢穴净化者护肩/沙漠卫士胸甲/蛇行神灵兜帽/重生巨蛇长袍），待插件 1.0.27 probe/游戏内取证补订',
+      '备份双份落 backup/2026-08-16-sql27/（四表 pg_dump+行级 JSON 可回插）；verify-s2-ilvl.js 27/27 含 B3b/C5 断言'
+    ]
+  },
+  {
+    id: 'v3.2.0-s2-loot-ilvl',
+    version: 'v3.2.0',
+    date: '2026-08-16',
+    type: 'feature',
+    typeLabel: '新增功能',
+    title: 'S2 赛季掉落数据公示上线 + 装备卡片物品等级（REQ-116）',
+    summary: 'S2 掉落数据 381 语句导入（sql/24_s2_loot_import）：烈毒之渊 101 件+潮缚石窟 12 件+S2 大米八本 207 件，公示页当前赛季 320 件（杂项/装饰/幻化按既定口径不入库 29 件）；装备卡片 meta 行新增「物品等级 X」（ilvl 非空才渲染，sql/26_s2_ilvl 静态表：烈毒按 BOSS 位次 318/321/324/344、潮缚全 318、S2 大米全 311，S1 存量不回填）；数据中心双掉落表单加「物品等级」录入框（可空、正整数校验）。',
+    details: [
+      '同档绑定（运营硬性前提，代码注释钉死）：装等显示档与 effect 数值必须同档——当前单值结构天然满足（effect=史诗档实测文本、ilvl=史诗档静态表值），日后拆档须联动切换',
+      '错名订正复核零残留（曱/帯 0 行）；icon 互换件已校正；毒咒标恰 8 行全挂乌拉特克',
+      '已知边界：2 件主手武器 slot 暂录「单手」+note 标注（库词表无主手词，前端词表支持后回迁）'
+    ]
+  },
+  {
+    id: 'v3.2.0-s2-darknight-rollback',
+    version: 'v3.2.0',
+    date: '2026-08-16',
+    type: 'refactor',
+    typeLabel: '模块调整',
+    title: '至暗之夜世界首领掉落回滚出库（sql/25_s2_darknight_rollback）',
+    summary: '运营终裁维持「世界BOSS掉落不入库」口径：至暗之夜 32 行 boss_loot 整体删除（含 08-06 遗留行），game_raids 至暗赛季回挂 S1；维度行（团本/BOSS）保留。至暗 type=world 本就被公开 RPC 剔除，公示页件数 320 零变化。',
+    details: [
+      '回滚依仗：四表全量 pg_dump + 至暗 32 行行级 JSON 备份（backup/2026-08-16-sql25/）',
+      '插件采集侧不受影响：至暗之夜仍按「无难度维（世界首领类）」单档采集留痕，仅不入库'
+    ]
+  },
+  {
     id: 'v3.2.0-addon-1026-final',
     version: 'v3.2.0',
-    date: '2026-08-15',
+    date: '2026-08-16',
     type: 'fix',
     typeLabel: '问题修复',
     title: '插件 1.0.26 定版：S2 掉落导出链真机全绿（BUG-094~099 六案收官）',
@@ -12846,7 +12887,11 @@ function mdEditLootItem(id) {
     { key: 'effect', label: '特效', type: 'textarea', placeholder: '装备：……（可空，多行）' },
     { key: 'venomcurse', label: '毒咒', type: 'select', options: [{ value: '', label: '无' }, { value: window.LootTaxonomy.VENOMCURSE_LABEL, label: window.LootTaxonomy.VENOMCURSE_LABEL }] },
     // REQ-092（任务书 #46 WP3）：图标ID（可空，空串由 mdEditorSave 统一转 NULL）；素材入库走 scripts/import-item-icons.js
-    { key: 'icon_id', label: '图标ID', type: 'number' }
+    { key: 'icon_id', label: '图标ID', type: 'number' },
+    // REQ-116（S2-装等批次）：物品等级（可空，正整数校验在 onSave）。
+    // 【同档绑定（运营硬性前提，钉死）】装等显示档与 effect 数值必须同档——禁止「装等取 A 档、数值取 B 档」
+    // 的混搭路径；当前单值结构天然满足（effect=史诗档实测文本、ilvl=史诗档静态表值），日后拆档须联动切换。
+    { key: 'ilvl', label: '物品等级', type: 'number' }
   ], row, async (out) => {
     // REQ-060：非法组合保存前弹提示确认（兜底优先，不硬拦；取消则中止保持弹窗）
     if (out.slot && out.item_type && MD_SLOT_TYPE_MAP[out.slot] && !MD_SLOT_TYPE_MAP[out.slot].includes(out.item_type)) {
@@ -12859,6 +12904,13 @@ function mdEditLootItem(id) {
     // REQ-092（任务书 #46）：icon_id 仅非空时携带——sql/29 迁移执行前（列不存在）保存链路保持可用（PGRST204 防护）；
     // 迁移后正常写入；「清空既有图标ID」需迁移执行后处理（登记遗留）
     if (out.icon_id !== null && out.icon_id !== undefined && out.icon_id !== '') payload.icon_id = out.icon_id;
+    // REQ-116（S2-装等批次）：ilvl 正整数校验（NaN/非整数/≤0 拦截）；sql/26 已随本批执行（列已在场），
+    // 故恒携带（清空=NULL 正常生效，无 icon_id 的迁移窗口遗留）
+    if (out.ilvl !== null && out.ilvl !== undefined && (!Number.isInteger(out.ilvl) || out.ilvl <= 0)) {
+      showToast('物品等级必须为正整数', 'error');
+      throw new Error('ilvl 校验失败');
+    }
+    payload.ilvl = (out.ilvl === undefined) ? null : out.ilvl;
     if (id) await MasterData.mdUpdate('boss_loot', payload, `id=eq.${id}`);
     else await MasterData.mdInsert('boss_loot', { boss_id: mdLootNav.bossId, ...payload });
     await MasterData.refresh('boss_loot');
@@ -12995,7 +13047,9 @@ function mdEditDungeonLootItem(id) {
     { key: 'effect', label: '特效', type: 'textarea', placeholder: '装备：……（可空，多行）' },
     { key: 'venomcurse', label: '毒咒', type: 'select', options: [{ value: '', label: '无' }, { value: window.LootTaxonomy.VENOMCURSE_LABEL, label: window.LootTaxonomy.VENOMCURSE_LABEL }] },
     // REQ-092（任务书 #46 WP3）：图标ID（可空，空串由 mdEditorSave 统一转 NULL）；素材入库走 scripts/import-item-icons.js
-    { key: 'icon_id', label: '图标ID', type: 'number' }
+    { key: 'icon_id', label: '图标ID', type: 'number' },
+    // REQ-116（S2-装等批次）：物品等级（可空，正整数校验在 onSave；同档绑定钉死同 boss_loot 表单注释）
+    { key: 'ilvl', label: '物品等级', type: 'number' }
   ], row, async (out) => {
     if (out.slot && out.item_type && MD_SLOT_TYPE_MAP[out.slot] && !MD_SLOT_TYPE_MAP[out.slot].includes(out.item_type)) {
       if (!confirm(`部位「${out.slot}」与类型「${out.item_type}」不是常见组合，仍要保存吗？`)) {
@@ -13006,6 +13060,12 @@ function mdEditDungeonLootItem(id) {
     const payload = { item_name: out.item_name, slot: out.slot, item_type: out.item_type, effect: out.effect, primary_stats: out.primary_stats, secondary_stats: out.secondary_stats, venomcurse: out.venomcurse };
     // REQ-092（任务书 #46）：icon_id 仅非空时携带（sql/29 迁移窗口 PGRST204 防护，同 boss_loot 口径）
     if (out.icon_id !== null && out.icon_id !== undefined && out.icon_id !== '') payload.icon_id = out.icon_id;
+    // REQ-116（S2-装等批次）：ilvl 正整数校验（NaN/非整数/≤0 拦截）；恒携带（清空=NULL 生效，同 boss_loot 口径）
+    if (out.ilvl !== null && out.ilvl !== undefined && (!Number.isInteger(out.ilvl) || out.ilvl <= 0)) {
+      showToast('物品等级必须为正整数', 'error');
+      throw new Error('ilvl 校验失败');
+    }
+    payload.ilvl = (out.ilvl === undefined) ? null : out.ilvl;
     if (id) await MasterData.mdUpdate('dungeon_loot', payload, `id=eq.${id}`);
     else await MasterData.mdInsert('dungeon_loot', {
       dungeon_id: mdDungeonLootNav.dungeonId,

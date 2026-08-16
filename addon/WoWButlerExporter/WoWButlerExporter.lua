@@ -226,8 +226,19 @@
 --   局部变量不触全局 stripLineCodes，影响面=本功能）；②模式回归严格版 ^史诗%s*毒咒%s*$
 --   （.- 版退役：剥码修好后两段间只剩 \n，%s* 足够误伤面最小）；dump/hex 豁免同步——
 --   命中后疑似 dump/hex 行自动消失（豁免生效=修复生效现场证据）；导出字段格式零改动）
+-- （1.0.27：BUG-100（P2）+REQ-116 副轨——
+--   ①BUG-100：伪实例（「史诗钥石地下城」，BUG-087 名表，段尾过滤在案）空占位不入 gating
+--     违规源——1.0.26 定版真机现形：其 2 空 BOSS 走同一空占位路径进 emptyBosses，误触发
+--     095 拒写基线（rep.seen 侧已有 s.pseudo 守卫，唯 emptyBosses 漏网）；修法=入列前一行级
+--     守卫 not PSEUDO_INSTANCE_NAMES[iname]，红字取证打印照旧保留不静默；
+--   ②REQ-116 副轨：难度档扫描成功分支补采每档装等 ilvl_tiers（当档 tooltip「物品等级 N」行，
+--     SetHyperlink 按 link 难度变体渲染=档位真值；GetItemInfo 第 4 返回值=基础装等不随档变、
+--     GetDetailedItemLevelInfo 已死，均不作档位装等源），供顾问侧交叉验证静态表；只加不改
+--     既有键（converter 天然兼容），纯特效饰品等无静态值品类同采；stripTiers 同抹保持一致；
+--   无难度维（世界首领类）normal 单档路径不补（无 link 扫描，且该类掉落不入库）；
+--   基础行既有 ilvl 字段与 parseStatLines 本体零改动）
 -- ============================================================
-local ADDON_VERSION = "1.0.26"
+local ADDON_VERSION = "1.0.27"
 
 local function msg(s) DEFAULT_CHAT_FRAME:AddMessage("|cffffd200[wjdc]|r " .. s) end
 local function err(s) DEFAULT_CHAT_FRAME:AddMessage("|cffff4040[wjdc]|r " .. s) end
@@ -637,7 +648,7 @@ local function whenLootListFresh(fn, attempt)
 end
 
 local function stripTiers(loot)
-  for _, it in ipairs(loot) do it.primary_tiers = nil it.secondary_tiers = nil end
+  for _, it in ipairs(loot) do it.primary_tiers = nil it.secondary_tiers = nil it.ilvl_tiers = nil end  -- 1.0.27：ilvl_tiers 同抹（hardFail 抹档一致性）
 end
 
 -- 逐 BOSS 难度档重扫（loot 行需带 li = GetLootInfoByIndex 序号，切档后按同序号重取该档 link）。
@@ -727,6 +738,18 @@ local function collectTiers(loot, tiers, opts, done)
           local d = { primary = {}, secondary = {}, primary_values = {}, secondary_values = {},
                       effect = "", venomcurse = "" }
           parseStatLines(lines, d)
+          -- 1.0.27（REQ-116 副轨）：补采每档装等 ilvl_tiers——来源=当档 tooltip「物品等级 N」行
+          -- （SetHyperlink 按 link 难度变体渲染，tooltip 为档位真值；GetItemInfo 第 4 返回值=基础装等
+          -- 不随档变、GetDetailedItemLevelInfo 已死（:936 在案），均不作档位装等源）。只加不改既有键
+          -- （converter 天然兼容）；纯特效饰品等无静态值品类同采（交叉验证需覆盖饰品）
+          for _, rawL in ipairs(lines) do
+            local iv = stripLineCodes(rawL):match("^物品等级%s*(%d+)%s*$")
+            if iv then
+              it.ilvl_tiers = it.ilvl_tiers or {}
+              it.ilvl_tiers[tier.key] = tonumber(iv)
+              break
+            end
+          end
           -- 只记有数值的档：无静态属性的品类（纯特效饰品/杂项）天然空档，计 noValue 单列
           if next(d.primary_values) then
             it.primary_tiers = it.primary_tiers or {}
@@ -1026,7 +1049,11 @@ local function exportInstances(isRaid, label, tierOn, done, abortFlag, onProgres
       return
     end
     if #items == 0 then
-      emptyBosses[#emptyBosses + 1] = tostring(iname) .. "·" .. tostring(bname)  -- BUG-095：空占位具名入 gating 违规源
+      -- 1.0.27（BUG-100）：伪实例（BUG-087 名表，段尾过滤）空占位不入 gating 违规源——
+      -- 1.0.26 定版真机现形：其 2 空 BOSS 占位误触发 095 拒写基线；红字取证打印照旧
+      if not PSEUDO_INSTANCE_NAMES[iname] then
+        emptyBosses[#emptyBosses + 1] = tostring(iname) .. "·" .. tostring(bname)  -- BUG-095：空占位具名入 gating 违规源
+      end
       if foreign > 0 then
         err(string.format("%s · %s：BOSS『%s』枚举重试 3 次列表均滞留其他 BOSS（串表 %d 件次已拦截）——记空掉落占位（选中态未生效，请截图反馈顾问侧）",
           label, tostring(iname), tostring(bname), foreign))

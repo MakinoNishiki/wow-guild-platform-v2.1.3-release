@@ -242,6 +242,24 @@ function main() {
   const dungTotal = dungInsts.reduce((s, x) => s + x.items, 0);
   const skipped = asArr(tget(dump, 'skipped_instances'));
 
+  // ---- ilvl_tiers 非空率报告（1.0.27，REQ-116 副轨）——报告型：不升硬闸、不影响退出码 ----
+  // 逐实例统计带 ilvl_tiers 非空的件数/总件数；旧版导出（无 ilvl_tiers 键）两态兼容：
+  // 全文件无键 → 打印「未采集（旧版导出）」提示，不判 ❌
+  {
+    console.log('\n---------------- ilvl_tiers 非空率（1.0.27 报告型，不影响退出码） ----------------');
+    let anyKey = false;
+    for (const inst of instances) {
+      let tot = 0, hit = 0;
+      for (const b of inst.bosses) for (const it of b.loot) {
+        tot++;
+        if (tget(it, 'ilvl_tiers') !== undefined) anyKey = true;
+        if (hashKeys(tget(it, 'ilvl_tiers')).length > 0) hit++;
+      }
+      console.log(`  ${inst.seg}/${inst.name}：ilvl_tiers 非空 ${hit}/${tot} 件`);
+    }
+    if (!anyKey) console.log('  未采集（旧版导出）——文件无 ilvl_tiers 键，不判定');
+  }
+
   // ---- V13（BUG-088）：断链留痕——中断跑 meta.partial 在场 / 完整跑无 partial 键 ----
   if (meta.partial) R('V13', '✅', '断链零留存：meta.partial 在场（中断跑产物留痕正确）', [`已扫实例 ${instances.length} 个已按段落表；注意：断链产物不可作验收全量`]);
   else R('V13', '✅', '断链零留存：完整跑无 partial 键', meta.smoke ? ['冒烟产物，partial 口径同适用'] : []);

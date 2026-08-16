@@ -603,12 +603,17 @@
     // REQ-092（任务书 #46 WP3）：装备图标——icon_id 纯数字校验后直拼规则路径 assets/icons/items/{id}.png
     // （与职业图标 IconMap 体系隔离）；空值不渲染、加载失败隐藏不占位（先例：套装行 :781 同款 onerror 回退）
     const iconId = (l.icon_id != null && /^\d+$/.test(String(l.icon_id))) ? String(l.icon_id) : '';
+    // REQ-116（S2-装等批次）：物品等级 meta 行首 tag——ilvl 非空才渲染（RPC 白名单透出，sql/26_s2_ilvl）。
+    // 【同档绑定（运营硬性前提，钉死）】装等显示档与 effect 数值必须同档——禁止「装等取 A 档、数值取 B 档」
+    // 的混搭路径。当前单值结构天然满足（effect=史诗档实测文本、ilvl=史诗档静态表值）；日后若拆档
+    // （多难度 ilvl_tiers），ilvl 取值档必须与 effect/tiers 取值档联动切换，单列单档语义不得走样。
     // P1（WP6 补丁）：卡盒样式挂 .dp-item-inner——hover 时 inner 转 absolute 向下生长，
     // 外层 .dp-item 由 JS 预设折叠态 minHeight 占位（仅溢出卡），网格不塌、生长部分覆盖下方卡片
     return `<div class="dp-item"><div class="dp-item-inner">
       ${iconId ? `<img class="dp-item-icon" src="assets/icons/items/${iconId}.png" loading="lazy" alt="" onerror="this.style.display='none'">` : ''}
       <div class="dp-item-name">${esc(l.item_name)}</div>
       <div class="dp-item-meta">
+        ${l.ilvl != null ? `<span class="dp-tag">物品等级 ${esc(l.ilvl)}</span>` : ''}
         ${l.slot ? `<span class="dp-tag">${esc(l.slot)}</span>` : ''}
         ${l.item_type ? `<span class="dp-tag">${esc(l.item_type)}</span>` : ''}
         ${l.venomcurse ? `<span class="dp-tag dp-tag-venom">${esc(l.venomcurse)}</span>` : ''}
