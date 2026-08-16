@@ -199,8 +199,35 @@
 --     （即使主嫌疑修错也有取证兜底，零猜测）；
 --   ③毒咒八件全中列入冒烟硬项（步骤卡 Q4/V16+validator 冒烟分支 V3 硬闸）；
 --   导出字段格式零改动）
+-- （1.0.24：BUG-099 快补——1.0.23 冒烟主体绿、毒咒 0/8 仍红；转义 dump 铁证=单串
+--   「史诗\n毒咒」纯 \n 零杂码（夹码假设证伪），而 1.0.23 显式 \n 写法经 od 实证正确、
+--   顾问侧 LuaJIT 实证理论必中——真机未中即匹配输入串≠dump 串，剩余嫌疑=不显形字节
+--   （\t/U+00A0/零宽，转义 dump 三符之外）或加载层差异。按顾问定向：模式不指名换行符，
+--   ^史诗%s+毒咒%s*$——%s+ 通吃 \n/空格/混合形态，免疫锚不变（^史诗 起锚+$ 收尾，
+--   兑换物名行/flavor 句回归实证不误伤，在案）；dump 豁免条件同步；导出字段格式零改动。
+--   预授权并入（2026-08-15 运营）：八件 ID 疑似行追加字节级 hex dump（仅打印路径，
+--   VENOM_HEX_IDS 限定范围）——主嫌疑升级为不可见非 %s 字节（U+00A0/U+200B/U+FEFF/U+3000），
+--   转义 dump 对其失明，%s+ 不中当轮即出字节一跑定案；终修方向预置=剥码后字节归一化
+--   （C2A0/E2808B/EFBBBF/E38080）+模式回归 ^史诗%s*毒咒%s*$，待 hex 证据再动）
+-- （1.0.25：BUG-099 终修+取证一体版——1.0.24 冒烟主体三连绿、毒咒 0/8 仍红，悖论闭合：
+--   非 %s 不可见字节实锤（%s+ 对 U+00A0/U+200B/U+FEFF/U+3000 失明）——按顾问定向：
+--   ①单串形态级改字节无关版 ^史诗.-毒咒%s*$（.- 吃掉任意夹杂字节，不管夹的是什么；
+--   免疫锚不变：^史诗 起锚+毒咒%s*$ 收尾，fengari 断言覆盖合成不可见字节串必中+
+--   名行字续/flavor 句/兑换物名/单边四类不误伤）；②hex dump 兜底随版带上（仅八件 ID
+--   疑似行、只动打印路径）——连字节无关版都不中=「史诗」「毒咒」字面本身非预期字码，
+--   hex 截图一跑定死（最后一种可能）；dump 豁免条件同步；导出字段格式零改动）
+-- （1.0.26：BUG-099 终修——hex 一跑定案，根因=色码 hex 段内嵌空格畸形码：
+--   raw=|cFF 0FF 0史诗|r\n|cFF 0BF D毒咒|r（挤掉空格=6 位色值 FF0FF0/FF0BFD），严格剥码
+--   |c%x+ 遇空格断裂剥不掉→匹配串以「|」开头→所有 ^史诗 锚模式（含 .- 版）首字节即败，
+--   旧无 ^ 跨行版也因两段中文间夹 |r\n|cFF 0BF D 非空白而败——四版全灭同一根因，
+--   聊天显示干净=渲染器对畸形色码宽容。修法：①venomcurse 判定路径专用加固剥码
+--   vplain=t:gsub("|c[%x ]+",""):gsub("|r","")（兼容标准 8 位连续 hex 与内嵌空格畸形码；
+--   中文 UTF-8 首字节 ≥0x80 非 %x 非空格天然止跑不误吃正文；先 |c 后 |r 再 trim；
+--   局部变量不触全局 stripLineCodes，影响面=本功能）；②模式回归严格版 ^史诗%s*毒咒%s*$
+--   （.- 版退役：剥码修好后两段间只剩 \n，%s* 足够误伤面最小）；dump/hex 豁免同步——
+--   命中后疑似 dump/hex 行自动消失（豁免生效=修复生效现场证据）；导出字段格式零改动）
 -- ============================================================
-local ADDON_VERSION = "1.0.23"
+local ADDON_VERSION = "1.0.26"
 
 local function msg(s) DEFAULT_CHAT_FRAME:AddMessage("|cffffd200[wjdc]|r " .. s) end
 local function err(s) DEFAULT_CHAT_FRAME:AddMessage("|cffff4040[wjdc]|r " .. s) end
@@ -253,6 +280,8 @@ local function scanLink(link)
 end
 
 -- ---------- 物品明细：主副属性 / 特效（tooltip 扫描；装等走 GetItemInfo 见 getItemBasics） ----------
+-- 毒咒装备八件 ID（2026-08-14 运营终裁名单；1.0.24 预授权并入：疑似行字节级 hex dump 限定范围）
+local VENOM_HEX_IDS = { [268215]=1, [268202]=1, [268207]=1, [271874]=1, [271875]=1, [268265]=1, [271876]=1, [271878]=1 }
 local PRIMARY   = { ["力量"] = 1, ["敏捷"] = 1, ["智力"] = 1 }
 local SECONDARY = { ["爆击"] = 1, ["急速"] = 1, ["精通"] = 1, ["全能"] = 1,
                     ["吸血"] = 1, ["闪避"] = 1, ["加速"] = 1 }
@@ -282,11 +311,19 @@ local function stripLineCodes(t)
 end
 
 local function parseStatLines(lines, d)
-  local prevPlain
+  local prevVplain
   for _, t in ipairs(lines) do
     -- 1.0.16（E3/BUG-092）：属性行同样可能带行首码/行尾收色码，先剥再匹配（纯文本行零影响）——
     -- 258045 黎明之刃的战刃 primary 空（81 件唯一真缺损）的代码面嫌疑位：行首码致 ^%+ 锚定失配
     local plain = stripLineCodes(t)
+    -- 1.0.26（BUG-099 终修，hex 一跑定案）：根因=色码 hex 段内嵌空格畸形码
+    -- （raw=|cFF 0FF 0史诗|r\n|cFF 0BF D毒咒|r，挤掉空格=6 位色值 FF0FF0/FF0BFD）——严格剥码
+    -- |c%x+ 遇空格断裂剥不掉，匹配串以「|」开头，所有 ^史诗 锚模式首字节即败（四版全灭同一
+    -- 根因；聊天显示干净=渲染器对畸形色码宽容）。venomcurse 判定路径专用加固剥码（局部变量
+    -- vplain，不触全局 stripLineCodes——影响面=本功能）：|c[%x ]+ 兼容标准 8 位连续 hex 与
+    -- 内嵌空格畸形码（中文 UTF-8 首字节 ≥0x80 非 %x 非空格天然止跑，不误吃正文；禁用
+    -- |c[^|]-|r 形态——会吃掉色码与 |r 之间的正文）；顺序=先 |c 后 |r 再 trim
+    local vplain = t:gsub("|c[%x ]+", ""):gsub("|r", ""):gsub("^%s+", ""):gsub("%s+$", "")
     local num, stat = plain:match("^%+([%d,]+)%s*(.+)$")
     if stat then
       stat = stat:gsub("%s", "")
@@ -308,19 +345,30 @@ local function parseStatLines(lines, d)
       -- 1.0.18（毒咒两行形态，1.0.17 双跑真机取证「史诗↵毒咒」）：跨行匹配——上一行剥码后
       -- 以「史诗」收尾且与本行拼接恰成「史诗…毒咒」即判有（单行精确判定保留，判据不变）
       -- 1.0.23（BUG-099，1.0.22 冒烟真机取证 run 20260815-005810）：12.1 以单串内嵌 \n 形态
-      -- 交付（疑似 dump 单元=「史诗↵毒咒」合一格，跨行拼接够不到）——加第三级：单串内嵌
-      -- 换行形态 ^史诗%s*\n%s*毒咒%s*$（免疫锚不变：名行以字续不命中、flavor 以「。」收尾不命中）
+      -- 交付（疑似 dump 单元=「史诗↵毒咒」合一格，跨行拼接够不到）——加单串形态级
+      -- 1.0.24（BUG-099 快补，转义 dump 铁证）：单串=「史诗\n毒咒」纯 \n 零杂码（夹码假设
+      -- 证伪）；1.0.23 显式 \n 写法 od 实证正确（文件字节 5C 6E=标准转义）、LuaJIT 实证
+      -- 理论必中却真机未中——按顾问定向：模式不指名换行符，%s+ 通吃 \n/空格/混合形态
+      -- （免疫锚不变：^史诗 起锚+$ 收尾，名行以字续/flavor 以「。」收尾均不命中，在案）
+      -- 1.0.25（BUG-099 终修+取证一体，1.0.24 冒烟主体三连绿毒咒 0/8 仍红）：悖论闭合——
+      -- 非 %s 不可见字节实锤（U+00A0/U+200B/U+FEFF/U+3000，%s+ 对其失明）——按顾问定向
+      -- 模式改字节无关版 ^史诗.-毒咒%s*$：.- 吃掉任意夹杂字节，不管夹的是什么；免疫锚
+      -- 不变（^史诗 起锚+毒咒%s*$ 收尾，四类免疫回归 fengari 断言覆盖合成不可见字节串）；
+      -- hex dump 兜底随版带上——连字节无关版都不中=「史诗」「毒咒」字面本身非预期字码，
+      -- hex 截图一跑定死（最后一种可能）
+      -- 1.0.26（BUG-099 终修）：模式回归严格版 ^史诗%s*毒咒%s*$（1.0.25 .- 版退役——加固
+      -- 剥码后两段之间只剩 \n，%s* 足够且误伤面最小）；三级判定统一走加固串 vplain
       if d.venomcurse == "" then
-        if plain:match("^毒咒%s*$") then
+        if vplain:match("^毒咒%s*$") then
           d.venomcurse = "毒咒"
-        elseif plain:match("^史诗%s*\n%s*毒咒%s*$") then
+        elseif vplain:match("^史诗%s*毒咒%s*$") then
           d.venomcurse = "毒咒"
-        elseif prevPlain and (prevPlain .. plain):match("史诗%s*毒咒%s*$") then
+        elseif prevVplain and (prevVplain .. vplain):match("史诗%s*毒咒%s*$") then
           d.venomcurse = "毒咒"
         end
       end
     end
-    prevPlain = plain
+    prevVplain = vplain
   end
 end
 
@@ -699,16 +747,29 @@ local function collectTiers(loot, tiers, opts, done)
           --   防史诗档被跳档/陈旧拦截时漏采）；史诗档未命中时做疑似行取证（剥码后含「毒咒」
           -- 字样但非精确行的原行黄字 dump）——真机全场零命中的定位靠它一锤定音
           -- 1.0.23（BUG-099）：疑似 dump 转义可见化——\r/\n 显形为字面 \r\n、| 转义 ||，
-          -- 字节形态一锤定音（即使第三级匹配修错也有取证兜底，零猜测）
+          -- 字节形态一锤定音（即使单串形态级匹配修错也有取证兜底，零猜测）
+          -- 1.0.24：豁免条件与匹配级同步 ^史诗%s+毒咒%s*$（不指名换行符，%s+ 通吃）
+          -- 1.0.24（预授权并入，BUG-099 主嫌疑=不可见非 %s 字节 U+00A0/U+200B/U+FEFF/U+3000）：
+          -- 八件 ID 疑似行追加字节级 hex dump（仅打印路径）——转义 dump 对该类字节失明，
+          -- %s+ 不中当轮即出字节，一跑定案
+          -- 1.0.25：豁免条件与匹配级同步 ^史诗.-毒咒%s*$（字节无关版）；hex dump 随版带上——
+          -- 连字节无关版都不中=「史诗」「毒咒」字面本身非预期字码，hex 一跑定死
+          -- 1.0.26（hex 定案=畸形色码内嵌空格）：豁免条件与匹配级同步回归严格版
+          -- ^史诗%s*毒咒%s*$；加固剥码命中后 venomcurse 置值→本分支不进入，dump/hex 行
+          -- 自动消失（豁免生效=修复生效的现场证据）；仍未中则 dump/hex 照旧出
           if opts.venomcurse then
             if d.venomcurse ~= "" then
               it.venomcurse = d.venomcurse
             elseif tier.key == opts.effectTier then
               for _, raw in ipairs(lines) do
                 local p = stripLineCodes(raw)
-                if p:find("毒咒") and not p:match("^毒咒%s*$") and not p:match("^史诗%s*\n%s*毒咒%s*$") then
+                if p:find("毒咒") and not p:match("^毒咒%s*$") and not p:match("^史诗%s*毒咒%s*$") then
                   msg(string.format("毒咒疑似行未精确命中（物品 %s，%s 档）：%s",
                     tostring(it.id), tier.key, (raw:gsub("\r", "\\r"):gsub("\n", "\\n"):gsub("|", "||"))))
+                  if VENOM_HEX_IDS[it.id] then
+                    msg(string.format("毒咒疑似行 hex（物品 %s，%s 档）：%s",
+                      tostring(it.id), tier.key, (raw:gsub(".", function(c) return string.format("%02X ", c:byte()) end))))
+                  end
                 end
               end
             end
