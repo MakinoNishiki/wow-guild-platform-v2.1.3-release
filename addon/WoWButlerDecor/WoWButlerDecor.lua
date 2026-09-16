@@ -19,7 +19,7 @@
 --   ②国服客户端 API 可用性——若国服阉割，第一次真机跑即暴露（failCount=总数 或 枚举 0 结果）。
 -- ============================================================
 
-local ADDON_VERSION = "0.1.0"
+local ADDON_VERSION = "0.1.1"
 
 local function msg(s) DEFAULT_CHAT_FRAME:AddMessage("|cffffd200[wbd]|r " .. s) end
 local function err(s) DEFAULT_CHAT_FRAME:AddMessage("|cffff4040[wbd]|r " .. s) end
@@ -223,9 +223,18 @@ local function doScan()
   local okS, searcher = pcall(C_HousingCatalog.CreateCatalogSearcher)
   diag.steps[#diag.steps + 1] = string.format("CreateCatalogSearcher ok=%s type=%s (%.2fs)",
     tostring(okS), tostring(okS and type(searcher) or searcher), GetTime() - t0)
-  if not okS or type(searcher) ~= "table" then
+  if not okS or (type(searcher) ~= "table" and type(searcher) ~= "userdata") then
     saveFailure(diag, "目录枚举失败：CreateCatalogSearcher 未返回搜索器对象")
     return
+  end
+
+  -- 元表形态摸底（只读）：userdata 经元表 __index 取值，记录元表是否存在及 __index 类型
+  local okM, mt = pcall(getmetatable, searcher)
+  if okM then
+    diag.steps[#diag.steps + 1] = string.format("getmetatable: %s, __index type=%s",
+      tostring(mt ~= nil), type(mt and mt.__index))
+  else
+    diag.steps[#diag.steps + 1] = "getmetatable 异常（" .. tostring(mt) .. "）"
   end
 
   -- 能力探测：候选清单 type() 判 function + pairs 全量扫面（只探测不调用）

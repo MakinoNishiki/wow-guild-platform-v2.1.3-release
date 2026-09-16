@@ -2,6 +2,6 @@
 ## Title: WoW Butler Decor
 ## Title-zhCN: 魔兽管家-家宅装饰
 ## Notes: 魔兽管家家宅装饰数据探针（v0.1 切片）
-## Version: 0.1.0
+## Version: 0.1.1
 ## SavedVariables: WoWButlerDecorDB
 WoWButlerDecor.lua
