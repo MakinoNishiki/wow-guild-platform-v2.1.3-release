@@ -3,6 +3,9 @@
 -- 纯只读探针：只调 Get/Search/Create 类查询 API，零写入、不访问网络、不碰账号数据
 -- 导出目标：SavedVariables 全局表 WoWButlerDecorDB（/reload 或退出游戏后写盘）
 -- 命令：/wbd scan
+-- v0.2（任务书 #49 WP1）：scan 追加全量落盘——每件装饰的目录字段白名单拷贝进
+--   WoWButlerDecorDB.items（玩家态字段剔除），runMeta.dataset="full"；
+--   枚举/容错/diag/stats/samples 逻辑与 v0.1.1 完全一致，只调用不改写
 -- 调研依据（任务书 #48「调研依据」节 + 本节允许范围内的 wiki 补充）：
 --   warcraft.wiki.gg《World of Warcraft API》HousingCatalogUI 系统
 --   - C_HousingCatalog.CreateCatalogSearcher()：创建 HousingCatalogSearcher 搜索器对象
@@ -19,7 +22,7 @@
 --   ②国服客户端 API 可用性——若国服阉割，第一次真机跑即暴露（failCount=总数 或 枚举 0 结果）。
 -- ============================================================
 
-local ADDON_VERSION = "0.1.1"
+local ADDON_VERSION = "0.2.0"
 
 local function msg(s) DEFAULT_CHAT_FRAME:AddMessage("|cffffd200[wbd]|r " .. s) end
 local function err(s) DEFAULT_CHAT_FRAME:AddMessage("|cffff4040[wbd]|r " .. s) end
@@ -41,7 +44,8 @@ local SEARCHER_METHOD_CANDIDATES = {
 local function buildMeta()
   local ver, build, _, iface = GetBuildInfo()
   return { addon = ADDON_VERSION, client = ver, build = build, interface = iface,
-           time = date("%Y-%m-%d %H:%M:%S"), run_id = date("%Y%m%d-%H%M%S") }
+           time = date("%Y-%m-%d %H:%M:%S"), run_id = date("%Y%m%d-%H%M%S"),
+           dataset = "full" }
 end
 
 local function deepCopy(v, depth)
@@ -53,6 +57,46 @@ local function deepCopy(v, depth)
     t[k] = deepCopy(val, depth + 1)
   end
   return t
+end
+
+-- 目录字段白名单（任务书 #49 WP1）：仅目录静态字段；玩家态字段
+-- （totalNumStored/totalNumPlaced/numPlaced/quantity/showQuantity/
+--  remainingRedeemable/destroyableInstanceCount/dyeSlots/entryID）一律不进 items
+local ITEM_FIELD_WHITELIST = {
+  "itemID", "name", "iconTexture", "asset", "uiModelSceneID", "quality", "size",
+  "placementCost", "categoryIDs", "subcategoryIDs", "sourceText", "dataTagsByID",
+  "isAllowedIndoors", "isAllowedOutdoors", "canCustomize", "firstAcquisitionBonus",
+}
+
+-- 单件目录拷贝：白名单字段深拷贝 + recordID/entryType（新形态取自结构体；
+-- 旧形态纯数字 entryID 记入 recordID、entryType 留空，由后续转换层兼容）
+local function copyCatalogFields(info, entryID)
+  local item = {}
+  for _, k in ipairs(ITEM_FIELD_WHITELIST) do
+    local v = info[k]
+    if v ~= nil then item[k] = deepCopy(v, 0) end
+  end
+  if type(entryID) == "table" then
+    item.recordID = entryID.recordID
+    item.entryType = entryID.entryType
+  else
+    item.recordID = entryID
+  end
+  return item
+end
+
+-- items 序列化体积近似估算（仅用于聊天提示的 MB 数字，粗略即可，不准不追究）
+local function approxSerializedLen(v)
+  local ty = type(v)
+  if ty == "string" then return #v + 6 end
+  if ty == "table" then
+    local n = 4
+    for k, val in pairs(v) do
+      n = n + approxSerializedLen(k) + approxSerializedLen(val) + 4
+    end
+    return n
+  end
+  return 12 -- number/boolean 近似
 end
 
 -- 返回形态描述（type + 表规模 + 首键形态），供 diag 如实记录
@@ -125,6 +169,7 @@ local function collectAndSave(results, diag, t0)
     quality = { nonempty = 0 },
   }
   local samples = {}
+  local items = {}
 
   for _, e in ipairs(results) do
     total = total + 1
@@ -188,6 +233,8 @@ local function collectAndSave(results, diag, t0)
         s.entryID = deepCopy(entryID, 0)
         samples[#samples + 1] = s
       end
+      -- 全量落盘：目录字段白名单拷贝（v0.2 追加，stats/samples 口径不动）
+      items[#items + 1] = copyCatalogFields(info, entryID)
     end
   end
 
@@ -196,10 +243,12 @@ local function collectAndSave(results, diag, t0)
   diag.totalElapsedSec = tonumber(string.format("%.2f", tEnd - t0))
 
   WoWButlerDecorDB = { runMeta = buildMeta(), totalCount = total, failCount = fail,
-                       stats = stats, samples = samples, diag = diag }
+                       stats = stats, samples = samples, items = items, diag = diag }
 
   msg(string.format("扫描完成：总数 %d；sourceText 非空 %d / 空 %d；取字段失败 %d 件",
     total, stats.sourceText.nonempty, stats.sourceText.empty, fail))
+  msg(string.format("全量采集 %d 件已暂存，/reload 后写入 SavedVariables（文件约 %.1f MB）",
+    #items, approxSerializedLen(items) / 1048576))
   if total < 100 or total > 10000 then
     msg("数量异常，可能枚举通道不符预期（判据参照 3000±500）——数据照常落盘")
   end
@@ -209,6 +258,8 @@ end
 local function doScan()
   msg("开始扫描家宅装饰目录（/wbd scan，插件 v" .. ADDON_VERSION .. "，纯只读）…")
   local t0 = GetTime()
+  -- 落盘前清空上一轮全量暂存（防重跑叠加，同时提前释放上轮内存）
+  if type(WoWButlerDecorDB) == "table" then WoWButlerDecorDB.items = nil end
   local diag = { probedMethods = {}, pairsSweep = "未执行", steps = {}, retries = 0 }
 
   if type(C_HousingCatalog) ~= "table" or type(C_HousingCatalog.CreateCatalogSearcher) ~= "function"
