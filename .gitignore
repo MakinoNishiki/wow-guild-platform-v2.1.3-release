@@ -7,3 +7,4 @@ tools/
 scripts/wjdc/out*/
 scripts/decor/out/
 /WoWButlerDecor.lua
+scripts/decor/WoWButlerDecor.lua
