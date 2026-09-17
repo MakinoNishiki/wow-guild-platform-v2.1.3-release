@@ -33,12 +33,16 @@ parse_source.py — decor_catalog.source_text 来源结构化解析器
     - 空 75 件 sources=[]，entry_type 分布贴出
     - 生成 SQL 自查：UPDATE 语句数=2062、BEGIN/COMMIT 各 1、record_id 覆盖=2062 全唯一
 
-实测偏差申报（不吞并不擅改，全部逐条贴出待顾问定夺，详见报告）：
-    ① 名望： 6 次全部出现在商人出售条目内部（非首键），落为 vendor 元素 renown 字段，
-       type 枚举 renown 未实例化；② 价格存在任务书两形态之外的实测形态——
-       |Hitem:ID|h 物品价（30 件）、无超链接裸贴图（21 件：20×腐化贴图100 + 1 件 2金50银），
-       扩展 {"item_id"/"texture"/"silver"} 表达；③ 25546 佩佩 原文仅两个地区无类型键，
-       无法归类在案 sources=[]；④ 8176 地区键前置先于任务键，挂入随后的任务元素。
+实测偏差处置（2026-09-17 顾问对送审件六类偏差已定夺，按定夺落地）：
+    ① 名望： 6 次全部出现在商人出售条目内部（非首键），落 vendor 条目内字段
+       reputation（顾问定夺：对齐任务书 schema 示例，勿用 renown）；type 枚举
+       renown 保留不动（未实例化）；② 物品价 |Hitem:ID|h（30 件）落
+       {"item_id":N,"amount":M}；③ 无超链接裸贴图价（20 件，全为腐化贴图
+       amount=100）落 {"texture":贴图文件名主干,"amount":N}——主干 = 去路径、
+       去尾部 ":0"、去 .blp 扩展名；④ 金+银合并件（1482「2金50银」）同元素
+       双键 {"gold":2,"silver":50} 不折合；⑤ 8176 地区键前置先于任务键，
+       归 quest、地区并入 zones；⑥ 25546 佩佩 原文仅两个地区无类型键，
+       无法归类在案 sources=[]（运营游戏内核查中），清单逐条贴出不吞并。
 """
 
 import argparse
@@ -66,7 +70,7 @@ TYPE_KEYS = {
     "可在美酒节开始前购买": ("festival_note", "note"),
 }
 
-# 字段键（归属当前元素）；名望实测为条目内字段（见头注释偏差①）
+# 字段键（归属当前元素）；名望实测为条目内字段，定夺①落 reputation（见头注释）
 FIELD_KEYS = {"地区", "价格", "阵营", "分类", "名望"}
 
 # 色标键值对令牌：|cFFFFD200{键}{可选冒号}|r{值}（值 = 到下一键或文本结尾）
@@ -82,7 +86,7 @@ PRICE_TOKEN_RE = re.compile(
     r"|(\d+)\|T([^|]*)\|t"                       # 5=amount 6=texture 路径
 )
 
-# 任务书全清单计数（覆盖率对齐基准；名望 6 按实测落字段，见偏差①）
+# 任务书全清单计数（覆盖率对齐基准；名望 6 按定夺①落 reputation 字段）
 SPEC_TYPE_COUNTS = {
     "vendor": 2015 + 30,
     "profession": 330,
@@ -93,7 +97,7 @@ SPEC_TYPE_COUNTS = {
     "treasure": 14,
     "event": 1,
     "festival_note": 4 + 2,
-    "renown": 0,  # 任务书清单列 6，实测 6 次均为条目内字段 → 元素计数 0，偏差在案
+    "renown": 0,  # type 枚举保留（定夺①）；名望 6 次均落 reputation 字段 → 元素计数 0
 }
 SPEC_KEY_COUNTS = {
     "地区": 2693, "商人出售": 2015, "价格": 2003, "专业技能": 330, "任务": 326,
@@ -127,8 +131,9 @@ def parse_price(raw):
 
     返回 (price_list, residual)：residual 非空 = 存在未识别残差（护栏报警）。
     金币 {"gold":N}；货币 {"currency_id":N,"amount":M}；物品 {"item_id":N,"amount":M}；
-    银币与金币相邻时合并 {"gold":G,"silver":S}（实测仅 record 1482「2金50银」）；
-    无超链接裸贴图 {"texture":名,"amount":N}（实测仅腐化贴图，偏差②）。
+    银币与金币相邻时合并 {"gold":G,"silver":S}（定夺④：同元素双键不折合，实测仅
+    record 1482「2金50银」）；无超链接裸贴图 {"texture":文件名主干,"amount":N}
+    （定夺③：主干 = 去路径、去尾部 ":0"、去 .blp 扩展名；实测仅腐化贴图）。
     """
     parts = []
     for m in PRICE_TOKEN_RE.finditer(raw):
@@ -139,12 +144,13 @@ def parse_price(raw):
         else:
             amount, tex = int(m.group(5)), m.group(6)
             name = tex.replace("\\", "/").split("/")[-1].rsplit(":", 1)[0]
-            if "GOLDICON" in name.upper():
+            stem = re.sub(r"\.blp$", "", name, flags=re.I)
+            if "GOLDICON" in stem.upper():
                 parts.append({"gold": amount})
-            elif "SILVERICON" in name.upper():
+            elif "SILVERICON" in stem.upper():
                 parts.append({"silver": amount})
             else:
-                parts.append({"texture": name, "amount": amount})
+                parts.append({"texture": stem, "amount": amount})
     # 金+银相邻合并为一个金钱元素（顺序位置以金币为准）
     merged = []
     for p in parts:
@@ -216,7 +222,7 @@ def parse_source_text(source_text):
                 if cur is None:
                     anomalies.append("名望键无归属元素")
                 else:
-                    cur["renown"] = val  # 偏差①：名望实测为条目内字段
+                    cur["reputation"] = val  # 定夺①：名望落条目内 reputation 字段
         else:
             anomalies.append("清单外新键: " + key)
     if pending_zones:
@@ -250,7 +256,6 @@ def main():
                 "zones": el.get("zones", []),
                 "price": el.get("price"),
                 "reputation": el.get("reputation"),
-                **({"renown": el["renown"]} if "renown" in el else {}),
             }
         if el["type"] in ("quest", "drop", "treasure"):
             field = {"quest": "quest", "drop": "drop", "treasure": "treasure"}[el["type"]]
@@ -321,7 +326,7 @@ def main():
     for typ, spec_n in SPEC_TYPE_COUNTS.items():
         got = type_counts.get(typ, 0)
         mark = "OK" if got == spec_n else "!!"
-        note = "名望 6 次实测为条目内字段（偏差①，逐条在下）" if typ == "renown" else ""
+        note = "名望 6 次按定夺①落 reputation 字段（逐条在下）" if typ == "renown" else ""
         if got != spec_n:
             hard_fail = True
         out(f"  {mark} {typ:<13}{got:>6}{spec_n:>6}  {note}")
@@ -379,23 +384,24 @@ def main():
         if not ok:
             hard_fail = True
 
-    # 实测偏差逐条清单（红线：不吞并，全部在案待顾问定夺）
+    # 实测偏差处置清单（六类偏差顾问已定夺 2026-09-17，按定夺落地；仍逐条在案）
     def records_with(pred):
         return sorted(rid for rid, els in sources_by_id.items()
                       if any(pred(p) for e in els for p in e.get("price") or []))
 
-    renown_records = sorted(rid for rid, els in sources_by_id.items()
-                            if any("renown" in e for e in els))
-    out("\n--- 实测偏差逐条清单（清单外形态/定位出入，不吞并、待顾问定夺） ---")
-    out(f"  ① 名望作条目内字段（type 枚举 renown 未实例化），{len(renown_records)} 件：{renown_records}")
+    renown_records = sorted(d["record_id"] for d in data if "名望：" in d["source_text"])
+    out("\n--- 实测偏差处置清单（六类顾问定夺已落地，逐条在案） ---")
+    out(f"  ① 名望落 vendor 条目内 reputation 字段（type 枚举 renown 保留未实例化），"
+        f"{len(renown_records)} 件：{renown_records}")
     out(f"  ② |Hitem:ID|h 物品价（{{\"item_id\":N,\"amount\":M}}），"
         f"{len(records_with(lambda p: 'item_id' in p))} 件：{records_with(lambda p: 'item_id' in p)}")
-    out(f"  ③ 无超链接裸贴图价（{{\"texture\":名,\"amount\":N}}，实测全为腐化贴图 amount=100），"
+    out(f"  ③ 无超链接裸贴图价（{{\"texture\":文件名主干,\"amount\":N}}，实测全为腐化贴图 amount=100），"
         f"{len(records_with(lambda p: 'texture' in p))} 件：{records_with(lambda p: 'texture' in p)}")
-    out(f"  ④ 金+银合并价（{{\"gold\":G,\"silver\":S}}），"
+    out(f"  ④ 金+银合并价同元素双键（{{\"gold\":G,\"silver\":S}} 不折合），"
         f"{len(records_with(lambda p: 'silver' in p))} 件：{records_with(lambda p: 'silver' in p)}")
-    out(f"  ⑤ 地区键前置挂入随后元素：{[rid for rid, a in anomalies_all if '前置' in a]}")
-    out(f"  ⑥ 无法归类（原文无类型首键，sources=[]）：{[rid for rid, _ in unclassified]}")
+    out(f"  ⑤ 地区键前置归随后 quest 元素、地区并入 zones：{[rid for rid, a in anomalies_all if '前置' in a]}")
+    out(f"  ⑥ 无法归类（原文无类型首键，sources=[] 在案不吞并，运营游戏内核查中）："
+        f"{[rid for rid, _ in unclassified]}")
 
     # 价格形态普查
     out("\n--- 价格形态普查（2003 个价格值） ---")
@@ -405,7 +411,7 @@ def main():
             continue
         for el in sources_by_id[d["record_id"]]:
             if "price" in el and el["price"] is not None:
-                sig = tuple(sorted(frozenset(p) for p in el["price"]))
+                sig = tuple(tuple(sorted(p)) for p in el["price"])
                 shape[sig] += 1
     for sig, n in shape.most_common():
         out(f"  {n:>5} × {sig}")
@@ -451,7 +457,7 @@ def main():
 
     out(f"\n产物：{json_path} / {sql_path} / {args.outdir}/parse_source_report.txt")
     out(f"\n硬门总判：{'全部通过' if not hard_fail else '存在未过项（见 !! 行）'}"
-        f"（实测偏差 6 类逐条在案，见上节，待顾问定夺）")
+        f"（实测偏差 6 类顾问定夺已落地，逐条在案见上节）")
     with open(f"{args.outdir}/parse_source_report.txt", "w", encoding="utf-8", newline="\n") as f:
         f.write(report.getvalue())
     sys.exit(1 if hard_fail else 0)
