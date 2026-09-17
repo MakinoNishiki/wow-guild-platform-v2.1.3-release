@@ -2231,7 +2231,8 @@ const pageTitles = {
   data: '数据管理',
   changelog: '更新日志',
   datacenter: '数据中心',
-  lootdrop: '副本掉落' // 任务书 #28 WP5（REQ-086）：原「数据公示」更名 + 双壳嵌入
+  lootdrop: '副本掉落', // 任务书 #28 WP5（REQ-086）：原「数据公示」更名 + 双壳嵌入
+  decor: '家宅图鉴' // 任务书 #51（REQ-137 一期）：双壳登录壳页签，只读
 };
 
 // ==================== 任务书 #42（REQ-105/107）：用户偏好包 ====================
@@ -2392,6 +2393,11 @@ function switchPage(pageName) {
     ensureLootdropMounted();
   }
 
+  // 任务书 #51：家宅图鉴 tab——首次切入懒挂载渲染层（DecorCatalog.mount 挂 page-decor 容器）
+  if (pageName === 'decor') {
+    ensureDecorMounted();
+  }
+
   // 移动端关闭侧边栏
   if (window.innerWidth <= 768) {
     document.getElementById('sidebar').classList.remove('show');
@@ -2416,6 +2422,19 @@ function ensureLootdropMounted() {
     DPLootDrop.mount(document.getElementById('page-lootdrop'));
   } else {
     DPLootDrop.activate();
+  }
+}
+
+// 任务书 #51（REQ-137 一期）：家宅图鉴 tab 懒挂载（双壳之登录壳；渲染层 js/decorData.js 与公开页
+// decor.html（WP2）同源单一真源；activate 为对称占位——只读目录无脏标记链路，重切零请求）
+let decorMounted = false;
+function ensureDecorMounted() {
+  if (!window.DecorCatalog) return;
+  if (!decorMounted) {
+    decorMounted = true;
+    DecorCatalog.mount(document.getElementById('page-decor'));
+  } else {
+    DecorCatalog.activate();
   }
 }
 
@@ -7175,6 +7194,21 @@ function lootFillAssignedTo(idOrName) {
 // ==================== 初始化 ====================
 // ==================== 更新日志 ====================
 const changelogData = [
+  {
+    id: 'v3.2.0-decor-catalog',
+    version: 'v3.2.0',
+    date: '2026-09-18',
+    type: 'feature',
+    typeLabel: '新增功能',
+    title: '家宅图鉴（一期）：2062 件家宅装饰全量目录，七维筛选+详情弹窗（任务书 #51 / REQ-137）',
+    summary: '新增「家宅图鉴」页签（侧边栏「副本掉落」下方，全角色只读）：12.x 家宅装饰全量目录 2062 件（2023 装饰+39 房间/户型），品质色网格卡片（128 图标+容量徽标）+ 七维筛选（名称搜索/分类/来源十类/资料片/容量档/摆放环境/可放宠物·房间开关）+ 详情弹窗（品质/容量/尺寸/摆放/分类子类/标签 chips/结构化来源十类逐类渲染，含价格五键形中英文词表与原文兜底）。货币/物品中文名映射经顾问终审（wago.tools DB2 官方 zhCN 客户端字符串出处）；裸贴图价查证=货币 3568「封存腐化」。免登录公示版（decor.html）随 WP2 交付。',
+    details: [
+      '数据通道：anon 直连 PostgREST 读 decor_catalog（公开目录表，只读零写入）；PostgREST 单请求 1000 行上限——分页循环拉满 2062 行后内存索引，筛选/翻页全程零请求',
+      '性能：每页 60 件分页 + 图标 lazy 加载；41 件缺图标条目统一占位图+onerror 双保险',
+      '来源渲染规格：商人/任务/掉落/成就/制造/商城/宝藏/事件/节日九类结构化渲染 + sources 空时 source_text 原文兜底（剥离 |c/|r/|n/|T|t/|H|h 标记），75 件官方无来源显示「来源未知」',
+      '「可放宠物」筛选 = 官方子分类「宠物床」（11 件，数据驱动零清单常量）；3D 展示一期不做'
+    ]
+  },
   {
     id: 'v3.2.0-s2-temple-remnant-fix',
     version: 'v3.2.0',
