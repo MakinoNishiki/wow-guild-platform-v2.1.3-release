@@ -16,9 +16,9 @@ resize_icons.py — 家宅装饰原生图标 → 128×128 终版压缩入库（�
     scripts/decor/out/icons_manifest.json          files[fileID] 增补 final_size/final_bytes
 
 增量：manifest 已含 final_bytes 且目标 PNG 在盘上即跳过，重跑零重写。
-说明：原生 400×400 全量约 99MB 超 50MB 红线，终版统一压 128×128（任务书：过大压一遍、
-过小不拉申；本批原生全 400×400，无拉申件）。原生件留 scripts/decor/out/icons-native/
-（产物目录 gitignore 不入库），可复跑再生。
+说明：原生全量实测 87.0MB 超 50MB 红线，终版统一压 128×128（任务书：过大压一遍、
+过小不拉申；本批原生 400×400 共 2000 件压缩、21 件原生 128×128 原样落盘不拉申）。
+原生件留 scripts/decor/out/icons-native/（产物目录 gitignore 不入库），可复跑再生。
 """
 import argparse
 import json
