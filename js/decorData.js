@@ -162,8 +162,8 @@
     // 搜索（模糊即时，REQ-084 同款清除钮：有内容才显示、点击/Esc 清空、焦点留存）
     const searchInput = $('dhSearch'), searchClear = $('dhSearchClear');
     const syncClear = () => { searchClear.style.display = searchInput.value ? 'block' : 'none'; };
-    const clearSearch = () => { searchInput.value = ''; state.search = ''; state.page = 1; syncClear(); searchInput.focus(); render(true); };
-    searchInput.oninput = e => { state.search = e.target.value.trim().toLowerCase(); state.page = 1; syncClear(); render(true); };
+    const clearSearch = () => { searchInput.value = ''; state.search = ''; state.page = 1; syncClear(); searchInput.focus(); refreshCount(); render(true); };
+    searchInput.oninput = e => { state.search = e.target.value.trim().toLowerCase(); state.page = 1; syncClear(); refreshCount(); render(true); };
     searchInput.onkeydown = e => { if (e.key === 'Escape' && searchInput.value) clearSearch(); };
     searchClear.onclick = clearSearch;
 

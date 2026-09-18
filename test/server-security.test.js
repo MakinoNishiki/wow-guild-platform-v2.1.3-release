@@ -14,6 +14,7 @@ const USER = { id: "user-a", app_metadata: {} };
 
 test("静态文件只允许前端公开资源", () => {
   assert.equal(isPublicStaticFile(path.join(ROOT, "index.html")), true);
+  assert.equal(isPublicStaticFile(path.join(ROOT, "decor.html")), true);
   assert.equal(isPublicStaticFile(path.join(ROOT, "js", "app.js")), true);
   assert.equal(isPublicStaticFile(path.join(ROOT, "assets", "brand", "favicon-32.png")), true);
   assert.equal(isPublicStaticFile(path.join(ROOT, ".env")), false);

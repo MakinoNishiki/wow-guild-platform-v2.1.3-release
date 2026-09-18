@@ -6,8 +6,9 @@ const path = require("path");
 const { execSync } = require("child_process");
 
 const ROOT = __dirname;
-// 任务书 #23 WP2：data.html 数据公示页（免登录公开页，与 index.html 同级放行）
-const PUBLIC_STATIC_FILES = new Set([path.join(ROOT, "index.html"), path.join(ROOT, "data.html")]);
+// 任务书 #23 WP2：data.html 数据公示页（免登录公开页，与 index.html 同级放行）；
+// 任务书 #51 WP2：decor.html 家宅图鉴公示页同级放行（免登录，anon 只读）
+const PUBLIC_STATIC_FILES = new Set([path.join(ROOT, "index.html"), path.join(ROOT, "data.html"), path.join(ROOT, "decor.html")]);
 const PUBLIC_STATIC_ROOTS = ["assets", "css", "js"].map(
   (dir) => `${path.join(ROOT, dir)}${path.sep}`
 );

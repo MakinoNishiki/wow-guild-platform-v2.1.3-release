@@ -269,3 +269,56 @@
   .dh-card:hover { transform: none; }
   .dh-loading::before { animation: none; }
 }
+
+/* ============================================================
+   任务书 #51 WP2：公开壳外壳（decor.html）——.data-decor-body 作用域，登录壳零影响
+   独立版式：居中 1100px 版心，不套主应用框架；配色复用 main.css 暗色变量体系；
+   页头/页脚镜像 data-public.css 的 .dp-header/.dp-footer 公示同款观感（不引用 dp- 类，
+   data.html 与 decor.html 各自独立文件零交叉加载）。
+   ============================================================ */
+.data-decor-body {
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  min-height: 100vh;
+}
+
+.dh-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 24px 20px 16px;
+  border-bottom: 1px solid var(--border-color);
+  flex-wrap: wrap;
+}
+.dh-brand { display: flex; align-items: center; gap: 12px; }
+.dh-logo { width: 48px; height: 48px; border-radius: 8px; }
+.dh-title { font-size: 22px; font-weight: 700; color: var(--gold); }
+.dh-subtitle { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+.dh-nav-link { text-decoration: none; flex: none; }
+
+/* 筛选栏/主区/页脚收入 1100px 版心（登录壳由 .page 容器约束，公开壳此处自补） */
+.data-decor-body .dh-filterbar {
+  width: min(1100px, calc(100% - 32px));
+  margin: 16px auto;
+}
+.data-decor-body .dh-main {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 4px 20px 24px;
+}
+.dh-footer {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 16px 20px 48px;
+  font-size: 12px;
+  color: var(--text-muted);
+  border-top: 1px solid var(--border-color);
+}
+
+@media (max-width: 768px) {
+  .dh-header { padding: 16px 14px 12px; }
+  .data-decor-body .dh-main { padding: 4px 14px 20px; }
+}
