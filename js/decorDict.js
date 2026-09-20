@@ -131,11 +131,12 @@
     { key: '5+', label: '容量 5+', match: c => c >= 5 },
   ];
 
-  // ---- 摆放环境 ----
+  // ---- 摆放环境（任务书 #51-补丁 第四节：四档砍三档） ----
+  // 数据依据（顾问 RPC 直连实测 2026-09-18，直接采信）：indoors=true=2062（全量，「室内」档=全部无筛选价值，砍）；
+  // outdoors=true=2020、双可=2020（「均可」与「室外」恒等，砍）；仅室内=42（39 房间+9144/10952/14583）；仅室外=0。
   const ENV_OPTIONS = [
-    { key: 'indoor', label: '室内', match: r => r.indoors === true },
-    { key: 'outdoor', label: '室外', match: r => r.outdoors === true },
-    { key: 'both', label: '均可', match: r => r.indoors === true && r.outdoors === true },
+    { key: 'outdoor', label: '可放室外', match: r => r.outdoors === true },
+    { key: 'indoor_only', label: '仅室内', match: r => r.indoors === true && r.outdoors !== true },
   ];
 
   window.DecorDict = {

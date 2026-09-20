@@ -14,7 +14,7 @@ const ROOT = path.join(__dirname, '..');
 const SHOT_DIR = path.join(ROOT, 'backup', '2026-09-18-task51-wp2');
 const PORT = 15651;
 const BASE = `http://127.0.0.1:${PORT}`;
-const VER = '20260918.65';
+const VER = '20260919.66';
 
 const env = {};
 for (const line of fs.readFileSync(path.join(ROOT, '.env'), 'utf8').split(/\r?\n/)) {
@@ -77,14 +77,16 @@ function staticAsserts() {
   check('A5 decor.html 零数据逻辑/常量内嵌（无 fetch/表名/词表键/渲染函数）',
     !/fetch\(|decor_catalog|CURRENCY_NAMES|ITEM_NAMES|SUBCATEGORY_NAMES|window\.DecorDict\s*=|function\s+(loadData|render|sourceText|priceText)/.test(decor));
   check('A6 decor.html 版本串全为 ' + VER + '（注释+4 处引用）',
-    (decor.match(/20260918\.65/g) || []).length === 5 && !/\?v=(?!20260918\.65)/.test(decor));
+    (decor.match(new RegExp(VER.replace('.', '\\.'), 'g')) || []).length === 5 && !new RegExp('\\?v=(?!' + VER.replace('.', '\\.') + ')').test(decor));
   check('A7 decor.html 头部互链指向 data.html', /<a[^>]+href="data\.html"[^>]*>副本掉落公示<\/a>/.test(decor));
   check('A8 骨架双壳零差异（#dhFilterBar + #dhMain + dh-loading 初始态）',
     /id="dhFilterBar"/.test(decor) && /id="dhMain"/.test(decor) && /<div class="dh-loading">数据加载中…<\/div>/.test(decor));
 
   check('B1 data.html 顶部互链指向 decor.html（有且仅有一处）',
     (data.match(/href="decor\.html"/g) || []).length === 1);
-  check('B2 data.html 版本串同步递增为 ' + VER + '（7 处，无旧串残留）',
+  // data.html 版本串停留 20260918.65：#51-补丁2 版本串递增仅及 index.html/decor.html——
+  // data.html 引用的 main.css/data-public.css/dataPublic.js/lootTaxonomy.js 本批零改动，按规范不递增
+  check('B2 data.html 版本串停留 20260918.65 ×7（引用资产本批零改动，不递增；无更旧串残留）',
     (data.match(/20260918\.65/g) || []).length === 7 && !/20260816\.64/.test(data));
   check('B3 data.html 零 decor 三件套引用（不交叉加载，仅互链）',
     !/decorData\.js|decorDict\.js|decor-public\.css/.test(data));
@@ -146,12 +148,13 @@ async function browserAsserts() {
   check('D3 首页 60 卡 + 分页「第 1/35 页 · 共 2062 件」',
     cards === 60 && pagerText.includes('第 1/35 页') && pagerText.includes(`共 ${dbTotal} 件`), `${cards} 卡, ${pagerText.trim()}`);
 
-  // D4 首页占位图 = 库内前 60 件缺图标数
-  const first60 = await anonGet('select=record_id,icon_file_id&order=record_id.asc&limit=60');
+  // D4 首页占位图 = 库内新序首 60 件缺图标数【2026-09-19 口径同步（任务书 #51-补丁 第一节排序沉底）：
+  //    装饰在前房间沉底，首页窗口=装饰序前 60 件（entry_type=1）；缺图标 39 间房间已沉底，期望=0】
+  const first60 = await anonGet('select=record_id,icon_file_id&entry_type=eq.1&order=record_id.asc&limit=60');
   const expectPh = first60.filter(r => r.icon_file_id == null).length;
   const actualPh = await page.locator('.dh-grid .dh-card img').evaluateAll(
     imgs => imgs.filter(i => i.src.endsWith('_placeholder.png')).length);
-  check('D4 首页占位图计数 = 库内前 60 件缺图标数', actualPh === expectPh, `页面=${actualPh} 库=${expectPh}`);
+  check('D4 首页占位图计数 = 库内新序首 60 件缺图标数（装饰序，房间沉底）', actualPh === expectPh, `页面=${actualPh} 库=${expectPh}`);
 
   // D5 基准六件详情（搜索名称→点卡→断言来源区）
   for (const item of SIX) {
@@ -204,12 +207,12 @@ async function browserAsserts() {
   hit = await page.locator('#dhCount').textContent();
   check('D6c 重置筛选还原全量', hit.includes(`共 ${dbTotal} 件`), hit.trim());
 
-  // D7 翻页：第 2 页首卡 = 库内第 61 件
-  const [row61] = await anonGet('select=record_id&order=record_id.asc&offset=60&limit=1');
+  // D7 翻页：第 2 页首卡 = 库内装饰序第 61 件【2026-09-19 口径同步（#51-补丁 第一节）：旧=全量第 61 件 487，新=装饰序第 61 件 718】
+  const [row61] = await anonGet('select=record_id&entry_type=eq.1&order=record_id.asc&offset=60&limit=1');
   await page.locator('.dh-pager button:text-is("2")').click();
   await page.waitForFunction(() => [...document.querySelectorAll('.dh-pager-info')].some(el => el.textContent.includes('第 2/35 页')));
   const firstRid = await page.locator('.dh-grid .dh-card').first().getAttribute('data-rid');
-  check('D7 翻页第 2 页首卡 = 库内第 61 件', +firstRid === row61.record_id, `页面 rid=${firstRid} 库 rid=${row61.record_id}`);
+  check('D7 翻页第 2 页首卡 = 库内装饰序第 61 件（新口径）', +firstRid === row61.record_id, `页面 rid=${firstRid} 库 rid=${row61.record_id}`);
 
   // D8 空态：无命中 → 提示 + 重置引导还原
   await page.locator('#dhSearch').fill('绝不存在的装饰xyz123');
@@ -257,7 +260,8 @@ async function browserAsserts() {
   await page.locator('.dh-modal-close').click();
   await page.locator('#dhSearch').fill('');
 
-  // D12 768px 窄屏：筛选折叠↔展开、网格降列（minmax 150→104 + 图标 72→56 媒体查询收小）、两态截图
+  // D12 768px 窄屏：筛选折叠↔展开、网格降列（minmax 190→132 + 图标 104→80 媒体查询收小，
+  //      2026-09-19 口径同步=#51-补丁 第二节图标放大后双态：桌面 104px / 768 档 80px）、两态截图
   await page.setViewportSize({ width: 768, height: 900 });
   await page.waitForSelector('.dh-grid .dh-card');
   const rowsHidden = await page.locator('#dhFilterRows').isHidden();
@@ -272,8 +276,8 @@ async function browserAsserts() {
   const deskIcon = await page.locator('.dh-icon-wrap').first().evaluate(el => getComputedStyle(el).width);
   const deskMin = await page.locator('.dh-grid').evaluate(el => getComputedStyle(el).gridTemplateColumns);
   const narrowColW = parseFloat(narrowMin.split(' ')[0]), deskColW = parseFloat(deskMin.split(' ')[0]);
-  check('D12 768px 窄屏：筛选栏折叠↔展开 + 网格降列（列宽/图标收小）',
-    rowsHidden && toggleVisible && rowsShown && narrowIcon === '56px' && deskIcon === '72px' && narrowColW < deskColW,
+  check('D12 768px 窄屏：筛选栏折叠↔展开 + 网格降列（列宽/图标收小，放大后双态 104/80）',
+    rowsHidden && toggleVisible && rowsShown && narrowIcon === '80px' && deskIcon === '104px' && narrowColW < deskColW,
     `图标 768=${narrowIcon} 桌面=${deskIcon}；列宽 768=${narrowColW}px 桌面=${deskColW}px`);
 
   // D13 全程零 JS 报错、零 ≥400 响应（anon 只读通道）

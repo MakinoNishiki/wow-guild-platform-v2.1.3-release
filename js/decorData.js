@@ -82,7 +82,10 @@
       if (state.petOnly && !(Array.isArray(r.subcategory_ids) && r.subcategory_ids.includes(D.PET_SUBCATEGORY_ID))) return false;
       if (state.roomsOnly && r.entry_type !== 2) return false;
       return true;
-    });
+      // 任务书 #51-补丁 第一节（2026-09-18）：默认排序——装饰在前、房间沉底（观感修复：缺图标 41 件中
+      // 39 件为低 record_id 房间条目，旧序扎堆首屏）；第一键 entry_type===2 沉底，第二键 record_id 升序
+      // （filter 保 REST 原生 record_id asc，sort 稳定即组内原序）；不加排序选择器，默认序即唯一序
+    }).sort((a, b) => (a.entry_type === 2 ? 1 : 0) - (b.entry_type === 2 ? 1 : 0));
   }
 
   // ---- 筛选栏（结构 JS 生成，双壳零骨架差异） ----
@@ -143,10 +146,11 @@
       state.costTier = costDefs[i].key; state.page = 1; refreshChips(); render(true);
     });
 
-    // 摆放环境（单选）
+    // 摆放环境（单选；任务书 #51-补丁 第四节：四档砍三档——「室内」=全部无筛选价值、「均可」与「室外」恒等，
+    // 词表 ENV_OPTIONS 已同步精简；三档计数按新口径动态渲染，「全部」档同样带计数 2062）
     const envDefs = [{ key: '', label: '全部' }, ...D.ENV_OPTIONS];
     $('dhEnvChips').innerHTML = envDefs.map(e =>
-      chip(e.label, state.env === e.key, e.key ? countBy(r => e.match(r)) : null)).join('');
+      chip(e.label, state.env === e.key, e.key ? countBy(r => e.match(r)) : rows.length)).join('');
     [...$('dhEnvChips').children].forEach((btn, i) => btn.onclick = () => {
       state.env = envDefs[i].key; state.page = 1; refreshChips(); render(true);
     });
@@ -200,15 +204,40 @@
   // ---- 网格渲染 ----
   function iconSrc(r) { return r.icon_file_id != null ? `assets/decor-icons/${r.icon_file_id}.png` : PLACEHOLDER; }
 
+  // 任务书 #51-补丁 第三节：分类路径行（主类 · 子类；多分类取第一个主类+第一个子类；
+  // 子类 34/35 词表已映射父类名（杂项/房间），与主类同名时去重只显一次；房间件显示「房间」；无子类仅显主类名）
+  function catPathText(r) {
+    if (r.entry_type === 2) return '房间';
+    const cat = Array.isArray(r.category_ids) && r.category_ids.length ? (D.CATEGORY_NAMES[r.category_ids[0]] || `分类 ${r.category_ids[0]}`) : '';
+    const sub = Array.isArray(r.subcategory_ids) && r.subcategory_ids.length ? (D.SUBCATEGORY_NAMES[r.subcategory_ids[0]] || `子类 ${r.subcategory_ids[0]}`) : '';
+    if (cat && sub && sub !== cat) return `${cat} · ${sub}`;
+    return cat || sub || '—';
+  }
+
+  // 任务书 #51-补丁 第三节：来源摘要行——sources[0] 复用详情弹窗同款 sourceText 措辞（单行截断交给 CSS）；
+  // sources 空且 source_text 非空 → 剥离控制码取首行截断 24 字+…；全无 → 「来源未知」（灰字 .dh-src-unknown）
+  function srcSummaryText(r) {
+    if (Array.isArray(r.sources) && r.sources.length) return { text: sourceText(r.sources[0]), unknown: false };
+    const raw = stripRawText(r.source_text);
+    if (raw) {
+      const first = raw.split('\n')[0];
+      return { text: first.length > 24 ? first.slice(0, 24) + '…' : first, unknown: false };
+    }
+    return { text: '来源未知', unknown: true };
+  }
+
   function cardHtml(r) {
     const q = r.quality != null ? r.quality : 1;
     const badges = [];
     if (r.entry_type === 2) badges.push('<span class="dh-badge dh-badge-room">房间</span>');
     if (Array.isArray(r.subcategory_ids) && r.subcategory_ids.includes(D.PET_SUBCATEGORY_ID)) badges.push('<span class="dh-badge dh-badge-pet">可放宠物</span>');
     if (r.placement_cost != null) badges.push(`<span class="dh-badge">容量 ${r.placement_cost}</span>`);
+    const src = srcSummaryText(r);
     return `<div class="dh-card" data-rid="${r.record_id}" tabindex="0" role="button" aria-label="${esc(r.name)}">
       <div class="dh-icon-wrap"><img src="${iconSrc(r)}" alt="" loading="lazy" onerror="this.onerror=null;this.src='${PLACEHOLDER}'"></div>
       <div class="dh-name dh-q${q}">${esc(r.name)}</div>
+      <div class="dh-cat">${esc(catPathText(r))}</div>
+      <div class="dh-src${src.unknown ? ' dh-src-unknown' : ''}">${esc(src.text)}</div>
       <div class="dh-badges">${badges.join('')}</div>
     </div>`;
   }

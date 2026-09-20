@@ -61,9 +61,11 @@
 .dh-chip.on .dh-chip-n { color: var(--gold-dark); }
 
 /* ---- 网格与卡片 ---- */
+/* 任务书 #51-补丁 第二节：图标显示尺寸放大——网格 minmax 150→190、图标 img 64→96px 显示
+   （128 源图 1.33x 缩放可接受，本阶段不换图源；768 断点同步放大，换图待侦察闸 b 定夺另行指令） */
 .dh-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
   gap: 12px;
 }
 .dh-card {
@@ -81,8 +83,8 @@
 .dh-card:hover { transform: translateY(-2px); border-color: var(--gold-dark); }
 .dh-card:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
 .dh-icon-wrap {
-  width: 72px;
-  height: 72px;
+  width: 104px;
+  height: 104px;
   border-radius: 8px;
   border: 1px solid var(--border-color);
   background: var(--bg-primary);
@@ -91,7 +93,7 @@
   justify-content: center;
   overflow: hidden;
 }
-.dh-icon-wrap img { width: 64px; height: 64px; image-rendering: auto; }
+.dh-icon-wrap img { width: 96px; height: 96px; image-rendering: auto; }
 .dh-name {
   font-size: 13px;
   font-weight: 600;
@@ -104,6 +106,18 @@
   min-height: 2.8em;
   word-break: break-all;
 }
+/* 任务书 #51-补丁 第三节：分类路径行 + 来源摘要行（WoWDB 式摘要，小字一档、颜色降一级） */
+.dh-cat, .dh-src {
+  font-size: 11px;
+  line-height: 1.4;
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.dh-cat { color: var(--text-muted); }
+.dh-src { color: var(--text-secondary); }
+.dh-src-unknown { color: var(--text-muted); font-style: italic; }
 /* 品质色（WoW 官方配色：0 灰 1 白 2 绿 3 蓝 4 紫 5 橙） */
 .dh-q0 { color: #9d9d9d; }
 .dh-q1 { color: #ffffff; }
@@ -205,14 +219,15 @@
 .dh-modal-overlay.show .dh-modal { transform: scale(1); }
 .dh-modal-head { display: flex; gap: 14px; align-items: flex-start; }
 .dh-modal-icon {
-  width: 80px;
-  height: 80px;
+  width: 136px;
+  height: 136px;
   flex: none;
   border-radius: 8px;
   border: 1px solid var(--border-color);
   background: var(--bg-primary);
 }
-.dh-modal-icon img { width: 72px; height: 72px; margin: 4px; }
+/* 任务书 #51-补丁 第二节：详情弹窗图标放大至 128px 显示（源图 128 原生显示，零缩放损耗） */
+.dh-modal-icon img { width: 128px; height: 128px; margin: 4px; }
 .dh-modal-title { font-size: 17px; font-weight: 700; line-height: 1.4; }
 .dh-modal-sub { color: var(--text-muted); font-size: 12px; margin-top: 4px; }
 .dh-modal-close {
@@ -250,17 +265,30 @@
 }
 .dh-src-raw { color: var(--text-secondary); }
 
-/* ---- 768px 窄屏：网格降列 + 筛选栏折叠 ---- */
+/* ---- 768px 窄屏：网格降列 + 筛选栏折叠（#51-补丁 第二节：卡片/图标同比放大适配） ---- */
 @media (max-width: 768px) {
-  .dh-grid { grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 8px; }
-  .dh-icon-wrap { width: 56px; height: 56px; }
-  .dh-icon-wrap img { width: 48px; height: 48px; }
+  .dh-grid { grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)); gap: 8px; }
+  .dh-icon-wrap { width: 80px; height: 80px; }
+  .dh-icon-wrap img { width: 72px; height: 72px; }
   .dh-name { font-size: 12px; }
   .dh-filter-toggle { display: inline-block; }
   .dh-filter-rows { display: none; }
   .dh-filterbar.filters-open .dh-filter-rows { display: block; }
   .dh-count { margin-left: 0; flex-basis: 100%; }
   .dh-meta-rows { grid-template-columns: 1fr; }
+}
+
+/* ---- 任务书 #51-补丁 第六节：:focus-visible 补登（WP2 UI 审计登记项）——
+   全部可点击/可聚焦元素键盘焦点轨迹可见；outline 2px 既有 accent 金色、offset 2px；
+   纯轮廓无动画，不动既有 :hover/:active 表现（.dh-card 既有规则在卡片段） ---- */
+.dh-chip:focus-visible,
+.dh-pager button:focus-visible,
+.dh-modal-close:focus-visible,
+.dh-filterbar .btn:focus-visible,
+.dh-empty .btn:focus-visible,
+.dh-error .btn:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
 }
 
 /* ---- reduced-motion 降级 ---- */
