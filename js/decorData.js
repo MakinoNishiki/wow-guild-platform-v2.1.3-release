@@ -29,6 +29,7 @@
     petOnly: false,      // 可放宠物（subcategory 含 53，方案 A 终审）
     roomsOnly: false,    // 房间/户型（entry_type=2）
     page: 1,
+    pageSize: 0,         // 任务书 #51-补丁3：动态每页件数（0=未实测，首渲染前实测列数×8 行）
   };
 
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -204,6 +205,52 @@
   // ---- 网格渲染 ----
   function iconSrc(r) { return r.icon_file_id != null ? `assets/decor-icons/${r.icon_file_id}.png` : PLACEHOLDER; }
 
+  // ---- 每页件数动态化（任务书 #51-补丁3 第一节：PAGE_SIZE 常量 60 → 实测列数 × 8 行） ----
+  // 列数取法=网格渲染后 getComputedStyle(gridEl).gridTemplateColumns 实测，不写死断点、不复制媒体查询逻辑；
+  // 探针同步三连（append→getComputedStyle 强制排版→remove，同一 JS 任务内完成，无绘制无闪烁）。
+  // 首挂载先算再渲染；resize 防抖 300ms 重算，件数变化时记当前页首件 record_id 锚点重定位（不粗暴回第 1 页）；
+  // 筛选/搜索/排序变化回第 1 页现逻辑不动；页码语义随窗口宽度漂移=任务书明示的已知代价。
+  const ROWS_PER_PAGE = 8;
+  function measureColumns() {
+    if (!main) return 0;
+    const probe = document.createElement('div');
+    probe.className = 'dh-grid';
+    probe.style.visibility = 'hidden';
+    probe.innerHTML = '<div class="dh-card"></div>';
+    main.appendChild(probe);
+    const tracks = getComputedStyle(probe).gridTemplateColumns;
+    probe.remove();
+    // 隐藏态（登录壳切去他页 display:none）auto-fill 不可解析 → 原样 repeat() 串或 none，判不可测
+    if (!tracks || tracks === 'none' || tracks.indexOf('repeat(') !== -1) return 0;
+    return Math.max(1, tracks.split(/\s+/).filter(Boolean).length);
+  }
+  function currentPageSize() {
+    if (!state.pageSize) {
+      const cols = measureColumns();
+      state.pageSize = cols ? cols * ROWS_PER_PAGE : D.PAGE_SIZE; // 隐藏态降级=词表旧常量兜底
+    }
+    return state.pageSize;
+  }
+  let resizeTimer = null;
+  window.addEventListener('resize', () => {
+    if (!started || !main) return;
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(() => {
+      const cols = measureColumns();
+      if (!cols) return; // 隐藏态不测不动
+      const newSize = cols * ROWS_PER_PAGE;
+      if (newSize === state.pageSize) return;
+      const rows = filteredRows();
+      const anchor = rows[(state.page - 1) * state.pageSize]; // 当前页首件锚点
+      state.pageSize = newSize;
+      if (anchor) {
+        const idx = rows.findIndex(r => r.record_id === anchor.record_id);
+        state.page = idx >= 0 ? Math.floor(idx / newSize) + 1 : 1;
+      }
+      render();
+    }, 300);
+  });
+
   // 任务书 #51-补丁 第三节：分类路径行（主类 · 子类；多分类取第一个主类+第一个子类；
   // 子类 34/35 词表已映射父类名（杂项/房间），与主类同名时去重只显一次；房间件显示「房间」；无子类仅显主类名）
   function catPathText(r) {
@@ -214,8 +261,9 @@
     return cat || sub || '—';
   }
 
-  // 任务书 #51-补丁 第三节：来源摘要行——sources[0] 复用详情弹窗同款 sourceText 措辞（单行截断交给 CSS）；
-  // sources 空且 source_text 非空 → 剥离控制码取首行截断 24 字+…；全无 → 「来源未知」（灰字 .dh-src-unknown）
+  // 任务书 #51-补丁 第三节：来源摘要行——sources[0] 复用详情弹窗同款 sourceText 措辞；
+  // 任务书 #51-补丁3 第二节：CSS 两行截断（-webkit-line-clamp:2 + 标准 line-clamp 回退，单行截断砍尾修复）；
+  // sources 空且 source_text 非空 → 剥离控制码取首行截断 24 字+…；全无 → 「来源未知」（灰字 .dh-src-unknown，单行维持）
   function srcSummaryText(r) {
     if (Array.isArray(r.sources) && r.sources.length) return { text: sourceText(r.sources[0]), unknown: false };
     const raw = stripRawText(r.source_text);
@@ -231,14 +279,16 @@
     const badges = [];
     if (r.entry_type === 2) badges.push('<span class="dh-badge dh-badge-room">房间</span>');
     if (Array.isArray(r.subcategory_ids) && r.subcategory_ids.includes(D.PET_SUBCATEGORY_ID)) badges.push('<span class="dh-badge dh-badge-pet">可放宠物</span>');
-    if (r.placement_cost != null) badges.push(`<span class="dh-badge">容量 ${r.placement_cost}</span>`);
+    // 任务书 #51-补丁3 第二节：容量徽标挪图标右上角角标（.dh-cost-badge 绝对定位），原底部容量行删除；
+    // 无房间/宠物徽标时整行省略（净空高，抵来源一行变两行）
+    const cost = r.placement_cost != null ? `<span class="dh-badge dh-cost-badge">容量 ${r.placement_cost}</span>` : '';
     const src = srcSummaryText(r);
     return `<div class="dh-card" data-rid="${r.record_id}" tabindex="0" role="button" aria-label="${esc(r.name)}">
-      <div class="dh-icon-wrap"><img src="${iconSrc(r)}" alt="" loading="lazy" onerror="this.onerror=null;this.src='${PLACEHOLDER}'"></div>
+      <div class="dh-icon-wrap"><img src="${iconSrc(r)}" alt="" loading="lazy" onerror="this.onerror=null;this.src='${PLACEHOLDER}'">${cost}</div>
       <div class="dh-name dh-q${q}">${esc(r.name)}</div>
       <div class="dh-cat">${esc(catPathText(r))}</div>
       <div class="dh-src${src.unknown ? ' dh-src-unknown' : ''}">${esc(src.text)}</div>
-      <div class="dh-badges">${badges.join('')}</div>
+      ${badges.length ? `<div class="dh-badges">${badges.join('')}</div>` : ''}
     </div>`;
   }
 
@@ -260,10 +310,11 @@
 
   function render() {
     const rows = filteredRows();
-    const pages = Math.max(1, Math.ceil(rows.length / D.PAGE_SIZE));
+    const size = currentPageSize(); // 任务书 #51-补丁3：动态每页件数=实测列数×8 行（首挂载先算再渲染）
+    const pages = Math.max(1, Math.ceil(rows.length / size));
     if (state.page > pages) state.page = pages;
-    const start = (state.page - 1) * D.PAGE_SIZE;
-    const pageRows = rows.slice(start, start + D.PAGE_SIZE);
+    const start = (state.page - 1) * size;
+    const pageRows = rows.slice(start, start + size);
 
     if (!rows.length) {
       main.innerHTML = `<div class="dh-empty">

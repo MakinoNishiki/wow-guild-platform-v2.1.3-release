@@ -5,6 +5,9 @@
 //           双向互链、768px 窄屏；A 组静态断言锁双壳同源（decor.html 零数据逻辑内嵌、data.html 零越界改动）。
 // 零写入声明：全程只读（anon REST 对照计数），不建测试用户/公会/数据。用法: node scripts/verify-task51-wp2.js
 // 截图输出 backup/2026-09-18-task51-wp2/
+// 【口径同步】2026-09-21 任务书 #51-补丁3：①每页件数动态化（60 常量 → 实测列数×8 行）——D3/D4/D7 旧 60 卡
+//   口径改动态（浏览器内实测 gridTemplateColumns 列数×8 为期望基准）；②卡片版式重排（容量角标 .dh-cost-badge +
+//   底部容量行删除 + 来源两行截断）——新增 D15 版式断言。版本串 VER 随两壳递增。
 const fs = require('fs');
 const path = require('path');
 const { spawn, spawnSync } = require('child_process');
@@ -14,7 +17,7 @@ const ROOT = path.join(__dirname, '..');
 const SHOT_DIR = path.join(ROOT, 'backup', '2026-09-18-task51-wp2');
 const PORT = 15651;
 const BASE = `http://127.0.0.1:${PORT}`;
-const VER = '20260919.66';
+const VER = '20260919.67';
 
 const env = {};
 for (const line of fs.readFileSync(path.join(ROOT, '.env'), 'utf8').split(/\r?\n/)) {
@@ -143,18 +146,26 @@ async function browserAsserts() {
   check('D2 全量计数 = 库内 2062（装饰 2023 + 房间 39）',
     dbTotal === 2062 && dbDecor === 2023 && dbRooms === 39 && countText.includes(`共 ${dbTotal} 件`),
     `页面=${countText.trim()} 库=${dbTotal}/${dbDecor}/${dbRooms}`);
+  // D3 首页卡数 + 分页【2026-09-21 补丁3 动态口径：每页件数=实测列数×8 行（1100px 版心），页数随动】
+  const gridProbe = await page.evaluate(() => {
+    const tracks = getComputedStyle(document.querySelector('.dh-grid')).gridTemplateColumns;
+    const cols = tracks.split(/\s+/).filter(Boolean).length;
+    return { cols, size: cols * 8 };
+  });
+  const PAGE = gridProbe.size;
+  const PAGES = Math.max(1, Math.ceil(dbTotal / PAGE));
   const cards = await page.locator('.dh-grid .dh-card').count();
   const pagerText = await page.locator('.dh-pager-info').last().textContent();
-  check('D3 首页 60 卡 + 分页「第 1/35 页 · 共 2062 件」',
-    cards === 60 && pagerText.includes('第 1/35 页') && pagerText.includes(`共 ${dbTotal} 件`), `${cards} 卡, ${pagerText.trim()}`);
+  check(`D3 首页卡数=实测列数×8（公示壳 1366 视口/1100 版心实测 ${gridProbe.cols} 列×8=${PAGE}/页）+ 分页「第 1/${PAGES} 页 · 共 2062 件」`,
+    cards === PAGE && pagerText.includes(`第 1/${PAGES} 页`) && pagerText.includes(`共 ${dbTotal} 件`), `${cards} 卡, ${pagerText.trim()}`);
 
-  // D4 首页占位图 = 库内新序首 60 件缺图标数【2026-09-19 口径同步（任务书 #51-补丁 第一节排序沉底）：
-  //    装饰在前房间沉底，首页窗口=装饰序前 60 件（entry_type=1）；缺图标 39 间房间已沉底，期望=0】
-  const first60 = await anonGet('select=record_id,icon_file_id&entry_type=eq.1&order=record_id.asc&limit=60');
-  const expectPh = first60.filter(r => r.icon_file_id == null).length;
+  // D4 首页占位图 = 库内新序首 PAGE 件缺图标数【2026-09-21 补丁3 动态口径：窗口=装饰序前 PAGE 件（entry_type=1）；
+  //    历史口径：2026-09-19 排序沉底同步（装饰在前房间沉底，缺图标 39 间房间已沉底，期望=0）】
+  const firstPageRows = await anonGet(`select=record_id,icon_file_id&entry_type=eq.1&order=record_id.asc&limit=${PAGE}`);
+  const expectPh = firstPageRows.filter(r => r.icon_file_id == null).length;
   const actualPh = await page.locator('.dh-grid .dh-card img').evaluateAll(
     imgs => imgs.filter(i => i.src.endsWith('_placeholder.png')).length);
-  check('D4 首页占位图计数 = 库内新序首 60 件缺图标数（装饰序，房间沉底）', actualPh === expectPh, `页面=${actualPh} 库=${expectPh}`);
+  check(`D4 首页占位图计数 = 库内新序首 ${PAGE} 件缺图标数（装饰序，房间沉底）`, actualPh === expectPh, `页面=${actualPh} 库=${expectPh}`);
 
   // D5 基准六件详情（搜索名称→点卡→断言来源区）
   for (const item of SIX) {
@@ -207,12 +218,32 @@ async function browserAsserts() {
   hit = await page.locator('#dhCount').textContent();
   check('D6c 重置筛选还原全量', hit.includes(`共 ${dbTotal} 件`), hit.trim());
 
-  // D7 翻页：第 2 页首卡 = 库内装饰序第 61 件【2026-09-19 口径同步（#51-补丁 第一节）：旧=全量第 61 件 487，新=装饰序第 61 件 718】
-  const [row61] = await anonGet('select=record_id&entry_type=eq.1&order=record_id.asc&offset=60&limit=1');
+  // D7 翻页：第 2 页首卡 = 库内装饰序第 PAGE+1 件【2026-09-21 补丁3 动态口径：offset=PAGE（实测列数×8）；
+  //    历史口径：旧=全量第 61 件 487 → 2026-09-19 排序沉底=装饰序第 61 件 718 → 本批动态化】
+  const [rowNext] = await anonGet(`select=record_id&entry_type=eq.1&order=record_id.asc&offset=${PAGE}&limit=1`);
   await page.locator('.dh-pager button:text-is("2")').click();
-  await page.waitForFunction(() => [...document.querySelectorAll('.dh-pager-info')].some(el => el.textContent.includes('第 2/35 页')));
+  await page.waitForFunction(
+    p => [...document.querySelectorAll('.dh-pager-info')].some(el => el.textContent.includes(`第 2/${p} 页`)), PAGES);
   const firstRid = await page.locator('.dh-grid .dh-card').first().getAttribute('data-rid');
-  check('D7 翻页第 2 页首卡 = 库内装饰序第 61 件（新口径）', +firstRid === row61.record_id, `页面 rid=${firstRid} 库 rid=${row61.record_id}`);
+  check(`D7 翻页第 2 页首卡 = 库内装饰序第 ${PAGE + 1} 件（动态口径）`, +firstRid === rowNext.record_id, `页面 rid=${firstRid} 库 rid=${rowNext.record_id}`);
+
+  // D15（任务书 #51-补丁3 第二节）：卡片版式重排——容量角标在图标容器内 + 底部容量行绝迹 + 来源两行截断
+  const d15 = await page.evaluate(() => {
+    const cards = [...document.querySelectorAll('.dh-grid .dh-card')];
+    const badgeEl = document.querySelector('.dh-cost-badge');
+    const srcEl = document.querySelector('.dh-card .dh-src');
+    return {
+      n: cards.length,
+      costInIcon: cards.every(c => { const b = c.querySelector('.dh-cost-badge'); return !b || b.parentElement.classList.contains('dh-icon-wrap'); }),
+      noBottomCost: cards.every(c => { const b = c.querySelector('.dh-badges'); return !b || !b.textContent.includes('容量'); }),
+      clamp: srcEl ? getComputedStyle(srcEl).webkitLineClamp : null,
+      badgePos: badgeEl ? getComputedStyle(badgeEl).position : null,
+      badgeFont: badgeEl ? getComputedStyle(badgeEl).fontSize : null,
+    };
+  });
+  check(`D15 卡片版式：${d15.n} 卡容量角标全部位于 .dh-icon-wrap 内 + 底部容量行绝迹 + 来源两行截断（clamp=2）+ 角标 absolute/≤11px`,
+    d15.costInIcon && d15.noBottomCost && d15.clamp === '2' && d15.badgePos === 'absolute' && parseFloat(d15.badgeFont) <= 11,
+    `入容器=${d15.costInIcon} 无底部容量=${d15.noBottomCost} clamp=${d15.clamp} 角标=${d15.badgePos}/${d15.badgeFont}`);
 
   // D8 空态：无命中 → 提示 + 重置引导还原
   await page.locator('#dhSearch').fill('绝不存在的装饰xyz123');

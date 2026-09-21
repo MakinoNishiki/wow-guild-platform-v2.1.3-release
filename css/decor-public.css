@@ -83,6 +83,7 @@
 .dh-card:hover { transform: translateY(-2px); border-color: var(--gold-dark); }
 .dh-card:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
 .dh-icon-wrap {
+  position: relative; /* 任务书 #51-补丁3 第二节：容量角标定位父级 */
   width: 104px;
   height: 104px;
   border-radius: 8px;
@@ -94,6 +95,16 @@
   overflow: hidden;
 }
 .dh-icon-wrap img { width: 96px; height: 96px; image-rendering: auto; }
+/* 任务书 #51-补丁3 第二节：容量徽标 = 图标右上角角标（绝对定位；底色/圆角/描边沿袭 .dh-badge，
+   字号≤11px；仅覆图标右上角缘，不遮挡图标主体与边框描边） */
+.dh-cost-badge {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  padding: 0 4px;
+  font-size: 10px;
+  line-height: 1.5;
+}
 .dh-name {
   font-size: 13px;
   font-weight: 600;
@@ -106,18 +117,30 @@
   min-height: 2.8em;
   word-break: break-all;
 }
-/* 任务书 #51-补丁 第三节：分类路径行 + 来源摘要行（WoWDB 式摘要，小字一档、颜色降一级） */
+/* 任务书 #51-补丁 第三节：分类路径行 + 来源摘要行（WoWDB 式摘要，小字一档、颜色降一级）；
+   任务书 #51-补丁3 第二节：来源摘要单行截断砍尾修复 → 两行截断（-webkit-line-clamp:2 + 标准 line-clamp 回退），
+   「来源未知」灰字维持单行；分类行维持单行省略不动 */
 .dh-cat, .dh-src {
   font-size: 11px;
   line-height: 1.4;
   max-width: 100%;
-  white-space: nowrap;
   overflow: hidden;
+}
+.dh-cat {
+  color: var(--text-muted);
+  white-space: nowrap;
   text-overflow: ellipsis;
 }
-.dh-cat { color: var(--text-muted); }
-.dh-src { color: var(--text-secondary); }
-.dh-src-unknown { color: var(--text-muted); font-style: italic; }
+.dh-src {
+  color: var(--text-secondary);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  text-align: center;
+  word-break: break-all;
+}
+.dh-src-unknown { color: var(--text-muted); font-style: italic; white-space: nowrap; }
 /* 品质色（WoW 官方配色：0 灰 1 白 2 绿 3 蓝 4 紫 5 橙） */
 .dh-q0 { color: #9d9d9d; }
 .dh-q1 { color: #ffffff; }
@@ -270,6 +293,7 @@
   .dh-grid { grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)); gap: 8px; }
   .dh-icon-wrap { width: 80px; height: 80px; }
   .dh-icon-wrap img { width: 72px; height: 72px; }
+  .dh-cost-badge { font-size: 9px; padding: 0 3px; top: 1px; right: 1px; } /* #51-补丁3：角标同比例缩小，来源两行继承全局 */
   .dh-name { font-size: 12px; }
   .dh-filter-toggle { display: inline-block; }
   .dh-filter-rows { display: none; }
