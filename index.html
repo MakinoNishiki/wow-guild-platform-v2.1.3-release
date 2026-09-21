@@ -4,13 +4,13 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>魔兽管家</title>
-<!-- 静态资源版本号：20260919.68（任务书 #22 WP3-②：凡改动 js/css 的 commit 必须同步递增此处与所有 ?v= 查询串，见 docs/开发规范.md 第五章） -->
+<!-- 静态资源版本号：20260919.69（任务书 #22 WP3-②：凡改动 js/css 的 commit 必须同步递增此处与所有 ?v= 查询串，见 docs/开发规范.md 第五章） -->
 <link rel="icon" type="image/png" sizes="32x32" href="assets/brand/favicon-32.png">
 <link rel="icon" type="image/png" sizes="16x16" href="assets/brand/favicon-16.png">
-<link rel="stylesheet" href="css/main.css?v=20260919.68">
-<link rel="stylesheet" href="css/data-public.css?v=20260919.68"><!-- 任务书 #28 WP5：副本掉落 tab（选择器全 .dp- 前缀 + #page-lootdrop 作用域，零泄漏） -->
-<link rel="stylesheet" href="css/decor-public.css?v=20260919.68"><!-- 任务书 #51：家宅图鉴（选择器全 .dh- 前缀，零泄漏，双壳共用） -->
-<script src="assets/vendor/supabase-js-2.js?v=20260919.68"></script>
+<link rel="stylesheet" href="css/main.css?v=20260919.69">
+<link rel="stylesheet" href="css/data-public.css?v=20260919.69"><!-- 任务书 #28 WP5：副本掉落 tab（选择器全 .dp- 前缀 + #page-lootdrop 作用域，零泄漏） -->
+<link rel="stylesheet" href="css/decor-public.css?v=20260919.69"><!-- 任务书 #51：家宅图鉴（选择器全 .dh- 前缀，零泄漏，双壳共用） -->
+<script src="assets/vendor/supabase-js-2.js?v=20260919.69"></script>
 </head>
 <body>
 
@@ -61,10 +61,21 @@
     </div>
 
     <!-- 创建/加入公会 -->
+    <!-- REQ-138（任务书 #52 WP2，2026-09-18 运营拍板）：主次调换——多数注册者是团员，邀请码加入提为主路径
+         （btn-primary + 引导文案），创建公会降次级（btn-ghost）；handleCreateGuild/handleJoinGuild 零逻辑变更，
+         仅区块结构与文案；文案零 emoji（上传通道破坏在案） -->
     <div class="auth-form" id="authGuildForm" style="display:none">
-      <p class="auth-guild-hint">你还没有加入任何公会，请创建或加入一个</p>
+      <p class="auth-guild-hint">加入公会后即可使用全部功能</p>
       <div class="auth-field">
-        <label>创建新公会</label>
+        <div class="auth-field-hint">团员请向会长索取 8 位邀请码</div>
+        <label>邀请码</label>
+        <input type="text" id="joinInviteCode" placeholder="输入8位邀请码" class="auth-input" maxlength="8" style="text-transform:uppercase">
+      </div>
+      <button class="btn btn-primary auth-btn" onclick="handleJoinGuild()">加入公会</button>
+      <div class="auth-divider"><span>或者</span></div>
+      <div class="auth-field">
+        <div class="auth-field-hint">你是会长？创建新公会</div>
+        <label>公会名称</label>
         <input type="text" id="newGuildName" placeholder="输入公会名称" class="auth-input">
       </div>
       <div class="auth-field">
@@ -85,18 +96,15 @@
           <div class="autocomplete-dropdown" id="serverDropdown"></div>
         </div>
       </div>
-      <button class="btn btn-primary auth-btn" onclick="handleCreateGuild()">创建公会</button>
-      <div class="auth-divider"><span>或者</span></div>
-      <div class="auth-field">
-        <label>邀请码</label>
-        <input type="text" id="joinInviteCode" placeholder="输入8位邀请码" class="auth-input" maxlength="8" style="text-transform:uppercase">
-      </div>
-      <button class="btn auth-btn" onclick="handleJoinGuild()">加入公会</button>
+      <button class="btn btn-ghost auth-btn" onclick="handleCreateGuild()">创建公会</button>
       <div class="auth-divider"><span>或者</span></div>
       <button class="btn btn-ghost auth-btn" onclick="showLoginForm()">返回登录</button>
     </div>
 
     <div class="auth-error" id="authError"></div>
+    <!-- 任务书 #52 WP2（REQ-137 一期收尾）：公示页免登录出口——样式降一级不抢登录主流程；
+         新 Tab 打开（登录页驻留不丢输入态） -->
+    <div class="auth-public-links">无需登录：<a href="decor.html" target="_blank" rel="noopener">家宅图鉴公示</a> · <a href="data.html" target="_blank" rel="noopener">副本掉落公示</a></div>
   </div>
 </div>
 
@@ -224,6 +232,26 @@
     <div class="content-area">
       <!-- 仪表盘 -->
       <div class="page active" id="page-dashboard">
+        <!-- 任务书 #52 WP2（REQ-137 一期收尾）：首页双入口耦合——拒绝独立页孤岛；插于统计卡之前、
+             不影响既有 stats-grid/dashboard-grid 区块；复用 .card 体系（样式见 main.css .entry-cards 段），全角色可见 -->
+        <div class="entry-cards">
+          <div class="card entry-card" onclick="switchPage('attendance')">
+            <span class="entry-card-icon">⚔️</span>
+            <div class="entry-card-body">
+              <div class="entry-card-title">公会团队管理</div>
+              <div class="entry-card-desc">考勤、装备、心愿单——团长每晚的行政工作，十分钟打完</div>
+            </div>
+            <span class="entry-card-go">进入 →</span>
+          </div>
+          <div class="card entry-card" onclick="switchPage('decor')">
+            <span class="entry-card-icon">🏠</span>
+            <div class="entry-card-body">
+              <div class="entry-card-title">家宅</div>
+              <div class="entry-card-desc">2062 件家宅装饰全量目录，来源筛选一键到位</div>
+            </div>
+            <span class="entry-card-go">进入 →</span>
+          </div>
+        </div>
         <div class="stats-grid" id="statsGrid"></div>
         <div class="dashboard-grid">
           <div class="card">
@@ -1994,20 +2022,20 @@
   </div>
 </div>
 
-<script src="js/cloud.js?v=20260919.68"></script>
+<script src="js/cloud.js?v=20260919.69"></script>
 <!-- 任务书 #14：主数据层（快照兜底 + 加载层），须在 app.js 之前 -->
-<script src="js/masterDataSnapshot.js?v=20260919.68"></script>
-<script src="js/masterData.js?v=20260919.68"></script>
+<script src="js/masterDataSnapshot.js?v=20260919.69"></script>
+<script src="js/masterData.js?v=20260919.69"></script>
 <!-- 任务书 #22 WP2：职业/专精/职责图标集中映射（全站唯一取图处） -->
-<script src="js/iconMap.js?v=20260919.68"></script>
+<script src="js/iconMap.js?v=20260919.69"></script>
 <!-- 任务书 #31（REQ-097）：装备分类词表单一真源（公示页 chips / picker 过滤 / BUG-057 回填三处消费，须在 dataPublic.js 与 app.js 之前） -->
-<script src="js/lootTaxonomy.js?v=20260919.68"></script>
+<script src="js/lootTaxonomy.js?v=20260919.69"></script>
 <!-- 任务书 #28 WP5：副本掉落渲染层（双壳同源；无 data-public-body 不自动启动，由 app.js 懒挂载，须在 app.js 之前） -->
-<script src="js/dataPublic.js?v=20260919.68"></script>
+<script src="js/dataPublic.js?v=20260919.69"></script>
 <!-- 任务书 #51（REQ-137 一期）：家宅图鉴词表单一真源（价格/分类/尺寸/来源词表，须在 decorData.js 之前） -->
-<script src="js/decorDict.js?v=20260919.68"></script>
+<script src="js/decorDict.js?v=20260919.69"></script>
 <!-- 任务书 #51：家宅图鉴数据层+渲染层（双壳同源；无 data-decor-body 不自动启动，由 app.js 懒挂载，须在 app.js 之前） -->
-<script src="js/decorData.js?v=20260919.68"></script>
-<script src="js/app.js?v=20260919.68"></script>
+<script src="js/decorData.js?v=20260919.69"></script>
+<script src="js/app.js?v=20260919.69"></script>
 </body>
 </html>

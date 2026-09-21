@@ -880,6 +880,45 @@ body {
   gap: 20px;
 }
 
+/* ==================== 任务书 #52 WP2：dashboard 顶部双入口大卡（REQ-137 一期收尾） ==================== */
+/* 复用 .card 体系（不新建并行体系），本段只加排布与交互反馈：hover 提一档亮（深色浮层纪律）、
+   :active 缩放按下即反馈（v2 §4.1/§7 反馈铁律）；全角色可见，不涉及权限 */
+.entry-cards {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+.entry-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 0; /* 抵消 .card 默认底距，由 .entry-cards 容器统一承担间距 */
+  cursor: pointer;
+}
+.entry-card:hover {
+  background: var(--bg-tertiary); /* 底色亮一档 */
+  border-color: var(--gold-dark);
+}
+.entry-card:active {
+  transform: scale(0.97);
+  transition-duration: 100ms;
+}
+.entry-card-icon { font-size: 28px; line-height: 1; }
+.entry-card-body { min-width: 0; }
+.entry-card-title { font-size: 15px; font-weight: 600; color: var(--text-primary); }
+.entry-card-desc { font-size: 12px; color: var(--text-secondary); margin-top: 4px; }
+.entry-card-go {
+  margin-left: auto;
+  color: var(--gold);
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+@media (max-width: 768px) {
+  .entry-cards { grid-template-columns: 1fr; } /* 窄屏纵排（任务书 WP2-1 口径） */
+}
+
 .recent-list { display: flex; flex-direction: column; gap: 10px; }
 
 .recent-item {
@@ -3018,6 +3057,27 @@ body {
   color: var(--text-secondary);
   margin-bottom: 20px;
   text-align: center;
+}
+/* REQ-138（任务书 #52 WP2）：遮罩区块引导小字（主/次路径各一句），比 label 再降一级 */
+.auth-field-hint {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+/* 任务书 #52 WP2：登录墙公示链接行（免登录出口，样式降一级，不抢登录主流程） */
+.auth-public-links {
+  margin-top: 28px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.auth-public-links a {
+  color: var(--text-secondary);
+  text-decoration: none;
+}
+.auth-public-links a:hover {
+  color: var(--gold);
+  text-decoration: underline;
 }
 
 /* ==================== 公会栏 ==================== */
