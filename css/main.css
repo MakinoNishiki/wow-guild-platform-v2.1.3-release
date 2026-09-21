@@ -83,7 +83,7 @@ body {
 
 .sidebar-title {
   font-size: 16px;
-  font-weight: 600;
+  font-weight: 700; /* 任务书 #52 WP1 审计修订：对齐 v2 规范 §3「侧边栏标题 16/700 金」（原 600 为偏差） */
   color: var(--gold);
 }
 
@@ -98,7 +98,21 @@ body {
   overflow-y: auto;
 }
 
-.nav-item {
+/* 任务书 #52 WP1（REQ-137 一期收尾）：导航组头——纯视觉分组标签，不可点、不参与路由/REQ-105 排序
+   （无 .nav-item 类）；排版纪律=v2 §3 小标签：字号降一档、颜色降一级、letter-spacing 微幅放宽 */
+.nav-group-label {
+  font-size: 11px;
+  color: var(--text-muted);
+  letter-spacing: 0.08em;
+  padding: 0 14px;
+  margin: 14px 0 4px;
+  cursor: default;
+  user-select: none;
+}
+.nav-group-label:first-child { margin-top: 0; }
+
+.nav-item,
+.nav-item-disabled {
   display: flex;
   align-items: center;
   gap: 12px;
@@ -111,6 +125,14 @@ body {
   font-size: 14px;
   border-left: 3px solid transparent;
   position: relative;
+}
+
+/* REQ-137 二期预留位（任务书 #52 WP1）：灰态禁用——几何与 .nav-item 同版（上一条规则共用），
+   仅降色降透明度、不响应悬停；无 .nav-item 类故不参与 switchPage 激活切换与拖拽排序 */
+.nav-item-disabled {
+  color: var(--text-muted);
+  cursor: default;
+  opacity: 0.55;
 }
 
 .nav-item:hover {

@@ -4,13 +4,13 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>魔兽管家</title>
-<!-- 静态资源版本号：20260919.67（任务书 #22 WP3-②：凡改动 js/css 的 commit 必须同步递增此处与所有 ?v= 查询串，见 docs/开发规范.md 第五章） -->
+<!-- 静态资源版本号：20260919.68（任务书 #22 WP3-②：凡改动 js/css 的 commit 必须同步递增此处与所有 ?v= 查询串，见 docs/开发规范.md 第五章） -->
 <link rel="icon" type="image/png" sizes="32x32" href="assets/brand/favicon-32.png">
 <link rel="icon" type="image/png" sizes="16x16" href="assets/brand/favicon-16.png">
-<link rel="stylesheet" href="css/main.css?v=20260919.67">
-<link rel="stylesheet" href="css/data-public.css?v=20260919.67"><!-- 任务书 #28 WP5：副本掉落 tab（选择器全 .dp- 前缀 + #page-lootdrop 作用域，零泄漏） -->
-<link rel="stylesheet" href="css/decor-public.css?v=20260919.67"><!-- 任务书 #51：家宅图鉴（选择器全 .dh- 前缀，零泄漏，双壳共用） -->
-<script src="assets/vendor/supabase-js-2.js?v=20260919.67"></script>
+<link rel="stylesheet" href="css/main.css?v=20260919.68">
+<link rel="stylesheet" href="css/data-public.css?v=20260919.68"><!-- 任务书 #28 WP5：副本掉落 tab（选择器全 .dp- 前缀 + #page-lootdrop 作用域，零泄漏） -->
+<link rel="stylesheet" href="css/decor-public.css?v=20260919.68"><!-- 任务书 #51：家宅图鉴（选择器全 .dh- 前缀，零泄漏，双壳共用） -->
+<script src="assets/vendor/supabase-js-2.js?v=20260919.68"></script>
 </head>
 <body>
 
@@ -112,44 +112,55 @@
     </div>
     <!-- REQ-103（任务书 #36 WP4）：侧栏公会行已整行移除——切换公会/公会设置唯一入口=用户中心公会卡；
          左上角公会卡（品牌+#guildName 名称行）纯展示，无交互（WP3：现状即满足，零改动） -->
+    <!-- 任务书 #52 WP1（REQ-137 一期收尾）：导航两组式——组头 .nav-group-label 纯视觉（无 .nav-item 类、
+         无 data-page/navkey，不可点、不参与路由与 REQ-105 排序持久化）；归组明细=docs/TASK-052-侦察送审.md §二
+         （顾问闸 2026-09-19 过：更新日志移出分组沉底至用户中心之上）；全部 data-page/onclick/显隐逻辑零变更 -->
     <nav class="nav-menu">
-      <div class="nav-item active" data-page="dashboard" onclick="switchPage('dashboard')">
+      <div class="nav-group-label" data-nav-group="guild">公会团队管理</div>
+      <div class="nav-item active" data-page="dashboard" data-nav-group="guild" onclick="switchPage('dashboard')">
         <span class="nav-icon">📊</span><span>仪表盘</span>
       </div>
-      <div class="nav-item" data-page="members" onclick="switchPage('members')">
+      <div class="nav-item" data-page="members" data-nav-group="guild" onclick="switchPage('members')">
         <span class="nav-icon">👥</span><span>成员管理</span>
       </div>
-      <div class="nav-item" data-page="attendance" onclick="switchPage('attendance')">
+      <div class="nav-item" data-page="attendance" data-nav-group="guild" onclick="switchPage('attendance')">
         <span class="nav-icon">📅</span><span>考勤记录</span>
       </div>
-      <div class="nav-item" data-page="loot" onclick="switchPage('loot')">
+      <div class="nav-item" data-page="loot" data-nav-group="guild" onclick="switchPage('loot')">
         <span class="nav-icon">⚔️</span><span>装备分配</span>
       </div>
-      <div class="nav-item" data-page="wishlist" onclick="switchPage('wishlist')">
+      <div class="nav-item" data-page="wishlist" data-nav-group="guild" onclick="switchPage('wishlist')">
         <span class="nav-icon">🎯</span><span>心愿单</span>
       </div>
-      <div class="nav-item" data-page="reports" onclick="switchPage('reports')">
+      <div class="nav-item" data-page="reports" data-nav-group="guild" onclick="switchPage('reports')">
         <span class="nav-icon">📈</span><span>统计报表</span>
       </div>
-      <div class="nav-item" data-page="data" onclick="switchPage('data')">
+      <div class="nav-item" data-page="data" data-nav-group="guild" onclick="switchPage('data')">
         <span class="nav-icon">💾</span><span>数据管理</span>
       </div>
-      <div class="nav-item" data-page="changelog" onclick="switchPage('changelog')">
-        <span class="nav-icon">📝</span><span>更新日志</span>
-      </div>
       <!-- 任务书 #14：数据中心（仅超管可见，非超管不渲染） -->
-      <div class="nav-item" id="navDatacenter" data-page="datacenter" onclick="switchPage('datacenter')" style="display:none">
+      <div class="nav-item" id="navDatacenter" data-page="datacenter" data-nav-group="guild" onclick="switchPage('datacenter')" style="display:none">
         <span class="nav-icon">🗄</span><span>数据中心</span>
       </div>
       <!-- 任务书 #28 WP5：副本掉落（REQ-086 收官；原「数据公示」更名 + 双壳嵌入——应用内切 tab，
            免登录公开页 data.html 保留可分享；全角色可见、只读） -->
-      <div class="nav-item" data-page="lootdrop" onclick="switchPage('lootdrop')">
+      <div class="nav-item" data-page="lootdrop" data-nav-group="guild" onclick="switchPage('lootdrop')">
         <span class="nav-icon">📖</span><span>副本掉落</span>
       </div>
-      <!-- 任务书 #51（REQ-137 一期）：家宅图鉴——最小入口（导航分组重构与首页耦合属 #52 范围不碰）；
+      <div class="nav-group-label" data-nav-group="home">家宅</div>
+      <!-- 任务书 #51（REQ-137 一期）：家宅图鉴——#52 WP1 起归「家宅」组；
            全角色可见、只读零操作；渲染层 js/decorData.js 与公开页 decor.html（WP2）同源单一真源 -->
-      <div class="nav-item" data-page="decor" onclick="switchPage('decor')">
+      <div class="nav-item" data-page="decor" data-nav-group="home" onclick="switchPage('decor')">
         <span class="nav-icon">🏠</span><span>家宅图鉴</span>
+      </div>
+      <!-- REQ-137 二期预留，数据线另立（任务书 #52 WP1）：小宠物图鉴预留位——灰态禁用，
+           无 data-page/onclick、独立 .nav-item-disabled 类，不参与 switchPage/REQ-105 排序，窄屏底部 Tab 不加 -->
+      <div class="nav-item-disabled" id="navPets" title="数据侦察中，敬请期待" aria-disabled="true">
+        <span class="nav-icon">🐾</span><span>小宠物图鉴</span>
+      </div>
+      <!-- 不入组元功能（任务书 #52 WP1 顾问闸定：更新日志=站点信息项非团队管理功能，移出分组沉底至用户中心之上） -->
+      <div class="nav-item" data-page="changelog" onclick="switchPage('changelog')">
+        <span class="nav-icon">📝</span><span>更新日志</span>
       </div>
       <div class="nav-item" data-navkey="usercenter" onclick="openUserCenter()">
         <span class="nav-icon">👤</span><span>用户中心</span>
@@ -1983,20 +1994,20 @@
   </div>
 </div>
 
-<script src="js/cloud.js?v=20260919.67"></script>
+<script src="js/cloud.js?v=20260919.68"></script>
 <!-- 任务书 #14：主数据层（快照兜底 + 加载层），须在 app.js 之前 -->
-<script src="js/masterDataSnapshot.js?v=20260919.67"></script>
-<script src="js/masterData.js?v=20260919.67"></script>
+<script src="js/masterDataSnapshot.js?v=20260919.68"></script>
+<script src="js/masterData.js?v=20260919.68"></script>
 <!-- 任务书 #22 WP2：职业/专精/职责图标集中映射（全站唯一取图处） -->
-<script src="js/iconMap.js?v=20260919.67"></script>
+<script src="js/iconMap.js?v=20260919.68"></script>
 <!-- 任务书 #31（REQ-097）：装备分类词表单一真源（公示页 chips / picker 过滤 / BUG-057 回填三处消费，须在 dataPublic.js 与 app.js 之前） -->
-<script src="js/lootTaxonomy.js?v=20260919.67"></script>
+<script src="js/lootTaxonomy.js?v=20260919.68"></script>
 <!-- 任务书 #28 WP5：副本掉落渲染层（双壳同源；无 data-public-body 不自动启动，由 app.js 懒挂载，须在 app.js 之前） -->
-<script src="js/dataPublic.js?v=20260919.67"></script>
+<script src="js/dataPublic.js?v=20260919.68"></script>
 <!-- 任务书 #51（REQ-137 一期）：家宅图鉴词表单一真源（价格/分类/尺寸/来源词表，须在 decorData.js 之前） -->
-<script src="js/decorDict.js?v=20260919.67"></script>
+<script src="js/decorDict.js?v=20260919.68"></script>
 <!-- 任务书 #51：家宅图鉴数据层+渲染层（双壳同源；无 data-decor-body 不自动启动，由 app.js 懒挂载，须在 app.js 之前） -->
-<script src="js/decorData.js?v=20260919.67"></script>
-<script src="js/app.js?v=20260919.67"></script>
+<script src="js/decorData.js?v=20260919.68"></script>
+<script src="js/app.js?v=20260919.68"></script>
 </body>
 </html>

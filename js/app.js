@@ -2272,6 +2272,16 @@ function applyNavOrder(forced) {
     if (byKey[k] && !used.has(k)) { menu.appendChild(byKey[k]); used.add(k); }
   });
   items.forEach(it => { const k = navKeyOf(it); if (!used.has(k)) menu.appendChild(it); }); // 缺失 key 按原序追加尾部
+  // 任务书 #52 WP1（顾问闸授权最小适配）：组头/预留位随组重定位——二者均非 .nav-item、无 key、不入 nav_order，
+  // 上方 appendChild 重排只移动 .nav-item，组头会滞留原位错位，故重排完成后把组头插回该组首个项之前、
+  // 预留位（#navPets）紧跟家宅图鉴项之后；组归属=静态 data-nav-group 属性，跨组拖拽时组头随组走
+  menu.querySelectorAll('.nav-group-label[data-nav-group]').forEach(label => {
+    const first = menu.querySelector(`.nav-item[data-nav-group="${label.dataset.navGroup}"]`);
+    if (first) menu.insertBefore(label, first);
+  });
+  const petsSlot = document.getElementById('navPets');
+  const decorNavItem = menu.querySelector('.nav-item[data-page="decor"]');
+  if (petsSlot && decorNavItem) decorNavItem.after(petsSlot);
 }
 let navDragEl = null;
 let navOrderBeforeDrag = null;
@@ -2279,6 +2289,8 @@ function refreshNavDraggable() {
   // 移动端/触屏（<768px 或 hover 不可用）禁用拖拽，仅桌面
   const desktop = window.innerWidth > 768 && !(window.matchMedia && window.matchMedia('(hover: none)').matches);
   document.querySelectorAll('.nav-menu .nav-item').forEach(it => { it.draggable = desktop; });
+  // 任务书 #52 WP1：组头/预留位 draggable 永 false（本无 .nav-item 类不会被上方赋值，防御性钉死）
+  document.querySelectorAll('.nav-menu .nav-group-label, .nav-menu .nav-item-disabled').forEach(el => { el.draggable = false; });
 }
 function initNavDragSort() {
   const menu = document.querySelector('.nav-menu');
@@ -2311,6 +2323,9 @@ function initNavDragSort() {
     if (!navDragEl) return;
     navDragEl.classList.remove('nav-dragging');
     navDragEl = null;
+    // 任务书 #52 WP1：落定后先按当前序重定位组头/预留位（forced=当前序，项序本身不变），
+    // 使拖拽跨组后组头即时归位（否则要等下次 applyNavOrder 触发才归位）；nav_order 写库/回滚链路零变更
+    applyNavOrder(currentNavOrder());
     persistNavOrder(); // 防抖口径：落定一次写，拖拽过程零打库
   });
 }
