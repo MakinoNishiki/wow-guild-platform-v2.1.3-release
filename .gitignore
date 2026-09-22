@@ -10,3 +10,4 @@ scripts/decor/out/
 scripts/decor/WoWButlerDecor.lua
 __pycache__/
 *.pyc
+diff-task*.txt
