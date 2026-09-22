@@ -405,6 +405,78 @@ function trackIpHash(ip) {
     .digest("hex");
 }
 
+// ------------------------------------------------------------
+// REQ-141 访问统计看板（任务书 #55 WP1）：POST /api/analytics/summary 配套
+// 站点运营数据仅管理员可见：登录 JWT（401）→ uid 白名单（403）两段鉴权。
+// 白名单走 .env ANALYTICS_ADMIN_UIDS（逗号分隔 uid 列表），永不进 git/文档。
+// ------------------------------------------------------------
+const ANALYTICS_SUMMARY_MAX_BODY_BYTES = 8 * 1024; // body >8KB → 400
+const ANALYTICS_SUMMARY_RATE_PER_MIN = 30;         // 同 uid ≤30 次/分钟（滑动窗口，与 track 限流桶分离）
+const ANALYTICS_MAX_RANGE_MS = 92 * 24 * 60 * 60 * 1000; // 90 天保留 + 2 天余量
+const ANALYTICS_GRAINS = ["hour", "day", "week", "month"];
+const ANALYTICS_PAGE_RE = /^(all|index|decor|data|index:[a-z]+)$/;
+const analyticsSummaryRateBuckets = new Map();     // uid -> 时间戳数组（进程内，零依赖）
+
+function analyticsAdminUids() {
+  return (process.env.ANALYTICS_ADMIN_UIDS || "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
+function analyticsSummaryRateLimited(uid) {
+  const now = Date.now();
+  const cutoff = now - 60000;
+  let arr = analyticsSummaryRateBuckets.get(uid);
+  if (!arr) { arr = []; analyticsSummaryRateBuckets.set(uid, arr); }
+  while (arr.length && arr[0] <= cutoff) arr.shift();
+  if (arr.length >= ANALYTICS_SUMMARY_RATE_PER_MIN) return true;
+  arr.push(now);
+  // 兜底清扫防 Map 无界增长（与 trackRateLimited 同款）
+  if (analyticsSummaryRateBuckets.size > 10000) {
+    for (const [k, v] of analyticsSummaryRateBuckets) {
+      if (!v.length || v[v.length - 1] <= cutoff) analyticsSummaryRateBuckets.delete(k);
+    }
+  }
+  return false;
+}
+
+// 90 天滚动清理（server.js 版——侦察闸 3 定案：pg_cron 不启用，二选一不并装）
+// 启动 10 分钟首跑、之后每 24h 一次 RPC analytics_purge_90d；异常 console.error 不崩进程。
+const ANALYTICS_PURGE_FIRST_DELAY_MS = 10 * 60 * 1000;
+const ANALYTICS_PURGE_INTERVAL_MS = 24 * 60 * 60 * 1000;
+
+function runAnalyticsPurge() {
+  try {
+    proxyToSupabase(
+      "POST",
+      "/rest/v1/rpc/analytics_purge_90d",
+      { "content-type": "application/json", "prefer": "return=representation" },
+      "{}",
+      (result) => {
+        if (!result || result.statusCode >= 300) {
+          console.error(
+            "[analytics] 90 天滚动清理失败 status=" + (result && result.statusCode),
+            result && String(result.body).slice(0, 200)
+          );
+          return;
+        }
+        console.log("[analytics] 90 天滚动清理完成，删除行数=" + String(result.body).trim());
+      }
+    );
+  } catch (e) {
+    console.error("[analytics] 90 天滚动清理异常（已吞，不影响进程）:", e);
+  }
+}
+
+function scheduleAnalyticsPurge() {
+  // unref：计时器不拖住事件循环（require server.js 的测试进程可自然退出）
+  setTimeout(() => {
+    runAnalyticsPurge();
+    setInterval(runAnalyticsPurge, ANALYTICS_PURGE_INTERVAL_MS).unref();
+  }, ANALYTICS_PURGE_FIRST_DELAY_MS).unref();
+}
+
 function authorizeRpcPayload(user, fnName, rawBody) {
   let payload;
   try {
@@ -1204,6 +1276,98 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // API: 访问统计查询 - POST /api/analytics/summary（任务书 #55 WP1 / REQ-141）
+  // 两段鉴权（先声明权限要求，开发规范 §2.2）：
+  //   ① 用户 JWT（verifyTokenCached，WCL//api/db 同款先例）——未登录/无效 → 401；
+  //   ② uid ∈ ANALYTICS_ADMIN_UIDS 白名单——不在 → 403 {error:'仅管理员可见'}。
+  // 站点运营数据不对普通团员暴露。通过后经 proxyToSupabase 调 RPC analytics_overview
+  // （service_role；函数层已 revoke anon/authenticated，/api/db RPC 白名单亦不放行，三重防线）。
+  if (urlPath === "/api/analytics/summary" && req.method === "POST") {
+    (async () => {
+      const send = (status, obj) => {
+        res.writeHead(status, { "Content-Type": "application/json", ...corsHeaders });
+        res.end(JSON.stringify(obj));
+      };
+      try {
+        const authHeader = req.headers["authorization"] || "";
+        const token = authHeader.replace("Bearer ", "");
+        if (!token) return send(401, { error: "未登录或登录已过期，请重新登录" });
+        const user = await verifyTokenCached(token);
+        if (!user) return send(401, { error: "登录状态无效，请重新登录" });
+        if (!analyticsAdminUids().includes(user.id)) {
+          return send(403, { error: "仅管理员可见" });
+        }
+        // 限流：同 uid 30 次/分（滑窗 Map，与 track 限流桶分离）
+        if (analyticsSummaryRateLimited(user.id)) {
+          return send(429, { error: "请求过于频繁，请稍后再试" });
+        }
+        let raw;
+        try {
+          raw = await readBody(req);
+        } catch (e) {
+          return send(e.statusCode || 400, { error: e.message || "无法读取请求内容" });
+        }
+        if (Buffer.byteLength(raw || "") > ANALYTICS_SUMMARY_MAX_BODY_BYTES) {
+          return send(400, { error: "请求体超过 8KB 限制" });
+        }
+        let body;
+        try {
+          body = JSON.parse(raw);
+        } catch {
+          return send(400, { error: "请求体不是有效 JSON" });
+        }
+        if (!body || typeof body !== "object") {
+          return send(400, { error: "请求体不是有效 JSON" });
+        }
+        // body {start, end, grain, page} 四项校验（与 RPC 同规则，非法 → 400 中文错误）
+        const startMs = Date.parse(body.start);
+        const endMs = Date.parse(body.end);
+        if (!Number.isFinite(startMs) || !Number.isFinite(endMs)) {
+          return send(400, { error: "起止时间格式无效（需 ISO 时间串）" });
+        }
+        if (endMs <= startMs) {
+          return send(400, { error: "结束时间必须晚于开始时间" });
+        }
+        if (endMs - startMs > ANALYTICS_MAX_RANGE_MS) {
+          return send(400, { error: "时间范围不能超过 92 天" });
+        }
+        if (!ANALYTICS_GRAINS.includes(body.grain)) {
+          return send(400, { error: "粒度参数无效（hour/day/week/month）" });
+        }
+        if (typeof body.page !== "string" || !ANALYTICS_PAGE_RE.test(body.page)) {
+          return send(400, { error: "页面筛选参数无效" });
+        }
+        proxyToSupabase(
+          "POST",
+          "/rest/v1/rpc/analytics_overview",
+          { "content-type": "application/json", "prefer": "return=representation" },
+          JSON.stringify({
+            p_start: new Date(startMs).toISOString(),
+            p_end: new Date(endMs).toISOString(),
+            p_grain: body.grain,
+            p_page: body.page,
+          }),
+          (result) => {
+            if (!result || result.statusCode >= 300) {
+              // RPC 失败 → 502 + console.error，不泄露内部细节
+              console.error(
+                "[analytics] 统计查询 RPC 失败 status=" + (result && result.statusCode),
+                result && String(result.body).slice(0, 200)
+              );
+              return send(502, { error: "统计服务暂不可用" });
+            }
+            res.writeHead(200, { "Content-Type": "application/json", ...corsHeaders });
+            res.end(result.body); // jsonb 原样透传
+          }
+        );
+      } catch (e) {
+        console.error("[analytics] 查询端点异常:", e);
+        send(500, { error: "统计服务暂不可用" });
+      }
+    })();
+    return;
+  }
+
   // API: DB Proxy - /api/db/rest/v1/:table
   // 代理读写操作到 Supabase（service_role），转发前必须过 SEC-001 公会级鉴权
   if (urlPath.startsWith("/api/db/rest/v1/") && (req.method === "GET" || req.method === "POST" || req.method === "PATCH" || req.method === "DELETE")) {
@@ -1395,6 +1559,7 @@ const server = http.createServer(async (req, res) => {
 function startServer() {
   return server.listen(PORT, HOST, () => {
     process.stderr.write(`Server listening on ${HOST}:${PORT}\n`);
+    scheduleAnalyticsPurge(); // 任务书 #55 WP1：90 天滚动清理（10 分钟首跑 + 每 24h）
   });
 }
 
