@@ -1,6 +1,7 @@
 "use strict";
 const http = require("http");
 const https = require("https");
+const crypto = require("crypto");
 const fs = require("fs");
 const path = require("path");
 const { execSync } = require("child_process");
@@ -356,6 +357,52 @@ function getCorsHeaders(req) {
 
 function isJsonRequest(req) {
   return /^application\/json(?:\s*;|$)/i.test(req.headers["content-type"] || "");
+}
+
+// ------------------------------------------------------------
+// REQ-141 全站埋点采集（任务书 #54 WP1）：POST /api/track 配套
+// 事件白名单一处维护——WP1 只开 page_view；WP3 扩名单只改此常量。
+// 红线：明文 IP 永不落库（仅 ip_h 日盐 hash）；埋点静默兜底，恒 204。
+// ------------------------------------------------------------
+const TRACK_EVENTS = ["page_view"];
+const TRACK_PAGE_RE = /^(decor|data|index:[a-z]+)$/;
+const TRACK_MAX_BODY_BYTES = 8 * 1024;   // body >8KB → 204 吞掉
+const TRACK_MAX_PROPS_BYTES = 2 * 1024;  // props 序列化 >2KB → 204 吞掉
+const TRACK_RATE_LIMIT_PER_MIN = 60;     // 同 IP ≤60 次/分钟（滑动窗口）
+const trackRateBuckets = new Map();      // ip -> 时间戳数组（进程内，零依赖）
+
+function trackClientIp(req) {
+  // 当前无反代直连；兼容将来反代场景取 x-forwarded-for 首段
+  const xff = req.headers["x-forwarded-for"];
+  if (xff) return String(xff).split(",")[0].trim();
+  return req.socket.remoteAddress || "";
+}
+
+function trackRateLimited(ip) {
+  const now = Date.now();
+  const cutoff = now - 60000;
+  let arr = trackRateBuckets.get(ip);
+  if (!arr) { arr = []; trackRateBuckets.set(ip, arr); }
+  while (arr.length && arr[0] <= cutoff) arr.shift();
+  if (arr.length >= TRACK_RATE_LIMIT_PER_MIN) return true;
+  arr.push(now);
+  // 兜底清扫防 Map 无界增长（大量一次性 IP 场景）
+  if (trackRateBuckets.size > 10000) {
+    for (const [k, v] of trackRateBuckets) {
+      if (!v.length || v[v.length - 1] <= cutoff) trackRateBuckets.delete(k);
+    }
+  }
+  return false;
+}
+
+function trackIpHash(ip) {
+  // 日盐：YYYYMMDD 每日轮换，跨日不可关联
+  const d = new Date();
+  const ymd = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}`;
+  return crypto
+    .createHash("sha256")
+    .update(`${ip}|${ymd}|${process.env.TRACK_SALT || "wb-track"}`)
+    .digest("hex");
 }
 
 function authorizeRpcPayload(user, fnName, rawBody) {
@@ -1091,6 +1138,69 @@ const server = http.createServer(async (req, res) => {
   }
   if (urlPath === "/api/wcl/attendance-snapshot" && req.method === "POST") {
     handleWclRequest(req, res, corsHeaders, true);
+    return;
+  }
+
+  // API: 埋点采集 - POST /api/track（任务书 #54 WP1 / REQ-141）
+  // 复刻 /api/db 同层先例（service_role 转发 PostgREST），但无鉴权无 JWT——
+  // 公开采集端点，安全边界 = 白名单事件 + page 格式 + 限流 + 白名单列组装 + 恒 204。
+  // 埋点永不得影响业务：任何异常/超限/非法一律 204 吞掉，自身异常 console.error 不 500。
+  if (urlPath === "/api/track" && req.method === "POST") {
+    res.writeHead(204, corsHeaders);
+    res.end();
+    (async () => {
+      try {
+        const ip = trackClientIp(req);
+        if (trackRateLimited(ip)) return; // 超限吞掉
+        let raw;
+        try { raw = await readBody(req); } catch { return; } // 超 1MiB 硬限同样吞掉
+        if (Buffer.byteLength(raw || "") > TRACK_MAX_BODY_BYTES) return;
+        let body;
+        try { body = JSON.parse(raw); } catch { return; }
+        if (!body || typeof body !== "object") return;
+        // 白名单校验：event 不在名单 / page 格式非法 → 吞掉（不入库不报错）
+        if (!TRACK_EVENTS.includes(body.event)) return;
+        if (typeof body.page !== "string" || !TRACK_PAGE_RE.test(body.page)) return;
+        const props =
+          body.props && typeof body.props === "object" && !Array.isArray(body.props)
+            ? body.props
+            : {};
+        if (JSON.stringify(props).length > TRACK_MAX_PROPS_BYTES) return;
+        // uid 取 body.uid（前端显式传；WP1 不验 JWT，统计自用口径）；
+        // 轻格式校验防脏值打爆 uuid 列，缺失/非法 → null
+        const uid =
+          typeof body.uid === "string" &&
+          /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(body.uid)
+            ? body.uid
+            : null;
+        // 只取白名单列组装行（event/page/uid/vid/ip_h/ref_dom/props），body 其余字段一律丢弃
+        const row = {
+          event: body.event,
+          page: body.page,
+          uid,
+          vid: typeof body.vid === "string" && body.vid ? body.vid : null,
+          ip_h: trackIpHash(ip),
+          ref_dom: typeof body.ref_dom === "string" && body.ref_dom ? body.ref_dom : null,
+          props,
+        };
+        proxyToSupabase(
+          "POST",
+          "/rest/v1/analytics_events",
+          { "content-type": "application/json", "prefer": "return=minimal" },
+          JSON.stringify(row),
+          (result) => {
+            if (!result || result.statusCode >= 300) {
+              console.error(
+                "[track] 埋点写库失败 status=" + (result && result.statusCode),
+                result && String(result.body).slice(0, 200)
+              );
+            }
+          }
+        );
+      } catch (e) {
+        console.error("[track] 埋点端点异常（已吞，不影响业务）:", e);
+      }
+    })();
     return;
   }
 

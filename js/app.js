@@ -2011,6 +2011,7 @@ async function handleSwitchGuild(guildId) {
 
 // 退出登录（全站唯一 logout 路径：头像菜单 / 切换公会弹窗 都走这里）
 async function handleSignOut() {
+  window.__wbUid = null; // REQ-141（任务书 #54 WP1）授权行②：退出清空埋点 uid
   try {
     await window.CloudSync.signOut(); // ①清理登录态（supabase 会话）与公会态（SIGNED_OUT 清空上下文）
   } catch (e) {
@@ -2029,6 +2030,8 @@ async function handleSignOut() {
 
 // 显示应用视图（登录后）
 function showAppView() {
+  // REQ-141（任务书 #54 WP1）授权行①：会话建立（登录/注册/会话恢复共同落点）写埋点 uid
+  window.__wbUid = (window.CloudSync && window.CloudSync.getCachedUser()?.id) || null;
   const authOverlay = document.getElementById('authOverlay');
   const appContainer = document.querySelector('.app-container');
   if (authOverlay) authOverlay.style.display = 'none';
