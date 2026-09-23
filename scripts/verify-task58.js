@@ -1,4 +1,6 @@
 // 任务书 #58-WP1 验证：家宅方案单——数据底座 + 组单抽屉（形态A）+ 导出文字链路
+// （2026-09-23 #58-补丁同脚本维护：卡片角标＋退役→底部通栏按钮「加入方案单/已加入 ×N」双态 +
+//   详情弹窗加单主按钮 + decor_plan_add from:card/detail 双来源；A3c 改写、A3e/A3f 新增、B8 扩三段、版本串 .74）
 // A 静态：sql/35 锚点（两表/八策略/UNIQUE/回滚/NOTIFY）；cloud.js decorPlan 注册锚点；decorData.js 抽屉/草稿/合并/导出锚点；
 //   app.js bridge/saveDecorPlan/modalDirtyChecks 锚点；server.js 白名单 11 事件；规范章事件表 11 行；
 //   版本串 20260923.73（index×15/decor×6）+ data.html 停留 20260919.72×8（引用资产零改动先例）+ 旧串零残留；
@@ -18,7 +20,8 @@ const { chromium } = require('playwright');
 const ROOT = path.join(__dirname, '..');
 const PORT = 15658;
 const BASE = `http://127.0.0.1:${PORT}`;
-const VER = '20260923.73';
+const VER = '20260923.74';
+const VER_PREV = '20260923.73'; // #58-WP1 串（#58-补丁后须零残留）
 const VER_KEEP = '20260919.72'; // data.html 停留（引用资产本任务零改动）
 const PWD = 'T58-Plan-2026!';
 const EMAIL = 't58-plan@example.com';
@@ -109,11 +112,25 @@ function staticAsserts() {
   check('A3b D2 锚点：公示壳恒未登录（无 bridge）→ 提示文案 + 跳 index.html；保存成功清草稿',
     /保存方案单需要登录，登录后组单内容不丢/.test(dd) && /location\.href = 'index\.html'/.test(dd) &&
     /localStorage\.removeItem\(PLAN_DRAFT_KEY\)/.test(dd));
-  check('A3c 卡片按钮 + stopPropagation + 三事件埋点（decor_plan_add/save/export_text）',
-    /class="dh-add-plan" data-add=/.test(dd) && /e\.stopPropagation\(\); planAdd/.test(dd) &&
-    /WBTrack\.event\('decor_plan_add', \{ from: 'card', record_id: recordId \}\)/.test(dd) &&
+  check('A3c 卡片通栏按钮（#58-补丁：角标＋退役）+ stopPropagation + 三事件埋点（add 双来源 card/detail）',
+    /class="dh-card-add\$\{planQtyOf\(r\.record_id\) \? ' added' : ''\}" data-add="\$\{r\.record_id\}"/.test(dd) &&
+    /e\.stopPropagation\(\); planAdd/.test(dd) &&
+    /WBTrack\.event\('decor_plan_add', \{ from: from \|\| 'card', record_id: recordId \}\)/.test(dd) &&
     /WBTrack\.event\('decor_plan_save', \{ items: planCount\(\), capacity: planCapacity\(\) \}\)/.test(dd) &&
     /WBTrack\.event\('decor_plan_export_text', \{ items: planCount\(\) \}\)/.test(dd));
+  check('A3e #58-补丁锚点：双态助手/统一刷新/弹窗主按钮/from=detail/按钮 keydown 止冒泡/角标零残留',
+    /function planQtyOf\(/.test(dd) && /function planAddLabel\(/.test(dd) && /function planRefreshEntries\(/.test(dd) &&
+    /planRender\(\) \{\s*\n\s*planBuildDom\(\);\s*\n\s*planRefreshEntries\(\);/.test(dd) &&
+    /class="btn btn-primary dh-detail-add\$\{planQtyOf/.test(dd) &&
+    /planAdd\(r\.record_id, 'detail'\)/.test(dd) &&
+    /btn\.onkeydown = e => e\.stopPropagation\(\);/.test(dd) &&
+    /已加入 ×\$\{q\}/.test(dd) && !dd.includes('dh-add-plan'));
+  const cssDecor = fs.readFileSync(path.join(ROOT, 'css/decor-public.css'), 'utf8');
+  check('A3f #58-补丁样式锚点：通栏按钮 32px/双态/弹窗主按钮/reduced-motion 换名/旧角标样式退役',
+    /\.dh-card-add \{[\s\S]*?height: 32px;/.test(cssDecor) &&
+    /\.dh-card-add\.added \{/.test(cssDecor) && /\.dh-card-add:focus-visible/.test(cssDecor) &&
+    /\.dh-detail-add \{/.test(cssDecor) && /\.dh-detail-add\.added \{/.test(cssDecor) &&
+    /\.dh-card-add, \.dh-detail-add, \.dh-plan-toggle/.test(cssDecor) && !cssDecor.includes('dh-add-plan'));
   check('A3d 导出弹窗锚点：提示条/尾行固定链接/dirty 检查/二次确认/clipboard 降级',
     /改动只影响本次导出，不回写方案单数据/.test(dd) &&
     /魔兽管家 · 家宅图鉴免费组单：https:\/\/wow\.ddctl\.com\/decor\.html/.test(dd) &&
@@ -135,8 +152,9 @@ function staticAsserts() {
     /TRACK_EVENTS` 白名单一一对应/.test(spec));
 
   const countStr = (s, v) => (s.match(new RegExp(v.replace(/\./g, '\\.'), 'g')) || []).length;
-  check(`A6 版本串 ${VER}（index×15/decor×6）+ data.html 停留 ${VER_KEEP}×8（资产零改动先例）+ index/decor 旧串零残留`,
+  check(`A6 版本串 ${VER}（index×15/decor×6）+ data.html 停留 ${VER_KEEP}×8（资产零改动先例）+ index/decor 旧串（${VER_PREV}/${VER_KEEP}）零残留`,
     countStr(index, VER) === 15 && countStr(decor, VER) === 6 &&
+    countStr(index, VER_PREV) === 0 && countStr(decor, VER_PREV) === 0 &&
     countStr(index, VER_KEEP) === 0 && countStr(decor, VER_KEEP) === 0 &&
     countStr(data, VER_KEEP) === 8 && countStr(data, VER) === 0);
 
@@ -217,7 +235,7 @@ async function waitDecorReady(pg) {
   await pg.waitForSelector('.dh-grid .dh-card', { timeout: 30000 });
 }
 async function addN(pg, n) {
-  const btns = pg.locator('.dh-add-plan');
+  const btns = pg.locator('.dh-card-add');
   for (let i = 0; i < n; i++) await btns.nth(i).click();
 }
 async function openDrawer(pg) {
@@ -433,14 +451,54 @@ async function liveAsserts() {
   check('B7 768px 窄屏抽屉全宽覆盖（width=100vw）', Math.abs(drawerW - 768) < 2, `width=${drawerW}`);
   await P.pg.setViewportSize({ width: 1440, height: 900 });
   await P.pg.click('#dhPlanClose');
-  // B8：点＋不弹详情；点卡片本体弹详情
-  await P.pg.locator('.dh-add-plan').first().click();
+  // B8：卡片通栏按钮回归 + #58-补丁双态/弹窗入口/from 来源链路
+  const firstCardBtn = P.pg.locator('.dh-card-add').first();
+  const beforeLabel = (await firstCardBtn.textContent()).trim();
+  const beforeQty = beforeLabel.startsWith('已加入') ? +(beforeLabel.match(/×(\d+)/) || [0, 0])[1] : 0;
+  await firstCardBtn.click();
   await sleep(300);
   const noModal = await P.pg.locator('.dh-modal-overlay .dh-modal-title').count() === 0;
+  const afterCardLabel = (await firstCardBtn.textContent()).trim();
+  check('B8a 卡片回归+双态：通栏按钮不触发详情弹窗 / 点击后文案即时刷新（×N+1）+ added 态',
+    noModal && afterCardLabel === `已加入 ×${beforeQty + 1}` &&
+    await firstCardBtn.evaluate(el => el.classList.contains('added')),
+    `「${beforeLabel}」→「${afterCardLabel}」`);
+  // 弹窗同件双态同步 + 弹窗加单
   await P.pg.locator('.dh-card').first().click();
   await P.pg.waitForSelector('.dh-modal-overlay.show', { timeout: 5000 });
-  check('B8 卡片回归：＋按钮不触发详情弹窗 / 卡片本体照常开详情', noModal);
+  const detailBtn = P.pg.locator('.dh-detail-add');
+  const detailLabel1 = (await detailBtn.textContent()).trim();
+  await detailBtn.click();
+  await sleep(300);
+  const detailLabel2 = (await detailBtn.textContent()).trim();
+  const cardLabelAfterDetail = (await firstCardBtn.textContent()).trim();
+  check('B8b 详情弹窗加单主按钮：入场即同步「已加入 ×N」→ 点击 qty+1 → 弹窗与卡片文案同刷',
+    detailLabel1 === `已加入 ×${beforeQty + 1}` && detailLabel2 === `已加入 ×${beforeQty + 2}` &&
+    cardLabelAfterDetail === detailLabel2,
+    `弹窗「${detailLabel1}」→「${detailLabel2}」 卡片=「${cardLabelAfterDetail}」`);
   await P.pg.click('.dh-modal-overlay .dh-modal-close');
+  await sleep(400);
+  // 埋点 from 双来源实证（本段新增两条 add：先 card 后 detail）
+  const t58b = await P.pg.evaluate(() => JSON.parse(localStorage.getItem('__t58log') || '[]'));
+  const addFroms = t58b.filter(e => e.event === 'decor_plan_add').map(e => e.props && e.props.from);
+  check('B8c 埋点 decor_plan_add from 区分来源（card 与 detail 双值在场）',
+    addFroms.includes('card') && addFroms.includes('detail'), `froms=${addFroms.join(',')}`);
+  // B8d 终审打回修复：焦点在加单按钮上按 Enter/Space → 只加单（qty+1），不冒泡开详情弹窗
+  const labelBeforeKey = (await firstCardBtn.textContent()).trim();
+  const qtyBeforeKey = +(labelBeforeKey.match(/×(\d+)/) || [0, 0])[1];
+  await firstCardBtn.focus();
+  await P.pg.keyboard.press('Enter');
+  await sleep(300);
+  const labelAfterEnter = (await firstCardBtn.textContent()).trim();
+  const noModalAfterEnter = await P.pg.locator('.dh-modal-overlay .dh-modal-title').count() === 0;
+  await P.pg.keyboard.press('Space');
+  await sleep(300);
+  const labelAfterSpace = (await firstCardBtn.textContent()).trim();
+  const noModalAfterSpace = await P.pg.locator('.dh-modal-overlay .dh-modal-title').count() === 0;
+  check('B8d 键盘止冒泡：焦点按钮 Enter/Space 只加单（×N+1 两次）不开详情',
+    labelAfterEnter === `已加入 ×${qtyBeforeKey + 1}` && noModalAfterEnter &&
+    labelAfterSpace === `已加入 ×${qtyBeforeKey + 2}` && noModalAfterSpace,
+    `「${labelBeforeKey}」→Enter→「${labelAfterEnter}」→Space→「${labelAfterSpace}」 弹窗=${!noModalAfterEnter}/${!noModalAfterSpace}`);
   const appSkeleton = await P.pg.evaluate(() =>
     ['dhPlanToggle', 'dhPlanDrawer', 'dhPlanList', 'dhPlanCap', 'dhPlanSave', 'dhPlanExport'].map(id => !!document.getElementById(id)));
   check('B9 双壳抽屉 DOM 同构（公示壳 vs 登录壳骨架 id 全一致）',

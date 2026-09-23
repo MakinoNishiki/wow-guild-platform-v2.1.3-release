@@ -286,12 +286,14 @@
     // 无房间/宠物徽标时整行省略（净空高，抵来源一行变两行）
     const cost = r.placement_cost != null ? `<span class="dh-badge dh-cost-badge">容量 ${r.placement_cost}</span>` : '';
     const src = srcSummaryText(r);
+    // 任务书 #58-补丁：角标 ＋ 退役 → 卡片底部通栏按钮「加入方案单 / 已加入 ×N」双态
     return `<div class="dh-card" data-rid="${r.record_id}" tabindex="0" role="button" aria-label="${esc(r.name)}">
-      <div class="dh-icon-wrap"><img src="${iconSrc(r)}" alt="" loading="lazy" onerror="this.onerror=null;this.src='${PLACEHOLDER}'">${cost}<button type="button" class="dh-add-plan" data-add="${r.record_id}" title="加入方案单" aria-label="加入方案单">＋</button></div>
+      <div class="dh-icon-wrap"><img src="${iconSrc(r)}" alt="" loading="lazy" onerror="this.onerror=null;this.src='${PLACEHOLDER}'">${cost}</div>
       <div class="dh-name dh-q${q}">${esc(r.name)}</div>
       <div class="dh-cat">${esc(catPathText(r))}</div>
       <div class="dh-src${src.unknown ? ' dh-src-unknown' : ''}">${esc(src.text)}</div>
       ${badges.length ? `<div class="dh-badges">${badges.join('')}</div>` : ''}
+      <button type="button" class="dh-card-add${planQtyOf(r.record_id) ? ' added' : ''}" data-add="${r.record_id}">${planAddLabel(r.record_id)}</button>
     </div>`;
   }
 
@@ -337,9 +339,10 @@
       card.onclick = open;
       card.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); } };
     });
-    // 任务书 #58-WP1：卡片「加入方案单」（stopPropagation 不触发详情弹窗）
+    // 任务书 #58-补丁：卡片通栏「加入方案单」按钮（click/keydown 双 stopPropagation——焦点按钮 Enter/Space 只加单，不冒泡触发卡片开详情）
     [...main.querySelectorAll('[data-add]')].forEach(btn => {
       btn.onclick = e => { e.stopPropagation(); planAdd(+btn.dataset.add); };
+      btn.onkeydown = e => e.stopPropagation();
     });
     const pager = $('dhPager');
     if (pager) [...pager.querySelectorAll('button[data-pg]')].forEach(btn => btn.onclick = () => {
@@ -452,9 +455,12 @@
       ${tags.length ? `<div class="dh-sec-title">标签</div><div class="dh-tags">${tags.map(t => `<span class="dh-badge">${esc(t)}</span>`).join('')}</div>` : ''}
       <div class="dh-sec-title">来源</div>
       <div class="dh-src-list">${renderSourceBlock(r)}</div>
+      <div class="dh-detail-add-row"><button type="button" class="btn btn-primary dh-detail-add${planQtyOf(r.record_id) ? ' added' : ''}" data-add="${r.record_id}">${planAddLabel(r.record_id)}</button></div>
     </div>`;
     modalEl.addEventListener('click', e => { if (e.target === modalEl) closeDetail(); });
     modalEl.querySelector('.dh-modal-close').onclick = closeDetail;
+    // 任务书 #58-补丁：详情弹窗底部加单主按钮（行为同卡片：加入/已加入 ×N 双态，点击 qty+1）
+    modalEl.querySelector('.dh-detail-add').onclick = () => planAdd(r.record_id, 'detail');
     document.body.appendChild(modalEl);
     document.addEventListener('keydown', onModalKey);
     requestAnimationFrame(() => modalEl && modalEl.classList.add('show'));
@@ -530,7 +536,26 @@
     planRender();
   }
 
-  function planAdd(recordId) {
+  // 任务书 #58-补丁：加单入口双态同源助手（卡片通栏按钮 + 详情弹窗主按钮共用）
+  function planQtyOf(recordId) {
+    const hit = plan.items.find(it => it.record_id === recordId);
+    return hit ? hit.qty : 0;
+  }
+  function planAddLabel(recordId) {
+    const q = planQtyOf(recordId);
+    return q > 0 ? `已加入 ×${q}` : '加入方案单';
+  }
+  // 全部 [data-add] 入口（卡片 + 详情弹窗）文案/双态统一刷新——抽屉步进/移除后回到弹窗文案亦最新
+  function planRefreshEntries() {
+    [...document.querySelectorAll('[data-add]')].forEach(btn => {
+      const rid = +btn.dataset.add;
+      btn.textContent = planAddLabel(rid);
+      btn.classList.toggle('added', planQtyOf(rid) > 0);
+    });
+  }
+
+  // 任务书 #58-补丁：from 区分来源（card=卡片通栏按钮 / detail=详情弹窗主按钮），默认 card
+  function planAdd(recordId, from) {
     const hit = plan.items.find(it => it.record_id === recordId);
     if (hit) hit.qty = Math.min(99, hit.qty + 1);
     else plan.items.push({ record_id: recordId, qty: 1 });
@@ -538,7 +563,7 @@
     planRender();
     planToast('已加入方案单');
     // 任务书 #56 登记事件（props ≤2KB；record_id 书载可带）
-    if (window.WBTrack) WBTrack.event('decor_plan_add', { from: 'card', record_id: recordId });
+    if (window.WBTrack) WBTrack.event('decor_plan_add', { from: from || 'card', record_id: recordId });
   }
   function planSetQty(recordId, qty) {
     const hit = plan.items.find(it => it.record_id === recordId);
@@ -594,6 +619,7 @@
 
   function planRender() {
     planBuildDom();
+    planRefreshEntries(); // 任务书 #58-补丁：加单入口双态同步（须在空清单早退前执行）
     const n = planCount();
     $doc('dhPlanToggleN').textContent = n;
     $doc('dhPlanCount').textContent = `${n} 件`;

@@ -381,29 +381,39 @@
    按钮 :active 按下即反馈（v2 §1）；reduced-motion 降级。
    ============================================================ */
 
-/* ---- 卡片「加入方案单」按钮（图标左下角，与右上容量角标错位；不破坏卡片尺寸） ---- */
-.dh-add-plan {
-  position: absolute;
-  left: 3px;
-  bottom: 3px;
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
+/* ---- 卡片「加入方案单」通栏按钮（任务书 #58-补丁：图标角标 ＋ 退役 → 卡片底部通栏；
+   按钮行 32px、网格列数不变；常态幽灵金描边降噪，已加入态实心金底=状态强信号） ---- */
+.dh-card-add {
+  align-self: stretch;
+  height: 32px;
+  border-radius: 6px;
   border: 1px solid var(--gold-dark);
-  background: rgba(13, 17, 23, 0.82);
+  background: rgba(240, 192, 96, 0.08);
   color: var(--gold);
-  font-size: 14px;
-  line-height: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
   cursor: pointer;
   padding: 0;
   transition: background-color 0.15s ease, transform 0.1s ease;
 }
-.dh-add-plan:hover { background: rgba(240, 192, 96, 0.22); }
-.dh-add-plan:active { transform: scale(0.9); }
-.dh-add-plan:focus-visible { outline: 2px solid var(--gold); outline-offset: 1px; }
+.dh-card-add:hover { background: rgba(240, 192, 96, 0.18); }
+.dh-card-add:active { transform: scale(0.97); }
+.dh-card-add:focus-visible { outline: 2px solid var(--gold); outline-offset: 1px; }
+.dh-card-add.added { background: var(--gold); border-color: var(--gold); color: #221a08; }
+.dh-card-add.added:hover { background: var(--gold-light); }
+
+/* ---- 详情弹窗加单主按钮（任务书 #58-补丁：常态 gold 主按钮；已加入态降幽灵与卡片同语义） ---- */
+.dh-detail-add-row { margin-top: 16px; }
+.dh-detail-add { width: 100%; justify-content: center; font-variant-numeric: tabular-nums; }
+.dh-detail-add.added {
+  background: transparent;
+  border-color: var(--gold-dark);
+  color: var(--gold);
+  box-shadow: none;
+}
+.dh-detail-add.added:hover { background: rgba(240, 192, 96, 0.12); box-shadow: none; }
 
 /* ---- 抽屉入口按钮（右下固定，总件数徽标实时更新） ---- */
 .dh-plan-toggle {
@@ -642,5 +652,5 @@
 
 /* ---- reduced-motion 降级 ---- */
 @media (prefers-reduced-motion: reduce) {
-  .dh-plan-drawer, .dh-plan-scrim, .dh-plan-toast, .dh-add-plan, .dh-plan-toggle, .dh-plan-step-btn { transition: none; }
+  .dh-plan-drawer, .dh-plan-scrim, .dh-plan-toast, .dh-card-add, .dh-detail-add, .dh-plan-toggle, .dh-plan-step-btn { transition: none; }
 }
