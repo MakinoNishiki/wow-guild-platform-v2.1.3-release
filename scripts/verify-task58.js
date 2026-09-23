@@ -20,8 +20,8 @@ const { chromium } = require('playwright');
 const ROOT = path.join(__dirname, '..');
 const PORT = 15658;
 const BASE = `http://127.0.0.1:${PORT}`;
-const VER = '20260923.74';
-const VER_PREV = '20260923.73'; // #58-WP1 串（#58-补丁后须零残留）
+const VER = '20260923.75';
+const VER_PREV = '20260923.74'; // #58-补丁串（#58-WP2-1 后须零残留）
 const VER_KEEP = '20260919.72'; // data.html 停留（引用资产本任务零改动）
 const PWD = 'T58-Plan-2026!';
 const EMAIL = 't58-plan@example.com';
@@ -94,13 +94,16 @@ function staticAsserts() {
     /DROP TABLE decor_plan_items;/.test(sql) && /DROP TABLE decor_plans;/.test(sql) &&
     /NOTIFY pgrst, 'reload schema';/.test(sql));
 
-  check('A2a cloud.js decorPlan 双 switch 注册 + reloadDecorPlan（updated_at 倒序取 1）',
+  check('A2a cloud.js decorPlan 双 switch 注册 + #58-WP2-1 多方案口径（当前选定 wb_decor_plan_current 回退 updated_at 最新）',
     /case 'decorPlan':[\s\S]{0,120}reloadDecorPlan\(\)/.test(cloud) &&
     /case 'decorPlan':[\s\S]{0,120}syncDecorPlan\(operation, item\)/.test(cloud) &&
     /async function reloadDecorPlan/.test(cloud) && /decor_plan_items\(\*\)/.test(cloud) &&
-    /order\('updated_at', \{ ascending: false \}\)[\s\S]{0,30}limit\(1\)/.test(cloud));
-  check('A2b syncDecorPlan：save 幂等（无方案 INSERT 头/有方案 UPDATE 头）+ 明细差集批量（禁逐行）',
-    /async function syncDecorPlan/.test(cloud) && /仅支持 save 操作/.test(cloud) &&
+    /wb_decor_plan_current/.test(cloud) && /decorPlanResolveCurrentId/.test(cloud) &&
+    /window\.appData\.decorPlans = plans/.test(cloud) &&
+    /order\('updated_at', \{ ascending: false \}\)/.test(cloud));
+  check('A2b syncDecorPlan：save 幂等（无方案 INSERT 头/有方案 UPDATE 头）+ 明细差集批量（禁逐行）+ WP2-1 五操作',
+    /async function syncDecorPlan/.test(cloud) && /decorPlan 支持 save\/create\/rename\/delete\/switch 操作/.test(cloud) &&
+    /仅剩一个方案，禁止删除/.test(cloud) &&
     /onConflict: 'plan_id,record_id'/.test(cloud) &&
     /\.in\('record_id', toDelete\)/.test(cloud));
 
@@ -266,10 +269,14 @@ async function liveAsserts() {
   await P.pg.goto(`${BASE}/decor.html`, { waitUntil: 'load' });
   await waitDecorReady(P.pg);
   await addN(P.pg, 3);
-  const draft1 = await P.pg.evaluate(() => JSON.parse(localStorage.getItem('wb_decor_plan_draft') || 'null'));
+  // #58-WP2-1 起草稿分键（{plans:{anon|planId:{items}}}）；公示壳未登录恒落 anon 槽
+  const draft1 = await P.pg.evaluate(() => {
+    const d = JSON.parse(localStorage.getItem('wb_decor_plan_draft') || 'null');
+    return d && d.plans && d.plans.anon ? d.plans.anon : null;
+  });
   await openDrawer(P.pg);
   const rowsPub = await P.pg.locator('.dh-plan-row').count();
-  check('B1① 公示壳未登录组单：3 件入抽屉 + 徽标=3 + 草稿自动暂存（3 行）',
+  check('B1① 公示壳未登录组单：3 件入抽屉 + 徽标=3 + 草稿自动暂存（anon 槽 3 行）',
     rowsPub === 3 && draft1 && draft1.items.length === 3 &&
     (await P.pg.locator('#dhPlanToggleN').textContent()).trim() === '3',
     `抽屉行=${rowsPub} 草稿=${draft1 && draft1.items.length}`);
@@ -280,7 +287,10 @@ async function liveAsserts() {
   await P.pg.click('#dhPlanSave');
   await P.pg.waitForURL(url => url.pathname.endsWith('index.html') || url.pathname === '/', { timeout: 10000 });
   check('B1② 公示壳点保存：提示「登录后组单内容不丢」+ 跳主站登录页（草稿未丢）',
-    (await P.pg.evaluate(() => (JSON.parse(localStorage.getItem('wb_decor_plan_draft') || '{}').items || []).length)) === 3);
+    (await P.pg.evaluate(() => {
+      const d = JSON.parse(localStorage.getItem('wb_decor_plan_draft') || 'null');
+      return d && d.plans && d.plans.anon && Array.isArray(d.plans.anon.items) ? d.plans.anon.items.length : 0;
+    })) === 3);
   // 登录 → 切图鉴 → 抽屉 3 件齐全（硬验收）
   await P.pg.fill('#authEmail', EMAIL);
   await P.pg.fill('#authPassword', PWD);

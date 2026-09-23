@@ -654,3 +654,174 @@
 @media (prefers-reduced-motion: reduce) {
   .dh-plan-drawer, .dh-plan-scrim, .dh-plan-toast, .dh-card-add, .dh-detail-add, .dh-plan-toggle, .dh-plan-step-btn { transition: none; }
 }
+
+/* ============================================================
+   任务书 #58-WP2-1：方案单独立页（形态B，应用壳专用 .dh-pp-* 前缀，零泄漏）
+   规范对齐：暗色主题/CSS 变量/≤8px 圆角/768px 断点；表格规范对齐 v2 A.3
+   （文本左/数字右/操作居中、表头小一档金色+底线、斑马纹、悬停亮一档）。
+   ============================================================ */
+
+/* ---- 侧栏「方案单」项徽标（与抽屉入口/页内摘要同源计数） ---- */
+.dh-nav-plan-badge {
+  margin-left: auto;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 5px;
+  background: rgba(240, 192, 96, 0.16);
+  border: 1px solid var(--gold-dark);
+  color: var(--gold);
+  font-size: 11px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ---- 页头 ---- */
+.dh-pp { padding: 4px 0 24px; }
+.dh-pp-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+.dh-pp-title { font-size: 20px; font-weight: 700; color: var(--gold); letter-spacing: -0.02em; margin: 0; }
+.dh-pp-ctl { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.dh-pp-plan-sel {
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  color: var(--text-primary);
+  font-size: 13px;
+  padding: 6px 10px;
+  max-width: 220px;
+  cursor: pointer;
+}
+.dh-pp-plan-sel:focus-visible { outline: 2px solid var(--gold); outline-offset: 1px; }
+.dh-pp-back {
+  margin-left: auto;
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 13px;
+  cursor: pointer;
+  padding: 6px 4px;
+}
+.dh-pp-back:hover { color: var(--gold); }
+.dh-pp-back:focus-visible { outline: 2px solid var(--gold); outline-offset: 1px; }
+.dh-pp-notice {
+  background: rgba(240, 192, 96, 0.1);
+  border: 1px solid var(--gold-dark);
+  border-radius: 6px;
+  color: var(--gold);
+  font-size: 12px;
+  padding: 8px 12px;
+  margin-bottom: 12px;
+}
+
+/* ---- 主区布局：全宽表格 + 右侧摘要卡 ---- */
+.dh-pp-body { display: flex; gap: 16px; align-items: flex-start; }
+.dh-pp-main { flex: 1; min-width: 0; }
+.dh-pp-side { width: 280px; flex: none; }
+
+/* ---- 批量操作条 ---- */
+.dh-pp-batch {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 8px 12px;
+  margin-bottom: 10px;
+}
+.dh-pp-selall { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text-primary); cursor: pointer; }
+.dh-pp-batch-info { margin-left: auto; font-size: 12px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.dh-pp-batch input[type="checkbox"], .dh-pp-sel { accent-color: var(--gold); cursor: pointer; }
+
+/* ---- 表格 ---- */
+.dh-pp-table-wrap { overflow-x: auto; border: 1px solid var(--border-color); border-radius: 8px; background: var(--bg-card); }
+.dh-pp-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.dh-pp-table th {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--gold);
+  text-align: left;
+  padding: 10px 12px;
+  border-bottom: 2px solid var(--gold-dark);
+  white-space: nowrap;
+  position: sticky;
+  top: 0;
+  background: var(--bg-card);
+}
+.dh-pp-table td { padding: 8px 12px; border-bottom: 1px solid var(--border-color); vertical-align: middle; }
+.dh-pp-table tbody tr:nth-child(odd) { background: rgba(255, 255, 255, 0.03); }
+.dh-pp-table tbody tr:hover { background: rgba(240, 192, 96, 0.08); }
+.dh-pp-cb { width: 32px; text-align: center; }
+.dh-pp-item { display: inline-flex; align-items: center; gap: 10px; min-width: 0; }
+.dh-pp-icon { width: 36px; height: 36px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-primary); flex: none; }
+.dh-pp-name { font-weight: 600; }
+.dh-pp-src {
+  max-width: 260px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.dh-pp-qty { white-space: nowrap; }
+.dh-pp-qty .dh-plan-step { display: inline-flex; align-items: center; gap: 6px; }
+.dh-pp-num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.dh-pp-op { text-align: center; width: 48px; }
+
+/* ---- 空态 ---- */
+.dh-pp-empty {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  text-align: center;
+  padding: 48px 20px;
+}
+
+/* ---- 右侧摘要卡 ---- */
+.dh-pp-summary {
+  background: var(--bg-card);
+  border: 1px solid var(--border-gold);
+  border-radius: 8px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  position: sticky;
+  top: 70px;
+}
+.dh-pp-sum-row { font-size: 13px; color: var(--text-secondary); display: flex; justify-content: space-between; align-items: baseline; }
+.dh-pp-sum-row b { color: var(--text-primary); font-size: 16px; font-variant-numeric: tabular-nums; }
+.dh-pp-sum-row b.dh-pp-over { color: var(--danger); }
+.dh-pp-progress { height: 8px; border-radius: 4px; background: var(--bg-primary); overflow: hidden; }
+.dh-pp-progress-bar { height: 100%; border-radius: 4px; background: linear-gradient(90deg, var(--gold-dark), var(--gold)); transition: width 0.2s ease; }
+.dh-pp-progress-bar.over { background: var(--danger); }
+.dh-pp-over-hint { font-size: 11px; color: var(--danger); line-height: 1.5; }
+.dh-pp-export { width: 100%; justify-content: center; }
+.dh-pp-share { width: 100%; justify-content: center; }
+.dh-pp-sync { font-size: 11px; color: var(--text-muted); text-align: center; }
+
+/* ---- 768px 窄屏：表格横向滚动 + 摘要卡下移 ---- */
+@media (max-width: 768px) {
+  .dh-pp-body { flex-direction: column; }
+  .dh-pp-side { width: 100%; }
+  .dh-pp-summary { position: static; }
+  .dh-pp-head { gap: 8px; }
+  .dh-pp-back { margin-left: 0; flex-basis: 100%; text-align: left; }
+  .dh-pp-src { max-width: 160px; }
+  .dh-pp-batch { flex-wrap: wrap; }
+  .dh-pp-batch-info { margin-left: 0; flex-basis: 100%; }
+}
+
+/* ---- reduced-motion 降级 ---- */
+@media (prefers-reduced-motion: reduce) {
+  .dh-pp-progress-bar { transition: none; }
+}

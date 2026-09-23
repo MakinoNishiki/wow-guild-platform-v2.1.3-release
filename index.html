@@ -4,13 +4,13 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>魔兽管家</title>
-<!-- 静态资源版本号：20260923.74（任务书 #22 WP3-②：凡改动 js/css 的 commit 必须同步递增此处与所有 ?v= 查询串，见 docs/开发规范.md 第五章） -->
+<!-- 静态资源版本号：20260923.75（任务书 #22 WP3-②：凡改动 js/css 的 commit 必须同步递增此处与所有 ?v= 查询串，见 docs/开发规范.md 第五章） -->
 <link rel="icon" type="image/png" sizes="32x32" href="assets/brand/favicon-32.png">
 <link rel="icon" type="image/png" sizes="16x16" href="assets/brand/favicon-16.png">
-<link rel="stylesheet" href="css/main.css?v=20260923.74">
-<link rel="stylesheet" href="css/data-public.css?v=20260923.74"><!-- 任务书 #28 WP5：副本掉落 tab（选择器全 .dp- 前缀 + #page-lootdrop 作用域，零泄漏） -->
-<link rel="stylesheet" href="css/decor-public.css?v=20260923.74"><!-- 任务书 #51：家宅图鉴（选择器全 .dh- 前缀，零泄漏，双壳共用） -->
-<script src="assets/vendor/supabase-js-2.js?v=20260923.74"></script>
+<link rel="stylesheet" href="css/main.css?v=20260923.75">
+<link rel="stylesheet" href="css/data-public.css?v=20260923.75"><!-- 任务书 #28 WP5：副本掉落 tab（选择器全 .dp- 前缀 + #page-lootdrop 作用域，零泄漏） -->
+<link rel="stylesheet" href="css/decor-public.css?v=20260923.75"><!-- 任务书 #51：家宅图鉴（选择器全 .dh- 前缀，零泄漏，双壳共用） -->
+<script src="assets/vendor/supabase-js-2.js?v=20260923.75"></script>
 </head>
 <body>
 
@@ -160,6 +160,11 @@
            全角色可见、只读零操作；渲染层 js/decorData.js 与公开页 decor.html（WP2）同源单一真源 -->
       <div class="nav-item" data-page="decor" data-nav-group="home" onclick="switchPage('decor')">
         <span class="nav-icon">🏠</span><span>家宅图鉴</span>
+      </div>
+      <!-- 任务书 #58-WP2-1：方案单独立页——「家宅」组内增量（#57 一级导航/分组/首页结构不碰）；
+           徽标与图鉴抽屉入口同源（当前方案总件数，decorData planRender 联动刷新） -->
+      <div class="nav-item" data-page="decor-plan" data-nav-group="home" onclick="switchPage('decor-plan')">
+        <span class="nav-icon">🧺</span><span>方案单</span><span class="dh-nav-plan-badge" id="dhNavPlanBadge" style="display:none">0</span>
       </div>
       <!-- REQ-137 二期预留，数据线另立（任务书 #52 WP1）：小宠物图鉴预留位——灰态禁用，
            无 data-page/onclick、独立 .nav-item-disabled 类，不参与 switchPage/REQ-105 排序，窄屏底部 Tab 不加 -->
@@ -786,6 +791,9 @@
           <div class="dh-loading">数据加载中…</div>
         </main>
       </div>
+      <!-- 任务书 #58-WP2-1：方案单独立页（形态B）——渲染层 js/decorData.js（DecorCatalog.mountPlanPage 挂本容器，
+           与抽屉共享同一方案数据模块，禁止复制第二份数据逻辑）；骨架极简，结构由渲染层生成 -->
+      <div class="page" id="page-decor-plan"></div>
     </div>
   </main>
 </div>
@@ -2024,21 +2032,21 @@
   </div>
 </div>
 
-<script src="js/cloud.js?v=20260923.74"></script>
+<script src="js/cloud.js?v=20260923.75"></script>
 <!-- 任务书 #14：主数据层（快照兜底 + 加载层），须在 app.js 之前 -->
-<script src="js/masterDataSnapshot.js?v=20260923.74"></script>
-<script src="js/masterData.js?v=20260923.74"></script>
+<script src="js/masterDataSnapshot.js?v=20260923.75"></script>
+<script src="js/masterData.js?v=20260923.75"></script>
 <!-- 任务书 #22 WP2：职业/专精/职责图标集中映射（全站唯一取图处） -->
-<script src="js/iconMap.js?v=20260923.74"></script>
+<script src="js/iconMap.js?v=20260923.75"></script>
 <!-- 任务书 #31（REQ-097）：装备分类词表单一真源（公示页 chips / picker 过滤 / BUG-057 回填三处消费，须在 dataPublic.js 与 app.js 之前） -->
-<script src="js/lootTaxonomy.js?v=20260923.74"></script>
+<script src="js/lootTaxonomy.js?v=20260923.75"></script>
 <!-- 任务书 #28 WP5：副本掉落渲染层（双壳同源；无 data-public-body 不自动启动，由 app.js 懒挂载，须在 app.js 之前） -->
-<script src="js/dataPublic.js?v=20260923.74"></script>
+<script src="js/dataPublic.js?v=20260923.75"></script>
 <!-- 任务书 #51（REQ-137 一期）：家宅图鉴词表单一真源（价格/分类/尺寸/来源词表，须在 decorData.js 之前） -->
-<script src="js/decorDict.js?v=20260923.74"></script>
+<script src="js/decorDict.js?v=20260923.75"></script>
 <!-- 任务书 #51：家宅图鉴数据层+渲染层（双壳同源；无 data-decor-body 不自动启动，由 app.js 懒挂载，须在 app.js 之前） -->
-<script src="js/decorData.js?v=20260923.74"></script>
-<script src="js/app.js?v=20260923.74"></script>
-<script src="js/track.js?v=20260923.74"></script><!-- 任务书 #54 WP1：全站埋点采集层（REQ-141，零依赖静默兜底） -->
+<script src="js/decorData.js?v=20260923.75"></script>
+<script src="js/app.js?v=20260923.75"></script>
+<script src="js/track.js?v=20260923.75"></script><!-- 任务书 #54 WP1：全站埋点采集层（REQ-141，零依赖静默兜底） -->
 </body>
 </html>

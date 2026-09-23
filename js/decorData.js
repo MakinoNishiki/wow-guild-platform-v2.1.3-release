@@ -475,7 +475,9 @@
   const DECOR_PLAN_CAPACITY_REF = 2000; // 容量参考上限：游戏内实际预算随住宅等级变化，此处仅参考——超限仅标红不阻断
 
   const plan = {
-    items: [],          // [{record_id, qty}]
+    items: [],          // [{record_id, qty}]——当前选定方案的工作集
+    plans: [],          // 任务书 #58-WP2-1：全量方案 [{id,name,updated_at,items}]（未登录恒空）
+    currentId: null,    // 任务书 #58-WP2-1：当前选定方案 id（未登录恒 null → 草稿键 'anon'）
     cloudName: '我的方案单',
     notice: '',         // 一次性提示（草稿还原）
     saving: false,
@@ -490,22 +492,42 @@
       return s + ((row && row.placement_cost) || 0) * it.qty;
     }, 0);
   }
+  // 任务书 #58-WP2-1：草稿按方案分键（{plans:{[planId|'anon']:{items,updatedAt}}}）——切方案不串单；
+  // 兼容 WP1 旧形态 {items,updatedAt} → 视作 'anon' 单槽（未登录/无云端方案行为不变）
+  function planDraftReadAll() {
+    try {
+      const raw = localStorage.getItem(PLAN_DRAFT_KEY);
+      if (!raw) return { plans: {} };
+      const d = JSON.parse(raw);
+      if (d && d.plans && typeof d.plans === 'object') return d;
+      if (d && Array.isArray(d.items)) return { plans: { anon: { items: d.items, updatedAt: d.updatedAt } } };
+      return { plans: {} };
+    } catch { return { plans: {} }; }
+  }
+  function planDraftKey() { return plan.currentId != null ? String(plan.currentId) : 'anon'; }
   function planDraftSave() {
     try {
-      if (plan.items.length) {
-        localStorage.setItem(PLAN_DRAFT_KEY, JSON.stringify({ items: plan.items, updatedAt: Date.now() }));
-      } else {
-        localStorage.removeItem(PLAN_DRAFT_KEY);
-      }
+      const all = planDraftReadAll();
+      if (plan.items.length) all.plans[planDraftKey()] = { items: plan.items, updatedAt: Date.now() };
+      else delete all.plans[planDraftKey()];
+      if (Object.keys(all.plans).length) localStorage.setItem(PLAN_DRAFT_KEY, JSON.stringify(all));
+      else localStorage.removeItem(PLAN_DRAFT_KEY);
     } catch { /* localStorage 不可用（隐私模式等）静默 */ }
   }
   function planDraftLoad() {
-    try {
-      const raw = localStorage.getItem(PLAN_DRAFT_KEY);
-      if (!raw) return null;
-      const d = JSON.parse(raw);
-      return (d && Array.isArray(d.items) && d.items.length) ? d : null;
-    } catch { return null; }
+    const d = planDraftReadAll().plans[planDraftKey()];
+    return (d && Array.isArray(d.items) && d.items.length) ? d : null;
+  }
+  // 登录态认领 'anon' 槽（WP1 旧草稿 / 公示壳未登录组单）→ 一次性迁入当前方案槽，认领后不再回潮
+  function planDraftAdoptAnon() {
+    if (planDraftKey() === 'anon') return;
+    const all = planDraftReadAll();
+    const legacy = all.plans.anon;
+    if (!all.plans[planDraftKey()] && legacy && Array.isArray(legacy.items) && legacy.items.length) {
+      all.plans[planDraftKey()] = legacy;
+      delete all.plans.anon;
+      try { localStorage.setItem(PLAN_DRAFT_KEY, JSON.stringify(all)); } catch { /* 静默 */ }
+    }
   }
 
   function planBridge() { return window.DecorCatalog && window.DecorCatalog.planBridge; }
@@ -514,22 +536,37 @@
     return !!(b && typeof b.isLoggedIn === 'function' && b.isLoggedIn());
   }
 
-  // 初始化（boot 数据拉齐后调用）：草稿/云端合并三分支（已登录）——草稿空→云端；云端空→草稿；皆非空→草稿优先+一次性提示
-  async function planInit() {
+  // 任务书 #58-WP2-1：登录态云端对齐——拉全量方案 → plans/currentId/cloudName；
+  // 当前方案 items 合并三分支（草稿空→云端；云端空→草稿；皆非空→草稿优先+一次性提示）
+  async function planPullCloud() {
+    let list = [];
+    try { list = await planBridge().listPlans(); } catch { list = []; }
+    plan.plans = Array.isArray(list) ? list : [];
+    const bid = planBridge().currentPlanId && planBridge().currentPlanId();
+    plan.currentId = bid != null ? bid : (plan.plans[0] && plan.plans[0].id) || null;
+    const cur = plan.plans.find(p => String(p.id) === String(plan.currentId)) || null;
+    plan.cloudName = (cur && cur.name) || '我的方案单';
+    const cloudItems = cur && Array.isArray(cur.items) && cur.items.length ? cur.items : null;
+    planDraftAdoptAnon(); // 先认领 anon 遗留槽，再按三分支合并
     const draft = planDraftLoad();
-    if (planLoggedIn()) {
-      let cloud = null;
-      try { cloud = await planBridge().loadCloud(); } catch { cloud = null; }
-      const cloudItems = cloud && Array.isArray(cloud.items) && cloud.items.length ? cloud.items : null;
-      if (cloud && cloud.name) plan.cloudName = cloud.name;
-      if (draft) {
-        plan.items = draft.items.map(it => ({ record_id: it.record_id | 0, qty: Math.max(1, it.qty | 0) }));
-        plan.notice = '已还原你上次未保存的组单，保存后覆盖云端';
-      } else if (cloudItems) {
-        plan.items = cloudItems.map(it => ({ record_id: it.record_id, qty: it.qty }));
-      }
-    } else if (draft) {
+    if (draft) {
       plan.items = draft.items.map(it => ({ record_id: it.record_id | 0, qty: Math.max(1, it.qty | 0) }));
+      plan.notice = '已还原你上次未保存的组单，保存后覆盖云端';
+    } else {
+      plan.notice = '';
+      plan.items = cloudItems ? cloudItems.map(it => ({ record_id: it.record_id, qty: it.qty })) : [];
+    }
+  }
+
+  // 初始化（boot 数据拉齐后调用）
+  async function planInit() {
+    if (planLoggedIn()) {
+      await planPullCloud();
+    } else {
+      plan.plans = [];
+      plan.currentId = null;
+      const draft = planDraftLoad();
+      if (draft) plan.items = draft.items.map(it => ({ record_id: it.record_id | 0, qty: Math.max(1, it.qty | 0) }));
     }
     // 目录外 record_id（数据下线等）静默剔除
     plan.items = plan.items.filter(it => state.rows.some(r => r.record_id === it.record_id));
@@ -578,6 +615,73 @@
     planRender();
   }
 
+  // ---- 任务书 #58-WP2-1：批量操作（独立页批量条；单次变更一次 planDraftSave+planRender，不循环触发） ----
+  function planBatchRemove(recordIds) {
+    const ids = new Set(recordIds.map(Number));
+    plan.items = plan.items.filter(it => !ids.has(it.record_id));
+    planDraftSave();
+    planRender();
+  }
+  function planBatchInc(recordIds) {
+    const ids = new Set(recordIds.map(Number));
+    plan.items.forEach(it => { if (ids.has(it.record_id)) it.qty = Math.min(99, it.qty + 1); });
+    planDraftSave();
+    planRender();
+  }
+
+  // ---- 任务书 #58-WP2-1：多方案动作（登录壳专用；写全部走 bridge→cloudCrud，完成后云端对齐重渲染） ----
+  async function planActionSwitch(id) {
+    if (!planLoggedIn() || String(id) === String(plan.currentId)) return;
+    planDraftSave(); // 当前方案未保存编辑先入草稿（切方案不丢不串）
+    try {
+      await planBridge().switchPlan(id);
+      await planPullCloud();
+      planRender();
+      // 任务书 #58-WP2-3 登记事件（切换一次一埋；plan_count=方案总数）
+      if (window.WBTrack) WBTrack.event('decor_plan_switch', { plan_count: plan.plans.length });
+    } catch (e) { planToast('切换方案失败：' + ((e && e.message) || '未知错误'), true); }
+  }
+  async function planActionCreate() {
+    if (!planLoggedIn()) { planToast('新建方案需要登录，登录后组单内容不丢'); setTimeout(() => { location.href = 'index.html'; }, 900); return; }
+    planDraftSave();
+    // 默认名「我的方案 N」：取未被占用的最小序号
+    const used = new Set(plan.plans.map(p => p.name));
+    let seq = plan.plans.length + 1;
+    while (used.has(`我的方案 ${seq}`)) seq++;
+    try {
+      await planBridge().createPlan(`我的方案 ${seq}`);
+      await planPullCloud();
+      planRender();
+      // 任务书 #58-WP2-3 登记事件
+      if (window.WBTrack) WBTrack.event('decor_plan_create', {});
+      planToast(`已创建「我的方案 ${seq}」`);
+    } catch (e) { planToast('新建方案失败：' + ((e && e.message) || '未知错误'), true); }
+  }
+  async function planActionRename() {
+    if (!planLoggedIn() || plan.currentId == null) return;
+    const name = window.prompt('方案名称', plan.cloudName || '我的方案单');
+    if (name == null) return; // 取消
+    const trimmed = name.trim().slice(0, 40);
+    if (!trimmed || trimmed === plan.cloudName) return;
+    try {
+      await planBridge().renamePlan(plan.currentId, trimmed);
+      await planPullCloud();
+      planRender();
+      planToast('方案已重命名');
+    } catch (e) { planToast('重命名失败：' + ((e && e.message) || '未知错误'), true); }
+  }
+  async function planActionDelete() {
+    if (!planLoggedIn() || plan.currentId == null) return;
+    if (plan.plans.length <= 1) { planToast('仅剩一个方案，禁止删除', true); return; } // 前端拦截与服务端同口径
+    if (!window.confirm(`确定删除方案「${plan.cloudName}」吗？明细一并删除，不可恢复。`)) return;
+    try {
+      await planBridge().deletePlan(plan.currentId);
+      await planPullCloud();
+      planRender();
+      planToast('方案已删除');
+    } catch (e) { planToast('删除失败：' + ((e && e.message) || '未知错误'), true); }
+  }
+
   // ---- 抽屉 DOM（fixed 挂 body，双壳自足；与 root 挂载点无关） ----
   function planBuildDom() {
     if (plan.built) return;
@@ -623,6 +727,11 @@
     const n = planCount();
     $doc('dhPlanToggleN').textContent = n;
     $doc('dhPlanCount').textContent = `${n} 件`;
+    // 任务书 #58-WP2-1：徽标三处同源——侧栏「方案单」项徽标（应用壳独有，公示壳无此节点自动跳过）
+    const navBadge = document.getElementById('dhNavPlanBadge');
+    if (navBadge) { navBadge.textContent = n; navBadge.style.display = n > 0 ? '' : 'none'; }
+    // 独立页已挂载则同步重渲染（抽屉/卡片操作实时反映到页内表格与摘要卡）
+    if (planPageEl) planPageRender();
     const cap = planCapacity();
     const capEl = $doc('dhPlanCap');
     capEl.textContent = `容量 ${cap.toLocaleString()} / ${DECOR_PLAN_CAPACITY_REF.toLocaleString()}`;
@@ -691,7 +800,10 @@
     btn.disabled = true; btn.textContent = '保存中…';
     try {
       await planBridge().save(plan.items, plan.cloudName || '我的方案单');
-      try { localStorage.removeItem(PLAN_DRAFT_KEY); } catch { /* 静默 */ } // 保存成功清空草稿（云端为真源）
+      // 保存成功清当前方案草稿槽（云端为真源；#58-WP2-1 分键草稿——其他方案草稿槽不受影响）
+      plan.items = [];
+      planDraftSave();
+      await planPullCloud(); // 云端对齐（头名/明细以库为准）
       plan.notice = '';
       planRender();
       // 任务书 #56 登记事件（计数口径：总件数+容量）
@@ -783,13 +895,169 @@
     }
   }
 
+  // ==================== 任务书 #58-WP2-1：方案单独立页（形态B，应用壳专用渲染层） ====================
+  // 与抽屉共享同一 plan 数据模块（增删改/步进/批量/多方案动作全复用上方函数，禁止复制第二份数据逻辑）；
+  // 仅应用壳经 DecorCatalog.mountPlanPage 挂载（公示壳不挂，本段代码在公示壳惰性不触发）。
+  let planPageEl = null;
+  const planPageSel = new Set(); // 批量条勾选态（record_id）
+
+  function mountPlanPage(el) {
+    planPageEl = el;
+    planPageRender();
+  }
+  function activatePlanPage() { planPageRender(); } // 重切页签刷新（方案可能在抽屉/卡片侧改过）
+
+  function planPageRowHtml(it) {
+    const row = state.rows.find(r => r.record_id === it.record_id);
+    if (!row) return '';
+    const q = row.quality != null ? row.quality : 1;
+    const src = srcSummaryText(row);
+    const cost = row.placement_cost != null ? row.placement_cost : '—';
+    const sub = row.placement_cost != null ? (row.placement_cost * it.qty).toLocaleString() : '—';
+    return `<tr data-rid="${it.record_id}">
+      <td class="dh-pp-cb"><input type="checkbox" class="dh-pp-sel" data-rid="${it.record_id}" ${planPageSel.has(it.record_id) ? 'checked' : ''} aria-label="选择 ${esc(row.name)}"></td>
+      <td><span class="dh-pp-item"><img class="dh-pp-icon" src="${iconSrc(row)}" alt="" loading="lazy" onerror="this.onerror=null;this.src='${PLACEHOLDER}'"><span class="dh-pp-name dh-q${q}" title="${esc(row.name)}">${esc(row.name)}</span></span></td>
+      <td class="dh-pp-src${src.unknown ? ' dh-src-unknown' : ''}" title="${esc(src.text)}">${esc(src.text)}</td>
+      <td class="dh-pp-qty"><span class="dh-plan-step">
+        <button type="button" class="dh-plan-step-btn" data-step="-1" ${it.qty <= 1 ? 'disabled' : ''} aria-label="减少数量">−</button>
+        <span class="dh-plan-qty">${it.qty}</span>
+        <button type="button" class="dh-plan-step-btn" data-step="1" ${it.qty >= 99 ? 'disabled' : ''} aria-label="增加数量">＋</button>
+      </span></td>
+      <td class="dh-pp-num">${cost}</td>
+      <td class="dh-pp-num">${sub}</td>
+      <td class="dh-pp-op"><button type="button" class="dh-plan-rm" data-rm="1" aria-label="移除">&times;</button></td>
+    </tr>`;
+  }
+
+  function planPageBatchInfo() {
+    const ids = [...planPageSel];
+    const sub = ids.reduce((s, rid) => {
+      const it = plan.items.find(x => x.record_id === rid);
+      const row = state.rows.find(r => r.record_id === rid);
+      return s + (it && row && row.placement_cost ? row.placement_cost * it.qty : 0);
+    }, 0);
+    return `已选 ${ids.length} 件 · 小计容量 ${sub.toLocaleString()}`;
+  }
+
+  function planPageRender() {
+    if (!planPageEl) return;
+    // 三态：目录数据未就绪（加载中 / 失败重试）
+    if (!state.rows.length) {
+      planPageEl.innerHTML = state.loadError
+        ? `<div class="dh-error"><div class="dh-error-text">${esc(state.loadError)}</div><button type="button" class="btn btn-primary" id="dhPpRetry">重试</button></div>`
+        : '<div class="dh-loading">数据加载中…</div>';
+      const retry = planPageEl.querySelector('#dhPpRetry');
+      if (retry) retry.onclick = () => { state.loadError = ''; planPageRender(); boot(); };
+      return;
+    }
+    // 勾选手残清理（已移除的件不再选中）
+    [...planPageSel].forEach(rid => { if (!plan.items.some(it => it.record_id === rid)) planPageSel.delete(rid); });
+
+    const n = planCount();
+    const cap = planCapacity();
+    const capPct = Math.min(100, Math.round(cap / DECOR_PLAN_CAPACITY_REF * 100));
+    const logged = planLoggedIn();
+    const options = plan.plans.map(p =>
+      `<option value="${p.id}" ${String(p.id) === String(plan.currentId) ? 'selected' : ''}>${esc(p.name)}</option>`).join('');
+    const selInfo = planPageBatchInfo();
+
+    planPageEl.innerHTML = `<div class="dh-pp">
+      <div class="dh-pp-head">
+        <h2 class="dh-pp-title">我的方案单</h2>
+        ${logged ? `<div class="dh-pp-ctl">
+          <select class="dh-pp-plan-sel" id="dhPpPlanSel" aria-label="切换方案">${options}</select>
+          <button type="button" class="btn btn-sm" id="dhPpCreate">＋ 新建方案</button>
+          <button type="button" class="btn btn-sm" id="dhPpRename">重命名</button>
+          <button type="button" class="btn btn-sm btn-danger" id="dhPpDelete">删除</button>
+        </div>` : ''}
+        <button type="button" class="dh-pp-back" id="dhPpBack">← 返回图鉴</button>
+      </div>
+      ${plan.notice ? `<div class="dh-pp-notice">${esc(plan.notice)}</div>` : ''}
+      <div class="dh-pp-body">
+        <div class="dh-pp-main">
+          <div class="dh-pp-batch">
+            <label class="dh-pp-selall"><input type="checkbox" id="dhPpSelAll"> 全选</label>
+            <button type="button" class="btn btn-sm" id="dhPpBatchRm">批量移除</button>
+            <button type="button" class="btn btn-sm" id="dhPpBatchInc">批量 +1</button>
+            <span class="dh-pp-batch-info" id="dhPpBatchInfo">${esc(selInfo)}</span>
+          </div>
+          ${plan.items.length ? `<div class="dh-pp-table-wrap"><table class="dh-pp-table">
+            <thead><tr><th></th><th>家具</th><th>来源</th><th>数量</th><th>容量·件</th><th>小计</th><th>操作</th></tr></thead>
+            <tbody>${plan.items.map(planPageRowHtml).join('')}</tbody>
+          </table></div>`
+          : `<div class="dh-pp-empty">
+              <div class="dh-empty-title">方案单还是空的</div>
+              <div class="dh-empty-hint">去图鉴挑几件装饰加入方案单</div>
+              <button type="button" class="btn btn-primary" id="dhPpGoDecor">去图鉴挑装饰</button>
+            </div>`}
+        </div>
+        <aside class="dh-pp-side">
+          <div class="dh-pp-summary">
+            <div class="dh-pp-sum-row">总件数 <b id="dhPpTotal">${n}</b></div>
+            <div class="dh-pp-sum-row">容量合计 <b class="${cap > DECOR_PLAN_CAPACITY_REF ? 'dh-pp-over' : ''}">${cap.toLocaleString()}</b> / ${DECOR_PLAN_CAPACITY_REF.toLocaleString()}</div>
+            <div class="dh-pp-progress"><div class="dh-pp-progress-bar${cap > DECOR_PLAN_CAPACITY_REF ? ' over' : ''}" style="width:${capPct}%"></div></div>
+            ${cap > DECOR_PLAN_CAPACITY_REF ? '<div class="dh-pp-over-hint">已超参考上限（游戏内预算随住宅等级变化，仅提示不阻断）</div>' : ''}
+            <button type="button" class="btn btn-primary dh-pp-export" id="dhPpExport">导出</button>
+            <button type="button" class="btn dh-pp-share" id="dhPpShare" disabled title="三期社区开放">分享方案</button>
+            <div class="dh-pp-sync">${logged ? '云端已同步 · 跨设备可用' : '未登录 · 草稿本地暂存，保存时跳登录'}</div>
+          </div>
+        </aside>
+      </div>
+    </div>`;
+
+    // ---- 事件绑定 ----
+    const $p = id => planPageEl.querySelector('#' + id);
+    $p('dhPpBack').onclick = () => { if (typeof switchPage === 'function') switchPage('decor'); };
+    const goDecor = $p('dhPpGoDecor');
+    if (goDecor) goDecor.onclick = () => { if (typeof switchPage === 'function') switchPage('decor'); };
+    if (logged) {
+      const selEl = $p('dhPpPlanSel');
+      selEl.dataset.current = String(plan.currentId); // 异步切换落地标记（verify/测试可观测）
+      selEl.onchange = e => planActionSwitch(e.target.value);
+      $p('dhPpCreate').onclick = planActionCreate;
+      $p('dhPpRename').onclick = planActionRename;
+      $p('dhPpDelete').onclick = planActionDelete;
+    }
+    $p('dhPpExport').onclick = planOpenExport;
+    // 表格行交互（复用抽屉同源函数）
+    [...planPageEl.querySelectorAll('tbody tr')].forEach(tr => {
+      const rid = +tr.dataset.rid;
+      [...tr.querySelectorAll('[data-step]')].forEach(btn => btn.onclick = () => {
+        const cur = plan.items.find(it => it.record_id === rid);
+        if (cur) planSetQty(rid, cur.qty + (+btn.dataset.step));
+      });
+      tr.querySelector('[data-rm]').onclick = () => planRemove(rid);
+      tr.querySelector('.dh-pp-sel').onchange = e => {
+        if (e.target.checked) planPageSel.add(rid); else planPageSel.delete(rid);
+        planPageRender();
+      };
+    });
+    $p('dhPpSelAll').checked = plan.items.length > 0 && plan.items.every(it => planPageSel.has(it.record_id));
+    $p('dhPpSelAll').onchange = e => {
+      planPageSel.clear();
+      if (e.target.checked) plan.items.forEach(it => planPageSel.add(it.record_id));
+      planPageRender();
+    };
+    $p('dhPpBatchRm').onclick = () => {
+      if (!planPageSel.size) { planToast('先勾选要操作的装饰', true); return; }
+      planBatchRemove([...planPageSel]);
+      planPageSel.clear();
+    };
+    $p('dhPpBatchInc').onclick = () => {
+      if (!planPageSel.size) { planToast('先勾选要操作的装饰', true); return; }
+      planBatchInc([...planPageSel]);
+    };
+  }
+
   // ---- 三态 ----
   function showError(msg) {
+    state.loadError = msg || '数据加载失败'; // 任务书 #58-WP2-1：独立页失败重试同源消费
     main.innerHTML = `<div class="dh-error">
       <div class="dh-error-text">${esc(msg || '数据加载失败')}</div>
       <button type="button" class="btn btn-primary" id="dhRetry">重试</button>
     </div>`;
     $('dhRetry').onclick = () => { main.innerHTML = '<div class="dh-loading">数据加载中…</div>'; boot(); };
+    if (planPageEl) planPageRender();
   }
 
   // ---- 启动 ----
@@ -797,6 +1065,7 @@
   async function boot() {
     filterBar = $('dhFilterBar');
     main = $('dhMain');
+    state.loadError = '';
     let cfg;
     try {
       const r = await fetch('/api/supabase-config');
@@ -825,6 +1094,9 @@
       boot();
     },
     activate() { /* 只读目录：无脏标记、无重测需求，刻意零动作 */ },
+    // 任务书 #58-WP2-1：方案单独立页（应用壳专用；公示壳不调用，惰性不触发）
+    mountPlanPage(el) { mountPlanPage(el); },
+    activatePlanPage() { activatePlanPage(); },
     // 任务书 #58-WP1：导出弹窗脏检查（app 壳登记 modalDirtyChecks 用，规范 4.6）
     planExportIsDirty() { return planExportIsDirty(); },
   };

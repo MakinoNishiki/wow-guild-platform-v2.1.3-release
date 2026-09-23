@@ -2243,7 +2243,8 @@ const pageTitles = {
   changelog: '更新日志',
   datacenter: '数据中心',
   lootdrop: '副本掉落', // 任务书 #28 WP5（REQ-086）：原「数据公示」更名 + 双壳嵌入
-  decor: '家宅图鉴' // 任务书 #51（REQ-137 一期）：双壳登录壳页签，只读
+  decor: '家宅图鉴', // 任务书 #51（REQ-137 一期）：双壳登录壳页签，只读
+  'decor-plan': '我的方案单' // 任务书 #58-WP2-1：方案单独立页（形态B，「家宅」组内增量）
 };
 
 // ==================== 任务书 #42（REQ-105/107）：用户偏好包 ====================
@@ -2424,6 +2425,11 @@ function switchPage(pageName) {
     ensureDecorMounted();
   }
 
+  // 任务书 #58-WP2-1：方案单独立页 tab——懒挂载（DecorCatalog.mountPlanPage 挂 page-decor-plan 容器）
+  if (pageName === 'decor-plan') {
+    ensureDecorPlanPageMounted();
+  }
+
   // 移动端关闭侧边栏
   if (window.innerWidth <= 768) {
     document.getElementById('sidebar').classList.remove('show');
@@ -2464,12 +2470,36 @@ function ensureDecorMounted() {
       return window.appData.decorPlan || null;
     },
     save: (items, name) => saveDecorPlan(items, name),
+    // 任务书 #58-WP2-1：多方案操作（写走 cloudCrud 统一入口；switch 仅切 localStorage 不写库）
+    listPlans: async () => {
+      await window.CloudSync.reloadData('decorPlan');
+      return window.appData.decorPlans || [];
+    },
+    currentPlanId: () => (window.appData.decorPlan && window.appData.decorPlan.id) || null,
+    createPlan: name => cloudCrud('decorPlan', 'create', { name }, { renderFn: () => {} }),
+    renamePlan: (id, name) => cloudCrud('decorPlan', 'rename', { id, name }, { renderFn: () => {} }),
+    deletePlan: id => cloudCrud('decorPlan', 'delete', { id }, { renderFn: () => {} }),
+    switchPlan: id => cloudCrud('decorPlan', 'switch', { id }, { renderFn: () => {} }),
   };
   if (!decorMounted) {
     decorMounted = true;
     DecorCatalog.mount(document.getElementById('page-decor'));
   } else {
     DecorCatalog.activate();
+  }
+}
+
+// 任务书 #58-WP2-1：方案单独立页懒挂载（渲染层 decorData.js 与抽屉同源单一真源；
+// 先 ensureDecorMounted 保证 bridge 注入与目录数据启动——挂载幂等，图鉴未访问过也能直进本页）
+let decorPlanPageMounted = false;
+function ensureDecorPlanPageMounted() {
+  if (!window.DecorCatalog || !DecorCatalog.mountPlanPage) return;
+  ensureDecorMounted();
+  if (!decorPlanPageMounted) {
+    decorPlanPageMounted = true;
+    DecorCatalog.mountPlanPage(document.getElementById('page-decor-plan'));
+  } else {
+    DecorCatalog.activatePlanPage();
   }
 }
 

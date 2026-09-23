@@ -872,45 +872,95 @@
     }
   }
 
-  // ---- 方案单（任务书 #58-WP1）----
+  // ---- 方案单（任务书 #58-WP1；#58-WP2-1 多方案口径改造）----
   // 用户行级 RLS 制式（user_profiles 先例）：读写均 SDK 直连，RLS 为最后防线，不经 /api/db 代理
-  // （代理是公会级鉴权，本表无 guild_id 不适用）。多方案表级预留，WP1 口径 = updated_at 最新一条。
+  // （代理是公会级鉴权，本表无 guild_id 不适用）。
+  // WP2-1 口径 = 「当前选定方案」：选定 id 存 localStorage wb_decor_plan_current；无选定值或
+  // 选定 id 已不存在 → 回退 updated_at 最新。appData.decorPlans = 全量方案（updated_at 倒序），
+  // appData.decorPlan = 当前方案（WP1 单方案消费方零改动）。
+  const DECOR_PLAN_CURRENT_KEY = 'wb_decor_plan_current';
+  function decorPlanResolveCurrentId(planIds) {
+    let cid = null;
+    try { cid = localStorage.getItem(DECOR_PLAN_CURRENT_KEY); } catch { cid = null; }
+    if (cid && planIds.some(id => String(id) === cid)) return cid;
+    return planIds.length ? String(planIds[0]) : null; // 调用方保证 updated_at 倒序
+  }
   async function reloadDecorPlan() {
     if (!currentUser) {
-      if (typeof window.appData !== 'undefined') window.appData.decorPlan = null;
+      if (typeof window.appData !== 'undefined') { window.appData.decorPlans = []; window.appData.decorPlan = null; }
       return;
     }
     const { data, error } = await supabaseClient
       .from('decor_plans')
       .select('*, decor_plan_items(*)')
       .eq('user_id', currentUser.id)
-      .order('updated_at', { ascending: false })
-      .limit(1);
+      .order('updated_at', { ascending: false });
     if (error) throw error;
-    const row = data && data[0];
+    const plans = (data || []).map(row => ({
+      id: row.id,
+      name: row.name,
+      updated_at: row.updated_at,
+      items: (row.decor_plan_items || []).map(it => ({ record_id: it.record_id, qty: it.qty })),
+    }));
     if (typeof window.appData !== 'undefined') {
-      window.appData.decorPlan = row ? {
-        id: row.id,
-        name: row.name,
-        items: (row.decor_plan_items || []).map(it => ({ record_id: it.record_id, qty: it.qty })),
-      } : null;
+      window.appData.decorPlans = plans;
+      const cid = decorPlanResolveCurrentId(plans.map(p => p.id));
+      const cur = plans.find(p => String(p.id) === cid) || null;
+      window.appData.decorPlan = cur ? { id: cur.id, name: cur.name, items: cur.items } : null;
     }
   }
 
   async function syncDecorPlan(operation, item) {
-    if (operation !== 'save') throw new Error('decorPlan 仅支持 save 操作');
     if (!currentUser) throw new Error('未登录，无法保存方案单');
+
+    // switch：仅切 localStorage，不写库（reload 由 cloudCrud 统一触发）
+    if (operation === 'switch') {
+      try { localStorage.setItem(DECOR_PLAN_CURRENT_KEY, String(item && item.id)); } catch { /* localStorage 不可用静默 */ }
+      return;
+    }
+    // create：INSERT 头 + 空明细，并设为当前选定
+    if (operation === 'create') {
+      const { data: ins, error: iErr } = await supabaseClient
+        .from('decor_plans').insert({ user_id: currentUser.id, name: (item && item.name) || '我的方案单' }).select('id').single();
+      if (iErr) throw iErr;
+      try { localStorage.setItem(DECOR_PLAN_CURRENT_KEY, String(ins.id)); } catch { /* 静默 */ }
+      return;
+    }
+    // rename：仅改头名（不 bump updated_at——当前选定由 id 锚定，排序语义不动）
+    if (operation === 'rename') {
+      if (!item || !item.id) throw new Error('rename 缺少方案 id');
+      const { error: rErr } = await supabaseClient
+        .from('decor_plans').update({ name: item.name || '我的方案单' }).eq('id', item.id);
+      if (rErr) throw rErr;
+      return;
+    }
+    // delete：仅剩一个方案禁止删除；删头明细级联；删的是当前选定则清除选定（回退最新）
+    if (operation === 'delete') {
+      if (!item || !item.id) throw new Error('delete 缺少方案 id');
+      const { count, error: cErr } = await supabaseClient
+        .from('decor_plans').select('id', { count: 'exact', head: true }).eq('user_id', currentUser.id);
+      if (cErr) throw cErr;
+      if ((count || 0) <= 1) throw new Error('仅剩一个方案，禁止删除');
+      const { error: dErr } = await supabaseClient.from('decor_plans').delete().eq('id', item.id);
+      if (dErr) throw dErr;
+      try {
+        if (localStorage.getItem(DECOR_PLAN_CURRENT_KEY) === String(item.id)) localStorage.removeItem(DECOR_PLAN_CURRENT_KEY);
+      } catch { /* 静默 */ }
+      return;
+    }
+    if (operation !== 'save') throw new Error('decorPlan 支持 save/create/rename/delete/switch 操作');
+
     const items = (Array.isArray(item && item.items) ? item.items : [])
       .map(it => ({ record_id: it.record_id | 0, qty: Math.max(1, it.qty | 0) }))
       .filter(it => it.record_id > 0);
     const name = (item && item.name) || '我的方案单';
 
-    // 当前方案 = updated_at 最新一条；无则 INSERT 头，有则 UPDATE 头（名/时间戳）
+    // 当前方案 = 选定 id（回退 updated_at 最新）；无则 INSERT 头，有则 UPDATE 头（名/时间戳）
     const { data: plans, error: qErr } = await supabaseClient
       .from('decor_plans').select('id').eq('user_id', currentUser.id)
-      .order('updated_at', { ascending: false }).limit(1);
+      .order('updated_at', { ascending: false });
     if (qErr) throw qErr;
-    let planId = plans && plans[0] && plans[0].id;
+    let planId = decorPlanResolveCurrentId((plans || []).map(p => p.id));
     if (!planId) {
       const { data: ins, error: iErr } = await supabaseClient
         .from('decor_plans').insert({ user_id: currentUser.id, name }).select('id').single();
