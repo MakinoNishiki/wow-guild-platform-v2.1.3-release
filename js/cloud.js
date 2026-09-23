@@ -652,6 +652,10 @@
         case 'activities':
           await reloadActivities(guildId);
           break;
+        case 'decorPlan':
+          // 任务书 #58-WP1：方案单（用户行级 RLS，无公会维度）
+          await reloadDecorPlan();
+          break;
         default:
           console.warn('未知 reload 数据类型:', dataType);
       }
@@ -855,12 +859,86 @@
         case 'wishlists':
           await syncWishlist(guildId, operation, item);
           break;
+        case 'decorPlan':
+          // 任务书 #58-WP1：方案单（用户行级 RLS，无公会维度）
+          await syncDecorPlan(operation, item);
+          break;
         default:
           console.warn('未知数据类型:', dataType);
       }
     } catch (e) {
       console.error('云端同步失败:', dataType, operation, e);
       throw e;
+    }
+  }
+
+  // ---- 方案单（任务书 #58-WP1）----
+  // 用户行级 RLS 制式（user_profiles 先例）：读写均 SDK 直连，RLS 为最后防线，不经 /api/db 代理
+  // （代理是公会级鉴权，本表无 guild_id 不适用）。多方案表级预留，WP1 口径 = updated_at 最新一条。
+  async function reloadDecorPlan() {
+    if (!currentUser) {
+      if (typeof window.appData !== 'undefined') window.appData.decorPlan = null;
+      return;
+    }
+    const { data, error } = await supabaseClient
+      .from('decor_plans')
+      .select('*, decor_plan_items(*)')
+      .eq('user_id', currentUser.id)
+      .order('updated_at', { ascending: false })
+      .limit(1);
+    if (error) throw error;
+    const row = data && data[0];
+    if (typeof window.appData !== 'undefined') {
+      window.appData.decorPlan = row ? {
+        id: row.id,
+        name: row.name,
+        items: (row.decor_plan_items || []).map(it => ({ record_id: it.record_id, qty: it.qty })),
+      } : null;
+    }
+  }
+
+  async function syncDecorPlan(operation, item) {
+    if (operation !== 'save') throw new Error('decorPlan 仅支持 save 操作');
+    if (!currentUser) throw new Error('未登录，无法保存方案单');
+    const items = (Array.isArray(item && item.items) ? item.items : [])
+      .map(it => ({ record_id: it.record_id | 0, qty: Math.max(1, it.qty | 0) }))
+      .filter(it => it.record_id > 0);
+    const name = (item && item.name) || '我的方案单';
+
+    // 当前方案 = updated_at 最新一条；无则 INSERT 头，有则 UPDATE 头（名/时间戳）
+    const { data: plans, error: qErr } = await supabaseClient
+      .from('decor_plans').select('id').eq('user_id', currentUser.id)
+      .order('updated_at', { ascending: false }).limit(1);
+    if (qErr) throw qErr;
+    let planId = plans && plans[0] && plans[0].id;
+    if (!planId) {
+      const { data: ins, error: iErr } = await supabaseClient
+        .from('decor_plans').insert({ user_id: currentUser.id, name }).select('id').single();
+      if (iErr) throw iErr;
+      planId = ins.id;
+    } else {
+      const { error: uErr } = await supabaseClient
+        .from('decor_plans').update({ name, updated_at: new Date().toISOString() }).eq('id', planId);
+      if (uErr) throw uErr;
+    }
+
+    // 明细差集批量写（开发规范 1.2.3：禁逐行循环 reload；此处删除/ upsert 各一个批量请求）
+    const { data: cur, error: cErr } = await supabaseClient
+      .from('decor_plan_items').select('record_id').eq('plan_id', planId);
+    if (cErr) throw cErr;
+    const keep = new Set(items.map(it => it.record_id));
+    const toDelete = (cur || []).filter(r => !keep.has(r.record_id)).map(r => r.record_id);
+    if (toDelete.length) {
+      const { error: dErr } = await supabaseClient
+        .from('decor_plan_items').delete().eq('plan_id', planId).in('record_id', toDelete);
+      if (dErr) throw dErr;
+    }
+    if (items.length) {
+      const { error: u2Err } = await supabaseClient
+        .from('decor_plan_items')
+        .upsert(items.map(it => ({ plan_id: planId, record_id: it.record_id, qty: it.qty })),
+          { onConflict: 'plan_id,record_id' });
+      if (u2Err) throw u2Err;
     }
   }
 

@@ -2456,12 +2456,29 @@ function ensureLootdropMounted() {
 let decorMounted = false;
 function ensureDecorMounted() {
   if (!window.DecorCatalog) return;
+  // 任务书 #58-WP1：方案单保存通道注入（公示壳无 bridge → 恒未登录行为；登录壳走 cloudCrud 全流程）
+  DecorCatalog.planBridge = {
+    isLoggedIn: () => !!(window.CloudSync && window.CloudSync.getCachedUser && window.CloudSync.getCachedUser()),
+    loadCloud: async () => {
+      await window.CloudSync.reloadData('decorPlan');
+      return window.appData.decorPlan || null;
+    },
+    save: (items, name) => saveDecorPlan(items, name),
+  };
   if (!decorMounted) {
     decorMounted = true;
     DecorCatalog.mount(document.getElementById('page-decor'));
   } else {
     DecorCatalog.activate();
   }
+}
+
+// 任务书 #58-WP1：方案单保存（严格 DB-first：cloudCrud('decorPlan','save') → reload → 缓存）；
+// 保存成功清空草稿由 decorData 抽屉侧执行（云端为真源）。失败 cloudCrud 内部已 toast，此处抛错供抽屉提示。
+async function saveDecorPlan(items, name) {
+  const res = await cloudCrud('decorPlan', 'save', { items, name }, { renderFn: () => {} });
+  if (!res || !res.success) throw new Error((res && res.error && res.error.message) || '保存失败');
+  return window.appData.decorPlan;
 }
 
 function toggleSidebar() {
@@ -2507,6 +2524,8 @@ function isModalFormDirty(modalId) {
 
 // 各弹窗"有未保存内容"判定；未登记的弹窗遮罩点击/ESC 直接关闭（维持现状）
 const modalDirtyChecks = {
+  // 任务书 #58-WP1：方案单导出弹窗（decorData 双壳自足渲染，textarea 改动=未保存内容，规范 4.6 登记）
+  decorPlanExport: () => !!(window.DecorCatalog && window.DecorCatalog.planExportIsDirty && window.DecorCatalog.planExportIsDirty()),
   importMembersModal: () => isModalFormDirty('importMembersModal') || importPreviewRows.length > 0,
   // REQ-048：聚合确认弹窗——改动过勾选（与默认全选快照不一致）才算未保存内容
   importRestoreModal: () => isModalFormDirty('importRestoreModal'),

@@ -364,7 +364,8 @@ function isJsonRequest(req) {
 // 事件白名单一处维护——WP1 只开 page_view；WP3 扩名单只改此常量。
 // 红线：明文 IP 永不落库（仅 ip_h 日盐 hash）；埋点静默兜底，恒 204。
 // ------------------------------------------------------------
-const TRACK_EVENTS = ["page_view"];
+const TRACK_EVENTS = ["page_view", "user_register", "guild_create", "guild_join", "attendance_save", "loot_assign", "wishlist_add", "smart_import",
+  "decor_plan_add", "decor_plan_save", "decor_plan_export_text"]; // 任务书 #56 七事件 + 任务书 #58-WP1 方案单三事件（与 docs/开发规范.md 埋点纪律章事件表一一对应）
 const TRACK_PAGE_RE = /^(decor|data|index:[a-z]+)$/;
 const TRACK_MAX_BODY_BYTES = 8 * 1024;   // body >8KB → 204 吞掉
 const TRACK_MAX_PROPS_BYTES = 2 * 1024;  // props 序列化 >2KB → 204 吞掉

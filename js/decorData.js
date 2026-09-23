@@ -15,6 +15,9 @@
   // WP5 定式：root = 挂载根（公开壳 document / 登录壳 #page-decor 容器），id 查找限定 root 不越界
   let root = document;
   const $ = id => root.querySelector(`#${id}`);
+  // 任务书 #58-WP1：方案单抽屉/导出/toast 挂 document.body（fixed 双壳自足），查找必须 document 级——
+  // 登录壳 root=#page-decor 容器，root 作用域 $ 查不到 body 级节点（B1③ 实证打回根因）
+  const $doc = id => document.getElementById(id);
   let filterBar = null, main = null;
 
   const state = {
@@ -284,7 +287,7 @@
     const cost = r.placement_cost != null ? `<span class="dh-badge dh-cost-badge">容量 ${r.placement_cost}</span>` : '';
     const src = srcSummaryText(r);
     return `<div class="dh-card" data-rid="${r.record_id}" tabindex="0" role="button" aria-label="${esc(r.name)}">
-      <div class="dh-icon-wrap"><img src="${iconSrc(r)}" alt="" loading="lazy" onerror="this.onerror=null;this.src='${PLACEHOLDER}'">${cost}</div>
+      <div class="dh-icon-wrap"><img src="${iconSrc(r)}" alt="" loading="lazy" onerror="this.onerror=null;this.src='${PLACEHOLDER}'">${cost}<button type="button" class="dh-add-plan" data-add="${r.record_id}" title="加入方案单" aria-label="加入方案单">＋</button></div>
       <div class="dh-name dh-q${q}">${esc(r.name)}</div>
       <div class="dh-cat">${esc(catPathText(r))}</div>
       <div class="dh-src${src.unknown ? ' dh-src-unknown' : ''}">${esc(src.text)}</div>
@@ -333,6 +336,10 @@
       const open = () => openDetail(state.rows.find(r => r.record_id === +card.dataset.rid));
       card.onclick = open;
       card.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); } };
+    });
+    // 任务书 #58-WP1：卡片「加入方案单」（stopPropagation 不触发详情弹窗）
+    [...main.querySelectorAll('[data-add]')].forEach(btn => {
+      btn.onclick = e => { e.stopPropagation(); planAdd(+btn.dataset.add); };
     });
     const pager = $('dhPager');
     if (pager) [...pager.querySelectorAll('button[data-pg]')].forEach(btn => btn.onclick = () => {
@@ -453,6 +460,303 @@
     requestAnimationFrame(() => modalEl && modalEl.classList.add('show'));
   }
 
+  // ==================== 任务书 #58-WP1：方案单·组单抽屉（形态A）+ 导出文字链路 ====================
+  // D2 红线实现：未登录可组单（草稿 localStorage 自动暂存）、保存才登录（公示壳恒视为未登录）、
+  // 登录返回组单不丢（双壳同域同 key）。保存通道走 bridge（app.js 注入 cloudCrud 链路）；
+  // 公示壳无 bridge → 恒未登录行为。抽屉非弹窗、自动暂存无丢失风险，不登记 modalDirtyChecks；
+  // 导出弹窗含可编辑内容，二次确认本模块自实现（双壳自足，app 壳另登记 modalDirtyChecks 对齐规范 4.6）。
+  const PLAN_DRAFT_KEY = 'wb_decor_plan_draft'; // 双壳同 key（D2 硬验收：登录跳转往返草稿不丢）
+  const DECOR_PLAN_CAPACITY_REF = 2000; // 容量参考上限：游戏内实际预算随住宅等级变化，此处仅参考——超限仅标红不阻断
+
+  const plan = {
+    items: [],          // [{record_id, qty}]
+    cloudName: '我的方案单',
+    notice: '',         // 一次性提示（草稿还原）
+    saving: false,
+    built: false,
+  };
+
+  function planCount() { return plan.items.reduce((s, it) => s + it.qty, 0); }
+  // 容量合计纯前端算：placement_cost 取自图鉴内存索引，零请求
+  function planCapacity() {
+    return plan.items.reduce((s, it) => {
+      const row = state.rows.find(r => r.record_id === it.record_id);
+      return s + ((row && row.placement_cost) || 0) * it.qty;
+    }, 0);
+  }
+  function planDraftSave() {
+    try {
+      if (plan.items.length) {
+        localStorage.setItem(PLAN_DRAFT_KEY, JSON.stringify({ items: plan.items, updatedAt: Date.now() }));
+      } else {
+        localStorage.removeItem(PLAN_DRAFT_KEY);
+      }
+    } catch { /* localStorage 不可用（隐私模式等）静默 */ }
+  }
+  function planDraftLoad() {
+    try {
+      const raw = localStorage.getItem(PLAN_DRAFT_KEY);
+      if (!raw) return null;
+      const d = JSON.parse(raw);
+      return (d && Array.isArray(d.items) && d.items.length) ? d : null;
+    } catch { return null; }
+  }
+
+  function planBridge() { return window.DecorCatalog && window.DecorCatalog.planBridge; }
+  function planLoggedIn() {
+    const b = planBridge();
+    return !!(b && typeof b.isLoggedIn === 'function' && b.isLoggedIn());
+  }
+
+  // 初始化（boot 数据拉齐后调用）：草稿/云端合并三分支（已登录）——草稿空→云端；云端空→草稿；皆非空→草稿优先+一次性提示
+  async function planInit() {
+    const draft = planDraftLoad();
+    if (planLoggedIn()) {
+      let cloud = null;
+      try { cloud = await planBridge().loadCloud(); } catch { cloud = null; }
+      const cloudItems = cloud && Array.isArray(cloud.items) && cloud.items.length ? cloud.items : null;
+      if (cloud && cloud.name) plan.cloudName = cloud.name;
+      if (draft) {
+        plan.items = draft.items.map(it => ({ record_id: it.record_id | 0, qty: Math.max(1, it.qty | 0) }));
+        plan.notice = '已还原你上次未保存的组单，保存后覆盖云端';
+      } else if (cloudItems) {
+        plan.items = cloudItems.map(it => ({ record_id: it.record_id, qty: it.qty }));
+      }
+    } else if (draft) {
+      plan.items = draft.items.map(it => ({ record_id: it.record_id | 0, qty: Math.max(1, it.qty | 0) }));
+    }
+    // 目录外 record_id（数据下线等）静默剔除
+    plan.items = plan.items.filter(it => state.rows.some(r => r.record_id === it.record_id));
+    planRender();
+  }
+
+  function planAdd(recordId) {
+    const hit = plan.items.find(it => it.record_id === recordId);
+    if (hit) hit.qty = Math.min(99, hit.qty + 1);
+    else plan.items.push({ record_id: recordId, qty: 1 });
+    planDraftSave();
+    planRender();
+    planToast('已加入方案单');
+    // 任务书 #56 登记事件（props ≤2KB；record_id 书载可带）
+    if (window.WBTrack) WBTrack.event('decor_plan_add', { from: 'card', record_id: recordId });
+  }
+  function planSetQty(recordId, qty) {
+    const hit = plan.items.find(it => it.record_id === recordId);
+    if (!hit) return;
+    hit.qty = Math.max(1, Math.min(99, qty));
+    planDraftSave();
+    planRender();
+  }
+  function planRemove(recordId) {
+    plan.items = plan.items.filter(it => it.record_id !== recordId);
+    planDraftSave();
+    planRender();
+  }
+
+  // ---- 抽屉 DOM（fixed 挂 body，双壳自足；与 root 挂载点无关） ----
+  function planBuildDom() {
+    if (plan.built) return;
+    plan.built = true;
+    const wrap = document.createElement('div');
+    wrap.id = 'dhPlanRoot';
+    wrap.innerHTML = `
+      <button type="button" class="dh-plan-toggle" id="dhPlanToggle" aria-label="打开方案单">🧺 方案单 <span class="dh-plan-toggle-n" id="dhPlanToggleN">0</span></button>
+      <div class="dh-plan-scrim" id="dhPlanScrim"></div>
+      <aside class="dh-plan-drawer" id="dhPlanDrawer" aria-label="我的方案单">
+        <div class="dh-plan-head">
+          <span class="dh-plan-title">我的方案单</span>
+          <span class="dh-plan-count" id="dhPlanCount">0 件</span>
+          <button type="button" class="dh-plan-x" id="dhPlanClose" aria-label="收起方案单">&times;</button>
+        </div>
+        <div class="dh-plan-notice" id="dhPlanNotice" style="display:none"></div>
+        <div class="dh-plan-list" id="dhPlanList"></div>
+        <div class="dh-plan-foot">
+          <div class="dh-plan-cap" id="dhPlanCap"></div>
+          <div class="dh-plan-actions">
+            <button type="button" class="btn btn-primary" id="dhPlanSave">保存</button>
+            <button type="button" class="btn btn-secondary" id="dhPlanExport">导出文本清单</button>
+          </div>
+        </div>
+      </aside>`;
+    document.body.appendChild(wrap);
+    $doc('dhPlanToggle').onclick = () => planSetOpen(true);
+    $doc('dhPlanClose').onclick = () => planSetOpen(false);
+    $doc('dhPlanScrim').onclick = () => planSetOpen(false);
+    $doc('dhPlanSave').onclick = planSave;
+    $doc('dhPlanExport').onclick = planOpenExport;
+  }
+
+  function planSetOpen(open) {
+    planBuildDom();
+    $doc('dhPlanDrawer').classList.toggle('open', open);
+    $doc('dhPlanScrim').classList.toggle('open', open);
+  }
+
+  function planRender() {
+    planBuildDom();
+    const n = planCount();
+    $doc('dhPlanToggleN').textContent = n;
+    $doc('dhPlanCount').textContent = `${n} 件`;
+    const cap = planCapacity();
+    const capEl = $doc('dhPlanCap');
+    capEl.textContent = `容量 ${cap.toLocaleString()} / ${DECOR_PLAN_CAPACITY_REF.toLocaleString()}`;
+    capEl.classList.toggle('over', cap > DECOR_PLAN_CAPACITY_REF); // 超限仅标红警示，不阻断
+    const noticeEl = $doc('dhPlanNotice');
+    if (plan.notice) { noticeEl.textContent = plan.notice; noticeEl.style.display = ''; }
+    else noticeEl.style.display = 'none';
+
+    const list = $doc('dhPlanList');
+    if (!plan.items.length) {
+      list.innerHTML = '<div class="dh-plan-empty">方案单还是空的<br><span>从左侧图鉴挑装饰加入方案单</span></div>';
+      return;
+    }
+    list.innerHTML = plan.items.map(it => {
+      const row = state.rows.find(r => r.record_id === it.record_id);
+      if (!row) return '';
+      const q = row.quality != null ? row.quality : 1;
+      return `<div class="dh-plan-row" data-rid="${it.record_id}">
+        <span class="dh-plan-icon"><img src="${iconSrc(row)}" alt="" loading="lazy" onerror="this.onerror=null;this.src='${PLACEHOLDER}'"></span>
+        <span class="dh-plan-name dh-q${q}" title="${esc(row.name)}">${esc(row.name)}</span>
+        <span class="dh-plan-step">
+          <button type="button" class="dh-plan-step-btn" data-step="-1" ${it.qty <= 1 ? 'disabled' : ''} aria-label="减少数量">−</button>
+          <span class="dh-plan-qty">${it.qty}</span>
+          <button type="button" class="dh-plan-step-btn" data-step="1" ${it.qty >= 99 ? 'disabled' : ''} aria-label="增加数量">＋</button>
+        </span>
+        <button type="button" class="dh-plan-rm" data-rm="1" aria-label="移除">&times;</button>
+      </div>`;
+    }).join('');
+    [...list.querySelectorAll('.dh-plan-row')].forEach(rowEl => {
+      const rid = +rowEl.dataset.rid;
+      [...rowEl.querySelectorAll('[data-step]')].forEach(btn => btn.onclick = () => {
+        const cur = plan.items.find(it => it.record_id === rid);
+        if (cur) planSetQty(rid, cur.qty + (+btn.dataset.step));
+      });
+      rowEl.querySelector('[data-rm]').onclick = () => planRemove(rid);
+    });
+  }
+
+  // 迷你 toast（公开壳无 app.js showToast，双壳自足）
+  let planToastTimer = null;
+  function planToast(msg, isErr) {
+    let el = document.getElementById('dhPlanToast');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'dhPlanToast';
+      el.className = 'dh-plan-toast';
+      document.body.appendChild(el);
+    }
+    el.textContent = msg;
+    el.classList.toggle('err', !!isErr);
+    el.classList.add('show');
+    clearTimeout(planToastTimer);
+    planToastTimer = setTimeout(() => el.classList.remove('show'), 2200);
+  }
+
+  // ---- 保存（D2：公示壳恒视为未登录 → 提示+跳主站登录页；登录壳走 bridge cloudCrud 链路） ----
+  async function planSave() {
+    if (!planLoggedIn()) {
+      planToast('保存方案单需要登录，登录后组单内容不丢');
+      setTimeout(() => { location.href = 'index.html'; }, 900);
+      return;
+    }
+    if (plan.saving) return;
+    plan.saving = true;
+    const btn = $doc('dhPlanSave');
+    btn.disabled = true; btn.textContent = '保存中…';
+    try {
+      await planBridge().save(plan.items, plan.cloudName || '我的方案单');
+      try { localStorage.removeItem(PLAN_DRAFT_KEY); } catch { /* 静默 */ } // 保存成功清空草稿（云端为真源）
+      plan.notice = '';
+      planRender();
+      // 任务书 #56 登记事件（计数口径：总件数+容量）
+      if (window.WBTrack) WBTrack.event('decor_plan_save', { items: planCount(), capacity: planCapacity() });
+      planToast('方案单已保存');
+    } catch (e) {
+      planToast('保存失败：' + ((e && e.message) || '未知错误'), true); // 禁止静默失败
+    } finally {
+      plan.saving = false;
+      btn.disabled = false; btn.textContent = '保存';
+    }
+  }
+
+  // ---- 导出文字链路（WP1 仅文字模式；双壳可用，不写库） ----
+  function planExportText() {
+    const name = plan.cloudName || '我的方案单';
+    const lines = [`【魔兽管家 · 家宅方案单】${name}`];
+    plan.items.forEach(it => {
+      const row = state.rows.find(r => r.record_id === it.record_id);
+      if (!row) return;
+      lines.push(`${row.name} ×${it.qty}（容量 ${row.placement_cost != null ? row.placement_cost : '—'}/件）`);
+    });
+    lines.push('——————————');
+    lines.push(`合计 ${planCount()} 件 · 容量 ${planCapacity()}`);
+    // 尾行固定挂站点链接（文本其他位置不再插链接）
+    lines.push('魔兽管家 · 家宅图鉴免费组单：https://wow.ddctl.com/decor.html');
+    return lines.join('\n');
+  }
+
+  let exportEl = null, exportOriginal = '';
+  function planExportIsDirty() {
+    const ta = exportEl && exportEl.querySelector('#dhPlanExportText');
+    return !!(ta && ta.value !== exportOriginal);
+  }
+  function planCloseExport(force) {
+    if (!exportEl) return;
+    if (!force && planExportIsDirty()) {
+      // 规范 4.6：含未保存编辑内容，遮罩/ESC 二次确认（双壳自足实现；app 壳另已登记 modalDirtyChecks）
+      if (!window.confirm('内容未保存，确定放弃吗？')) return;
+    }
+    const el = exportEl;
+    exportEl = null;
+    el.classList.remove('show');
+    setTimeout(() => el.remove(), 200);
+    document.removeEventListener('keydown', onExportKey);
+  }
+  function onExportKey(e) { if (e.key === 'Escape') planCloseExport(false); }
+
+  function planOpenExport() {
+    if (exportEl) return;
+    if (!plan.items.length) { planToast('方案单还是空的，先挑几件装饰'); return; }
+    exportOriginal = planExportText();
+    exportEl = document.createElement('div');
+    exportEl.className = 'dh-modal-overlay dh-plan-export-overlay';
+    exportEl.innerHTML = `<div class="dh-modal dh-plan-export" role="dialog" aria-label="导出方案单">
+      <div class="dh-plan-export-head">
+        <span class="dh-plan-export-title">导出方案单</span>
+        <button type="button" class="dh-modal-close" aria-label="关闭">&times;</button>
+      </div>
+      <div class="dh-plan-export-hint">改动只影响本次导出，不回写方案单数据</div>
+      <textarea id="dhPlanExportText" class="dh-plan-export-text" spellcheck="false"></textarea>
+      <div class="dh-plan-export-actions">
+        <button type="button" class="btn btn-primary" id="dhPlanCopyBtn">复制文本清单</button>
+      </div>
+    </div>`;
+    const ta = exportEl.querySelector('#dhPlanExportText');
+    ta.value = exportOriginal;
+    exportEl.addEventListener('click', e => { if (e.target === exportEl) planCloseExport(false); });
+    exportEl.querySelector('.dh-modal-close').onclick = () => planCloseExport(false);
+    exportEl.querySelector('#dhPlanCopyBtn').onclick = planCopyExport;
+    document.body.appendChild(exportEl);
+    document.addEventListener('keydown', onExportKey);
+    requestAnimationFrame(() => exportEl && exportEl.classList.add('show'));
+  }
+
+  async function planCopyExport() {
+    const ta = exportEl && exportEl.querySelector('#dhPlanExportText');
+    if (!ta) return;
+    // 任务书 #56 登记事件（复制点击挂点，双壳可用）
+    if (window.WBTrack) WBTrack.event('decor_plan_export_text', { items: planCount() });
+    try {
+      await navigator.clipboard.writeText(ta.value);
+      planToast('文本清单已复制');
+    } catch {
+      // 降级：clipboard 不可用（非安全上下文/权限拒）→ 全选提示手动复制
+      ta.focus();
+      ta.select();
+      planToast('已全选，请按 Ctrl+C 手动复制');
+    }
+  }
+
   // ---- 三态 ----
   function showError(msg) {
     main.innerHTML = `<div class="dh-error">
@@ -481,6 +785,7 @@
     } catch (e) { showError(e.message || '数据加载失败'); return; }
     buildFilterBar();
     render();
+    planInit(); // 任务书 #58-WP1：抽屉初始化（草稿/云端合并三分支）+ 入口徽标
   }
 
   // 双宿主挂载入口（WP5 定式）：公开壳自动挂 document 立即启动；登录壳 tab 首切 mount(容器) 懒启动（幂等）。
@@ -494,6 +799,8 @@
       boot();
     },
     activate() { /* 只读目录：无脏标记、无重测需求，刻意零动作 */ },
+    // 任务书 #58-WP1：导出弹窗脏检查（app 壳登记 modalDirtyChecks 用，规范 4.6）
+    planExportIsDirty() { return planExportIsDirty(); },
   };
   if (document.body.classList.contains('data-decor-body')) window.DecorCatalog.mount(document);
 })();
