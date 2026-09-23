@@ -1265,6 +1265,8 @@ async function acceptGuildInvite(guildId, notificationId) {
     await window.CloudSync.joinGuildById(guildId);
     await markNotificationRead(notificationId);
     showAppView();
+    // 任务书 #56：REQ-141 WP3 埋点（事件名见 docs/开发规范.md 埋点纪律章）
+    if (window.WBTrack) WBTrack.event('guild_join');
   } catch (e) {
     alert('加入失败：' + e.message);
   }
@@ -1600,6 +1602,8 @@ async function handleRegister() {
     }
     // 注册后一定没有公会，显示创建/加入公会表单
     showAuthError('');
+    // 任务书 #56：REQ-141 WP3 埋点（事件名见 docs/开发规范.md 埋点纪律章）
+    if (window.WBTrack) WBTrack.event('user_register');
     showGuildForm();
     authSetBusy('register', false);
     updatePwGate('reg'); // REQ-094：复位后按强度规则重估提交门
@@ -1718,6 +1722,8 @@ async function handleCreateGuild() {
     showAuthError('创建中...');
     await window.CloudSync.createGuild(name, serverName, serverRegion);
     showAppView();
+    // 任务书 #56：REQ-141 WP3 埋点（事件名见 docs/开发规范.md 埋点纪律章）
+    if (window.WBTrack) WBTrack.event('guild_create');
   } catch (e) {
     showAuthError('创建失败：' + (e.message || '未知错误'));
   }
@@ -1732,6 +1738,8 @@ async function handleJoinGuild() {
     showAuthError('加入中...');
     await window.CloudSync.joinGuild(code);
     showAppView();
+    // 任务书 #56：REQ-141 WP3 埋点（事件名见 docs/开发规范.md 埋点纪律章）
+    if (window.WBTrack) WBTrack.event('guild_join');
   } catch (e) {
     showAuthError(e.message || '加入失败');
   }
@@ -4017,6 +4025,9 @@ async function importExecute(toAdd, toRestore, skipped) {
       await window.CloudSync.reloadData('members');
       saveData();
       renderMembers();
+      // 任务书 #56：REQ-141 WP3 埋点（事件名见 docs/开发规范.md 埋点纪律章）
+      // ——有成功行才埋（纪律 3 禁失败也埋）；rows=新增+恢复行数，import_type=来源标签页枚举
+      if (window.WBTrack) WBTrack.event('smart_import', { import_type: importSource, rows: addedOk + restoredOk });
     }
     const failedMsg = failedRows.length
       ? `，失败 ${failedRows.length} 个（${failedRows.slice(0, 3).map(f => `${f.name}：${f.reason}`).join('；')}${failedRows.length > 3 ? ' 等' : ''}）`
@@ -4546,6 +4557,8 @@ async function saveActivity() {
       const payload = { ...activity, ...activityData, id: editingActivityId };
       await cloudCrud('activities', 'update', payload, { renderFn: renderAttendance });
       rememberRecentRaidName(raidName); // REQ-029：真实写库成功才记最近使用
+      // 任务书 #56：REQ-141 WP3 埋点（事件名见 docs/开发规范.md 埋点纪律章）
+      if (window.WBTrack) WBTrack.event('attendance_save', { marked: appData.members.filter(m => m.status !== '离队').length });
       showToast('活动已更新', 'success');
     } else {
       const attendees = appData.members.filter(m => m.status !== '离队').map(m => ({
@@ -4554,6 +4567,8 @@ async function saveActivity() {
       const payload = { ...activityData, status: 'normal', attendees };
       await cloudCrud('activities', 'add', payload, { renderFn: renderAttendance });
       rememberRecentRaidName(raidName); // REQ-029
+      // 任务书 #56：REQ-141 WP3 埋点（事件名见 docs/开发规范.md 埋点纪律章）
+      if (window.WBTrack) WBTrack.event('attendance_save', { marked: attendees.length });
       showToast('活动已创建', 'success');
     }
     closeModal('activityModal'); // BUG-080 同族（任务书 #47 WP2-#3）：成功才关弹窗——失败保弹窗留输入便于重试（与 saveMember 口径对齐）
@@ -6315,6 +6330,9 @@ async function lootSave() {
     const payload = { ...lootData, character_id: lootCharacterId, id: lootEditingId || undefined };
     await cloudCrud('loots', isEdit ? 'update' : 'add', payload, { renderFn: lootRender });
 
+    // 任务书 #56：REQ-141 WP3 埋点（事件名见 docs/开发规范.md 埋点纪律章）
+    if (window.WBTrack) WBTrack.event('loot_assign', { count: 1 });
+
     // 联动心愿单：将分配状态变化同步到数据库（REQ-095/WP5：携 character_id，联动按 id 优先匹配）
     await syncWishlistLinkages({ ...lootData, character_id: lootCharacterId }, oldLoot);
 
@@ -7096,6 +7114,9 @@ async function wishlistSave() {
       saveData();
       wishlistRender();
       closeModal('wishlistModal');
+      // 任务书 #56：REQ-141 WP3 埋点（事件名见 docs/开发规范.md 埋点纪律章）
+      // ——批量添加属一次用户动作埋一次（纪律 3）；登记表 props={} 无数量键，按表不附（纪律 4 省略精神）
+      if (window.WBTrack) WBTrack.event('wishlist_add');
       const msg = skipCount > 0
         ? `已添加 ${pendingWishes.length} 条心愿，跳过 ${skipCount} 条重复`
         : `已为 ${pendingWishes.length} 人添加心愿`;
@@ -7212,6 +7233,20 @@ function lootFillAssignedTo(idOrName) {
 // ==================== 初始化 ====================
 // ==================== 更新日志 ====================
 const changelogData = [
+  {
+    id: 'v3.2.0-task56-analytics-events',
+    version: 'v3.2.0',
+    date: '2026-09-23',
+    type: 'feature',
+    typeLabel: '新增功能',
+    title: '访问统计补挂七类业务事件 + 开发规范「埋点纪律」章（任务书 #56 / REQ-141 WP3 收官）',
+    summary: '访问统计在 page_view 之外补挂七类业务事件：注册成功、建会成功、入会成功（邀请码与通知双路径同事件名）、考勤保存（附在册人数）、装备分配保存（附件数）、心愿单新增、智能导入完成（附导入类型与行数）——事件 TOP 面板自此有真实业务分布。全部埋点只在写库确认成功后触发、一次用户动作埋一次、失败不埋；props 只放数值与枚举口径，不采集人名/公会名/装备名等业务内容，仅用于站点运营统计。docs/开发规范.md 同步新增「埋点纪律」章：唯一入口/事件登记制/成功后触发+批量一次一埋/props 零 PII/静默不阻塞五条 + 事件清单表，今后所有新埋点先登记再施工。',
+    details: [
+      '埋点链路沿用 #54 采集层：WBTrack.event → POST /api/track 恒 204 静默，track.js/server.js/sql 零改动',
+      '心愿单/智能导入写路径绕过 cloudCrud 系在案 P1 旧债，本任务只挂埋点不修写路径（另案处理）',
+      '看板「事件 TOP」面板无需改动，新事件随真实使用自然累积'
+    ]
+  },
   {
     id: 'v3.2.0-task55-analytics-board',
     version: 'v3.2.0',
