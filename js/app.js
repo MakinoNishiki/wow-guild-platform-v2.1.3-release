@@ -7213,6 +7213,21 @@ function lootFillAssignedTo(idOrName) {
 // ==================== 更新日志 ====================
 const changelogData = [
   {
+    id: 'v3.2.0-task55-analytics-board',
+    version: 'v3.2.0',
+    date: '2026-09-22',
+    type: 'feature',
+    typeLabel: '新增功能',
+    title: '数据中心「访问统计」看板（任务书 #54/#55 / REQ-141 全站埋点一二期）',
+    summary: '全站访问统计上线：数据中心新增「访问统计」tab（仅管理员可见，服务端 JWT + 管理员 uid 白名单两段鉴权，非管理员整块占位提示）。总览与单日监控双模式同一套组件：快捷范围（今日/近7天/近30天/近90天/自定义起止）× 粒度（小时/天/周/月）× 页面筛选（全部/主站/家宅公示/掉落公示）任选；PV/UV/日均DAU 三卡、SVG 手绘双线趋势图（hover 参考线+浮层数值，范围=今天+粒度=小时即单日逐时起量线）、导航 TAB 排行（次数/人数双口径）、分页面、来源域 TOP10、事件 TOP 四面板。数据链路：track.js 三壳静默采集 → /api/track 白名单入库（明文 IP 不落库，日盐 hash）→ 聚合 RPC 按东八区分桶（无事件桶补零折线不断）→ 90 天滚动清理每日自动执行。',
+    details: [
+      '埋点红线全继承：采集/查询任何失败不影响页面业务；看板对埋点表只读+定时删，不碰任何业务表',
+      '身份口径：「人」= 登录 uid 优先、未登录取浏览器访客牌 vid；来源域只存域名不存全链接',
+      '零依赖铁律：不引图表库/日期库/第三方统计脚本，SVG 手写、reduced-motion 降级',
+      '管理员名单走服务器环境变量私聊配置，不进 git 不进文档'
+    ]
+  },
+  {
     id: 'v3.2.0-task52-home-entry',
     version: 'v3.2.0',
     date: '2026-09-19',
@@ -12568,7 +12583,8 @@ async function renderDatacenter() {
   const renderers = {
     patches: mdRenderPatches, seasons: mdRenderSeasons, raids: mdRenderRaids,
     bosses: mdRenderBosses, loot: mdRenderLoot, dungeonloot: mdRenderDungeonLoot, tiersets: mdRenderTierSets,
-    dungeons: mdRenderDungeons, classes: mdRenderClasses, specs: mdRenderSpecs
+    dungeons: mdRenderDungeons, classes: mdRenderClasses, specs: mdRenderSpecs,
+    analytics: mdRenderAnalytics // 任务书 #55 WP2：访问统计看板（REQ-141）
   };
   (renderers[mdCurrentTab] || mdRenderPatches)(panel);
 }
@@ -13463,6 +13479,342 @@ async function mdImportDict() {
     mdImporting = false;
     btn.disabled = false; btn.textContent = btn.dataset.originalText || '📥 导入职业/专精字典';
   }
+}
+
+// ==================== REQ-141 访问统计看板（任务书 #55 WP2，数据中心「访问统计」tab） ====================
+// 只读 analytics_events（POST /api/analytics/summary，服务端两段鉴权：JWT + 管理员 uid 白名单）。
+// 红线：任何查询失败不得影响数据中心其他 tab 与全站业务——四态（loading/正常/空/错误+重试/403 整块占位）面板内自含。
+let anxState = {
+  inited: false,      // 惰性首查标记（切回 tab 不自动重查，重查走「查询」按钮）
+  loading: false,
+  error: '',
+  forbidden: false,   // 403 → 整块占位，不弹错不闪屏不反复请求
+  range: '30d',       // today/7d/30d/90d/custom
+  grain: 'day',       // hour/day/week/month
+  page: 'all',        // all/index/decor/data
+  start: '', end: '', // YYYY-MM-DD 展示值（非自定义自动回填置灰，自定义可编辑）
+  data: null,
+};
+
+const ANX_RANGE_DAYS = { today: 0, '7d': 6, '30d': 29, '90d': 89 };
+const ANX_MAX_RANGE_MS = 92 * 24 * 3600 * 1000;
+const ANX_TAB_LABEL = {
+  dashboard: '仪表盘', members: '成员管理', attendance: '考勤记录', loot: '装备分配',
+  wishlist: '心愿单', reports: '统计报表', data: '数据管理', changelog: '更新日志',
+  lootdrop: '副本掉落', decor: '家宅图鉴', datacenter: '数据中心', login: '登录墙'
+};
+
+function anxEsc(s) {
+  return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function anxPageLabel(p) {
+  if (p === 'decor') return '家宅公示页';
+  if (p === 'data') return '掉落公示页';
+  if (p.startsWith('index:')) return '主站·' + (ANX_TAB_LABEL[p.slice(6)] || p.slice(6));
+  return p;
+}
+
+// 范围计算：预设按本地时区（今日=本地 0 点起至今；近 N 天=往前 N-1 个日历日 0 点起）；
+// 自定义按起日 00:00 ~ 止日 23:59:59.999。返回 { s: Date, e: Date } 或 null（自定义未填齐）。
+function anxComputeRange() {
+  if (anxState.range === 'custom') {
+    if (!anxState.start || !anxState.end) return null;
+    const s = new Date(anxState.start + 'T00:00:00');
+    const e = new Date(anxState.end + 'T23:59:59.999');
+    return { s, e };
+  }
+  const days = ANX_RANGE_DAYS[anxState.range];
+  const e = new Date();
+  const s = new Date();
+  s.setHours(0, 0, 0, 0);
+  s.setDate(s.getDate() - days);
+  return { s, e };
+}
+
+function anxFmtDate(d) {
+  const p2 = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())}`;
+}
+
+// 控制条渲染（每次切 tab 重建 DOM，状态全部来自 anxState）
+function mdRenderAnalytics(panel) {
+  const rangeBtns = [['today', '今日'], ['7d', '近7天'], ['30d', '近30天'], ['90d', '近90天'], ['custom', '自定义']]
+    .map(([k, label]) => `<button class="filter-btn anx-range-btn${anxState.range === k ? ' active' : ''}" data-range="${k}" onclick="anxSetRange('${k}')">${label}</button>`).join('');
+  const grainOpts = [['hour', '小时'], ['day', '天'], ['week', '周'], ['month', '月']]
+    .map(([v, l]) => `<option value="${v}"${anxState.grain === v ? ' selected' : ''}>${l}</option>`).join('');
+  const pageOpts = [['all', '全部'], ['index', '主站'], ['decor', '家宅公示'], ['data', '掉落公示']]
+    .map(([v, l]) => `<option value="${v}"${anxState.page === v ? ' selected' : ''}>${l}</option>`).join('');
+  const custom = anxState.range === 'custom';
+  panel.innerHTML = `
+    <div class="anx-controls">
+      <div class="anx-range-group">${rangeBtns}</div>
+      <span class="anx-date-pair">
+        <input type="date" id="anxStart" class="anx-date" value="${anxState.start}"${custom ? '' : ' disabled'} onchange="anxState.start=this.value">
+        <span class="anx-date-sep">至</span>
+        <input type="date" id="anxEnd" class="anx-date" value="${anxState.end}"${custom ? '' : ' disabled'} onchange="anxState.end=this.value">
+      </span>
+      <select id="anxGrain" class="form-select anx-select" onchange="anxState.grain=this.value">${grainOpts}</select>
+      <select id="anxPage" class="form-select anx-select" onchange="anxState.page=this.value">${pageOpts}</select>
+      <button id="anxQueryBtn" class="btn btn-primary anx-query-btn" onclick="anxQuery()">查询</button>
+      <span id="anxInlineErr" class="anx-inline-err"></span>
+    </div>
+    <div id="anxBody"></div>`;
+  // REQ-052：动态日期输入同步包裹中文遮罩（数据中心先例 mdOpenEditor）
+  zhWrapDateInput(document.getElementById('anxStart'));
+  zhWrapDateInput(document.getElementById('anxEnd'));
+  // 非自定义：回填展示区间（置灰）；自定义：保留用户已填
+  if (!custom) {
+    const r = anxComputeRange();
+    anxState.start = anxFmtDate(r.s);
+    anxState.end = anxFmtDate(r.e);
+    document.getElementById('anxStart').value = anxState.start;
+    document.getElementById('anxEnd').value = anxState.end;
+  }
+  if (!anxState.inited && !anxState.loading && !anxState.forbidden) {
+    anxQuery(); // 惰性首查（默认近30天+天粒度+全部）
+  } else {
+    anxRenderBody();
+  }
+}
+
+function anxSetRange(k) {
+  anxState.range = k;
+  document.querySelectorAll('.anx-range-btn').forEach(b => b.classList.toggle('active', b.dataset.range === k));
+  const custom = k === 'custom';
+  const sEl = document.getElementById('anxStart'), eEl = document.getElementById('anxEnd');
+  sEl.disabled = !custom; eEl.disabled = !custom;
+  if (!custom) {
+    const r = anxComputeRange();
+    anxState.start = anxFmtDate(r.s); anxState.end = anxFmtDate(r.e);
+    sEl.value = anxState.start; eEl.value = anxState.end;
+  }
+  document.getElementById('anxInlineErr').textContent = '';
+}
+
+// 就地校验：起 > 止 或区间 > 92 天 → 控制条旁红字，不发请求
+function anxValidateLocal(s, e) {
+  if (!(e.getTime() > s.getTime())) return '开始时间必须早于结束时间';
+  if (e.getTime() - s.getTime() > ANX_MAX_RANGE_MS) return '时间范围不能超过 92 天';
+  return '';
+}
+
+async function anxQuery() {
+  if (anxState.loading || anxState.forbidden) return;
+  const errEl = document.getElementById('anxInlineErr');
+  const r = anxComputeRange();
+  if (!r) { if (errEl) errEl.textContent = '请选择自定义起止日期'; return; }
+  const vErr = anxValidateLocal(r.s, r.e);
+  if (vErr) { if (errEl) errEl.textContent = vErr; return; }
+  if (errEl) errEl.textContent = '';
+
+  const btn = document.getElementById('anxQueryBtn');
+  anxState.loading = true;
+  if (btn) { btn.disabled = true; btn.textContent = '查询中…'; }
+  anxRenderBody();
+  try {
+    const token = await window.CloudSync.getAccessToken();
+    if (!token) { anxState.error = '未登录或登录已过期，请重新登录'; anxState.data = null; return; }
+    const resp = await fetch('/api/analytics/summary', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ start: r.s.toISOString(), end: r.e.toISOString(), grain: anxState.grain, page: anxState.page })
+    });
+    if (resp.status === 403) { // 整块占位，不弹错不闪屏不反复请求
+      anxState.forbidden = true; anxState.data = null; anxState.error = '';
+      return;
+    }
+    if (!resp.ok) {
+      const d = await resp.json().catch(() => null);
+      anxState.error = (d && d.error) || `查询失败（${resp.status}）`;
+      anxState.data = null;
+      return;
+    }
+    anxState.data = await resp.json();
+    anxState.error = '';
+    anxState.inited = true;
+  } catch (e) {
+    anxState.error = '网络异常或服务暂不可用，请重试';
+    anxState.data = null;
+  } finally {
+    anxState.loading = false;
+    if (btn) { btn.disabled = false; btn.textContent = '查询'; }
+    anxRenderBody();
+  }
+}
+
+// 四态分发：loading / 403 整块占位 / 错误条+重试 / 正常（空数据占位）
+function anxRenderBody() {
+  const body = document.getElementById('anxBody');
+  if (!body) return;
+  if (anxState.loading && !anxState.data) {
+    body.innerHTML = '<div class="anx-state">访问统计数据加载中…</div>';
+    return;
+  }
+  if (anxState.forbidden) {
+    body.innerHTML = '<div class="anx-state anx-forbidden">🔒 访问统计仅管理员可见</div>';
+    return;
+  }
+  if (anxState.error) {
+    body.innerHTML = `<div class="anx-error-bar">⚠ ${anxEsc(anxState.error)} <button class="btn btn-secondary" onclick="anxQuery()">重试</button></div>`;
+    return;
+  }
+  const d = anxState.data;
+  if (!d || !d.cards) { body.innerHTML = ''; return; }
+  if (!d.cards.pv) {
+    body.innerHTML = '<div class="anx-state">该时间范围内暂无数据</div>';
+    return;
+  }
+  const cards = `
+    <div class="anx-cards">
+      <div class="card anx-card"><div class="anx-card-label">总 PV</div><div class="anx-card-num">${d.cards.pv}</div></div>
+      <div class="card anx-card"><div class="anx-card-label">总 UV</div><div class="anx-card-num">${d.cards.uv}</div></div>
+      <div class="card anx-card"><div class="anx-card-label">日均 DAU</div><div class="anx-card-num">${d.cards.dau_avg}</div></div>
+    </div>`;
+  body.innerHTML = cards + anxChartHtml(d.series || [], anxState.grain) + anxPanelsHtml(d);
+  anxBindChart(d.series || [], anxState.grain);
+}
+
+// ---------- 趋势图（零依赖手写 SVG；PV 金 / UV 青 双线） ----------
+// X 轴桶标签按粒度格式化；Y 轴自适应刻度；hover 竖向参考线+浮层；reduced-motion 下无入场动画（本就零动画）。
+function anxFmtBucket(bucket, grain) {
+  // bucket = 桶起始 ISO 串（+08:00 墙钟），直接切串避免时区二次换算
+  const m = String(bucket).match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
+  if (!m) return String(bucket);
+  if (grain === 'hour') return `${m[2]}-${m[3]} ${m[4]}:${m[5]}`;
+  if (grain === 'month') return `${m[1]}-${m[2]}`;
+  return `${m[2]}-${m[3]}`; // day/week
+}
+
+function anxNiceStep(raw) {
+  const p = Math.pow(10, Math.floor(Math.log10(raw || 1)));
+  const n = raw / p;
+  return (n <= 1 ? 1 : n <= 2 ? 2 : n <= 5 ? 5 : 10) * p;
+}
+
+function anxChartHtml(series, grain) {
+  if (!series.length) return '<div class="anx-state">该时间范围内暂无数据</div>';
+  const W = 960, H = 280, padL = 52, padR = 16, padT = 16, padB = 34;
+  const iw = W - padL - padR, ih = H - padT - padB;
+  const maxV = Math.max(1, ...series.map(s => Math.max(s.pv || 0, s.uv || 0)));
+  const step = anxNiceStep(maxV / 4);
+  const yMax = step * 4;
+  const x = i => padL + (series.length === 1 ? iw / 2 : (i * iw) / (series.length - 1));
+  const y = v => padT + ih - (v / yMax) * ih;
+  const pts = key => series.map((s, i) => `${x(i).toFixed(1)},${y(s[key] || 0).toFixed(1)}`).join(' ');
+  // 网格 + Y 刻度
+  let grid = '';
+  for (let t = 0; t <= 4; t++) {
+    const gy = y(step * t);
+    grid += `<line x1="${padL}" y1="${gy}" x2="${W - padR}" y2="${gy}" class="anx-grid"/>` +
+      `<text x="${padL - 8}" y="${gy + 4}" class="anx-ytick">${step * t}</text>`;
+  }
+  // X 标签（≤12 个，跳采）
+  const labelEvery = Math.max(1, Math.ceil(series.length / 12));
+  let xlabels = '';
+  series.forEach((s, i) => {
+    if (i % labelEvery !== 0 && i !== series.length - 1) return;
+    xlabels += `<text x="${x(i)}" y="${H - 10}" class="anx-xtick" text-anchor="middle">${anxEsc(anxFmtBucket(s.bucket, grain))}</text>`;
+  });
+  return `
+    <div class="card anx-chart-card">
+      <div class="anx-chart-head">
+        <span class="anx-chart-title">访问趋势</span>
+        <span class="anx-legend"><i class="anx-dot anx-dot-pv"></i>PV <i class="anx-dot anx-dot-uv"></i>UV</span>
+      </div>
+      <div class="anx-chart-wrap" id="anxChartWrap">
+        <svg viewBox="0 0 ${W} ${H}" class="anx-chart" id="anxChartSvg" preserveAspectRatio="none">
+          ${grid}${xlabels}
+          <polyline points="${pts('pv')}" class="anx-line anx-line-pv"/>
+          <polyline points="${pts('uv')}" class="anx-line anx-line-uv"/>
+          <line id="anxGuide" x1="0" y1="${padT}" x2="0" y2="${padT + ih}" class="anx-guide" style="display:none"/>
+          <circle id="anxDotPv" r="4" class="anx-pt anx-pt-pv" style="display:none"/>
+          <circle id="anxDotUv" r="4" class="anx-pt anx-pt-uv" style="display:none"/>
+        </svg>
+        <div id="anxTip" class="anx-tip" style="display:none"></div>
+      </div>
+    </div>`;
+}
+
+function anxBindChart(series, grain) {
+  const wrap = document.getElementById('anxChartWrap');
+  if (!wrap || !series.length) return;
+  const svg = document.getElementById('anxChartSvg');
+  const guide = document.getElementById('anxGuide');
+  const dotPv = document.getElementById('anxDotPv');
+  const dotUv = document.getElementById('anxDotUv');
+  const tip = document.getElementById('anxTip');
+  const W = 960, H = 280, padL = 52, padR = 16, padT = 16, padB = 34;
+  const iw = W - padL - padR, ih = H - padT - padB;
+  const maxV = Math.max(1, ...series.map(s => Math.max(s.pv || 0, s.uv || 0)));
+  const yMax = anxNiceStep(maxV / 4) * 4;
+  const x = i => padL + (series.length === 1 ? iw / 2 : (i * iw) / (series.length - 1));
+  const y = v => padT + ih - (v / yMax) * ih;
+  svg.addEventListener('mousemove', (e) => {
+    const rect = svg.getBoundingClientRect();
+    const sx = ((e.clientX - rect.left) / rect.width) * W;
+    let idx = series.length === 1 ? 0 : Math.round(((sx - padL) / iw) * (series.length - 1));
+    idx = Math.max(0, Math.min(series.length - 1, idx));
+    const gx = x(idx);
+    guide.setAttribute('x1', gx); guide.setAttribute('x2', gx);
+    guide.style.display = '';
+    dotPv.setAttribute('cx', gx); dotPv.setAttribute('cy', y(series[idx].pv || 0)); dotPv.style.display = '';
+    dotUv.setAttribute('cx', gx); dotUv.setAttribute('cy', y(series[idx].uv || 0)); dotUv.style.display = '';
+    tip.textContent = `${anxFmtBucket(series[idx].bucket, grain)} · PV ${series[idx].pv || 0} · UV ${series[idx].uv || 0}`;
+    tip.style.display = '';
+    const px = (gx / W) * rect.width;
+    tip.style.left = Math.min(Math.max(px + 12, 4), rect.width - tip.offsetWidth - 4) + 'px';
+    tip.style.top = '8px';
+  });
+  svg.addEventListener('mouseleave', () => {
+    guide.style.display = 'none'; dotPv.style.display = 'none'; dotUv.style.display = 'none'; tip.style.display = 'none';
+  });
+}
+
+// ---------- 面板区（导航 TAB 排行 / 分页面 / 来源域 TOP10 / 事件 TOP） ----------
+function anxBarsHtml(items, getLabel, getV1, getV2, v1Name, v2Name) {
+  if (!items.length) return '<div class="anx-panel-empty">暂无数据</div>';
+  const max = Math.max(1, ...items.map(getV1));
+  return items.map(it => {
+    const v1 = getV1(it), v2 = getV2(it);
+    return `<div class="anx-bar-row">
+      <span class="anx-bar-label" title="${anxEsc(getLabel(it))}">${anxEsc(getLabel(it))}</span>
+      <span class="anx-bar-track"><span class="anx-bar-fill" style="width:${((v1 / max) * 100).toFixed(1)}%"></span></span>
+      <span class="anx-bar-num">${v1} <em>${v1Name}</em> · ${v2} <em>${v2Name}</em></span>
+    </div>`;
+  }).join('');
+}
+
+function anxTableHtml(headers, rows) {
+  if (!rows.length) return '<div class="anx-panel-empty">暂无数据</div>';
+  return `<table class="anx-table"><thead><tr>${headers.map(h => `<th>${h}</th>`).join('')}</tr></thead>
+    <tbody>${rows.map(r => `<tr>${r.map(c => `<td>${c}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
+}
+
+function anxPanelsHtml(d) {
+  const nav = (d.nav || []).map(it => ({ ...it, label: anxPageLabel(it.page) }));
+  const pages = (d.pages || []).map(it => [anxEsc(anxPageLabel(it.page)), it.pv, it.uv]);
+  const refs = (d.refs || []).map(it => ({ ...it }));
+  const events = (d.events || []).map(it => [anxEsc(it.event), it.cnt]);
+  return `
+    <div class="anx-panels">
+      <div class="card anx-panel">
+        <div class="anx-panel-title">导航 TAB 排行</div>
+        ${anxBarsHtml(nav, it => it.label, it => it.clicks || 0, it => it.people || 0, '次', '人')}
+      </div>
+      <div class="card anx-panel">
+        <div class="anx-panel-title">分页面</div>
+        ${anxTableHtml(['页面', 'PV', 'UV'], pages)}
+      </div>
+      <div class="card anx-panel">
+        <div class="anx-panel-title">来源域 TOP10</div>
+        ${anxBarsHtml(refs, it => it.ref_dom || '直接访问', it => it.pv || 0, it => it.uv || 0, 'PV', 'UV')}
+      </div>
+      <div class="card anx-panel">
+        <div class="anx-panel-title">事件 TOP</div>
+        ${anxTableHtml(['事件', '次数'], events)}
+      </div>
+    </div>`;
 }
 
 // ==================== REQ-052：日期输入中文化（原生 date input + 中文遮罩） ====================

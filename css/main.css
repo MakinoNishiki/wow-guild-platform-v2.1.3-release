@@ -4555,3 +4555,125 @@ img.class-icon[src$=".png"] { border-radius: 3px; }
   display: none;
 }
 .nav-item .notif-dot.show { display: block; }
+
+/* ==================== REQ-141 访问统计看板（任务书 #55 WP2） ====================
+   全部 .anx- 前缀作用域（数据中心「访问统计」tab 内），零泄漏；复用 .card 体系与 CSS 变量。 */
+.anx-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+.anx-range-group { display: flex; gap: 6px; flex-wrap: wrap; }
+.anx-date-pair { display: inline-flex; align-items: center; gap: 6px; }
+.anx-date { max-width: 150px; }
+.anx-date-sep { color: var(--text-muted); font-size: 12px; }
+.anx-select { width: auto; min-width: 96px; }
+.anx-query-btn { transition: transform 0.1s ease; }
+.anx-query-btn:active { transform: scale(0.97); }
+.anx-inline-err { color: var(--danger); font-size: 12px; }
+
+.anx-state {
+  padding: 48px 16px;
+  text-align: center;
+  color: var(--text-secondary);
+  background: var(--bg-tertiary);
+  border: 1px dashed var(--border-color);
+  border-radius: 8px;
+}
+.anx-forbidden { font-size: 15px; }
+.anx-error-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  color: var(--danger);
+  background: rgba(248, 81, 73, 0.08);
+  border: 1px solid rgba(248, 81, 73, 0.35);
+  border-radius: 8px;
+}
+
+.anx-cards {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin-bottom: 16px;
+}
+.anx-card { padding: 16px 20px; }
+.anx-card-label { font-size: 12px; color: var(--text-secondary); margin-bottom: 6px; }
+.anx-card-num { font-size: 26px; font-weight: 700; color: var(--gold); }
+.anx-card:nth-child(2) .anx-card-num { color: #39c5cf; }
+.anx-card:nth-child(3) .anx-card-num { color: var(--text-primary); }
+
+.anx-chart-card { padding: 16px 20px; margin-bottom: 16px; }
+.anx-chart-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+.anx-chart-title { font-size: 14px; font-weight: 600; }
+.anx-legend { font-size: 12px; color: var(--text-secondary); display: inline-flex; align-items: center; gap: 6px; }
+.anx-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-left: 8px; }
+.anx-dot-pv { background: var(--gold); }
+.anx-dot-uv { background: #39c5cf; }
+.anx-chart-wrap { position: relative; }
+.anx-chart { width: 100%; height: 280px; display: block; }
+.anx-grid { stroke: var(--border-color); stroke-width: 1; stroke-dasharray: 3 4; }
+.anx-ytick, .anx-xtick { fill: var(--text-muted); font-size: 11px; }
+.anx-ytick { text-anchor: end; }
+.anx-line { fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.anx-line-pv { stroke: var(--gold); }
+.anx-line-uv { stroke: #39c5cf; }
+.anx-guide { stroke: var(--text-muted); stroke-width: 1; stroke-dasharray: 2 3; }
+.anx-pt-pv { fill: var(--gold); }
+.anx-pt-uv { fill: #39c5cf; }
+.anx-tip {
+  position: absolute;
+  padding: 5px 10px;
+  font-size: 12px;
+  color: var(--text-primary);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-gold);
+  border-radius: 5px;
+  pointer-events: none;
+  white-space: nowrap;
+  z-index: 5;
+}
+
+.anx-panels {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+.anx-panel { padding: 16px 20px; }
+.anx-panel-title { font-size: 14px; font-weight: 600; margin-bottom: 12px; }
+.anx-panel-empty { color: var(--text-muted); font-size: 12px; padding: 12px 0; text-align: center; }
+.anx-bar-row {
+  display: grid;
+  grid-template-columns: 130px 1fr auto;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 0;
+  font-size: 12px;
+}
+.anx-bar-label { color: var(--text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.anx-bar-track { height: 8px; background: var(--bg-tertiary); border-radius: 4px; overflow: hidden; }
+.anx-bar-fill { display: block; height: 100%; background: linear-gradient(90deg, var(--gold-dark), var(--gold)); border-radius: 4px; }
+.anx-bar-num { color: var(--text-primary); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.anx-bar-num em { font-style: normal; color: var(--text-muted); }
+.anx-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.anx-table th {
+  text-align: left;
+  color: var(--text-secondary);
+  font-weight: 600;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border-color);
+}
+.anx-table td { padding: 6px 8px; border-bottom: 1px solid var(--bg-tertiary); color: var(--text-primary); }
+.anx-table th:nth-child(n+2), .anx-table td:nth-child(n+2) { text-align: right; font-variant-numeric: tabular-nums; }
+
+@media (max-width: 768px) {
+  .anx-panels { grid-template-columns: 1fr; }
+  .anx-cards { grid-template-columns: 1fr; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .anx-query-btn { transition: none; }
+  .anx-query-btn:active { transform: none; }
+}

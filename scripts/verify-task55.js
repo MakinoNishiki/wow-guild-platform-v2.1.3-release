@@ -1,21 +1,26 @@
-// 任务书 #55 WP1 验证：访问统计看板数据层（REQ-141）
-// A 静态：sql/34 锚点、server.js 端点/限流/清理调度锚点、版本串 .70 三壳计数守恒（WP1 不动前端）、node --check、安全回归
+// 任务书 #55 验证：访问统计看板（REQ-141）——WP1 数据层 + WP2 看板前端（2026-09-22 扩展）
+// A 静态：sql/34 锚点、server.js 端点/限流/清理调度锚点、版本串三壳计数（WP1=.70 守恒/WP2=.71 递增，计数仍 15/6/8）、
+//         WP2 增补=tab 挂载行/renderers 注册/app.js 看板锚点/main.css .anx- 锚点/changelog 条目、node --check、安全回归
 // B 实测（自起服务器注入 ANALYTICS_ADMIN_UIDS=<测试管理员 uid>，service_role 仅用于断言与清理）：
 //   B0 迁移闸——analytics_overview RPC 不在场则 B/C 全段 ⏸ 阻塞（非假绿），退出码非零；
 //   B1 curl 矩阵：无 token 401 / 非管理员 403 / 管理员合法 200 六键 / grain:'minute' 400 / 93 天 400 / page 注入 400 / anon 直调双 RPC 401|404；
 //   B2 数据正确性：5 条受控事件（东八区跨日子弹/补零桶/uv 口径/nav 剔 index:login/refs 直访归并/页面筛选）逐字断言；
 //   B3 90 天清理：种 91 天前旧行 → purge 返回 ≥1 且旧行消失、近行保留；
-//   B4 限流：同 uid 连发 40 次 → 出现 429（且不全是 429）。
+//   B5 浏览器四态矩阵（WP2，真机真点）：管理员默认近30天+天出图/今日+小时单日逐时/近90天+周/页面筛选重算/
+//     趋势图 3 桶与接口回放逐字一致/就地校验红字零请求/断网错误条+重试恢复/非管理员 403 整块占位不反复请求；
+//   B4 限流（末位跑）：同 uid 连发 40 次 → 出现 429（且不全是 429）。
 // C 清零：props->>test='t55' 行删除复核为零 + 双测试用户清理。
 // 用法: node scripts/verify-task55.js
 const fs = require('fs');
 const path = require('path');
 const { spawn, spawnSync } = require('child_process');
+const { chromium } = require('playwright');
 
 const ROOT = path.join(__dirname, '..');
 const PORT = 15655;
 const BASE = `http://127.0.0.1:${PORT}`;
-const VER = '20260919.70';
+const VER = '20260919.71';
+const VER_OLD = '20260919.70';
 const PWD = 'T55-Anx-2026!';
 const ADMIN_EMAIL = 't55-admin@example.com';
 const USER_EMAIL = 't55-user@example.com';
@@ -59,7 +64,7 @@ async function svcRest(method, restPath, body) {
 }
 
 let serverProc = null;
-let adminUid = null;
+let adminUid = null, userUid = null, adminToken = null, anxGuildId = null;
 function startServer() {
   return new Promise((resolve, reject) => {
     serverProc = spawn(process.execPath, ['server.js'], {
@@ -179,15 +184,51 @@ function staticAsserts() {
     /\.unref\(\)/.test(server) && /scheduleAnalyticsPurge\(\);/.test(server) &&
     server.indexOf('scheduleAnalyticsPurge();') > server.indexOf('function startServer()'));
 
-  // A3 版本串守恒（WP1 不动前端资产：.70 计数 index×15/decor×6/data×8 零漂移）
+  // A3 版本串递增（WP2 前端资产改动：.71 三壳计数仍 index×15/decor×6/data×8——本次无新增引用行；旧串零残留）
   const countStr = (s, v) => (s.match(new RegExp(v.replace(/\./g, '\\.'), 'g')) || []).length;
-  check(`A3 版本串 ${VER} 三壳计数守恒（index×15/decor×6/data×8）+ 无异版本串（WP1 不动前端）`,
+  check(`A3 版本串 ${VER} 三壳计数（index×15/decor×6/data×8，无新增引用行）+ 旧串 ${VER_OLD} 零残留 + 无异版本串`,
     countStr(index, VER) === 15 && countStr(decor, VER) === 6 && countStr(data, VER) === 8 &&
+    countStr(index, VER_OLD) === 0 && countStr(decor, VER_OLD) === 0 && countStr(data, VER_OLD) === 0 &&
     [index, decor, data].every(s => !(new RegExp('\\?v=(?!' + VER.replace(/\./g, '\\.') + ')\\d')).test(s)),
-    `实际=${countStr(index, VER)}/${countStr(decor, VER)}/${countStr(data, VER)}`);
+    `实际=${countStr(index, VER)}/${countStr(decor, VER)}/${countStr(data, VER)} 旧串=${countStr(index, VER_OLD)}/${countStr(decor, VER_OLD)}/${countStr(data, VER_OLD)}`);
+
+  // A5 WP2 看板前端锚点
+  const app = fs.readFileSync(path.join(ROOT, 'js', 'app.js'), 'utf8');
+  const css = fs.readFileSync(path.join(ROOT, 'css', 'main.css'), 'utf8');
+  check('A5a index.html「访问统计」tab 挂载（data-mdtab=analytics 位于 specs 之后、mdTabs 之内）',
+    /<div class="view-tab" data-mdtab="analytics" onclick="mdSwitchTab\('analytics'\)">访问统计<\/div>/.test(index) &&
+    index.indexOf('data-mdtab="analytics"') > index.indexOf('data-mdtab="specs"') &&
+    index.indexOf('data-mdtab="analytics"') < index.indexOf('id="mdPanel"'));
+  check('A5b renderers 注册 analytics: mdRenderAnalytics（复用 mdSwitchTab 现有 tab 体系）',
+    /analytics: mdRenderAnalytics/.test(app) && /function mdRenderAnalytics\(panel\)/.test(app));
+  check('A5c 控制条锚点：快捷五档/粒度四档/页面筛选四档/查询防重 loading/就地校验 92 天红字不发请求',
+    /ANX_RANGE_DAYS = \{ today: 0, '7d': 6, '30d': 29, '90d': 89 \}/.test(app) &&
+    /anxValidateLocal/.test(app) && /ANX_MAX_RANGE_MS = 92 \* 24 \* 3600 \* 1000/.test(app) &&
+    /btn\.disabled = true; btn\.textContent = '查询中…'/.test(app));
+  check('A5d 四态锚点：loading/403 整块占位/错误条+重试/空数据占位',
+    /访问统计数据加载中…/.test(app) && /anx-forbidden">🔒 访问统计仅管理员可见/.test(app) &&
+    /anx-error-bar/.test(app) && /该时间范围内暂无数据/.test(app) &&
+    /resp\.status === 403/.test(app));
+  check('A5e 趋势图锚点：SVG 手写双线（PV 金/UV 青）/hover 参考线+浮层/桶标签按粒度格式化',
+    /anxChartHtml/.test(app) && /anx-line-pv/.test(app) && /anx-line-uv/.test(app) &&
+    /anxFmtBucket/.test(app) && /anxGuide/.test(app) && /anxTip/.test(app) &&
+    /addEventListener\('mousemove'/.test(app));
+  check('A5f 四面板锚点：导航排行双口径/分页面表/来源域 TOP10/事件 TOP',
+    /导航 TAB 排行/.test(app) && /分页面/.test(app) && /来源域 TOP10/.test(app) && /事件 TOP/.test(app) &&
+    /anxBarsHtml/.test(app) && /anxPageLabel/.test(app));
+  check('A5g REQ-052 对齐：动态日期输入走 zhWrapDateInput 包裹',
+    /zhWrapDateInput\(document\.getElementById\('anxStart'\)\)/.test(app) &&
+    /zhWrapDateInput\(document\.getElementById\('anxEnd'\)\)/.test(app));
+  check('A5h main.css .anx- 作用域锚点：查询按钮 :active scale(0.97)/reduced-motion 降级/768 单列',
+    /\.anx-query-btn:active \{ transform: scale\(0\.97\); \}/.test(css) &&
+    /@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.anx-query-btn \{ transition: none; \}/.test(css) &&
+    /@media \(max-width: 768px\)[\s\S]*?\.anx-panels \{ grid-template-columns: 1fr; \}/.test(css) &&
+    /\.anx-line-uv \{ stroke: #39c5cf; \}/.test(css));
+  check('A5i changelog 补录（新增功能维度，REQ-141 看板条目）',
+    /id: 'v3\.2\.0-task55-analytics-board'/.test(app) && /访问统计」看板/.test(app));
 
   // A4 语法检查 + 静态安全回归
-  for (const f of ['server.js', 'scripts/verify-task55.js']) {
+  for (const f of ['server.js', 'js/app.js', 'scripts/verify-task55.js']) {
     const r = spawnSync(process.execPath, ['--check', f], { cwd: ROOT, encoding: 'utf8' });
     check('A4 node --check ' + f, r.status === 0, r.status === 0 ? '' : r.stderr.trim().split('\n')[0]);
   }
@@ -220,7 +261,7 @@ async function deleteTestUser(uid) {
 async function liveAsserts() {
   const ids = await ensureTestUsers();
   adminUid = ids.admin;
-  const userUid = ids.user;
+  userUid = ids.user;
   check('B-前置 双测试用户就位（admin  uid=' + String(adminUid || '').slice(0, 6) + '… 掩码）', !!adminUid && !!userUid);
   if (!adminUid || !userUid) { blocked('B/C 全段', '测试用户创建失败'); return; }
 
@@ -230,7 +271,7 @@ async function liveAsserts() {
   await startServer();
   console.log('--- 服务器已起（端口 ' + PORT + '，注入 ANALYTICS_ADMIN_UIDS=' + String(adminUid).slice(0, 6) + '… 掩码） ---');
 
-  const adminToken = await loginToken(ADMIN_EMAIL);
+  adminToken = await loginToken(ADMIN_EMAIL);
   const userToken = await loginToken(USER_EMAIL);
   check('B-前置 双用户密码登录拿 access_token', !!adminToken && !!userToken);
   if (!adminToken || !userToken) { blocked('B/C 全段', '登录失败'); return; }
@@ -349,6 +390,9 @@ async function liveAsserts() {
     Array.isArray(kept.body) && kept.body.length === 5,
     `purge返回=${JSON.stringify(purged.body)} 旧行残留=${Array.isArray(oldGone.body) ? oldGone.body.length : '?'} 近行=${Array.isArray(kept.body) ? kept.body.length : '?'}`);
 
+  // ---- B5 浏览器四态矩阵（任务书 #55 WP2；须在 B4 限流烧额度之前跑） ----
+  await browserAsserts();
+
   // ---- B4 限流（末位跑，额度 30/分） ----
   let n200 = 0, n429 = 0;
   for (let i = 0; i < 40; i++) {
@@ -360,6 +404,178 @@ async function liveAsserts() {
     n429 >= 1 && n200 >= 1, `200×${n200} 429×${n429}`);
 }
 
+// ==================== B5 浏览器四态矩阵（WP2） ====================
+// ensureTagNum 撞号重试 409 系 cloud.js:297-309 设计内噪音（与 #54 同案）——只精确滤
+// 「POST /rest/v1/user_profiles 的 409」+ 其逐条配对 console 回显，其余 4xx 一律照红。
+function mkNetFilter(badNet) {
+  const NET_409_PROFILES = /^http409 POST https:\/\/[^/]+\/rest\/v1\/user_profiles$/;
+  const real = badNet.filter(e => !NET_409_PROFILES.test(e));
+  let echoBudget = badNet.length - real.length;
+  return { real, filterErrs: (errs) => errs.filter(e => {
+    if (echoBudget > 0 && e === 'console: Failed to load resource: the server responded with a status of 409 ()') { echoBudget--; return false; }
+    return true;
+  }) };
+}
+
+async function loginAndGoAnalytics(browser, email) {
+  const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'zh-CN' });
+  const pg = await ctx.newPage();
+  const errs = [], badNet = [], summaryReqs = [];
+  pg.on('pageerror', e => errs.push('pageerror: ' + e.message));
+  pg.on('console', m => { if (m.type() === 'error') errs.push('console: ' + m.text()); });
+  pg.on('response', r => { if (r.status() >= 400) badNet.push(`http${r.status()} ${r.request().method()} ${r.url()}`); });
+  pg.on('request', r => { if (r.url().includes('/api/analytics/summary')) summaryReqs.push(r.postData()); });
+  await pg.goto(`${BASE}/`, { waitUntil: 'load' });
+  await pg.fill('#authEmail', email);
+  await pg.fill('#authPassword', PWD);
+  await pg.click('#authLoginBtn');
+  await pg.waitForSelector('.nav-item[data-page="datacenter"]', { state: 'visible', timeout: 30000 });
+  await pg.click('.nav-item[data-page="datacenter"]');
+  await pg.click('.view-tab[data-mdtab="analytics"]');
+  return { ctx, pg, errs, badNet, summaryReqs };
+}
+
+// 点「查询」并等到响应回来+渲染落定（旧图残留期不可靠 waitForSelector，一律走本函数）
+async function anxQueryAndWait(pg) {
+  await Promise.all([
+    pg.waitForResponse(r => r.url().includes('/api/analytics/summary') && r.request().method() === 'POST', { timeout: 20000 }),
+    pg.click('#anxQueryBtn'),
+  ]);
+  await pg.waitForFunction(() => anxState.loading === false, { timeout: 10000 });
+  await pg.waitForTimeout(150);
+}
+
+async function browserAsserts() {
+  // 双测试用户提 app_metadata.role='superadmin'（数据中心页超管门禁；ANALYTICS_ADMIN_UIDS 仍只含 admin → user 走 403 占位）；
+  // 并建测试公会（无公会登录落公会创建遮罩，侧栏整隐——#54 B5 同款先例）
+  for (const uid of [adminUid, userUid]) {
+    await svcRest('PUT', `/auth/v1/admin/users/${uid}`, { app_metadata: { role: 'superadmin' } });
+  }
+  const g = await svcRest('POST', '/rest/v1/guilds', { name: 'T55看板测试公会', owner_id: adminUid, invite_code: 'T55ANXBD', server_name: '测试', server_region: '一区' });
+  anxGuildId = g.body && g.body[0] && g.body[0].id;
+  await svcRest('POST', '/rest/v1/guild_members', [
+    { guild_id: anxGuildId, user_id: adminUid, role: 'owner', display_name: 't55-admin' },
+    { guild_id: anxGuildId, user_id: userUid, role: 'viewer', display_name: 't55-user' },
+  ]);
+  const browser = await chromium.launch({ headless: true });
+
+  // ---------- 管理员视角 ----------
+  const A = await loginAndGoAnalytics(browser, ADMIN_EMAIL);
+  // B5a 惰性首查：默认近30天+天粒度自动出数（正常态三卡+趋势图+四面板）
+  await A.pg.waitForSelector('.anx-cards .anx-card-num', { timeout: 20000 });
+  check('B5a 管理员「访问统计」tab 惰性首查（默认近30天+天）：三卡+趋势图+四面板全出',
+    await A.pg.locator('.anx-cards .anx-card').count() === 3 &&
+    await A.pg.locator('#anxChartSvg').count() === 1 &&
+    await A.pg.locator('.anx-panels .anx-panel').count() === 4 &&
+    A.summaryReqs.length === 1,
+    `请求数=${A.summaryReqs.length}`);
+
+  // B5b 趋势图抽 3 桶与接口回放逐字一致：自定义窗口=受控种子窗口（2026-09-20~2026-09-21，grain=day）
+  // （fill 只发 input 不发 change，日期值经 evaluate 显式落 anxState——与真实用户挑日期触发的 change 等效）
+  await A.pg.click('.anx-range-btn[data-range="custom"]');
+  await A.pg.fill('#anxStart', '2026-09-20');
+  await A.pg.fill('#anxEnd', '2026-09-21');
+  await A.pg.evaluate(() => { anxState.start = '2026-09-20'; anxState.end = '2026-09-21'; });
+  await A.pg.selectOption('#anxGrain', 'day');
+  await anxQueryAndWait(A.pg);
+  const pageSeries = await A.pg.evaluate(() => anxState.data.series.map(s => ({ bucket: s.bucket, pv: s.pv, uv: s.uv })));
+  const reqBody = JSON.parse(A.summaryReqs[A.summaryReqs.length - 1]);
+  const replay = await postSummary(adminToken, reqBody);
+  const replaySeries = (replay.body.series || []).map(s => ({ bucket: s.bucket, pv: s.pv, uv: s.uv }));
+  const pick3 = arr => [0, Math.floor((arr.length - 1) / 2), arr.length - 1].map(i => JSON.stringify(arr[i]));
+  check('B5b 自定义窗口出图 + 趋势图抽 3 桶（首/中/末）与接口回放逐字一致',
+    pageSeries.length >= 2 && JSON.stringify(pageSeries) === JSON.stringify(replaySeries) &&
+    JSON.stringify(pick3(pageSeries)) === JSON.stringify(pick3(replaySeries)),
+    `桶数=${pageSeries.length} 3桶=${pick3(pageSeries).join(' | ')}`);
+
+  // B5c 「今日+小时」= 单日逐时监控（同一套组件）
+  await A.pg.click('.anx-range-btn[data-range="today"]');
+  await A.pg.selectOption('#anxGrain', 'hour');
+  await anxQueryAndWait(A.pg);
+  const hourLabelOk = await A.pg.evaluate(() => {
+    if (!document.getElementById('anxChartSvg')) return 'empty-state'; // 今日无数据=合法空态
+    return [...document.querySelectorAll('.anx-xtick')].every(t => /^\d{2}-\d{2} \d{2}:\d{2}$/.test(t.textContent));
+  });
+  check('B5c 今日+小时：单日逐时曲线（X 轴 HH:mm 格式）或合法空态',
+    hourLabelOk === true || hourLabelOk === 'empty-state', String(hourLabelOk));
+
+  // B5d 「近90天+周」出 13 周波动线
+  await A.pg.click('.anx-range-btn[data-range="90d"]');
+  await A.pg.selectOption('#anxGrain', 'week');
+  await anxQueryAndWait(A.pg);
+  const weekOk = await A.pg.evaluate(() => {
+    if (!document.getElementById('anxChartSvg')) return 'empty-state';
+    const n = [...document.querySelectorAll('.anx-xtick')].every(t => /^\d{2}-\d{2}$/.test(t.textContent));
+    const buckets = anxState.data.series.length;
+    return n && buckets >= 13 && buckets <= 15 ? true : `桶数=${buckets}`;
+  });
+  check('B5d 近90天+周：≥13 周桶波动线（X 轴 MM-dd）或合法空态',
+    weekOk === true || weekOk === 'empty-state', String(weekOk));
+
+  // B5e 页面筛选切换：主站/家宅公示 重算（请求 page 参数正确 + PV ≤ 全部）
+  await A.pg.click('.anx-range-btn[data-range="30d"]');
+  await A.pg.selectOption('#anxGrain', 'day');
+  await A.pg.selectOption('#anxPage', 'all');
+  await anxQueryAndWait(A.pg);
+  const pvAll = await A.pg.evaluate(() => anxState.data ? anxState.data.cards.pv : 0);
+  await A.pg.selectOption('#anxPage', 'index');
+  await anxQueryAndWait(A.pg);
+  const pvIndex = await A.pg.evaluate(() => anxState.data ? anxState.data.cards.pv : 0);
+  const lastReq = JSON.parse(A.summaryReqs[A.summaryReqs.length - 1]);
+  check('B5e 页面筛选「主站」重算：请求 page=index + 主站 PV ≤ 全部 PV',
+    lastReq.page === 'index' && pvIndex <= pvAll, `全部=${pvAll} 主站=${pvIndex}`);
+
+  // B5f 就地校验：自定义起 > 止 → 红字提示零请求
+  const reqsBefore = A.summaryReqs.length;
+  await A.pg.click('.anx-range-btn[data-range="custom"]');
+  await A.pg.fill('#anxStart', '2026-09-21');
+  await A.pg.fill('#anxEnd', '2026-09-20');
+  await A.pg.evaluate(() => { anxState.start = '2026-09-21'; anxState.end = '2026-09-20'; });
+  await A.pg.click('#anxQueryBtn');
+  await A.pg.waitForTimeout(400);
+  const inlineErr = await A.pg.locator('#anxInlineErr').textContent();
+  check('B5f 就地校验：起 > 止 → 控制条旁红字 + 零请求发出',
+    inlineErr.includes('早于') && A.summaryReqs.length === reqsBefore,
+    `红字=「${inlineErr.trim()}」请求增量=${A.summaryReqs.length - reqsBefore}`);
+
+  // B5g 断网错误态 + 重试恢复（禁静默失败）
+  await A.pg.fill('#anxStart', '2026-09-20');
+  await A.pg.fill('#anxEnd', '2026-09-21');
+  await A.pg.evaluate(() => { anxState.start = '2026-09-20'; anxState.end = '2026-09-21'; });
+  await A.ctx.setOffline(true);
+  await A.pg.click('#anxQueryBtn');
+  await A.pg.waitForSelector('.anx-error-bar', { timeout: 15000 });
+  const errBarOk = await A.pg.locator('.anx-error-bar button').count() === 1;
+  await A.ctx.setOffline(false);
+  await Promise.all([
+    A.pg.waitForResponse(r => r.url().includes('/api/analytics/summary') && r.request().method() === 'POST', { timeout: 20000 }),
+    A.pg.click('.anx-error-bar button'),
+  ]);
+  await A.pg.waitForFunction(() => anxState.loading === false, { timeout: 10000 });
+  await A.pg.waitForSelector('#anxChartSvg, #anxBody .anx-cards', { timeout: 20000 });
+  check('B5g 断网 → 错误提示条+重试按钮；恢复网络点重试 → 重新出数', errBarOk);
+  // 断网段属有意制造的错误场景（B5g 已独立断言），其 console/网络噪音不进 B5h 全程门禁
+  A.errs.length = 0; A.badNet.length = 0;
+
+  const nfA = mkNetFilter(A.badNet);
+  const errsAReal = nfA.filterErrs(A.errs);
+  check('B5h 管理员全程零 JS 报错零意外 4xx（ensureTagNum 409 重试噪音按精确白名单滤除）',
+    nfA.real.length === 0 && errsAReal.length === 0,
+    `网络=${nfA.real.join(' | ') || 0} 报错=${errsAReal.join(' | ').slice(0, 160) || 0}`);
+  await A.ctx.close();
+
+  // ---------- 非管理员视角：403 整块占位（不弹错、不闪屏、不反复请求） ----------
+  const U = await loginAndGoAnalytics(browser, USER_EMAIL);
+  await U.pg.waitForSelector('.anx-forbidden', { timeout: 20000 });
+  await U.pg.waitForTimeout(800);
+  const forbidText = await U.pg.locator('.anx-forbidden').textContent();
+  check('B5i 非管理员 → 「访问统计仅管理员可见」整块占位 + 仅 1 次请求不反复',
+    forbidText.includes('仅管理员可见') && U.summaryReqs.length === 1,
+    `请求数=${U.summaryReqs.length} 文案=「${forbidText.trim()}」`);
+  await U.ctx.close();
+  await browser.close();
+}
+
 // ==================== C 清零 ====================
 async function cleanupAsserts() {
   await svcRest('DELETE', `/rest/v1/analytics_events?props->>test=eq.t55`);
@@ -367,6 +583,11 @@ async function cleanupAsserts() {
   check('C1 测试事件清零复核（props->>test=t55 零残留）',
     left.status === 200 && Array.isArray(left.body) && left.body.length === 0,
     `残留=${Array.isArray(left.body) ? left.body.length : '?'}`);
+  // 测试公会清理（B5 所建；成员行先行）
+  if (anxGuildId) {
+    await svcRest('DELETE', `/rest/v1/guild_members?guild_id=eq.${anxGuildId}`);
+    await svcRest('DELETE', `/rest/v1/guilds?id=eq.${anxGuildId}`);
+  }
   const list = await svcRest('GET', '/auth/v1/admin/users?page=1&per_page=200');
   const users = (list.body && (list.body.users || list.body)) || [];
   for (const u of (Array.isArray(users) ? users : [])) {

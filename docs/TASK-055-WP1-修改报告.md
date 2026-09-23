@@ -8,7 +8,7 @@
 1. **数据中心 tab 机制**：页名 `switchPage('datacenter')`；tab 体系 = index.html:711-723 `#mdTabs .view-tab[data-mdtab]` + `mdSwitchTab()`（app.js:12557-12561）→ `renderDatacenter()` renderers 映射（:12568-12573）→ `#mdPanel`（index.html:724）。WP2 挂载点定案：专精 tab 后追加 `data-mdtab="analytics"`，复用现有体系零新造样式。（顾问放行）
 2. **server.js 校验与 env**：两段鉴权活先例 = `handleWclRequest`（server.js:987-1011：401→403 中文 json，鉴权全过才触下游）；`verifyTokenCached`（:456，60s 缓存）为 JWT helper；env 直读先例 TRACK_SALT（:404）/WCL 凭证（:872-873）。（顾问放行）
 3. **pg_cron**：**定案 server.js setInterval 版**（启动 10 分钟首跑 + 每 24h），pg_cron 不启用、不再查。（运营定夺）
-4. **运营 uid**：service_role admin API 按邮箱定位（uid 掩码 `66de8e…`），已写入本地与服务器双端 .env；密码未使用未存储（运营已自行更换）。（顾问放行；uid 掩码新规本次起执行）
+4. **运营 uid**：service_role admin API 按邮箱定位（uid 掩码 `66de8e…`），已写入本地与服务器双端 .env；密码未使用未存储（运营已知情并决定不更换，事件结项）。（顾问放行；uid 掩码新规本次起执行）
 5. **verify 登录路径复用**：#54 spawn env 注入先例（verify-task54.js:77-79）+ admin API 自建/自删测试用户（:243/:315）原样复用；本任务 spawn 注入 `ANALYTICS_ADMIN_UIDS=<测试管理员 uid>`。（顾问放行）
 
 ## 一、改动清单（按任务书 WP1 四节）
