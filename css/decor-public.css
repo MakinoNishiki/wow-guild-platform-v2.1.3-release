@@ -825,3 +825,75 @@
 @media (prefers-reduced-motion: reduce) {
   .dh-pp-progress-bar { transition: none; }
 }
+
+/* ============================================================
+   任务书 #58-WP2-2：导出图片模式（tab 壳「文字预览 / 生成图片」+ 三皮肤 + 水印）
+   规范对齐：暗色主题/CSS 变量/≤8px 圆角/768px 断点；tab 语义 button+aria-selected。
+   ============================================================ */
+
+/* 图片模式需双栏预览+控件，弹窗加宽（文字模式随动，无其他改造） */
+.dh-plan-export { width: min(760px, calc(100vw - 32px)); }
+
+/* ---- tab 壳 ---- */
+.dh-exp-tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--border-color);
+  margin-bottom: 12px;
+}
+.dh-exp-tab {
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 8px 14px;
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+.dh-exp-tab:hover { color: var(--text-primary); }
+.dh-exp-tab.active { color: var(--gold); border-bottom-color: var(--gold); }
+.dh-exp-tab:focus-visible { outline: 2px solid var(--gold); outline-offset: 1px; }
+
+/* ---- 图片模式：左预览 + 右控件 ---- */
+.dh-exp-image-body { display: flex; gap: 16px; align-items: flex-start; }
+.dh-exp-preview {
+  flex: 1;
+  min-width: 0;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 10px;
+  display: flex;
+  justify-content: center;
+}
+.dh-exp-preview canvas { max-width: 100%; height: auto; border-radius: 8px; }
+.dh-exp-ctl { width: 200px; flex: none; display: flex; flex-direction: column; gap: 10px; }
+.dh-exp-ctl-title { font-size: 12px; color: var(--text-muted); font-weight: 600; }
+.dh-exp-skin {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-primary);
+  cursor: pointer;
+  padding: 7px 10px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  transition: border-color 0.15s ease;
+}
+.dh-exp-skin:hover { border-color: var(--gold-dark); }
+.dh-exp-skin input { accent-color: var(--gold); }
+.dh-exp-save, .dh-exp-copy { width: 100%; justify-content: center; }
+
+/* ---- 768px 窄屏：预览/控件纵向堆叠 ---- */
+@media (max-width: 768px) {
+  .dh-exp-image-body { flex-direction: column; }
+  .dh-exp-ctl { width: 100%; }
+}
+
+/* ---- reduced-motion 降级 ---- */
+@media (prefers-reduced-motion: reduce) {
+  .dh-exp-tab, .dh-exp-skin { transition: none; }
+}

@@ -852,9 +852,176 @@
   }
   function onExportKey(e) { if (e.key === 'Escape') planCloseExport(false); }
 
+  // ==================== 任务书 #58-WP2-2：导出图片模式（Canvas 零依赖手绘） + 三皮肤 + 阵营水印 ====================
+  // 素材口径：三枚水印为暴雪官方美术抠图（过渡使用）——正式上线前评估简化重绘（台账在案）。
+  const EXPORT_SKINS = {
+    gold: { label: '默认·管家金边', color: '#C9A869', wm: 'assets/decor-brand/wm-wb-shield.png' },
+    alliance: { label: '联盟·狮蓝', color: '#4A7FBF', wm: 'assets/decor-brand/wm-alliance.png' },
+    horde: { label: '部落·战红', color: '#B03A2E', wm: 'assets/decor-brand/wm-horde.png' },
+  };
+  const EXPORT_IMG_W = 900;      // 出图宽度 ≥900px（2 倍屏保真；预览同位图 CSS 缩放保清晰）
+  const EXPORT_WM_W = 150;       // 水印绘制宽度（硬规格）
+  const EXPORT_WM_MARGIN = 16;   // 水印右/下缘边距（硬规格）
+  const EXPORT_WM_ALPHA = 0.18;  // 水印不透明度 18%（硬规格 0.15–0.20 区间）
+  const EXPORT_BG = '#0F1115';   // 深色卡底（--bg-primary 同系）
+  const EXPORT_FONT = '-apple-system, "Segoe UI", "Microsoft YaHei", "PingFang SC", sans-serif';
+
+  const wmCache = {}; // skin -> HTMLImageElement | 'error'（404 优雅降级：无水印出图，console 告警，不阻断导出）
+  function loadWm(skinKey, onDone) {
+    const cur = wmCache[skinKey];
+    if (cur && cur !== 'error') { onDone(cur); return; }
+    if (cur === 'error') { onDone(null); return; }
+    const img = new Image();
+    img.onload = () => { wmCache[skinKey] = img; onDone(img); };
+    img.onerror = () => {
+      wmCache[skinKey] = 'error';
+      console.warn('[decor-export] 水印素材缺失（' + EXPORT_SKINS[skinKey].wm + '），本次导出降级为无水印出图');
+      onDone(null);
+    };
+    img.src = EXPORT_SKINS[skinKey].wm;
+  }
+
+  function roundRectPath(ctx, x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  }
+
+  // 绘制规格（任务书逐条硬规格）：图层顺序 = 卡底 → 边框 → 水印（垫底）→ 标题/清单/合计/页脚文字层；
+  // 卡高 = 内容自然高度（默认最小高，清单变长则变长——水印不参与尺寸计算）
+  function planDrawExportImage(canvas, skinKey, wmImg) {
+    const skin = EXPORT_SKINS[skinKey];
+    const W = EXPORT_IMG_W, PAD = 28, ROW_H = 32;
+    const name = plan.cloudName || '我的方案单';
+    const n = planCount(), cap = planCapacity();
+    const items = plan.items
+      .map(it => ({ it, row: state.rows.find(r => r.record_id === it.record_id) }))
+      .filter(x => x.row);
+    const H = PAD + 44 + 14 + Math.max(1, items.length) * ROW_H + 36 + 30 + PAD;
+    canvas.width = W;
+    canvas.height = H;
+    const ctx = canvas.getContext('2d');
+    // 卡底圆角矩形（半径 8px）+ 3px 皮肤边框
+    roundRectPath(ctx, 1.5, 1.5, W - 3, H - 3, 8);
+    ctx.fillStyle = EXPORT_BG;
+    ctx.fill();
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = skin.color;
+    ctx.stroke();
+    // 水印：锚定右下角（右/下缘各 16px）、绘制宽 150px、不透明度 18%、垫于文字之下
+    if (wmImg) {
+      const wmH = EXPORT_WM_W * ((wmImg.naturalHeight / wmImg.naturalWidth) || 1);
+      ctx.save();
+      ctx.globalAlpha = EXPORT_WM_ALPHA;
+      ctx.drawImage(wmImg, W - EXPORT_WM_MARGIN - EXPORT_WM_W, H - EXPORT_WM_MARGIN - wmH, EXPORT_WM_W, wmH);
+      ctx.restore();
+    }
+    ctx.textBaseline = 'middle';
+    // 标题区：方案名（皮肤色系标题色）+ 件数
+    ctx.fillStyle = skin.color;
+    ctx.font = '700 26px ' + EXPORT_FONT;
+    ctx.fillText(name, PAD, PAD + 20, W - PAD * 2 - 220);
+    ctx.fillStyle = '#9aa0a8';
+    ctx.font = '13px ' + EXPORT_FONT;
+    ctx.textAlign = 'right';
+    ctx.fillText(`共 ${n} 件 · 容量 ${cap.toLocaleString()}`, W - PAD, PAD + 20);
+    ctx.textAlign = 'left';
+    // 分隔线
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.12)';
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(PAD, PAD + 44); ctx.lineTo(W - PAD, PAD + 44); ctx.stroke();
+    // 清单行：名称 ×qty（容量/件 小字右置），行高随内容
+    let y = PAD + 44 + 14;
+    items.forEach(({ it, row }) => {
+      ctx.fillStyle = '#e8e8e8';
+      ctx.font = '15px ' + EXPORT_FONT;
+      ctx.fillText(`${row.name} ×${it.qty}`, PAD, y + ROW_H / 2, W - PAD * 2 - 240);
+      ctx.fillStyle = '#9aa0a8';
+      ctx.font = '12px ' + EXPORT_FONT;
+      if (row.placement_cost != null) {
+        ctx.textAlign = 'right';
+        ctx.fillText(`容量 ${row.placement_cost}/件 · 小计 ${(row.placement_cost * it.qty).toLocaleString()}`, W - PAD, y + ROW_H / 2);
+        ctx.textAlign = 'left';
+      }
+      y += ROW_H;
+    });
+    if (!items.length) {
+      ctx.fillStyle = '#7a7f85';
+      ctx.font = '13px ' + EXPORT_FONT;
+      ctx.fillText('（空方案——去图鉴挑几件装饰加入方案单）', PAD, y + ROW_H / 2);
+      y += ROW_H;
+    }
+    // 合计行
+    ctx.fillStyle = skin.color;
+    ctx.font = '600 14px ' + EXPORT_FONT;
+    ctx.fillText(`合计 ${n} 件 · 容量 ${cap.toLocaleString()}`, PAD, y + 18);
+    y += 36;
+    // 页脚固定行
+    ctx.fillStyle = '#7a7f85';
+    ctx.font = '12px ' + EXPORT_FONT;
+    ctx.fillText('魔兽管家 · 家宅图鉴免费组单：https://wow.ddctl.com/decor.html', PAD, y + 15);
+    return { W, H };
+  }
+
+  let exportSkin = 'gold';
+  function exportRedrawPreview() {
+    const canvas = exportEl && exportEl.querySelector('#dhExpCanvas');
+    if (!canvas) return;
+    const skinAtCall = exportSkin;
+    loadWm(exportSkin, img => {
+      if (!exportEl || exportSkin !== skinAtCall) return; // 已关弹窗或已切皮肤，丢弃过期回调
+      planDrawExportImage(canvas, skinAtCall, img);
+    });
+  }
+  function exportImageBlob() {
+    return new Promise(resolve => {
+      loadWm(exportSkin, img => {
+        const canvas = document.createElement('canvas');
+        planDrawExportImage(canvas, exportSkin, img);
+        canvas.toBlob(blob => resolve(blob), 'image/png');
+      });
+    });
+  }
+  function exportImageDownload(blob) {
+    const name = (plan.cloudName || '我的方案单').replace(/[\\/:*?"<>|]/g, '_');
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${name}-魔兽管家.png`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 4000);
+  }
+  async function planSaveExportImage() {
+    // 任务书 #58-WP2-3 登记事件（一次导出动作一次，props 枚举口径）
+    if (window.WBTrack) WBTrack.event('decor_plan_export_image', { skin: exportSkin });
+    const blob = await exportImageBlob();
+    if (!blob) { planToast('图片生成失败', true); return; }
+    exportImageDownload(blob);
+    planToast('图片已保存');
+  }
+  async function planCopyExportImage() {
+    if (window.WBTrack) WBTrack.event('decor_plan_export_image', { skin: exportSkin });
+    const blob = await exportImageBlob();
+    if (!blob) { planToast('图片生成失败', true); return; }
+    try {
+      await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+      planToast('图片已复制到剪贴板');
+    } catch {
+      // 不支持/权限拒 → 自动降级为下载 PNG 并 toast 说明（台账定案口径）
+      exportImageDownload(blob);
+      planToast('剪贴板不可用，已降级为下载 PNG');
+    }
+  }
+
   function planOpenExport() {
     if (exportEl) return;
-    if (!plan.items.length) { planToast('方案单还是空的，先挑几件装饰'); return; }
+    exportSkin = 'gold'; // 每次打开回到默认皮肤（与 radio checked 态一致）
     exportOriginal = planExportText();
     exportEl = document.createElement('div');
     exportEl.className = 'dh-modal-overlay dh-plan-export-overlay';
@@ -863,10 +1030,28 @@
         <span class="dh-plan-export-title">导出方案单</span>
         <button type="button" class="dh-modal-close" aria-label="关闭">&times;</button>
       </div>
-      <div class="dh-plan-export-hint">改动只影响本次导出，不回写方案单数据</div>
-      <textarea id="dhPlanExportText" class="dh-plan-export-text" spellcheck="false"></textarea>
-      <div class="dh-plan-export-actions">
-        <button type="button" class="btn btn-primary" id="dhPlanCopyBtn">复制文本清单</button>
+      <div class="dh-exp-tabs" role="tablist">
+        <button type="button" class="dh-exp-tab active" id="dhExpTabText" role="tab" aria-selected="true">文字预览</button>
+        <button type="button" class="dh-exp-tab" id="dhExpTabImage" role="tab" aria-selected="false">生成图片</button>
+      </div>
+      <div id="dhExpPaneText">
+        <div class="dh-plan-export-hint">改动只影响本次导出，不回写方案单数据</div>
+        <textarea id="dhPlanExportText" class="dh-plan-export-text" spellcheck="false"></textarea>
+        <div class="dh-plan-export-actions">
+          <button type="button" class="btn btn-primary" id="dhPlanCopyBtn">复制文本清单</button>
+        </div>
+      </div>
+      <div id="dhExpPaneImage" style="display:none">
+        <div class="dh-exp-image-body">
+          <div class="dh-exp-preview"><canvas id="dhExpCanvas"></canvas></div>
+          <div class="dh-exp-ctl">
+            <div class="dh-exp-ctl-title">边框皮肤</div>
+            ${Object.entries(EXPORT_SKINS).map(([k, s]) =>
+              `<label class="dh-exp-skin"><input type="radio" name="dhExpSkin" value="${k}" ${k === 'gold' ? 'checked' : ''}> ${s.label}</label>`).join('')}
+            <button type="button" class="btn btn-primary dh-exp-save" id="dhExpSaveImg">保存图片 PNG</button>
+            <button type="button" class="btn dh-exp-copy" id="dhExpCopyImg">复制图片到剪贴板</button>
+          </div>
+        </div>
       </div>
     </div>`;
     const ta = exportEl.querySelector('#dhPlanExportText');
@@ -874,6 +1059,25 @@
     exportEl.addEventListener('click', e => { if (e.target === exportEl) planCloseExport(false); });
     exportEl.querySelector('.dh-modal-close').onclick = () => planCloseExport(false);
     exportEl.querySelector('#dhPlanCopyBtn').onclick = planCopyExport;
+    // tab 壳：文字预览（默认聚焦）/ 生成图片（次位）——文字模式 WP1 逻辑原样迁移不改造
+    const tabText = exportEl.querySelector('#dhExpTabText');
+    const tabImage = exportEl.querySelector('#dhExpTabImage');
+    const setTab = which => {
+      tabText.classList.toggle('active', which === 'text');
+      tabImage.classList.toggle('active', which === 'image');
+      tabText.setAttribute('aria-selected', which === 'text' ? 'true' : 'false');
+      tabImage.setAttribute('aria-selected', which === 'image' ? 'true' : 'false');
+      exportEl.querySelector('#dhExpPaneText').style.display = which === 'text' ? '' : 'none';
+      exportEl.querySelector('#dhExpPaneImage').style.display = which === 'image' ? '' : 'none';
+      if (which === 'image') exportRedrawPreview();
+    };
+    tabText.onclick = () => setTab('text');
+    tabImage.onclick = () => setTab('image');
+    [...exportEl.querySelectorAll('input[name="dhExpSkin"]')].forEach(r => {
+      r.onchange = () => { exportSkin = r.value; exportRedrawPreview(); };
+    });
+    exportEl.querySelector('#dhExpSaveImg').onclick = planSaveExportImage;
+    exportEl.querySelector('#dhExpCopyImg').onclick = planCopyExportImage;
     document.body.appendChild(exportEl);
     document.addEventListener('keydown', onExportKey);
     requestAnimationFrame(() => exportEl && exportEl.classList.add('show'));
