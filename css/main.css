@@ -4933,3 +4933,39 @@ img.class-icon[src$=".png"] { border-radius: 3px; }
 }
 .ia-guide-create { width: 100%; justify-content: center; }
 .ia-guide-join-row .btn:disabled, .ia-guide-create:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* ==================== 任务书 #59 WP2 需求 4：导航页预览稿 P1 定稿（结构/文案/跳转；字体/装饰线/光晕纯视觉项随 WP4） ==================== */
+/* hero kicker：金色 + 加宽字距（任务书逐字口径） */
+.home-kicker { font-size: 12px; font-weight: 600; color: var(--gold); letter-spacing: 0.2em; margin-bottom: 12px; }
+/* 双色主标题：魔兽=浅色（--text-primary，基色继承）/ 管家=金色 */
+.home-hero-light { color: var(--text-primary); }
+/* 「免登录」金 chip（导流卡标题内联；描边+10% 金底参照 chip 选中态口径） */
+.home-chip-free {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--gold);
+  border: 1px solid var(--gold);
+  border-radius: 12px; /* chip 圆角例外已注册（v2 §9） */
+  background: rgba(240, 192, 96, 0.1);
+  vertical-align: 2px;
+}
+/* 导流卡标题行：chip 跟随标题、右箭头推至行尾 */
+.home-entry-title { display: flex; align-items: center; gap: 8px; }
+.home-entry-arrow { margin-left: auto; color: var(--gold); font-weight: 600; }
+/* 锁定功能预告带：说明行 + 带锁灰显 pill 排（纯展示不可点） */
+.home-locked-strip { margin-top: 32px; text-align: center; }
+.home-locked-label { font-size: 12px; color: var(--text-muted); margin-bottom: 10px; }
+.home-locked-pills { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+.home-locked-pill {
+  padding: 5px 12px;
+  font-size: 12px;
+  color: var(--text-muted);
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: 12px; /* chip 圆角例外已注册（v2 §9） */
+  cursor: default;
+  user-select: none;
+}

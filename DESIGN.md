@@ -83,3 +83,10 @@
 - `.ia-guide-join` / `.ia-guide-hint` / `.ia-guide-join-row` / `.ia-guide-code` —— 邀请码加入主卡（REQ-138 主路径）
 - `.ia-guide-or` —— 「或者」分隔线（::before/::after 双侧细线）
 - `.ia-guide-create` —— 创建公会次级 ghost 按钮（权重 ≤ 主卡一半）
+
+### 任务书 #59 WP2 需求 4 追加（导航页预览稿 P1 定稿，结构/文案/跳转；视觉项随 WP4）
+- `.home-kicker` —— hero 第一行 kicker（金色、letter-spacing 0.2em 加宽字距）
+- `.home-hero-light` / `.home-hero-gold` —— 双色主标题「魔兽（浅色）/ 管家（金色）」
+- `.home-chip-free` —— 导流卡「免登录」金 chip（描边 + 10% 金底，圆角 12px 走 chip 已注册例外）
+- `.home-entry-arrow` —— 导流卡右箭头（margin-left:auto 行尾）
+- `.home-locked-strip` / `.home-locked-label` / `.home-locked-pills` / `.home-locked-pill` —— 锁定功能预告带（带锁灰显 pill，纯展示不可点）

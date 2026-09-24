@@ -824,19 +824,34 @@
       <div class="page" id="page-decor-plan"></div>
 
       <!-- 任务书 #59 WP1：导航页（门户首页，游客与登录用户均可见） -->
+      <!-- 任务书 #59 WP2 需求 4（预览稿 P1 运营定稿）：hero 三行（kicker/双色主标题/副标）+
+           双导流卡（家宅图鉴/副本掉落，各带「免登录」金 chip 与右箭头）+ 锁定功能预告带；
+           文案逐字以任务书为准；字体/装饰线/光晕等纯视觉项随 WP4 不落地 -->
       <div class="page" id="page-home">
         <div class="home-hero">
-          <div class="home-hero-title"><span class="home-hero-gold">魔兽管家</span> WoW Butler</div>
-          <div class="home-hero-sub">WoW 公会团本考勤与家宅装饰的一站式工具箱</div>
+          <div class="home-kicker">一个随时会噶的魔兽站点，想到什么做什么</div>
+          <div class="home-hero-title"><span class="home-hero-light">魔兽</span><span class="home-hero-gold">管家</span></div>
+          <div class="home-hero-sub">团队行政 · 装备管理 · 家宅宠物 —— 社区？招募？依旧在探索、在尝试……</div>
         </div>
         <div class="home-entry-grid">
-          <div class="home-entry-card" onclick="iaSwitchTab('team')">
-            <div class="home-entry-title">⚔️ 团队管理</div>
-            <div class="home-entry-desc">公会团本考勤、装备分配、心愿单、成员管理与统计报表——登录并加入公会后解锁全部协作功能。</div>
+          <div class="home-entry-card" onclick="iaGoKey('decor')">
+            <div class="home-entry-title">🏠 家宅图鉴 <span class="home-chip-free">免登录</span><span class="home-entry-arrow">→</span></div>
+            <div class="home-entry-desc">浏览全部家宅物品与获取来源，无需登录，点开即看</div>
           </div>
-          <div class="home-entry-card" onclick="iaSwitchTab('house')">
-            <div class="home-entry-title">🏠 家宅房屋</div>
-            <div class="home-entry-desc">家宅装饰图鉴 2062 件全量目录、方案单组单与导出——无需登录，即开即用。</div>
+          <div class="home-entry-card" onclick="iaGoKey('lootdrop')">
+            <div class="home-entry-title">📖 副本掉落 <span class="home-chip-free">免登录</span><span class="home-entry-arrow">→</span></div>
+            <div class="home-entry-desc">各副本装备掉落与分配公示页，游客直读，数据实时同源</div>
+          </div>
+        </div>
+        <div class="home-locked-strip">
+          <div class="home-locked-label">🔒 登录并加入公会后可用</div>
+          <div class="home-locked-pills" aria-hidden="true">
+            <span class="home-locked-pill">🔒 考勤打卡</span>
+            <span class="home-locked-pill">🔒 装备分配</span>
+            <span class="home-locked-pill">🔒 心愿单</span>
+            <span class="home-locked-pill">🔒 团队统计</span>
+            <span class="home-locked-pill">🔒 数据中心</span>
+            <span class="home-locked-pill">🔒 更新日志</span>
           </div>
         </div>
         <div class="home-quick">
