@@ -77,3 +77,9 @@
 ### 既有类覆写（不改旧规则，新节覆盖）
 - `.sidebar { display:none }` / `.main-content { margin-left:0 }` / `.menu-toggle { display:none }` —— 侧栏退役
 - `.topbar .fb-entry` / `.topbar .fb-entry .fb-btn` / `.topbar .fb-card` —— 问题反馈浮层朝向覆写（按钮下方向下展开，z-index 60 沿用）
+
+### 任务书 #59 WP2 追加（团队管理引导卡正式版）
+- `.ia-guide-login` / `.ia-guide-login-text` —— 游客登录行（仅游客可见，iaRenderTeamGuide 控制）
+- `.ia-guide-join` / `.ia-guide-hint` / `.ia-guide-join-row` / `.ia-guide-code` —— 邀请码加入主卡（REQ-138 主路径）
+- `.ia-guide-or` —— 「或者」分隔线（::before/::after 双侧细线）
+- `.ia-guide-create` —— 创建公会次级 ghost 按钮（权重 ≤ 主卡一半）

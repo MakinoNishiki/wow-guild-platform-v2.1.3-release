@@ -642,7 +642,7 @@
     } catch (e) { planToast('切换方案失败：' + ((e && e.message) || '未知错误'), true); }
   }
   async function planActionCreate() {
-    if (!planLoggedIn()) { planToast('新建方案需要登录，登录后组单内容不丢'); setTimeout(() => { location.href = 'index.html'; }, 900); return; }
+    if (!planLoggedIn()) { planToast('新建方案需要登录，登录后组单内容不丢'); setTimeout(() => { location.href = 'index.html?auth=login'; }, 900); return; }
     planDraftSave();
     // 默认名「我的方案 N」：取未被占用的最小序号
     const used = new Set(plan.plans.map(p => p.name));
@@ -791,7 +791,7 @@
   async function planSave() {
     if (!planLoggedIn()) {
       planToast('保存方案单需要登录，登录后组单内容不丢');
-      setTimeout(() => { location.href = 'index.html'; }, 900);
+      setTimeout(() => { location.href = 'index.html?auth=login'; }, 900);
       return;
     }
     if (plan.saving) return;

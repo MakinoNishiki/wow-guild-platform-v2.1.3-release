@@ -1612,11 +1612,18 @@ async function handleRegister() {
       window.CloudSync.showAuthView();
       return;
     }
-    // 注册后一定没有公会，显示创建/加入公会表单
+    // 注册后一定没有公会——任务书 #59 WP2（D4/REQ-134① 注册解耦）：不再强制建会/入会，
+    // 直落导航页（与 handleLogin 无公会分支同套动作；建会/入会入口收进团队管理引导卡）
     showAuthError('');
     // 任务书 #56：REQ-141 WP3 埋点（事件名见 docs/开发规范.md 埋点纪律章）
     if (window.WBTrack) WBTrack.event('user_register');
-    showGuildForm();
+    iaEnterShell();
+    updateCloudUI();
+    updatePermissionUI();
+    loadData();
+    iaSyncTopRight();
+    iaSetHash('#/home');
+    iaApplyRoute();
     authSetBusy('register', false);
     updatePwGate('reg'); // REQ-094：复位后按强度规则重估提交门
   } catch (e) {
@@ -1745,13 +1752,20 @@ async function handleCreateGuild() {
   }
 }
 
-// 加入公会
-async function handleJoinGuild() {
-  const code = document.getElementById('joinInviteCode').value.trim().toUpperCase();
-  if (!code) { showAuthError('请输入邀请码'); return; }
+// 加入公会（任务书 #59 WP2：接受可选 codeOverride——遮罩表单按钮照旧无参调读 #joinInviteCode；
+// 引导卡按钮传 iaGuideInviteCode 值。引导卡场景遮罩未开、showAuthError 不可见，提示口径 = showToast）
+async function handleJoinGuild(codeOverride) {
+  const fromGuide = typeof codeOverride === 'string';
+  const code = (fromGuide ? codeOverride : document.getElementById('joinInviteCode').value).trim().toUpperCase();
+  if (!code) {
+    if (fromGuide) showToast('请输入邀请码', 'warning'); else showAuthError('请输入邀请码');
+    return;
+  }
 
+  const guideBtn = fromGuide ? document.getElementById('iaGuideJoinBtn') : null;
   try {
-    showAuthError('加入中...');
+    if (fromGuide) { if (guideBtn) { guideBtn.disabled = true; guideBtn.textContent = '加入中...'; } }
+    else showAuthError('加入中...');
     await window.CloudSync.joinGuild(code);
     showAppView();
     // 任务书 #59 WP1：入会成功从引导卡/公会表单落仪表盘
@@ -1761,7 +1775,10 @@ async function handleJoinGuild() {
     // 任务书 #56：REQ-141 WP3 埋点（事件名见 docs/开发规范.md 埋点纪律章）
     if (window.WBTrack) WBTrack.event('guild_join');
   } catch (e) {
-    showAuthError(e.message || '加入失败');
+    if (fromGuide) showToast(e.message || '加入失败', 'error');
+    else showAuthError(e.message || '加入失败');
+  } finally {
+    if (guideBtn) { guideBtn.disabled = false; guideBtn.textContent = '加入公会'; }
   }
 }
 
@@ -2600,13 +2617,20 @@ function iaSyncTopRight() {
   if (userMenu) userMenu.style.display = loggedIn ? '' : 'none';
 }
 
-// team-guide 引导卡两行按钮按登录态显隐
+// team-guide 引导卡按登录态控制（任务书 #59 WP2 正式版）：
+// 游客 = 登录行显 + 主卡/创建禁用（路径可预览，动作边界在登录）；登录无公会 = 登录行隐 + 主卡可用
 function iaRenderTeamGuide() {
   const loggedIn = iaIsLoggedIn();
   const guestRow = document.getElementById('iaGuideGuestRow');
-  const noguildRow = document.getElementById('iaGuideNoguildRow');
   if (guestRow) guestRow.style.display = loggedIn ? 'none' : '';
-  if (noguildRow) noguildRow.style.display = loggedIn ? '' : 'none';
+  const code = document.getElementById('iaGuideInviteCode');
+  const joinBtn = document.getElementById('iaGuideJoinBtn');
+  const createBtn = document.getElementById('iaGuideCreateBtn');
+  [[code, '登录后可加入'], [joinBtn, '登录后可加入'], [createBtn, '登录后可创建']].forEach(([el, tip]) => {
+    if (!el) return;
+    el.disabled = !loggedIn;
+    if (loggedIn) el.removeAttribute('title'); else el.title = tip;
+  });
 }
 
 // IA 导航态绘制：一级 tab active / 二级导航显隐 / pill active / QQ 悬浮钮（仅导航页）
@@ -2735,6 +2759,17 @@ function iaOpenAuth() {
   const authOverlay = document.getElementById('authOverlay');
   if (authOverlay) authOverlay.style.display = 'flex';
   showLoginForm();
+}
+
+// 任务书 #59 WP2 需求 5：?auth=login 唤醒参数（方案单未登录保存/新建跳主站，decorData.js 跳出点带参）——
+// 游客自动弹登录浮层、已登录忽略；处理后 history.replaceState 抹掉 query（保留 hash），避免刷新反复弹
+function iaAuthWakeCheck() {
+  try {
+    const params = new URLSearchParams(location.search);
+    if (params.get('auth') !== 'login') return;
+    if (!iaIsLoggedIn()) iaOpenAuth();
+    history.replaceState(null, '', location.pathname + location.hash);
+  } catch (e) { /* 静默 */ }
 }
 
 // 登出落地（cloud.js onUserSignedOut 与 app.js handleSignOut 双出口汇聚于此，幂等）：
@@ -9544,6 +9579,7 @@ async function init() {
           // 任务书 #59 WP1：登录有公会——应用路由（无 hash 默认 '#/team/dashboard'）
           iaSyncTopRight();
           iaApplyRoute();
+          iaAuthWakeCheck(); // 任务书 #59 WP2 需求 5：已登录带 auth=login 参数落地——忽略并抹参
           return;
         } else {
           // 已登录但没有公会——任务书 #59 WP1：不再盖公会表单遮罩，进登录态应用壳，
@@ -9556,6 +9592,7 @@ async function init() {
           loadData();
           iaSyncTopRight();
           iaApplyRoute();
+          iaAuthWakeCheck(); // 任务书 #59 WP2 需求 5：已登录带 auth=login 参数落地——忽略并抹参
           return;
         }
       }
@@ -9569,6 +9606,8 @@ async function init() {
   iaEnterShell();
   iaSyncTopRight();
   iaApplyRoute(); // 无 hash 默认 '#/home'
+  // 任务书 #59 WP2 需求 5：auth=login 唤醒——游客自动弹登录浮层并抹参；云端不可用分支不弹（banner 已提示）
+  if (cloudReady) iaAuthWakeCheck();
 
   // 云端不可用仍明确提示（不再盖遮罩——游客壳可用），复用 loadFailureBanner 提示条
   if (!cloudReady) {

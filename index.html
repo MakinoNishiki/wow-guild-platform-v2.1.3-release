@@ -856,18 +856,29 @@
         </div>
       </div>
 
-      <!-- 任务书 #59 WP1：团队管理引导卡占位（WP2 换装完整版：邀请码加入主路径/建会次级/游客登录行）；
-           两行按钮按登录态显隐（iaRenderTeamGuide）——游客见登录注册，登录无公会见加入/创建公会 -->
+      <!-- 任务书 #59 WP2（REQ-138）：团队管理引导卡正式版——邀请码加入主卡（主路径，视觉权重 ≥2:1）
+           + 创建公会次级（仅一枚 ghost 按钮）；游客版顶部登录行 + 主卡禁用预览（登录墙在动作边界）。
+           显隐/禁用态由 iaRenderTeamGuide() 按登录态控制；已有公会成员由路由守卫拦截永不见此卡 -->
       <div class="page" id="page-team-guide">
         <div class="card home-guide-card">
           <div class="home-entry-title">⚔️ 加入公会，解锁团队管理</div>
           <div class="home-entry-desc" style="margin-top:12px">考勤记录、装备分配、心愿单、成员管理、统计报表等团队功能，需登录并加入公会后使用。</div>
-          <div class="ia-guide-actions" id="iaGuideGuestRow">
+          <!-- 游客版登录行（登录后返回本引导卡位置——WP1 登录尊重当前 hash 已保证） -->
+          <div class="ia-guide-login" id="iaGuideGuestRow">
+            <span class="ia-guide-login-text">登录后可加入或创建公会</span>
             <button type="button" class="btn btn-primary" onclick="iaOpenAuth()">登录 / 注册</button>
           </div>
-          <div class="ia-guide-actions" id="iaGuideNoguildRow" style="display:none">
-            <button type="button" class="btn btn-primary" onclick="showGuildForm()">加入 / 创建公会</button>
+          <!-- 主卡：邀请码加入（REQ-138 文案口径） -->
+          <div class="ia-guide-join" id="iaGuideNoguildRow">
+            <div class="ia-guide-hint">团员请向会长索取 8 位邀请码</div>
+            <div class="ia-guide-join-row">
+              <input type="text" id="iaGuideInviteCode" class="auth-input ia-guide-code" placeholder="输入8位邀请码" maxlength="8">
+              <button type="button" class="btn btn-primary" id="iaGuideJoinBtn" onclick="handleJoinGuild(document.getElementById('iaGuideInviteCode').value)">加入公会</button>
+            </div>
           </div>
+          <!-- 次级：创建公会（权重 ≤ 主卡一半：分隔线 + 单枚 ghost 按钮） -->
+          <div class="ia-guide-or">或者</div>
+          <button type="button" class="btn btn-ghost ia-guide-create" id="iaGuideCreateBtn" onclick="showGuildForm()">创建公会</button>
         </div>
       </div>
     </div>

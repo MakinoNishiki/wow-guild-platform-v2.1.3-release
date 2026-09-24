@@ -4894,3 +4894,42 @@ img.class-icon[src$=".png"] { border-radius: 3px; }
   .ia-subnav { padding: 8px 12px; }
   .home-qq-float { right: 16px; bottom: 76px; }
 }
+
+/* ==================== 任务书 #59 WP2：团队管理引导卡正式版（REQ-138 主卡权重 ≥2:1） ==================== */
+/* 游客登录行（引导卡顶部，仅游客可见） */
+.ia-guide-login {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 20px;
+}
+.ia-guide-login-text { font-size: 13px; color: var(--text-secondary); }
+/* 邀请码加入主卡： bordered 区块 + primary 实心金按钮 = 区块主体（主路径） */
+.ia-guide-join {
+  margin-top: 20px;
+  padding: 20px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: var(--bg-tertiary);
+  text-align: left;
+}
+.ia-guide-hint { font-size: 12px; color: var(--text-muted); margin-bottom: 10px; }
+.ia-guide-join-row { display: flex; gap: 10px; }
+.ia-guide-code { flex: 1; text-transform: uppercase; }
+/* 次级：分隔线「或者」+ 单枚 ghost 按钮（视觉权重 ≤ 主卡一半） */
+.ia-guide-or {
+  margin: 16px 0 10px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.ia-guide-or::before, .ia-guide-or::after {
+  content: '';
+  flex: 1;
+  border-top: 1px solid var(--border-color);
+}
+.ia-guide-create { width: 100%; justify-content: center; }
+.ia-guide-join-row .btn:disabled, .ia-guide-create:disabled { opacity: 0.5; cursor: not-allowed; }
