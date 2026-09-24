@@ -4677,3 +4677,220 @@ img.class-icon[src$=".png"] { border-radius: 3px; }
   .anx-query-btn { transition: none; }
   .anx-query-btn:active { transform: none; }
 }
+
+/* ==================== 任务书 #59 WP1：门户化 IA（顶部一级 tab + 二级导航迁移 + 侧栏退役） ==================== */
+/* 侧栏退役：DOM 保留（applyNavOrder/#guildName/updateGuildUI 等 JS 写隐藏节点无副作用，零改动），
+   视觉整栏隐藏、主内容区左边距归零；.menu-toggle 失去对象一并隐藏；
+   移动端 .bottom-nav 不动（移动端封存已知取舍，见 docs/魔兽管家UI设计规范v2.md §9）。 */
+.sidebar { display: none; }
+.main-content { margin-left: 0; }
+.menu-toggle { display: none; }
+
+/* 一级 tab 栏（40px 高，当前态 2px 金色下划线） */
+.ia-topbar {
+  height: 40px;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 0 20px;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-color);
+}
+.ia-brand { display: flex; align-items: center; gap: 8px; }
+.ia-brand-logo { width: 28px; height: 28px; display: block; }
+.ia-brand-name { font-size: 15px; font-weight: 700; color: var(--gold); }
+.ia-brand-sub { font-size: 10px; color: var(--text-muted); }
+.ia-tabs { display: flex; align-items: stretch; height: 100%; }
+.ia-tab {
+  height: 40px;
+  padding: 0 16px;
+  font-size: 14px;
+  color: var(--text-secondary);
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+}
+.ia-tab:hover { color: var(--text-primary); }
+.ia-tab.active { color: var(--gold); border-bottom-color: var(--gold); }
+.ia-top-right { margin-left: auto; display: flex; align-items: center; }
+.ia-login-btn { padding: 5px 14px; font-size: 13px; }
+
+/* 二级导航（pill 条；放不下时换行，wrap 允许两行） */
+.ia-subnav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 10px 24px;
+  background: var(--bg-tertiary);
+  border-bottom: 1px solid var(--border-color);
+}
+.ia-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  background: none;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  cursor: pointer;
+}
+.ia-pill:hover { border-color: var(--gold); color: var(--text-primary); }
+.ia-pill.active {
+  color: var(--gold);
+  border-color: var(--gold);
+  background: rgba(240, 192, 96, 0.12); /* 淡金底，观感对齐 .nav-item.active */
+}
+/* pill 内方案单徽标沿用 .dh-nav-plan-badge（#58 既有类），此处只补水平间距 */
+.ia-pill .dh-nav-plan-badge { margin-left: 2px; }
+
+/* 顶部栏「用户中心」按钮（侧栏退役后入口；#navNotifDot 通知点宿主迁此，位置改为按钮右上角） */
+.ia-uc-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  background: none;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  cursor: pointer;
+}
+.ia-uc-btn:hover { color: var(--text-primary); border-color: var(--gold); }
+.ia-uc-btn .notif-dot {
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  width: 8px;
+  height: 8px;
+  background: var(--danger);
+  border-radius: 50%;
+  display: none;
+}
+.ia-uc-btn .notif-dot.show { display: block; }
+.ia-version { font-size: 11px; color: var(--text-muted); }
+
+/* 问题反馈迁入顶部栏后的浮层朝向覆写：原侧栏左下向上展开 → 按钮下方向下展开；
+   z-index 60 沿用（＞ sticky 筛选条 10 ＞ hover 卡 5 规约不破） */
+.topbar .fb-entry { position: relative; }
+.topbar .fb-entry .fb-btn { width: auto; margin-bottom: 0; }
+.topbar .fb-card {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  left: auto;
+  bottom: auto;
+}
+
+/* 导航页（#/home，游客与登录用户均可见） */
+.home-hero { text-align: center; padding: 56px 20px 32px; }
+.home-hero-title { font-size: 28px; font-weight: 700; color: var(--text-primary); }
+.home-hero-gold { color: var(--gold); }
+.home-hero-sub { margin-top: 12px; font-size: 14px; color: var(--text-secondary); line-height: 1.7; }
+.home-entry-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
+  max-width: 960px;
+  margin: 0 auto;
+}
+.home-entry-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 24px;
+  cursor: pointer;
+  transition: border-color 0.2s ease, transform 0.2s ease;
+}
+.home-entry-card:hover { border-color: var(--gold); transform: translateY(-2px); }
+.home-entry-title { font-size: 17px; font-weight: 600; color: var(--gold); }
+.home-entry-desc { margin-top: 8px; font-size: 13px; color: var(--text-secondary); line-height: 1.6; }
+.home-quick { margin-top: 36px; text-align: center; font-size: 13px; color: var(--text-muted); }
+.home-quick-link {
+  color: var(--blue-highlight);
+  background: none;
+  border: none;
+  padding: 2px 4px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.home-quick-link:hover { text-decoration: underline; }
+
+/* 引导卡/占位卡（team-guide / community 共用，复用 .card 体系） */
+.home-guide-card { max-width: 560px; margin: 60px auto; text-align: center; }
+.ia-guide-actions { margin-top: 20px; display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+
+/* 首页 QQ 用户群悬浮钮（任务书 #59 WP1 需求 6；仅 #/home 显示，显隐由路由控制；
+   44px 圆角 8px（§9 圆角上限）金线描边；纯 CSS hover/focus-within 出码，无埋点无跳转） */
+/* bottom 84px 让位：方案单抽屉钮 .dh-plan-toggle（decor-public.css，fixed right:20 bottom:20 z-index:1150）
+   挂载后常驻右下角，24px 会被完全压住（WP1 验证 BUG-1 实证）——抬高避让，不碰 #58 抽屉链 */
+.home-qq-float { position: fixed; right: 24px; bottom: 84px; z-index: 55; }
+.home-qq-btn {
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  border: 1px solid var(--gold);
+  background: var(--bg-secondary);
+  color: var(--gold);
+  cursor: pointer;
+  box-shadow: var(--shadow);
+}
+.home-qq-btn:hover { background: var(--bg-tertiary); }
+.home-qq-pop {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 12px);
+  width: 200px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--gold);
+  border-radius: 8px;
+  padding: 12px;
+  box-shadow: var(--shadow);
+  text-align: center;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(6px);
+  transition: opacity 0.2s ease-out, transform 0.2s ease-out, visibility 0.2s;
+}
+/* 指向按钮的小三角（金线描边同色系） */
+.home-qq-pop::after {
+  content: '';
+  position: absolute;
+  bottom: -6px;
+  right: 16px;
+  width: 10px;
+  height: 10px;
+  background: var(--bg-secondary);
+  border-right: 1px solid var(--gold);
+  border-bottom: 1px solid var(--gold);
+  transform: rotate(45deg);
+}
+.home-qq-float:hover .home-qq-pop, .home-qq-float:focus-within .home-qq-pop {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+}
+/* 浅色卡托：白底圆角 padding，深色主题下保扫码识别率（同 .fb-qr-wrap 口径） */
+.home-qq-qr { background: #ffffff; border-radius: 6px; padding: 8px; }
+.home-qq-qr img { display: block; width: 100%; }
+.home-qq-name { margin-top: 8px; font-size: 13px; font-weight: 600; color: var(--text-primary); }
+.home-qq-num { margin-top: 2px; font-size: 12px; color: var(--gold); }
+@media (prefers-reduced-motion: reduce) {
+  .home-qq-pop { transition: none; }
+  .home-entry-card { transition: none; }
+}
+
+/* 窄屏可用性兜底（移动端封存不精雕）：二级导航收紧、QQ 悬浮钮让开底部 Tab 栏 */
+@media (max-width: 768px) {
+  .ia-topbar { gap: 10px; padding: 0 12px; }
+  .ia-brand-sub { display: none; }
+  .ia-subnav { padding: 8px 12px; }
+  .home-qq-float { right: 16px; bottom: 76px; }
+}

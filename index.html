@@ -164,7 +164,7 @@
       <!-- 任务书 #58-WP2-1：方案单独立页——「家宅」组内增量（#57 一级导航/分组/首页结构不碰）；
            徽标与图鉴抽屉入口同源（当前方案总件数，decorData planRender 联动刷新） -->
       <div class="nav-item" data-page="decor-plan" data-nav-group="home" onclick="switchPage('decor-plan')">
-        <span class="nav-icon">🧺</span><span>方案单</span><span class="dh-nav-plan-badge" id="dhNavPlanBadge" style="display:none">0</span>
+        <span class="nav-icon">🧺</span><span>方案单</span><!-- 任务书 #59 WP1：#dhNavPlanBadge 徽标迁家宅二级导航 pill（id 唯一迁移） -->
       </div>
       <!-- REQ-137 二期预留，数据线另立（任务书 #52 WP1）：小宠物图鉴预留位——灰态禁用，
            无 data-page/onclick、独立 .nav-item-disabled 类，不参与 switchPage/REQ-105 排序，窄屏底部 Tab 不加 -->
@@ -177,25 +177,9 @@
       </div>
       <div class="nav-item" data-navkey="usercenter" onclick="openUserCenter()">
         <span class="nav-icon">👤</span><span>用户中心</span>
-        <!-- REQ-103（任务书 #36 WP4 附加）：未读通知点宿主迁自侧栏公会行 👤 按钮，显隐条件与数据源零变化 -->
-        <span class="notif-dot nav-notif-dot" id="navNotifDot"></span>
+        <!-- 任务书 #59 WP1：#navNotifDot 未读通知点迁顶部栏「用户中心」按钮（id 唯一迁移，显隐逻辑不变） -->
       </div>
     </nav>
-    <div class="sidebar-footer">
-      <!-- 任务书 #41（REQ-112）：问题反馈入口——侧栏底部、版本号上方（版本号保持最底）。
-           次级入口非导航项（无 data-page，不参与 REQ-105 拖拽排序）；悬浮卡非 modal 不走 modalStack，
-           桌面纯 CSS hover 显隐，移动端（hover 不可用）点击切换（js/app.js initFeedbackEntry） -->
-      <div class="fb-entry" id="feedbackEntry">
-        <button type="button" class="fb-btn" id="feedbackBtn" aria-haspopup="true" aria-expanded="false">💬 问题反馈</button>
-        <div class="fb-card" id="feedbackCard" role="dialog" aria-label="QQ 群二维码">
-          <div class="fb-qr-wrap"><img src="assets/qq-group-qr.png" alt="魔兽管家用户群 QQ 群二维码"></div>
-          <div class="fb-group">魔兽管家用户群</div>
-          <button type="button" class="fb-qq" id="feedbackQqCopy" title="点击复制群号">群号：1104273954</button>
-          <div class="fb-hint">扫码或搜群号加入，反馈问题/建议</div>
-        </div>
-      </div>
-      <div style="margin-top:4px" id="appVersion">v3.2.0</div>
-    </div>
   </aside>
 
   <!-- 主内容区 -->
@@ -206,6 +190,36 @@
       <button class="btn btn-sm btn-primary" onclick="location.reload()">刷新重试</button>
       <button class="btn btn-sm" onclick="document.getElementById('loadFailureBanner').style.display='none'">知道了</button>
     </div>
+    <!-- 任务书 #59 WP1：门户化 IA——一级 tab 栏 + 二级导航（侧边栏纵导航退役，CSS 隐藏保留 DOM） -->
+    <div class="ia-topbar" id="iaTopbar">
+      <div class="ia-brand"><img src="assets/brand/logo_B_64.png" alt="魔兽管家" class="ia-brand-logo"><span class="ia-brand-name">魔兽管家</span><span class="ia-brand-sub">WoW Butler</span></div>
+      <nav class="ia-tabs" aria-label="一级导航">
+        <button type="button" class="ia-tab" data-ia-tab="team" onclick="iaSwitchTab('team')">团队管理</button>
+        <button type="button" class="ia-tab" data-ia-tab="house" onclick="iaSwitchTab('house')">家宅房屋</button>
+      </nav>
+      <div class="ia-top-right">
+        <button type="button" class="btn btn-primary ia-login-btn" id="iaLoginBtn" style="display:none" onclick="iaOpenAuth()">登录 / 注册</button>
+      </div>
+    </div>
+    <!-- 团队管理二级导航（任务书 #59 WP1：原侧栏纵向导航 pill 化，数据中心显隐与 #navDatacenter 同步） -->
+    <div class="ia-subnav" id="iaSubnavTeam" style="display:none">
+      <button type="button" class="ia-pill" data-ia-key="dashboard" onclick="iaGoKey('dashboard')">📊 仪表盘</button>
+      <button type="button" class="ia-pill" data-ia-key="members" onclick="iaGoKey('members')">👥 成员管理</button>
+      <button type="button" class="ia-pill" data-ia-key="attendance" onclick="iaGoKey('attendance')">📅 考勤记录</button>
+      <button type="button" class="ia-pill" data-ia-key="loot" onclick="iaGoKey('loot')">⚔️ 装备分配</button>
+      <button type="button" class="ia-pill" data-ia-key="wishlist" onclick="iaGoKey('wishlist')">🎯 心愿单</button>
+      <button type="button" class="ia-pill" data-ia-key="reports" onclick="iaGoKey('reports')">📈 统计报表</button>
+      <button type="button" class="ia-pill" data-ia-key="data" onclick="iaGoKey('data')">💾 数据管理</button>
+      <button type="button" class="ia-pill" data-ia-key="datacenter" id="iaPillDatacenter" style="display:none" onclick="iaGoKey('datacenter')">🗄 数据中心</button>
+      <button type="button" class="ia-pill" data-ia-key="lootdrop" onclick="iaGoKey('lootdrop')">📖 副本掉落</button>
+      <button type="button" class="ia-pill" data-ia-key="changelog" onclick="iaGoKey('changelog')">📝 更新日志</button>
+    </div>
+    <!-- 家宅房屋二级导航（任务书 #59 WP1；#dhNavPlanBadge 徽标自侧栏 nav-item 整节点迁入，id 唯一、decorData.js 绑定不变） -->
+    <div class="ia-subnav" id="iaSubnavHouse" style="display:none">
+      <button type="button" class="ia-pill" data-ia-key="decor" onclick="iaGoKey('decor')">🏠 家宅图鉴</button>
+      <button type="button" class="ia-pill" data-ia-key="decor-plan" onclick="iaGoKey('decor-plan')">🧺 方案单 <span class="dh-nav-plan-badge" id="dhNavPlanBadge" style="display:none">0</span></button>
+      <button type="button" class="ia-pill" data-ia-key="community" onclick="iaGoKey('community')">💬 社区</button>
+    </div>
     <!-- 顶部栏 -->
     <header class="topbar">
       <div class="topbar-left">
@@ -213,7 +227,21 @@
         <div class="page-title" id="pageTitle">仪表盘</div>
       </div>
       <div class="topbar-right">
+        <!-- 任务书 #59 WP1：问题反馈入口自侧栏 footer 整节点迁入（全部 id 不变，initFeedbackEntry 绑定不受影响；
+             悬浮卡朝向由 CSS 覆写为按钮下方向下展开，z-index 60 层级沿用） -->
+        <div class="fb-entry" id="feedbackEntry">
+          <button type="button" class="fb-btn" id="feedbackBtn" aria-haspopup="true" aria-expanded="false">💬 问题反馈</button>
+          <div class="fb-card" id="feedbackCard" role="dialog" aria-label="QQ 群二维码">
+            <div class="fb-qr-wrap"><img src="assets/qq-group-qr.png" alt="魔兽管家用户群 QQ 群二维码"></div>
+            <div class="fb-group">魔兽管家用户群</div>
+            <button type="button" class="fb-qq" id="feedbackQqCopy" title="点击复制群号">群号：1104273954</button>
+            <div class="fb-hint">扫码或搜群号加入，反馈问题/建议</div>
+          </div>
+        </div>
+        <span class="ia-version" id="appVersion">v3.2.0</span>
         <span id="userInfo" style="font-size:12px;color:var(--text-muted);margin-right:8px"></span>
+        <!-- 任务书 #59 WP1：用户中心按钮（侧栏退役后入口迁此，登录后显示；#navNotifDot 自侧栏 nav-item 迁入，id 唯一） -->
+        <button type="button" class="ia-uc-btn" id="iaUserCenterBtn" style="display:none" onclick="openUserCenter()">👤 用户中心<span class="notif-dot nav-notif-dot" id="navNotifDot"></span></button>
         <!-- REQ-044（任务书 #13）：头像菜单替代裸「切换公会」按钮 -->
         <div class="user-menu" id="userMenu" style="display:none">
           <button class="user-menu-trigger" id="userMenuTrigger" onclick="userMenuToggle(event)">
@@ -794,6 +822,54 @@
       <!-- 任务书 #58-WP2-1：方案单独立页（形态B）——渲染层 js/decorData.js（DecorCatalog.mountPlanPage 挂本容器，
            与抽屉共享同一方案数据模块，禁止复制第二份数据逻辑）；骨架极简，结构由渲染层生成 -->
       <div class="page" id="page-decor-plan"></div>
+
+      <!-- 任务书 #59 WP1：导航页（门户首页，游客与登录用户均可见） -->
+      <div class="page" id="page-home">
+        <div class="home-hero">
+          <div class="home-hero-title"><span class="home-hero-gold">魔兽管家</span> WoW Butler</div>
+          <div class="home-hero-sub">WoW 公会团本考勤与家宅装饰的一站式工具箱</div>
+        </div>
+        <div class="home-entry-grid">
+          <div class="home-entry-card" onclick="iaSwitchTab('team')">
+            <div class="home-entry-title">⚔️ 团队管理</div>
+            <div class="home-entry-desc">公会团本考勤、装备分配、心愿单、成员管理与统计报表——登录并加入公会后解锁全部协作功能。</div>
+          </div>
+          <div class="home-entry-card" onclick="iaSwitchTab('house')">
+            <div class="home-entry-title">🏠 家宅房屋</div>
+            <div class="home-entry-desc">家宅装饰图鉴 2062 件全量目录、方案单组单与导出——无需登录，即开即用。</div>
+          </div>
+        </div>
+        <div class="home-quick">
+          无需登录：<button type="button" class="home-quick-link" onclick="iaGoKey('decor')">家宅图鉴</button> · <button type="button" class="home-quick-link" onclick="iaGoKey('lootdrop')">副本掉落</button> · <button type="button" class="home-quick-link" onclick="iaGoKey('decor-plan')">方案单</button>
+        </div>
+      </div>
+
+      <!-- 任务书 #59 WP1：家宅社区三期占位卡（静态占位 + 图鉴/方案单导流） -->
+      <div class="page" id="page-community">
+        <div class="card home-guide-card">
+          <div class="home-entry-title">💬 家宅社区筹备中</div>
+          <div class="home-entry-desc" style="margin-top:12px">家宅方案分享与交流社区正在筹备中，敬请期待。先去逛逛图鉴、整整方案单吧。</div>
+          <div class="ia-guide-actions">
+            <button type="button" class="btn btn-primary" onclick="iaGoKey('decor')">去看看家宅图鉴</button>
+            <button type="button" class="btn" onclick="iaGoKey('decor-plan')">打开方案单</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 任务书 #59 WP1：团队管理引导卡占位（WP2 换装完整版：邀请码加入主路径/建会次级/游客登录行）；
+           两行按钮按登录态显隐（iaRenderTeamGuide）——游客见登录注册，登录无公会见加入/创建公会 -->
+      <div class="page" id="page-team-guide">
+        <div class="card home-guide-card">
+          <div class="home-entry-title">⚔️ 加入公会，解锁团队管理</div>
+          <div class="home-entry-desc" style="margin-top:12px">考勤记录、装备分配、心愿单、成员管理、统计报表等团队功能，需登录并加入公会后使用。</div>
+          <div class="ia-guide-actions" id="iaGuideGuestRow">
+            <button type="button" class="btn btn-primary" onclick="iaOpenAuth()">登录 / 注册</button>
+          </div>
+          <div class="ia-guide-actions" id="iaGuideNoguildRow" style="display:none">
+            <button type="button" class="btn btn-primary" onclick="showGuildForm()">加入 / 创建公会</button>
+          </div>
+        </div>
+      </div>
     </div>
   </main>
 </div>
@@ -1792,6 +1868,26 @@
       <span class="nav-icon">⚙️</span><span>设置</span>
     </div>
   </nav>
+
+  <!-- 任务书 #59 WP1 需求 6：首页 QQ 用户群悬浮钮——仅 #/home 路由显示（显隐 iaApplyRoute 控制）；
+       纯 CSS hover/focus-within 出码，无埋点无跳转；二维码素材沿用现有静态目录 assets/brand/ -->
+  <div class="home-qq-float" id="homeQqFloat" style="display:none">
+    <button type="button" class="home-qq-btn" aria-label="QQ 用户群">
+      <svg viewBox="0 0 48 48" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <ellipse cx="24" cy="26" rx="13" ry="16"/>
+        <ellipse cx="24" cy="30" rx="7.5" ry="10"/>
+        <circle cx="19" cy="18" r="1.6" fill="currentColor" stroke="none"/>
+        <circle cx="29" cy="18" r="1.6" fill="currentColor" stroke="none"/>
+        <path d="M21 23 L24 26.5 L27 23"/>
+        <path d="M16 43 L21 40.5 M32 43 L27 40.5"/>
+      </svg>
+    </button>
+    <div class="home-qq-pop">
+      <div class="home-qq-qr"><img src="assets/brand/qq-group-qr.png" alt="魔兽管家用户群 QQ 群二维码"></div>
+      <div class="home-qq-name">魔兽管家用户群</div>
+      <div class="home-qq-num">群号：1104273954</div>
+    </div>
+  </div>
 
   <!-- 用户中心模态框 -->
   <div class="modal-overlay" id="userCenterModal">

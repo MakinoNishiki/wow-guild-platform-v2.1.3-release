@@ -408,7 +408,13 @@
     if (typeof window.applyNavOrder === 'function') window.applyNavOrder();
     // BUG-012：登出时清除 viewer 权限门状态
     if (typeof document !== 'undefined') document.body.classList.remove('viewer-mode');
-    showAuthView();
+    // 任务书 #59 WP1：登出落地汇聚 app.js iaOnSignedOut（游客壳 #/home，不盖登录遮罩）；
+    // 钩子缺席时回退旧行为（盖登录遮罩）
+    if (typeof window.iaOnSignedOut === 'function') {
+      window.iaOnSignedOut();
+    } else {
+      showAuthView();
+    }
   }
 
   // ---- 加载用户所属公会 (SELECT - 直接走 Supabase) ----

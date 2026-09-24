@@ -1265,6 +1265,10 @@ async function acceptGuildInvite(guildId, notificationId) {
     await window.CloudSync.joinGuildById(guildId);
     await markNotificationRead(notificationId);
     showAppView();
+    // 任务书 #59 WP1：接受邀请入会成功落仪表盘（同建会/邀请码入会见衔）
+    iaSyncTopRight();
+    iaSetHash('#/team/dashboard');
+    iaApplyRoute();
     // 任务书 #56：REQ-141 WP3 埋点（事件名见 docs/开发规范.md 埋点纪律章）
     if (window.WBTrack) WBTrack.event('guild_join');
   } catch (e) {
@@ -1565,11 +1569,19 @@ async function handleLogin() {
     const guilds = window.CloudSync.getUserGuilds();
     showAuthError(''); // 成功路径清除瞬时状态，视图随后切换
     if (guilds.length === 0) {
-      // 没有公会，显示创建/加入公会表单
-      showGuildForm();
+      // 任务书 #59 WP1：登录无公会不再强制公会表单——进登录态壳，团队 tab 落引导卡；
+      // 当前 hash 有效则尊重（D2 组单登录往返），无 hash 默认 '#/home'
+      iaEnterShell();
+      updateCloudUI();
+      updatePermissionUI();
+      loadData();
+      iaSyncTopRight();
+      iaApplyRoute();
     } else {
-      // 有公会，跳转到应用界面
+      // 有公会，跳转到应用界面（当前 hash 有效则尊重；无 hash 默认 '#/team/dashboard'）
       showAppView();
+      iaSyncTopRight();
+      iaApplyRoute();
     }
     authSetBusy('login', false); // 复位，供下次回到登录页时处于初始态
   } catch (e) {
@@ -1722,6 +1734,10 @@ async function handleCreateGuild() {
     showAuthError('创建中...');
     await window.CloudSync.createGuild(name, serverName, serverRegion);
     showAppView();
+    // 任务书 #59 WP1：建会成功从引导卡/公会表单落仪表盘（无此步会滞留 team-guide）
+    iaSyncTopRight();
+    iaSetHash('#/team/dashboard');
+    iaApplyRoute();
     // 任务书 #56：REQ-141 WP3 埋点（事件名见 docs/开发规范.md 埋点纪律章）
     if (window.WBTrack) WBTrack.event('guild_create');
   } catch (e) {
@@ -1738,6 +1754,10 @@ async function handleJoinGuild() {
     showAuthError('加入中...');
     await window.CloudSync.joinGuild(code);
     showAppView();
+    // 任务书 #59 WP1：入会成功从引导卡/公会表单落仪表盘
+    iaSyncTopRight();
+    iaSetHash('#/team/dashboard');
+    iaApplyRoute();
     // 任务书 #56：REQ-141 WP3 埋点（事件名见 docs/开发规范.md 埋点纪律章）
     if (window.WBTrack) WBTrack.event('guild_join');
   } catch (e) {
@@ -1957,10 +1977,14 @@ async function handleLeaveGuild() {
       renderCurrentPage();
       showToast('已退出公会', 'success');
     } else {
-      // 回"创建/加入公会"页（保持在登录态）
-      const appContainer = document.querySelector('.app-container');
-      if (appContainer) appContainer.style.display = 'none';
-      showGuildForm();
+      // 任务书 #59 WP1：退出最后一个公会不再盖公会表单遮罩——回登录态壳落 #/home，
+      // 团队 tab 落 team-guide 引导卡（其上按钮可再开公会表单）
+      iaEnterShell();
+      updateCloudUI();
+      updatePermissionUI();
+      iaSyncTopRight();
+      iaSetHash('#/home');
+      iaApplyRoute();
       showToast('已退出公会', 'success');
     }
   } catch (e) {
@@ -2030,9 +2054,14 @@ async function handleSignOut() {
   }
   // ②清空 modalStack 所有弹窗（不止切换公会弹窗——任何入口叠开的弹窗一律出栈）
   modalStack.slice().forEach(id => closeModal(id));
-  // ③跳转登录页（SIGNED_OUT 事件通常已触发，此处兜底幂等）
-  window.CloudSync.showAuthView();
-  // ④按 FIXED-023 状态机复位登录按钮（showAuthView 内已调，显式再保一道）
+  // ③落地视图：任务书 #59 WP1 起汇聚 iaOnSignedOut（游客壳 #/home）；兜底幂等
+  // （SIGNED_OUT 事件通常已触发同函数，重复调用无副作用）
+  if (typeof window.iaOnSignedOut === 'function') {
+    window.iaOnSignedOut();
+  } else {
+    window.CloudSync.showAuthView();
+  }
+  // ④按 FIXED-023 状态机复位登录按钮（iaOnSignedOut 内已调，显式再保一道）
   if (typeof resetAuthButtons === 'function') resetAuthButtons();
 }
 
@@ -2112,7 +2141,11 @@ function updateCloudUI() {
     if (cloudSyncStatus) cloudSyncStatus.textContent = '数据已云端同步';
     // 任务书 #14：数据中心 tab 仅超管可见（非超管不渲染）
     const navDc = document.getElementById('navDatacenter');
-    if (navDc) navDc.style.display = (window.MasterData && MasterData.isSuperadmin()) ? '' : 'none';
+    const isSuper = !!(window.MasterData && MasterData.isSuperadmin());
+    if (navDc) navDc.style.display = isSuper ? '' : 'none';
+    // 任务书 #59 WP1：二级导航数据中心 pill 显隐与 #navDatacenter 同源同步
+    const iaPillDc = document.getElementById('iaPillDatacenter');
+    if (iaPillDc) iaPillDc.style.display = isSuper ? '' : 'none';
   } else {
     if (userMenu) userMenu.style.display = 'none';
   }
@@ -2244,7 +2277,10 @@ const pageTitles = {
   datacenter: '数据中心',
   lootdrop: '副本掉落', // 任务书 #28 WP5（REQ-086）：原「数据公示」更名 + 双壳嵌入
   decor: '家宅图鉴', // 任务书 #51（REQ-137 一期）：双壳登录壳页签，只读
-  'decor-plan': '我的方案单' // 任务书 #58-WP2-1：方案单独立页（形态B，「家宅」组内增量）
+  'decor-plan': '我的方案单', // 任务书 #58-WP2-1：方案单独立页（形态B，「家宅」组内增量）
+  home: '首页', // 任务书 #59 WP1：门户导航页
+  community: '家宅社区', // 任务书 #59 WP1：三期占位
+  'team-guide': '团队管理' // 任务书 #59 WP1：游客/无公会引导卡（WP2 换装完整版）
 };
 
 // ==================== 任务书 #42（REQ-105/107）：用户偏好包 ====================
@@ -2443,6 +2479,14 @@ function switchPage(pageName) {
     case 'reports': renderReports(); break;
     case 'data': renderDataPage(); break;
   }
+
+  // 任务书 #59 WP1：直调 switchPage（底部导航/仪表盘入口卡/数据中心拦回递归等）同步 hash 与 IA 导航态。
+  // team-guide 不写 hash——路由守卫落引导卡时保留用户目标 hash 不改写（如 '#/team/members'）；
+  // 与 iaApplyRoute 间经 iaLastHash 防环（hash 相同则不触发二次路由）。
+  if (typeof iaSetHash === 'function' && pageName !== 'team-guide') {
+    iaSetHash(iaKeyToHash(pageName));
+    iaPaintRoute(pageName, iaTabOfPage(pageName));
+  }
 }
 
 // 任务书 #28 WP5：副本掉落 tab 懒挂载（双壳之登录壳；渲染层 js/dataPublic.js 与公开页 data.html 同源单一真源）
@@ -2509,6 +2553,199 @@ async function saveDecorPlan(items, name) {
   const res = await cloudCrud('decorPlan', 'save', { items, name }, { renderFn: () => {} });
   if (!res || !res.success) throw new Error((res && res.error && res.error.message) || '保存失败');
   return window.appData.decorPlan;
+}
+
+// ==================== 任务书 #59 WP1：门户化 IA——hash 路由 + 一级 tab + 二级导航 ====================
+// 路由表：#/home 导航页（游客与登录均可见）；#/house/decor|plan|community 家宅系（全免登录可读，组单保存登录墙维持 #58 现状）；
+// #/team/<key> 团队系——lootdrop 全员放行，其余 9 页需登录+公会（游客/无公会落 team-guide 引导卡，hash 不改写）。
+// 埋点 tab_click 仅此两处挂点（iaSwitchTab level:1 / iaGoKey level:2），WBTrack.event 直调不 await（track.js 自带静默兜底）。
+const IA_TEAM_KEYS = ['dashboard', 'members', 'attendance', 'loot', 'wishlist', 'reports', 'data', 'datacenter', 'lootdrop', 'changelog'];
+let iaLastHash = ''; // 防环锚点：本模块写过的最后一个 hash（hashchange 回火时比对跳过）
+
+function iaSetHash(h) {
+  iaLastHash = h;
+  if (location.hash !== h) location.hash = h;
+}
+
+function iaKeyToHash(key) {
+  if (key === 'home') return '#/home';
+  if (key === 'decor') return '#/house/decor';
+  if (key === 'decor-plan') return '#/house/plan';
+  if (key === 'community') return '#/house/community';
+  if (key === 'team-guide') return '#/team';
+  return '#/team/' + key;
+}
+
+function iaTabOfPage(page) {
+  if (page === 'decor' || page === 'decor-plan' || page === 'community') return 'house';
+  if (page === 'home') return null;
+  return 'team'; // 团队系 + team-guide
+}
+
+function iaIsLoggedIn() {
+  return !!(window.CloudSync && CloudSync.getCachedUser && CloudSync.getCachedUser());
+}
+function iaHasGuild() {
+  return !!(window.CloudSync && CloudSync.getCurrentGuild && CloudSync.getCurrentGuild());
+}
+
+// 顶部右侧按登录态显隐：游客见「登录 / 注册」，登录见「用户中心」+ 头像菜单
+function iaSyncTopRight() {
+  const loggedIn = iaIsLoggedIn();
+  const loginBtn = document.getElementById('iaLoginBtn');
+  const ucBtn = document.getElementById('iaUserCenterBtn');
+  const userMenu = document.getElementById('userMenu');
+  if (loginBtn) loginBtn.style.display = loggedIn ? 'none' : '';
+  if (ucBtn) ucBtn.style.display = loggedIn ? '' : 'none';
+  if (userMenu) userMenu.style.display = loggedIn ? '' : 'none';
+}
+
+// team-guide 引导卡两行按钮按登录态显隐
+function iaRenderTeamGuide() {
+  const loggedIn = iaIsLoggedIn();
+  const guestRow = document.getElementById('iaGuideGuestRow');
+  const noguildRow = document.getElementById('iaGuideNoguildRow');
+  if (guestRow) guestRow.style.display = loggedIn ? 'none' : '';
+  if (noguildRow) noguildRow.style.display = loggedIn ? '' : 'none';
+}
+
+// IA 导航态绘制：一级 tab active / 二级导航显隐 / pill active / QQ 悬浮钮（仅导航页）
+function iaPaintRoute(page, tab, activeKey) {
+  document.querySelectorAll('.ia-tab').forEach(t => t.classList.toggle('active', t.dataset.iaTab === tab));
+  const subTeam = document.getElementById('iaSubnavTeam');
+  const subHouse = document.getElementById('iaSubnavHouse');
+  if (subTeam) subTeam.style.display = tab === 'team' ? '' : 'none';
+  if (subHouse) subHouse.style.display = tab === 'house' ? '' : 'none';
+  const pillKey = activeKey || page;
+  document.querySelectorAll('.ia-pill').forEach(p => p.classList.toggle('active', p.dataset.iaKey === pillKey));
+  if (page === 'team-guide') iaRenderTeamGuide();
+  const qq = document.getElementById('homeQqFloat');
+  if (qq) qq.style.display = page === 'home' ? '' : 'none';
+}
+
+// 旧格式兼容：'#page-xxx' → 新 hash（location.replace 改写，避免历史栈污染）
+function iaLegacyRedirect(hash) {
+  const m = hash.match(/^#page-([a-z-]+)$/);
+  if (!m) return null;
+  const key = m[1];
+  if (key === 'decor') return '#/house/decor';
+  if (key === 'decor-plan') return '#/house/plan';
+  if (key === 'home') return '#/home';
+  if (key === 'community') return '#/house/community';
+  if (IA_TEAM_KEYS.includes(key)) return '#/team/' + key;
+  return null;
+}
+
+// 路由应用：解析 → 守卫 → IA 导航态 → switchPage（PV 由 track.js 包装自动发，新 key 均过既有 regex）
+function iaApplyRoute() {
+  let h = location.hash || '';
+  iaLastHash = h;
+  const legacy = iaLegacyRedirect(h);
+  if (legacy) {
+    iaLastHash = legacy;
+    location.replace(legacy);
+    h = legacy;
+  }
+  const hasGuild = iaIsLoggedIn() && iaHasGuild();
+  const defaultHash = hasGuild ? '#/team/dashboard' : '#/home';
+  if (!h || h === '#' || h === '#/') {
+    iaLastHash = defaultHash;
+    location.replace(defaultHash); // 默认落地不进历史栈
+    h = defaultHash;
+  }
+
+  let page = null, tab = null, activeKey = null;
+  if (h === '#/home') {
+    page = 'home'; tab = null;
+  } else if (h === '#/house' || h === '#/house/') {
+    iaLastHash = '#/house/decor'; location.replace('#/house/decor');
+    page = 'decor'; tab = 'house';
+  } else if (h === '#/house/decor') {
+    page = 'decor'; tab = 'house';
+  } else if (h === '#/house/plan') {
+    page = 'decor-plan'; tab = 'house';
+  } else if (h === '#/house/community') {
+    page = 'community'; tab = 'house';
+  } else if (h === '#/team' || h === '#/team/') {
+    if (hasGuild) {
+      iaLastHash = '#/team/dashboard'; location.replace('#/team/dashboard');
+      page = 'dashboard'; tab = 'team';
+    } else {
+      page = 'team-guide'; tab = 'team'; // 游客/无公会：引导卡（WP1 占位）
+    }
+  } else if (h.indexOf('#/team/') === 0) {
+    const key = h.slice('#/team/'.length);
+    tab = 'team';
+    if (IA_TEAM_KEYS.includes(key)) {
+      activeKey = key;
+      if (key === 'lootdrop' || hasGuild) {
+        page = key; // 副本掉落全员放行；公会成员原样进功能页
+      } else {
+        page = 'team-guide'; // 守卫：落引导卡，hash 保持不变不强行改写（pill 高亮目标 key）
+      }
+    } // 未知 key 落下方默认分支
+  }
+  if (!page) { // 未知 hash → 按态默认
+    iaLastHash = defaultHash;
+    location.replace(defaultHash);
+    page = hasGuild ? 'dashboard' : 'home';
+    tab = hasGuild ? 'team' : null;
+  }
+
+  iaPaintRoute(page, tab, activeKey);
+  switchPage(page);
+}
+
+window.addEventListener('hashchange', () => {
+  const h = location.hash || '';
+  if (h === iaLastHash) return; // 本模块自写 hash 的回火，跳过防环
+  iaApplyRoute();
+});
+
+// 一级 tab 点击（埋点 level:1；导航内联不转调 iaGoKey，避免一次点击双事件）
+function iaSwitchTab(tab) {
+  if (window.WBTrack) WBTrack.event('tab_click', { level: 1, key: tab });
+  if (tab === 'house') {
+    iaSetHash('#/house/decor');
+  } else if (iaHasGuild()) {
+    iaSetHash('#/team/dashboard');
+  } else {
+    iaSetHash('#/team'); // 游客/无公会 → 引导卡
+  }
+  iaApplyRoute();
+}
+
+// 二级 pill 点击（埋点 level:2）
+function iaGoKey(key) {
+  if (window.WBTrack) WBTrack.event('tab_click', { level: 2, key: key });
+  iaSetHash(iaKeyToHash(key));
+  iaApplyRoute();
+}
+
+// 游客壳：遮罩保持隐藏、应用壳直开（免登录页游客可用；零云端请求——不调 loadData/MasterData.init/偏好）
+function iaEnterShell() {
+  const authOverlay = document.getElementById('authOverlay');
+  const appContainer = document.querySelector('.app-container');
+  if (authOverlay) authOverlay.style.display = 'none';
+  if (appContainer) appContainer.style.display = '';
+}
+
+// 打开认证遮罩（登录表单；登录/注册成功路径在 handleLogin/handleRegister 收口）
+function iaOpenAuth() {
+  const authOverlay = document.getElementById('authOverlay');
+  if (authOverlay) authOverlay.style.display = 'flex';
+  showLoginForm();
+}
+
+// 登出落地（cloud.js onUserSignedOut 与 app.js handleSignOut 双出口汇聚于此，幂等）：
+// 不盖登录遮罩——转游客壳落 #/home（门户化后浏览边界零登录墙）
+function iaOnSignedOut() {
+  window.__wbUid = null; // REQ-141 授权行②同口径：登出清空埋点 uid
+  iaEnterShell();
+  iaSyncTopRight();
+  if (typeof resetAuthButtons === 'function') resetAuthButtons();
+  iaSetHash('#/home');
+  iaApplyRoute();
 }
 
 function toggleSidebar() {
@@ -9304,12 +9541,21 @@ async function init() {
             await window.CloudSync.selectGuild(guild.id);
           }
           showAppView();
+          // 任务书 #59 WP1：登录有公会——应用路由（无 hash 默认 '#/team/dashboard'）
+          iaSyncTopRight();
+          iaApplyRoute();
           return;
         } else {
-          // 已登录但没有公会
-          document.getElementById('authOverlay').style.display = 'flex';
-          document.querySelector('.app-container').style.display = 'none';
-          showGuildForm();
+          // 已登录但没有公会——任务书 #59 WP1：不再盖公会表单遮罩，进登录态应用壳，
+          // 默认 '#/home'，团队 tab 落 team-guide 引导卡（其上按钮可再开公会表单）。
+          // loadData 实读确认无公会前提假设（云端模式短路/localStorage 兜底），照常调用；
+          // MasterData.init/用户偏好跳过——无公会不消费字典表，入会/建会成功路径再加载。
+          iaEnterShell();
+          updateCloudUI();
+          updatePermissionUI();
+          loadData();
+          iaSyncTopRight();
+          iaApplyRoute();
           return;
         }
       }
@@ -9318,18 +9564,21 @@ async function init() {
     }
   }
 
-  // 未登录或云端不可用 - 停留在登录/注册界面（Supabase 是唯一数据源）
-  const authOverlay = document.getElementById('authOverlay');
-  const appContainer = document.querySelector('.app-container');
-  
-  if (authOverlay) {
-    authOverlay.style.display = 'flex';
-    if (appContainer) appContainer.style.display = 'none';
-  }
+  // 未登录或云端不可用——任务书 #59 WP1 游客壳：遮罩保持隐藏、应用壳直开（免登录页游客直显，
+  // 副本掉落/家宅图鉴渲染层走自己的 anon 通道 /api/supabase-config，不依赖 MasterData）
+  iaEnterShell();
+  iaSyncTopRight();
+  iaApplyRoute(); // 无 hash 默认 '#/home'
 
-  // 云端不可用时停留在登录页并给出明确提示
+  // 云端不可用仍明确提示（不再盖遮罩——游客壳可用），复用 loadFailureBanner 提示条
   if (!cloudReady) {
-    showAuthError('云端服务不可用，请检查网络后刷新重试');
+    const banner = document.getElementById('loadFailureBanner');
+    const text = document.getElementById('loadFailureText');
+    if (banner && text) {
+      text.textContent = '⚠ 云端服务不可用，请检查网络后刷新重试（家宅图鉴等免登录内容仍可浏览）';
+      banner.style.display = 'flex';
+    }
+    console.warn('云端服务不可用：游客壳已开启，登录与团队功能暂不可用');
   }
 }
 

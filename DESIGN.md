@@ -51,3 +51,29 @@
 - 不使用圆角超过 8px 的元素
 - 不使用过于鲜艳的渐变色
 - 不使用卡通风格图标
+
+## 任务书 #59 WP1 新增类登记（门户化 IA）
+
+> 样式集中于 css/main.css 末尾「任务书 #59 WP1」节；全部走 CSS 变量，新增类仅用 .ia- / .home- 前缀。侧栏纵导航退役（DOM 保留、CSS 隐藏），主内容区 margin-left 归零。
+
+### 布局与导航（.ia-）
+- `.ia-topbar` / `#iaTopbar` —— 一级 tab 栏容器（40px 高）
+- `.ia-brand` / `.ia-brand-logo` / `.ia-brand-name` / `.ia-brand-sub` —— 品牌区
+- `.ia-tabs` / `.ia-tab`（`.active` = 金色 2px 下划线，`data-ia-tab="team|house"`）—— 一级 tab
+- `.ia-top-right` / `.ia-login-btn`（`#iaLoginBtn`，游客可见）—— 登录/注册入口
+- `.ia-subnav`（`#iaSubnavTeam` / `#iaSubnavHouse`）—— 二级导航 pill 条
+- `.ia-pill`（`.active` = 金边金字淡金底，`data-ia-key` = 页签 key；`#iaPillDatacenter` 与 `#navDatacenter` 显隐同步）—— 二级导航项
+- `.ia-uc-btn`（`#iaUserCenterBtn`，登录后显示；`.notif-dot` 通知点宿主迁此）—— 顶部栏用户中心按钮
+- `.ia-version`（`#appVersion` 自侧栏 footer 迁入顶部栏）
+- `.ia-guide-actions` —— 引导卡/占位卡按钮行
+
+### 首页与 QQ 悬浮钮（.home-）
+- `.home-hero` / `.home-hero-title` / `.home-hero-gold` / `.home-hero-sub` —— 导航页 hero
+- `.home-entry-grid` / `.home-entry-card` / `.home-entry-title` / `.home-entry-desc` —— 双一级入口卡
+- `.home-quick` / `.home-quick-link` —— 「无需登录」快捷入口行
+- `.home-guide-card` —— team-guide/community 居中卡（复用 .card）
+- `.home-qq-float`（`#homeQqFloat`）/ `.home-qq-btn` / `.home-qq-pop`（含 `::after` 指向三角）/ `.home-qq-qr` / `.home-qq-name` / `.home-qq-num` —— 首页 QQ 用户群悬浮钮（44px 圆角 8px 金线描边，z-index 55；仅 #/home 显示；hover/focus-within 纯 CSS 出码，reduced-motion 直呈终态；白底卡托同 .fb-qr-wrap 口径保扫码率）
+
+### 既有类覆写（不改旧规则，新节覆盖）
+- `.sidebar { display:none }` / `.main-content { margin-left:0 }` / `.menu-toggle { display:none }` —— 侧栏退役
+- `.topbar .fb-entry` / `.topbar .fb-entry .fb-btn` / `.topbar .fb-card` —— 问题反馈浮层朝向覆写（按钮下方向下展开，z-index 60 沿用）

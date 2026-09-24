@@ -366,7 +366,8 @@ function isJsonRequest(req) {
 // ------------------------------------------------------------
 const TRACK_EVENTS = ["page_view", "user_register", "guild_create", "guild_join", "attendance_save", "loot_assign", "wishlist_add", "smart_import",
   "decor_plan_add", "decor_plan_save", "decor_plan_export_text",
-  "decor_plan_create", "decor_plan_switch", "decor_plan_export_image"]; // 任务书 #56 七事件 + 任务书 #58-WP1 方案单三事件 + 任务书 #58-WP2-3 方案单三事件（与 docs/开发规范.md 埋点纪律章事件表一一对应，14 事件）
+  "decor_plan_create", "decor_plan_switch", "decor_plan_export_image",
+  "tab_click"]; // 任务书 #56 七事件 + 任务书 #58-WP1 方案单三事件 + 任务书 #58-WP2-3 方案单三事件 + 任务书 #59-WP1 tab_click（与 docs/开发规范.md 埋点纪律章事件表一一对应，15 事件）
 const TRACK_PAGE_RE = /^(decor|data|index:[a-z-]+)$/; // 任务书 #58-WP2-3：index 页签 key 放行连字符（修复 index:decor-plan PV 被吞）
 const TRACK_MAX_BODY_BYTES = 8 * 1024;   // body >8KB → 204 吞掉
 const TRACK_MAX_PROPS_BYTES = 2 * 1024;  // props 序列化 >2KB → 204 吞掉
