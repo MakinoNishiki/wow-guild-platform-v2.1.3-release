@@ -33,7 +33,18 @@
     var p = location.pathname || "";
     if (p.indexOf("decor.html") !== -1) return "decor";
     if (p.indexOf("data.html") !== -1) return "data";
-    return "index:dashboard"; // index 壳起始页签
+    // 任务书 #59 WP3（顾问授权本批唯一埋点修改例外）：index 壳按实际落地 hash 页签推导——
+    // 原缺省 'index:dashboard' 是门户化前起始页假设，游客落 #/home 首条 PV 虚报 dashboard（WP1 开核实证）；
+    // 空/未知 hash 保留旧缺省（公会成员空 hash 默认 dashboard 口径不变；游客首条 PV 由 boot 改造后的
+    // switchPage 包装按路由实测上报，不再经本缺省）
+    var h = location.hash || "";
+    var m = h.match(/^#\/house\/(decor|plan|community)$/);
+    if (m) return "index:" + (m[1] === "plan" ? "decor-plan" : m[1]);
+    m = h.match(/^#\/team\/([a-z-]+)$/);
+    if (m) return "index:" + m[1];
+    if (h === "#/home") return "index:home";
+    if (h === "#/team" || h === "#/team/") return "index:team-guide";
+    return "index:dashboard"; // index 壳旧缺省（空 hash 兼容口径）
   }
 
   // ---- ref_dom：referrer 只取域（hostname），空 = 直接访问 → null ----
@@ -109,7 +120,11 @@
 
   function boot() {
     wrapSwitchPage();
-    reportPageView(); // 页面加载完成即自动上报一次 page_view
+    // 任务书 #59 WP3（同上授权勘定）：index 壳不发 boot 缺省 PV——WP1 起落地必经 iaApplyRoute→switchPage，
+    // 由包装器按实际落地页签上报（#/home 首条即 index:home，不再虚报 index:dashboard）；
+    // decor/data 壳（含 WP3 重定向壳）无 switchPage，维持 boot 自动 PV（旧口径 decor/data 不断）
+    var p = derivePage();
+    if (p === "decor" || p === "data") reportPageView();
   }
 
   if (document.readyState === "loading") {

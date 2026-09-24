@@ -4,89 +4,38 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>副本掉落 · 魔兽管家</title>
-<!-- 静态资源版本号与 index.html 同步递增（开发规范第五章第 6 条）：20260919.72 -->
+<!-- 静态资源版本号与 index.html 同步递增（开发规范第五章第 6 条，施工负责）：20260923.81 -->
+<!-- 任务书 #59 WP3（D3 拍板：不保留独立公示页）：本文件保留为重定向壳不删——
+     内容能力并入主站免登录页 index.html#/team/lootdrop（双壳本就同源 window.DPLootDrop 单一真源）。
+     JS location.replace 即跳（location.search 来源参数透传不丢）；meta refresh 3s 静态兜底
+     （仅 JS 失效时触发，静态 URL 不透参，透传以 JS 路径为准）。
+     track.js 保留：page_view page='data' 旧口径继续入库（外链传播源 PV 不断）——
+     重定向脚本注册在 track.js 之后的 DOMContentLoaded，保证 boot PV 先入队再跳（sendBeacon 跨导航存活）。
+     渲染层脚本引用保留（单一真源不拆第二份），body 已摘除 data-public-body 自动挂载类——
+     渲染层加载但惰性（零数据请求零渲染），跳转优先。 -->
+<meta http-equiv="refresh" content="3;url=index.html#/team/lootdrop">
 <link rel="icon" type="image/png" sizes="32x32" href="assets/brand/favicon-32.png">
 <link rel="icon" type="image/png" sizes="16x16" href="assets/brand/favicon-16.png">
-<link rel="stylesheet" href="css/main.css?v=20260919.72">
-<link rel="stylesheet" href="css/data-public.css?v=20260919.72">
-<script src="assets/vendor/supabase-js-2.js?v=20260919.72"></script>
-<script src="js/iconMap.js?v=20260919.72"></script>
+<link rel="stylesheet" href="css/main.css?v=20260923.81">
+<link rel="stylesheet" href="css/data-public.css?v=20260923.81">
+<script src="assets/vendor/supabase-js-2.js?v=20260923.81"></script>
+<script src="js/iconMap.js?v=20260923.81"></script>
 </head>
-<body class="data-public-body">
-  <!-- 任务书 #23 WP2：公开页（免登录公开，anon 直连 PostgREST，只读）；
-       任务书 #28 WP5：更名「副本掉落」（原「数据公示」）+ 双壳嵌入——本页为公开壳保留（URL 不动可分享），
-       登录壳 = 主应用 #page-lootdrop tab，同一渲染层 js/dataPublic.js（DPLootDrop）单一真源 -->
-  <header class="dp-header">
-    <div class="dp-brand">
-      <img src="assets/brand/logo_B_64.png" alt="魔兽管家" class="dp-logo">
-      <div>
-        <div class="dp-title">副本掉落</div>
-        <div class="dp-subtitle">魔兽管家 WoW Butler · 团本 / 大秘境掉落池与套装一览</div>
-      </div>
-    </div>
-    <div class="dp-season">
-      <!-- 任务书 #51 WP2：双向互链——家宅图鉴公示页入口（decor.html 头部有回本页链接；本行之外本文件零触碰） -->
-      <a class="btn btn-secondary" href="decor.html" style="text-decoration:none">🏠 家宅图鉴公示</a>
-      <label for="dpSeasonSelect">赛季</label>
-      <select id="dpSeasonSelect" class="form-select"></select>
-    </div>
-  </header>
-
-  <!-- 筛选规范 v2.0 §2 布局 + 任务书 #43（REQ-098）：右栏悬浮筛选面板（≥1400px）↔ 折叠顶栏（<1400px）
-       两态一套 DOM 同一份渲染 JS，仅容器形态随断点切换；面板态框体完整四边闭合、控件零裁切、独立纵向滚动；
-       层级规约：面板 z=10 ＞ hover 展开卡 z=5 ＞ 普通卡（#dpChipToast z=2000 独立层不动） -->
-  <div class="dp-filterbar" id="dpFilterBar">
-    <div class="dp-panel-title">筛选</div>
-    <div class="dp-top-row">
-      <!-- REQ-084（任务书 #23-补丁6）：搜索框清除钮保留（uc-input-wrap/uc-clear-btn 主应用同款，main.css 已加载） -->
-      <div class="uc-input-wrap dp-search-wrap"><input type="text" id="dpSearch" class="search-input" placeholder="搜索装备名…"><button type="button" id="dpSearchClear" class="uc-clear-btn" aria-label="清除搜索" title="清空" style="display:none">&times;</button></div>
-      <button type="button" id="dpResetFilters" class="btn btn-secondary dp-reset-btn">重置筛选</button>
-      <!-- 任务书 #43：命中计数恒显（浏览态「共 N 件」/ 筛选态「命中 X 件 · N 项生效」），两态同行 -->
-      <div class="dp-flat-head" id="dpFlatHead"></div>
-      <button id="dpFilterToggle" class="btn btn-secondary dp-filter-toggle">筛选 ▾</button>
-    </div>
-    <div class="dp-filter-rows" id="dpFilterRows">
-      <!-- 任务书 #28 WP6 F1：分类三级过滤组（第一组；二级 tab 单选、切换清空三级；三级 chips 多选 OR、与其他组 AND；
-           映射终版 2026-08-09 运营定：部位=slot 判定、武器/护甲=item_type 白名单、副手=slot'副手物品'、盾牌归护甲；
-           主手全库 0 命中——chip 定义保留不渲染，有数据自动出现；三级 chips 命中数随赛季数据驱动） -->
-      <div class="dp-group" id="dpCategoryGroup">
-        <div class="dp-group-head">分类<span class="dp-group-note">二级单选 · 三级多选</span></div>
-        <div class="dp-cat-tabs" id="dpCatTabs"></div>
-        <div class="dp-chips" id="dpCatChips" hidden></div>
-      </div>
-      <div class="dp-group">
-        <div class="dp-group-head">主属性<span class="dp-group-note">多选</span></div>
-        <div class="dp-chips" id="dpPrimaryChips"></div>
-      </div>
-      <div class="dp-group">
-        <div class="dp-group-head">副属性<span class="dp-group-note">多选</span></div>
-        <div class="dp-chips" id="dpSecondaryChips"></div>
-      </div>
-      <!-- 任务书 #28 WP2：来源单选维度（值域赛季数据驱动，无数据 chip 不渲染；副本任务/专业制造为预留值） -->
-      <div class="dp-group" id="dpSourceGroup">
-        <div class="dp-group-head">来源<span class="dp-group-note">单选 · 值域随赛季数据驱动</span></div>
-        <div class="dp-chips" id="dpSourceChips"></div>
-        <!-- WP6 F2：来源实例级——选中团本/大秘境时展开对应实例 chips（单选、再点取消、带计数；平铺态退化为纯过滤） -->
-        <div class="dp-chips dp-instance-row" id="dpInstanceChips" hidden></div>
-      </div>
-      <!-- 任务书 #43 增补（REQ-110 定案②）：毒咒筛选组（单选 chips 全部/有毒咒；判定=行 venomcurse 非空，
-           RPC 白名单已透出客户端筛选零 schema；文案取自 LootTaxonomy.VENOMCURSE_LABEL 与 #37 录入下拉同源） -->
-      <div class="dp-group" id="dpVenomGroup">
-        <div class="dp-group-head">毒咒<span class="dp-group-note">单选</span></div>
-        <div class="dp-chips" id="dpVenomChips"></div>
-      </div>
-    </div>
+<body>
+  <div class="card" style="max-width:420px;margin:120px auto;text-align:center">
+    副本掉落已并入主站，正在跳转…<br>
+    <a href="index.html#/team/lootdrop" style="color:var(--blue-highlight)">点击手动打开</a>
   </div>
-
-  <main class="dp-main" id="dpMain">
-    <div class="dp-loading">数据加载中…</div>
-  </main>
-
-  <footer class="dp-footer">数据来源：魔兽管家数据中心 · 只读公示，由运营维护</footer>
-
   <!-- 任务书 #31（REQ-097）：装备分类词表单一真源（须在 dataPublic.js 之前） -->
-  <script src="js/lootTaxonomy.js?v=20260919.72"></script>
-  <script src="js/dataPublic.js?v=20260919.72"></script>
-  <script src="js/track.js?v=20260919.72"></script><!-- 任务书 #54 WP1：全站埋点采集层（REQ-141） -->
+  <script src="js/lootTaxonomy.js?v=20260923.81"></script>
+  <script src="js/dataPublic.js?v=20260923.81"></script>
+  <script src="js/track.js?v=20260923.81"></script><!-- 任务书 #54 WP1：全站埋点采集层（REQ-141） -->
+  <script>
+  // 任务书 #59 WP3：JS 重定向（query 透传）；监听器注册晚于 track.js，PV 先发出
+  document.addEventListener('DOMContentLoaded', function () {
+    var t = 'index.html' + location.search + '#/team/lootdrop';
+    try { location.replace(t); } catch (e) { location.href = t; }
+  });
+  </script>
 </body>
 </html>
