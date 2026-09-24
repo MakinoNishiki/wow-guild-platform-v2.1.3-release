@@ -361,12 +361,13 @@ function isJsonRequest(req) {
 
 // ------------------------------------------------------------
 // REQ-141 全站埋点采集（任务书 #54 WP1）：POST /api/track 配套
-// 事件白名单一处维护——WP1 只开 page_view；WP3 扩名单只改此常量。
+// 事件白名单一处维护——扩名单只改此常量，并与 docs/开发规范.md 埋点纪律章事件表一一对应。
 // 红线：明文 IP 永不落库（仅 ip_h 日盐 hash）；埋点静默兜底，恒 204。
 // ------------------------------------------------------------
 const TRACK_EVENTS = ["page_view", "user_register", "guild_create", "guild_join", "attendance_save", "loot_assign", "wishlist_add", "smart_import",
-  "decor_plan_add", "decor_plan_save", "decor_plan_export_text"]; // 任务书 #56 七事件 + 任务书 #58-WP1 方案单三事件（与 docs/开发规范.md 埋点纪律章事件表一一对应）
-const TRACK_PAGE_RE = /^(decor|data|index:[a-z]+)$/;
+  "decor_plan_add", "decor_plan_save", "decor_plan_export_text",
+  "decor_plan_create", "decor_plan_switch", "decor_plan_export_image"]; // 任务书 #56 七事件 + 任务书 #58-WP1 方案单三事件 + 任务书 #58-WP2-3 方案单三事件（与 docs/开发规范.md 埋点纪律章事件表一一对应，14 事件）
+const TRACK_PAGE_RE = /^(decor|data|index:[a-z-]+)$/; // 任务书 #58-WP2-3：index 页签 key 放行连字符（修复 index:decor-plan PV 被吞）
 const TRACK_MAX_BODY_BYTES = 8 * 1024;   // body >8KB → 204 吞掉
 const TRACK_MAX_PROPS_BYTES = 2 * 1024;  // props 序列化 >2KB → 204 吞掉
 const TRACK_RATE_LIMIT_PER_MIN = 60;     // 同 IP ≤60 次/分钟（滑动窗口）
@@ -415,7 +416,7 @@ const ANALYTICS_SUMMARY_MAX_BODY_BYTES = 8 * 1024; // body >8KB → 400
 const ANALYTICS_SUMMARY_RATE_PER_MIN = 30;         // 同 uid ≤30 次/分钟（滑动窗口，与 track 限流桶分离）
 const ANALYTICS_MAX_RANGE_MS = 92 * 24 * 60 * 60 * 1000; // 90 天保留 + 2 天余量
 const ANALYTICS_GRAINS = ["hour", "day", "week", "month"];
-const ANALYTICS_PAGE_RE = /^(all|index|decor|data|index:[a-z]+)$/;
+const ANALYTICS_PAGE_RE = /^(all|index|decor|data|index:[a-z-]+)$/; // 任务书 #58-WP2-3：与 TRACK_PAGE_RE 同口径放行连字符（否则看板无法按 index:decor-plan 筛选）
 const analyticsSummaryRateBuckets = new Map();     // uid -> 时间戳数组（进程内，零依赖）
 
 function analyticsAdminUids() {
