@@ -855,9 +855,9 @@
   // ==================== 任务书 #58-WP2-2：导出图片模式（Canvas 零依赖手绘） + 三皮肤 + 阵营水印 ====================
   // 素材口径：三枚水印为暴雪官方美术抠图（过渡使用）——正式上线前评估简化重绘（台账在案）。
   const EXPORT_SKINS = {
-    gold: { label: '默认·管家金边', color: '#C9A869', wm: 'assets/decor-brand/wm-wb-shield.png' },
-    alliance: { label: '联盟·狮蓝', color: '#4A7FBF', wm: 'assets/decor-brand/wm-alliance.png' },
-    horde: { label: '部落·战红', color: '#B03A2E', wm: 'assets/decor-brand/wm-horde.png' },
+    gold: { label: '默认·管家金边', color: '#C9A869', wm: 'assets/decor-brand/wm-wb-shield-v2.png' },
+    alliance: { label: '联盟·狮蓝', color: '#4A7FBF', wm: 'assets/decor-brand/wm-alliance-v2.png' },
+    horde: { label: '部落·战红', color: '#B03A2E', wm: 'assets/decor-brand/wm-horde-v2.png' },
   };
   const EXPORT_IMG_W = 900;      // 出图宽度 ≥900px（2 倍屏保真；预览同位图 CSS 缩放保清晰）
   const EXPORT_WM_W = 150;       // 水印绘制宽度（硬规格）

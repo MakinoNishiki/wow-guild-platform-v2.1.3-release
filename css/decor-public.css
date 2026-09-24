@@ -777,6 +777,17 @@
 .dh-pp-num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .dh-pp-op { text-align: center; width: 48px; }
 
+/* 任务书 #58-补丁2-WP2：表格列宽受控（fixed 布局），修复表头与数据错位感 */
+.dh-pp-table { table-layout: fixed; }
+.dh-pp-table th:nth-child(1), .dh-pp-table td:nth-child(1) { width: 36px; }
+.dh-pp-table th:nth-child(3), .dh-pp-table td:nth-child(3) { width: 260px; }
+.dh-pp-table th:nth-child(4), .dh-pp-table td:nth-child(4) { width: 96px; text-align: center; }
+.dh-pp-table th:nth-child(5), .dh-pp-table td:nth-child(5) { width: 72px; }
+.dh-pp-table th:nth-child(6), .dh-pp-table td:nth-child(6) { width: 72px; }
+.dh-pp-table th:nth-child(7), .dh-pp-table td:nth-child(7) { width: 48px; }
+.dh-pp-table th:nth-child(5), .dh-pp-table th:nth-child(6) { text-align: right; }
+.dh-pp-src { max-width: none; } /* fixed 布局下 width 已受控，max-width 冗余去除 */
+
 /* ---- 空态 ---- */
 .dh-pp-empty {
   background: var(--bg-card);
