@@ -90,3 +90,22 @@
 - `.home-chip-free` —— 导流卡「免登录」金 chip（描边 + 10% 金底，圆角 12px 走 chip 已注册例外）
 - `.home-entry-arrow` —— 导流卡右箭头（margin-left:auto 行尾）
 - `.home-locked-strip` / `.home-locked-label` / `.home-locked-pills` / `.home-locked-pill` —— 锁定功能预告带（带锁灰显 pill，纯展示不可点）
+
+## 任务书 #59 WP4 登记（视觉密度五项，2026-09-28）
+
+> 纯 CSS 收口于 css/main.css 末尾「任务书 #59 WP4」节 + data-public.css / decor-public.css 各自作用域内改值；色值零改动，全部走 CSS 变量。
+
+### 按钮三档变量（:root 新增）
+- `--btn-h-primary: 40px` / `--btn-fs-primary: 14px` —— 主按钮（.btn-primary）
+- `--btn-h-secondary: 36px` / `--btn-fs-secondary: 13px` —— 次按钮（.btn 基类）
+- `--btn-h-ghost: 32px` / `--btn-fs-ghost: 12px` —— ghost 档（.btn-ghost/.btn-sm/.btn-xs + 存量小钮提档）
+
+### 提档清单（存量 <32px → ghost 档热区，字号不动）
+- `.ia-login-btn` / `.ia-uc-btn` / `.ia-pill` / `.filter-btn` / `.icon-btn`（main.css WP4 节）
+- `.dp-toggle`（data-public.css，26→32）/ `.dh-plan-x` / `.dh-pp-back`（decor-public.css，热区 32）
+- 豁免（规范钉死，不计入清零）：chip 24px（规范 v2 §4.3 恒定高）、.tag 徽标 20px（§4.2，含 claim-pending-btn 待认领）、纯文字链接 .home-quick-link
+
+### 容器与密度（覆写既有类，无新类名）
+- `.content-area > .page` max-width 1400px 居中；`#page-lootdrop` / `#page-decor` / `#page-decor-plan` 1600px（家宅/公示类宽页）
+- `.page-title` 22px/700/-0.02em；`.data-table td` 纵向 padding 12→9.6px（-20%）、`#page-reports .stats-rank-table td` 10→8px
+- `.dh-grid` minmax 190→210 / `.dp-items` minmax 240→210、gap 10→12；dp/dh 版心 1100→1600

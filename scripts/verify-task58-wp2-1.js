@@ -109,7 +109,7 @@ function staticAsserts() {
     /dh-pp-table/.test(dd) && /dh-pp-batch/.test(dd) && /dh-pp-summary/.test(dd) &&
     /已选 \$\{ids\.length\} 件 · 小计容量/.test(dd) &&
     /id="dhPpShare" disabled title="三期社区开放"/.test(dd) &&
-    /去图鉴挑装饰/.test(dd) &&
+    /去图鉴逛逛/.test(dd) && // 【任务书 #59 WP4 裁定驱动更新 2026-09-28：空态导流钮文案按任务书口径改「去图鉴逛逛」】
     /getElementById\('dhNavPlanBadge'\)/.test(dd) &&
     /mountPlanPage\(el\) \{ mountPlanPage\(el\); \}/.test(dd) &&
     /WBTrack\.event\('decor_plan_create', \{\}\)/.test(dd) &&

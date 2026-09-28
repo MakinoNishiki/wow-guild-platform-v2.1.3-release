@@ -146,7 +146,7 @@ async function browserAsserts() {
   check('D2 全量计数 = 库内 2062（装饰 2023 + 房间 39）',
     dbTotal === 2062 && dbDecor === 2023 && dbRooms === 39 && countText.includes(`共 ${dbTotal} 件`),
     `页面=${countText.trim()} 库=${dbTotal}/${dbDecor}/${dbRooms}`);
-  // D3 首页卡数 + 分页【2026-09-21 补丁3 动态口径：每页件数=实测列数×8 行（1100px 版心），页数随动】
+  // D3 首页卡数 + 分页【2026-09-21 补丁3 动态口径：每页件数=实测列数×8 行；任务书 #59 WP4 起版心 1100→1600、网格 minmax 210，列数实测随动】
   const gridProbe = await page.evaluate(() => {
     const tracks = getComputedStyle(document.querySelector('.dh-grid')).gridTemplateColumns;
     const cols = tracks.split(/\s+/).filter(Boolean).length;

@@ -125,7 +125,8 @@ async function login(page) {
   const cssSrc = fs.readFileSync(path.join(ROOT, 'css', 'data-public.css'), 'utf8');
   check('A5 BUG-081 两壳 CSS 落码（页头/登录壳赛季行并入 292 轨道）且登录壳规则在基线规则之后层叠',
     cssSrc.includes('.data-public-body .dp-header { margin-right: 292px; }')
-      && cssSrc.lastIndexOf('#page-lootdrop .dp-season { margin-right: 292px; }') > cssSrc.indexOf('#page-lootdrop .dp-season { max-width: 1100px'));
+      && cssSrc.lastIndexOf('#page-lootdrop .dp-season { margin-right: 292px; }') > cssSrc.indexOf('#page-lootdrop .dp-season { max-width: 1600px'));
+  // 【任务书 #59 WP4 裁定驱动更新 2026-09-28：A5 基线规则版心 1100→1600，层叠顺序断言口径同步滚动】
   // ---- WP4（运营裁定 b 先行+轻量门禁）静态断言 ----
   check('A6 WP4 哨兵落码：cloudCrud 写后自检函数+告警标记', appSrc.includes('function cloudCrudSentinelCheck') && appSrc.includes('[BUG-080 哨兵]'));
   const directWrites = (appSrc.match(/window\.CloudSync\.saveCloudData\(/g) || []).length - 1; // 扣 cloudCrud 内 1 处

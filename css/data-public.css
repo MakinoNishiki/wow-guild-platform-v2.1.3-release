@@ -12,7 +12,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  max-width: 1100px;
+  max-width: 1600px; /* 任务书 #59 WP4：公示类宽页版心 1100→1600 */
   margin: 0 auto;
   padding: 24px 20px 16px;
   border-bottom: 1px solid var(--border-color);
@@ -28,7 +28,7 @@
 .dp-filterbar {
   display: flex;
   gap: 8px; /* 筛选规范 §2：组与组之间固定 8px 行距 */
-  max-width: 1100px;
+  max-width: 1600px; /* 任务书 #59 WP4：1100→1600 */
   margin: 0 auto;
   padding: 14px 20px;
   flex-wrap: wrap;
@@ -165,7 +165,7 @@
 .dp-tier-filters .form-select { width: 130px; height: 28px; padding: 0 8px; font-size: 12px; }
 
 .dp-main {
-  max-width: 1100px;
+  max-width: 1600px; /* 任务书 #59 WP4：1100→1600 */
   margin: 0 auto;
   padding: 20px;
 }
@@ -210,7 +210,7 @@
 
 .dp-view-toggle { display: flex; gap: 6px; }
 .dp-toggle {
-  height: 26px;
+  height: 32px; /* 任务书 #59 WP4：26→32（消灭小纽扣，ghost 档热区） */
   padding: 0 12px;
   border-radius: 5px;
   border: 1px solid var(--border-color);
@@ -266,8 +266,8 @@
 
 .dp-items {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-  gap: 10px;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); /* 任务书 #59 WP4：卡片网格加密 240→210 */
+  gap: 12px; /* 任务书 #59 WP4：10→12 */
 }
 .dp-item {
   position: relative; /* P1（WP6 补丁）：生长定位锚点；卡盒样式迁 .dp-item-inner */
@@ -489,7 +489,7 @@
 .dp-error-text { color: var(--text-secondary); margin-bottom: 16px; }
 
 .dp-footer {
-  max-width: 1100px;
+  max-width: 1600px; /* 任务书 #59 WP4：1100→1600 */
   margin: 0 auto;
   /* P1-再补 边界（WP6 补丁三轮）：底部 200px 缓冲带——池末行溢出卡 hover 向下生长（≤260px 封顶）
      的 absolute 溢出被页末预留空间吸收，不撑出额外滚动区、滚动条零抖动 */
@@ -521,7 +521,7 @@
       （公开壳无 topbar，top:0 不动）；层级规约不变：筛选条/面板(10)＞hover卡(5)＜topbar(50)，无越层；
    ② 池末缓冲——登录壳无 .dp-footer 的 200px 底部缓冲带，由 .dp-main 自补（末行溢出卡 hover
       向下生长 ≤260px 的 absolute 溢出被吸收，不撑滚动区）；
-   ③ 赛季行对齐——登录壳无 .dp-header，赛季行与筛选条/主内容同 1100px 版心对齐。
+   ③ 赛季行对齐——登录壳无 .dp-header，赛季行与筛选条/主内容同 1600px 版心对齐（#59 WP4 起）。
    任务书 #43：top 让位按两态拆分——折叠顶栏态（<1400）吸顶 56px；面板态（≥1400）走壳级变量
    --dp-panel-top（= topbar 56 + 赛季行高，js/dataPublic.js syncPanelTop 实测写入） */
 @media (max-width: 1399px) {
@@ -532,7 +532,7 @@
   #page-lootdrop .dp-filterbar { top: calc(var(--dp-panel-top, 56px) + 12px); max-height: calc(100vh - var(--dp-panel-top, 56px) - 24px); }
 }
 #page-lootdrop .dp-main { padding-bottom: 200px; }
-#page-lootdrop .dp-season { max-width: 1100px; margin: 0 auto 4px; padding: 0 20px; justify-content: flex-end; }
+#page-lootdrop .dp-season { max-width: 1600px; margin: 0 auto 4px; padding: 0 20px; justify-content: flex-end; } /* 任务书 #59 WP4：1100→1600 */
 /* 任务书 #47 WP3（BUG-081）：面板态（≥1400）赛季行右缘并入卡片区右偏移轨道（须在上方基线规则之后层叠） */
 @media (min-width: 1400px) {
   #page-lootdrop .dp-season { margin-right: 292px; }

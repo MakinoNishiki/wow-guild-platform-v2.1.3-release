@@ -1192,7 +1192,7 @@
           : `<div class="dh-pp-empty">
               <div class="dh-empty-title">方案单还是空的</div>
               <div class="dh-empty-hint">去图鉴挑几件装饰加入方案单</div>
-              <button type="button" class="btn btn-primary" id="dhPpGoDecor">去图鉴挑装饰</button>
+              <button type="button" class="btn btn-primary" id="dhPpGoDecor">去图鉴逛逛</button>
             </div>`}
         </div>
         <aside class="dh-pp-side">

@@ -4969,3 +4969,33 @@ img.class-icon[src$=".png"] { border-radius: 3px; }
   cursor: default;
   user-select: none;
 }
+
+/* ==================== 任务书 #59 WP4：视觉密度五项（2026-09-28；纯 CSS 变量/类收口，色值零改动） ==================== */
+/* ① 容器放宽：现行 .page 无 max-width 全宽（实查 1392px@1440 / 1872px@1920 视口；.content-area padding 24px
+   已达 ≥24px 口径不动）——新值：团队管理各页 1400px 居中、家宅/公示类宽页 1600px 居中 */
+.content-area > .page { max-width: 1400px; margin-left: auto; margin-right: auto; }
+#page-lootdrop, #page-decor, #page-decor-plan { max-width: 1600px; }
+
+/* ③ 字号/行距阶梯：页标题 18px/600 → 22px/700/-0.02em（规范 v2 §3 大标题字距口径）；
+   正文行距 1.5–1.7 与全站字号不动——密度靠留白与行高压，不靠缩字号 */
+.page-title { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; }
+.page-title::before { height: 22px; }
+
+/* ③ 数据表格 td 纵向 padding 压缩 20%：.data-table 12px→9.6px、报表排名表 10px→8px（行高前后值见送审报告） */
+.data-table td { padding: 9.6px 16px; }
+#page-reports .stats-rank-table td { padding: 8px; }
+
+/* ④ 按钮三档阶梯（消灭小纽扣）：主 40px/14、次 36px/13、ghost 32px/12——CSS 变量收口；
+   存量 <32px 按钮统一提至 ghost 档热区（字号不动；清零清单与豁免项见送审报告 WP4 节） */
+:root {
+  --btn-h-primary: 40px;   --btn-fs-primary: 14px;
+  --btn-h-secondary: 36px; --btn-fs-secondary: 13px;
+  --btn-h-ghost: 32px;     --btn-fs-ghost: 12px;
+}
+.btn { min-height: var(--btn-h-secondary); }
+.btn-primary { min-height: var(--btn-h-primary); font-size: var(--btn-fs-primary); }
+/* ghost 档（置于 .btn-primary 之后层叠——btn-sm+primary 组合仍取 ghost 高度） */
+.btn-ghost, .btn-sm, .btn-xs { min-height: var(--btn-h-ghost); font-size: var(--btn-fs-ghost); }
+/* 存量 <32px 实查提档：顶栏登录钮(29) / 用户中心钮(31) / 二级导航 pill(31) / 报表范围钮(30) / 行内图标钮(30×30) */
+.ia-login-btn, .ia-uc-btn, .ia-pill, .filter-btn { min-height: var(--btn-h-ghost); }
+.icon-btn { width: var(--btn-h-ghost); height: var(--btn-h-ghost); }

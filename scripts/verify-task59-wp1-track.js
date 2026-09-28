@@ -35,7 +35,9 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   await page.click('button[data-ia-key="members"]'); // L2 members（守卫落引导卡也发）
   await sleep(3000);
 
-  const r = await fetch(`${SB_URL}/rest/v1/analytics_events?vid=eq.${VID}&select=event,page,props&order=created_at.asc`, { headers: SVC });
+  // 【任务书 #59 WP4 裁定驱动修复 2026-09-28：analytics_events 时间戳列名为 ts（sql/33 权威），
+  //   原 order=created_at.asc 撞 PostgREST 42703 返回错误对象致恒 0 行假象——列名订正，断言口径不变】
+  const r = await fetch(`${SB_URL}/rest/v1/analytics_events?vid=eq.${VID}&select=event,page,props&order=ts.asc`, { headers: SVC });
   const rows = await r.json();
   const tabRows = (Array.isArray(rows) ? rows : []).filter(x => x.event === 'tab_click');
   const pvRows = (Array.isArray(rows) ? rows : []).filter(x => x.event === 'page_view');

@@ -168,9 +168,10 @@ const cnt = {
   const nc = ['js/decorDict.js', 'js/decorData.js', 'js/app.js'].map(f => spawnSync(process.execPath, ['--check', path.join(ROOT, f)], { encoding: 'utf8' }).status);
   check('A6 node --check decorDict/decorData/app 三文件语法通过', nc.every(s => s === 0), nc.join('/'));
   // A7（#51-补丁 静态锚点）：第二节 CSS 放大 + 第三节卡片行 + 第四节词表三档 + 第六节 focus-visible
+  // 【任务书 #59 WP4 裁定驱动更新 2026-09-28：网格加密 minmax 190→210（gap 12 不变、1440 视口 ≥6 列），锚点同步滚动】
   const cssSrc = fs.readFileSync(path.join(ROOT, 'css', 'decor-public.css'), 'utf8');
-  check('A7a CSS 锚点：grid minmax(190px,1fr) + 768 档 minmax(132px,1fr)/80px + 弹窗 img 128px + .dh-cat/.dh-src 行',
-    cssSrc.includes('minmax(190px, 1fr)') && cssSrc.includes('minmax(132px, 1fr)')
+  check('A7a CSS 锚点：grid minmax(210px,1fr)（#59 WP4 加密）+ 768 档 minmax(132px,1fr)/80px + 弹窗 img 128px + .dh-cat/.dh-src 行',
+    cssSrc.includes('minmax(210px, 1fr)') && cssSrc.includes('minmax(132px, 1fr)')
     && cssSrc.includes('.dh-icon-wrap img { width: 96px; height: 96px')
     && cssSrc.includes('.dh-modal-icon img { width: 128px; height: 128px')
     && cssSrc.includes('.dh-cat {') && cssSrc.includes('.dh-src {'));

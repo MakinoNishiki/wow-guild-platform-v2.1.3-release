@@ -62,10 +62,11 @@
 
 /* ---- 网格与卡片 ---- */
 /* 任务书 #51-补丁 第二节：图标显示尺寸放大——网格 minmax 150→190、图标 img 64→96px 显示
-   （128 源图 1.33x 缩放可接受，本阶段不换图源；768 断点同步放大，换图待侦察闸 b 定夺另行指令） */
+   （128 源图 1.33x 缩放可接受，本阶段不换图源；768 断点同步放大，换图待侦察闸 b 定夺另行指令）；
+   任务书 #59 WP4：卡片网格加密 minmax 190→210（gap 12 不变），1440 视口 ≥6 列 */
 .dh-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
   gap: 12px;
 }
 .dh-card {
@@ -339,7 +340,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  max-width: 1100px;
+  max-width: 1600px; /* 任务书 #59 WP4：家宅宽页版心 1100→1600 */
   margin: 0 auto;
   padding: 24px 20px 16px;
   border-bottom: 1px solid var(--border-color);
@@ -351,18 +352,18 @@
 .dh-subtitle { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
 .dh-nav-link { text-decoration: none; flex: none; }
 
-/* 筛选栏/主区/页脚收入 1100px 版心（登录壳由 .page 容器约束，公开壳此处自补） */
+/* 筛选栏/主区/页脚收入 1600px 版心（任务书 #59 WP4：1100→1600；登录壳由 .page 容器约束，公开壳此处自补） */
 .data-decor-body .dh-filterbar {
-  width: min(1100px, calc(100% - 32px));
+  width: min(1600px, calc(100% - 32px));
   margin: 16px auto;
 }
 .data-decor-body .dh-main {
-  max-width: 1100px;
+  max-width: 1600px;
   margin: 0 auto;
   padding: 4px 20px 24px;
 }
 .dh-footer {
-  max-width: 1100px;
+  max-width: 1600px;
   margin: 0 auto;
   padding: 16px 20px 48px;
   font-size: 12px;
@@ -499,6 +500,8 @@
   line-height: 1;
   cursor: pointer;
   padding: 2px 6px;
+  min-width: 32px; /* 任务书 #59 WP4：关闭钮热区提至 ghost 档 32px（字形不动） */
+  min-height: 32px;
 }
 .dh-plan-x:hover { color: var(--text-primary); }
 .dh-plan-notice {
@@ -709,6 +712,7 @@
   font-size: 13px;
   cursor: pointer;
   padding: 6px 4px;
+  min-height: 32px; /* 任务书 #59 WP4：文字钮热区提至 ghost 档 32px */
 }
 .dh-pp-back:hover { color: var(--gold); }
 .dh-pp-back:focus-visible { outline: 2px solid var(--gold); outline-offset: 1px; }

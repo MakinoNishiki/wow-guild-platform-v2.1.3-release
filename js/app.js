@@ -5617,7 +5617,8 @@ function renderReports() {
   // 排名表格
   const tbody = document.getElementById('rankTableBody');
   if (!rankings.length) {
-    tbody.innerHTML = `<tr><td colspan="9"><div class="empty-state"><div class="empty-icon">📊</div><div class="empty-text">暂无数据</div></div></td></tr>`;
+    // 任务书 #59 WP4 空态填充：补对应入口钮（报表无数据 → 前往考勤记录；导航动作全角色可用不加 edit-only）
+    tbody.innerHTML = `<tr><td colspan="9"><div class="empty-state"><div class="empty-icon">📊</div><div class="empty-text">暂无数据</div><button class="btn" onclick="switchPage('attendance')">前往考勤记录</button></div></td></tr>`;
   } else {
     tbody.innerHTML = rankings.map((item, i) => {
       const cls = classMap[item.member.class] || '';
@@ -6276,12 +6277,14 @@ function lootRender() {
   }
   
   if (loots.length === 0) {
+    // 任务书 #59 WP4 空态填充：文案承诺的「添加装备」落成真实入口钮（viewer 由 edit-only 门控隐藏）
     tbody.innerHTML = `
       <tr>
         <td colspan="14">
           <div class="empty-state">
             <div class="empty-icon">⚔️</div>
             <div class="empty-text">暂无装备记录，点击「添加装备」开始记录</div>
+            <button class="btn btn-primary edit-only" onclick="lootShowModal()">+ 添加装备</button>
           </div>
         </td>
       </tr>
@@ -6948,12 +6951,14 @@ function wishlistRender() {
   }
 
   if (wishlist.length === 0) {
+    // 任务书 #59 WP4 空态填充：文案承诺的「添加心愿」落成真实入口钮（viewer 由 edit-only 门控隐藏）
     tbody.innerHTML = `
       <tr>
         <td colspan="10">
           <div class="empty-state">
             <div class="empty-icon">🎯</div>
             <div class="empty-text">暂无心愿记录，点击「添加心愿」开始记录</div>
+            <button class="btn btn-primary edit-only" onclick="wishlistShowModal()">+ 添加心愿</button>
           </div>
         </td>
       </tr>
