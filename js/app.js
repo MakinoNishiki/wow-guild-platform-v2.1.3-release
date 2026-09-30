@@ -13878,7 +13878,9 @@ const ANX_MAX_RANGE_MS = 92 * 24 * 3600 * 1000;
 const ANX_TAB_LABEL = {
   dashboard: '仪表盘', members: '成员管理', attendance: '考勤记录', loot: '装备分配',
   wishlist: '心愿单', reports: '统计报表', data: '数据管理', changelog: '更新日志',
-  lootdrop: '副本掉落', decor: '家宅图鉴', datacenter: '数据中心', login: '登录墙'
+  lootdrop: '副本掉落', decor: '家宅图鉴', datacenter: '数据中心', login: '登录墙',
+  // 任务书 #60 WP1：新 IA 页签四键（旧键原样保留，历史数据兼容展示）
+  home: '首页', 'team-guide': '团队引导', 'decor-plan': '方案单', community: '家宅社区'
 };
 
 function anxEsc(s) {
@@ -13920,7 +13922,13 @@ function mdRenderAnalytics(panel) {
     .map(([k, label]) => `<button class="filter-btn anx-range-btn${anxState.range === k ? ' active' : ''}" data-range="${k}" onclick="anxSetRange('${k}')">${label}</button>`).join('');
   const grainOpts = [['hour', '小时'], ['day', '天'], ['week', '周'], ['month', '月']]
     .map(([v, l]) => `<option value="${v}"${anxState.grain === v ? ' selected' : ''}>${l}</option>`).join('');
-  const pageOpts = [['all', '全部'], ['index', '主站'], ['decor', '家宅公示'], ['data', '掉落公示']]
+  // 任务书 #60 WP1：4 项旧筛（保留不动）+ 14 个单页签选项（label「主站·××」）
+  const pageOpts = [['all', '全部'], ['index', '主站'], ['decor', '家宅公示'], ['data', '掉落公示'],
+    ['index:home', '主站·首页'], ['index:team-guide', '主站·团队引导'], ['index:members', '主站·成员管理'],
+    ['index:attendance', '主站·考勤记录'], ['index:loot', '主站·装备分配'], ['index:wishlist', '主站·心愿单'],
+    ['index:reports', '主站·统计报表'], ['index:data', '主站·数据管理'], ['index:changelog', '主站·更新日志'],
+    ['index:datacenter', '主站·数据中心'], ['index:lootdrop', '主站·副本掉落'], ['index:decor', '主站·家宅图鉴'],
+    ['index:decor-plan', '主站·方案单'], ['index:community', '主站·家宅社区']]
     .map(([v, l]) => `<option value="${v}"${anxState.page === v ? ' selected' : ''}>${l}</option>`).join('');
   const custom = anxState.range === 'custom';
   panel.innerHTML = `
