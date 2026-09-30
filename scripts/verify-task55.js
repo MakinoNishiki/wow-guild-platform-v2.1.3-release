@@ -1,4 +1,7 @@
 // 任务书 #55 验证：访问统计看板（REQ-141）——WP1 数据层 + WP2 看板前端（2026-09-22 扩展）
+// 【任务书 #61-WP1 锚点适配（2026-09-30）】A2d page 正则钉 #58/#60 连字符现行口径（server.js+sql/36 同钉）；
+//   A3 版本串钉现行实查值（index .83×15 / decor .82×5 / data .82×8）；B5 登录路径钉 #59 门户化现行行为
+//   （?auth=login 唤醒浮层 → 一级 tab「团队管理」→ 二级 pill「数据中心」）。仅锚点/期望值适配，被测物零改动。
 // A 静态：sql/34 锚点、server.js 端点/限流/清理调度锚点、版本串三壳计数（WP1=.70 守恒/WP2=.71 递增，计数仍 15/6/8）、
 //         WP2 增补=tab 挂载行/renderers 注册/app.js 看板锚点/main.css .anx- 锚点/changelog 条目、node --check、安全回归
 // B 实测（自起服务器注入 ANALYTICS_ADMIN_UIDS=<测试管理员 uid>，service_role 仅用于断言与清理）：
@@ -19,8 +22,7 @@ const { chromium } = require('playwright');
 const ROOT = path.join(__dirname, '..');
 const PORT = 15655;
 const BASE = `http://127.0.0.1:${PORT}`;
-const VER = '20260919.71';
-const VER_OLD = '20260919.70';
+const VER_OLD = '20260919.70'; // #61-WP1：VER 主钉已随 A3 改为逐壳实查值，本常量仅作旧串零残留钉
 const PWD = 'T55-Anx-2026!';
 const ADMIN_EMAIL = 't55-admin@example.com';
 const USER_EMAIL = 't55-user@example.com';
@@ -163,11 +165,16 @@ function staticAsserts() {
     /const analyticsSummaryRateBuckets = new Map\(\);/.test(server) &&
     /analyticsSummaryRateLimited\(user\.id\)/.test(ep) &&
     /send\(429, \{ error: "请求过于频繁，请稍后再试" \}\)/.test(ep));
-  check('A2d body 四项校验（8KB 上限/92 天/grain 白名单/page 正则 → 400 中文）',
+  // 任务书 #61-WP1 锚点适配：page 正则钉现行连字符口径——server.js（#58-WP2-3 已放行）与 sql/36（#60 DB 对齐）同钉，
+  // 旧 [a-z]+ 形态在 server.js 钉零残留（sql/34 为历史迁移原文，其旧 regex 由 A1d 原样钉守，两处不矛盾）
+  const sql36 = fs.readFileSync(path.join(ROOT, 'sql', '36_task060_analytics_page_re.sql'), 'utf8');
+  check('A2d body 四项校验（8KB 上限/92 天/grain 白名单/page 正则 → 400 中文；正则=连字符现行口径 server.js+sql/36 同钉）',
     /const ANALYTICS_SUMMARY_MAX_BODY_BYTES = 8 \* 1024;/.test(server) &&
     /const ANALYTICS_MAX_RANGE_MS = 92 \* 24 \* 60 \* 60 \* 1000;/.test(server) &&
     /const ANALYTICS_GRAINS = \["hour", "day", "week", "month"\];/.test(server) &&
-    /const ANALYTICS_PAGE_RE = \/\^\(all\|index\|decor\|data\|index:\[a-z\]\+\)\$\//.test(server) &&
+    /const ANALYTICS_PAGE_RE = \/\^\(all\|index\|decor\|data\|index:\[a-z-\]\+\)\$\//.test(server) &&
+    !/index:\[a-z\]\+/.test(server) &&
+    /p_page !~ '\^\(all\|index\|decor\|data\|index:\[a-z-\]\+\)\$'/.test(sql36) &&
     /时间范围不能超过 92 天/.test(ep) && /页面筛选参数无效/.test(ep));
   check('A2e RPC 透传 + 失败 502 不泄露内部细节（console.error + 固定中文）',
     ep.includes('"/rest/v1/rpc/analytics_overview"') &&
@@ -184,13 +191,16 @@ function staticAsserts() {
     /\.unref\(\)/.test(server) && /scheduleAnalyticsPurge\(\);/.test(server) &&
     server.indexOf('scheduleAnalyticsPurge();') > server.indexOf('function startServer()'));
 
-  // A3 版本串递增（WP2 前端资产改动：.71 三壳计数仍 index×15/decor×6/data×8——本次无新增引用行；旧串零残留）
+  // A3 版本串（任务书 #61-WP1 锚点适配：钉现行实查值——index 经 #56~#60 递增至 .83×15；
+  // decor/data 自 #60 起不随 index 追平（裁定见 #60 报告 §3.4：规约对象=index.html 及被其引用资源），维持 .82×5/×8）
   const countStr = (s, v) => (s.match(new RegExp(v.replace(/\./g, '\\.'), 'g')) || []).length;
-  check(`A3 版本串 ${VER} 三壳计数（index×15/decor×6/data×8，无新增引用行）+ 旧串 ${VER_OLD} 零残留 + 无异版本串`,
-    countStr(index, VER) === 15 && countStr(decor, VER) === 6 && countStr(data, VER) === 8 &&
+  const VER_IDX = '20260923.83', VER_SHELL = '20260923.82';
+  check(`A3 版本串三壳实查（index ${VER_IDX}×15 / decor ${VER_SHELL}×5 / data ${VER_SHELL}×8）+ 旧串 ${VER_OLD} 零残留 + 各壳无异版本串`,
+    countStr(index, VER_IDX) === 15 && countStr(decor, VER_SHELL) === 5 && countStr(data, VER_SHELL) === 8 &&
     countStr(index, VER_OLD) === 0 && countStr(decor, VER_OLD) === 0 && countStr(data, VER_OLD) === 0 &&
-    [index, decor, data].every(s => !(new RegExp('\\?v=(?!' + VER.replace(/\./g, '\\.') + ')\\d')).test(s)),
-    `实际=${countStr(index, VER)}/${countStr(decor, VER)}/${countStr(data, VER)} 旧串=${countStr(index, VER_OLD)}/${countStr(decor, VER_OLD)}/${countStr(data, VER_OLD)}`);
+    !(new RegExp('\\?v=(?!' + VER_IDX.replace(/\./g, '\\.') + ')\\d')).test(index) &&
+    [decor, data].every(s => !(new RegExp('\\?v=(?!' + VER_SHELL.replace(/\./g, '\\.') + ')\\d')).test(s)),
+    `实际=${countStr(index, VER_IDX)}/${countStr(decor, VER_SHELL)}/${countStr(data, VER_SHELL)} 旧串=${countStr(index, VER_OLD)}/${countStr(decor, VER_OLD)}/${countStr(data, VER_OLD)}`);
 
   // A5 WP2 看板前端锚点
   const app = fs.readFileSync(path.join(ROOT, 'js', 'app.js'), 'utf8');
@@ -425,12 +435,19 @@ async function loginAndGoAnalytics(browser, email) {
   pg.on('console', m => { if (m.type() === 'error') errs.push('console: ' + m.text()); });
   pg.on('response', r => { if (r.status() >= 400) badNet.push(`http${r.status()} ${r.request().method()} ${r.url()}`); });
   pg.on('request', r => { if (r.url().includes('/api/analytics/summary')) summaryReqs.push(r.postData()); });
-  await pg.goto(`${BASE}/`, { waitUntil: 'load' });
+  // 任务书 #61-WP1 锚点适配：#59 门户化后现行登录路径 = ?auth=login 唤醒浮层 → 一级 tab「团队管理」→
+  // 二级 pill「数据中心」（超管门禁 pill 与 #navDatacenter 同源，经 app 自有 updateCloudUI 重跑门禁）
+  await pg.goto(`${BASE}/?auth=login`, { waitUntil: 'load' });
+  await pg.waitForSelector('#authEmail', { state: 'visible', timeout: 15000 });
   await pg.fill('#authEmail', email);
   await pg.fill('#authPassword', PWD);
   await pg.click('#authLoginBtn');
-  await pg.waitForSelector('.nav-item[data-page="datacenter"]', { state: 'visible', timeout: 30000 });
-  await pg.click('.nav-item[data-page="datacenter"]');
+  await pg.waitForSelector('.ia-tab[data-ia-tab="team"]', { state: 'visible', timeout: 30000 });
+  await pg.waitForFunction(() => !!(window.MasterData && MasterData.isSuperadmin && MasterData.isSuperadmin()), { timeout: 30000 });
+  await pg.evaluate(() => updateCloudUI());
+  await pg.click('.ia-tab[data-ia-tab="team"]');
+  await pg.waitForSelector('#iaPillDatacenter', { state: 'visible', timeout: 15000 });
+  await pg.click('#iaPillDatacenter');
   await pg.click('.view-tab[data-mdtab="analytics"]');
   return { ctx, pg, errs, badNet, summaryReqs };
 }

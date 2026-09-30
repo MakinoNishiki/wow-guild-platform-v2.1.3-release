@@ -80,9 +80,11 @@ check(`A5c data.html 本批未触碰维持 ${VER_OLD} ×8`, countStr(dat, VER_OL
   `.82=${countStr(dat, VER_OLD)} .83=${countStr(dat, VER)}`);
 
 // ---------- A6 冻结项 ----------
+// 任务书 #61-WP1 连带适配：原白名单正钉（diff 恰为 #60 三文件）在送审制/后续批下恒红，改反钉——
+// 本批冻结项 track.js/server.js 不在 diff（守卫目的不变：采集层与服务端零触碰）
 const diff = spawnSync('git', ['-c', 'core.quotepath=false', 'diff', '--name-only'], { cwd: ROOT, encoding: 'utf8' }).stdout.trim().split('\n').filter(Boolean).sort();
-check('A6 git diff 仅 index.html + js/app.js + docs/问题与需求清单.md 台账补记（track.js/server.js 零触碰）',
-  diff.length === 3 && diff.includes('index.html') && diff.includes('js/app.js') && diff.includes('docs/问题与需求清单.md'), diff.join(','));
+check('A6 冻结项反钉：track.js / server.js 零触碰（不在 git diff）',
+  !diff.includes('js/track.js') && !diff.includes('server.js'), diff.join(','));
 
 // ---------- A7 node --check ----------
 const nc = spawnSync('node', ['--check', 'js/app.js'], { cwd: ROOT, encoding: 'utf8' });

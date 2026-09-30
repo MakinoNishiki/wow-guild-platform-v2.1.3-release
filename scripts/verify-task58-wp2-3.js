@@ -1,4 +1,7 @@
 // 任务书 #58-WP2-3 验证：埋点白名单扩至 14 + TRACK_PAGE_RE 连字符修复 + 文档回写
+// 【任务书 #61-WP1 锚点适配（2026-09-30）】A1/A4 事件清单 14→15（#59-WP1 tab_click 在案）；A6 版本串钉现行实查值
+//   （index .83×15 / decor .82×5，decor 经 #59-WP3 壳化 6→5 且 #60 起不随 index 追平）；A7 排他白名单改 #58 全链
+//   冻结文件反向钉（送审制下 diff 恒有后续批文件，白名单锚点恒红失效）。仅锚点/期望值适配，被测物零改动。
 // A 静态：TRACK_EVENTS 14 事件逐一核对 / TRACK_PAGE_RE 新口径 / 前端三挂点名核对 /
 //   开发规范第七章事件表 14 行+regex 口径注记 / REQ-137 台账补记 / 版本串 / 红线零改动 / node --check / server-security 回归。
 // B 实测（起 server 直 POST /api/track，service key 复核 analytics_events）：
@@ -13,13 +16,14 @@ const { spawn, spawnSync } = require('child_process');
 const ROOT = path.join(__dirname, '..');
 const PORT = 15664;
 const BASE = `http://127.0.0.1:${PORT}`;
-const VER = '20260923.77';
-const VER_PREV = '20260923.76';
+const VER_PREV = '20260923.76'; // #61-WP1：VER 主钉已随 A6 改为逐壳实查值（index .83/decor .82），本常量仅作旧串零残留钉
 const VID = 'verify-t58wp23-' + Date.now().toString(36);
 
-const EVENTS_14 = ['page_view', 'user_register', 'guild_create', 'guild_join', 'attendance_save', 'loot_assign', 'wishlist_add', 'smart_import',
+// 任务书 #61-WP1 锚点适配：#59-WP1 新增第 15 事件 tab_click（server.js 与规范事件表已在案），清单 14→15
+const EVENTS_15 = ['page_view', 'user_register', 'guild_create', 'guild_join', 'attendance_save', 'loot_assign', 'wishlist_add', 'smart_import',
   'decor_plan_add', 'decor_plan_save', 'decor_plan_export_text',
-  'decor_plan_create', 'decor_plan_switch', 'decor_plan_export_image'];
+  'decor_plan_create', 'decor_plan_switch', 'decor_plan_export_image',
+  'tab_click'];
 
 const env = {};
 for (const line of fs.readFileSync(path.join(ROOT, '.env'), 'utf8').split(/\r?\n/)) {
@@ -89,9 +93,10 @@ function staticAsserts() {
 
   const mEvt = srv.match(/const TRACK_EVENTS = \[([\s\S]*?)\];/);
   const listed = mEvt ? (mEvt[1].match(/"([a-z_]+)"/g) || []).map(s => s.slice(1, -1)) : [];
-  check('A1 server.js TRACK_EVENTS = 14 事件（含 WP2-3 新增三事件，顺序逐一核对）',
-    JSON.stringify(listed) === JSON.stringify(EVENTS_14),
-    `库内=${listed.length} 缺=${EVENTS_14.filter(e => !listed.includes(e)).join(',') || '无'}`);
+  // 任务书 #61-WP1 锚点适配：14→15 事件（#59-WP1 tab_click 落库在案，B 段实测全绿佐证采集/入库链路无回归）
+  check('A1 server.js TRACK_EVENTS = 15 事件（WP2-3 三事件 + #59-WP1 tab_click，顺序逐一核对）',
+    JSON.stringify(listed) === JSON.stringify(EVENTS_15),
+    `库内=${listed.length} 缺=${EVENTS_15.filter(e => !listed.includes(e)).join(',') || '无'}`);
   check('A2 TRACK_PAGE_RE 放行连字符（index:[a-z-]+，修复 index:decor-plan PV 吞没）+ 看板 ANALYTICS_PAGE_RE 同口径',
     /const TRACK_PAGE_RE = \/\^\(decor\|data\|index:\[a-z-\]\+\)\$\//.test(srv) &&
     /const ANALYTICS_PAGE_RE = \/\^\(all\|index\|decor\|data\|index:\[a-z-\]\+\)\$\//.test(srv));
@@ -100,8 +105,9 @@ function staticAsserts() {
     /WBTrack\.event\('decor_plan_switch', \{ plan_count: plan\.plans\.length \}\)/.test(dd) &&
     (dd.match(/WBTrack\.event\('decor_plan_export_image', \{ skin: exportSkin \}\)/g) || []).length === 2);
   const tableRows = (spec.match(/^\| [a-z_]+ \|/gm) || []).map(l => l.slice(2, l.indexOf(' |', 2)));
-  check('A4 开发规范第七章事件表 14 行与白名单一一对应 + regex 口径注记在场',
-    JSON.stringify(tableRows) === JSON.stringify(EVENTS_14) &&
+  // 任务书 #61-WP1 锚点适配：规范第七章事件表现 15 行（tab_click 行在案），与白名单一一对应
+  check('A4 开发规范第七章事件表 15 行与白名单一一对应 + regex 口径注记在场',
+    JSON.stringify(tableRows) === JSON.stringify(EVENTS_15) &&
     /decor_plan_create \| 新建方案成功/.test(spec) &&
     /decor_plan_switch \| 方案下拉切换成功/.test(spec) && /\{plan_count: 方案总数\}/.test(spec) &&
     /decor_plan_export_image \| 导出图片动作一次/.test(spec) && /\{skin: 'gold'\/'alliance'\/'horde'\}/.test(spec) &&
@@ -111,15 +117,19 @@ function staticAsserts() {
     /#58-WP2 三工作包已实现待验收/.test(ledger) && /WP2-3 埋点白名单扩至 14 事件/.test(ledger) &&
     !/WP2 形态B\/批量管理\/多方案\/图片模式未启动/.test(ledger));
   const countStr = (s, v) => (s.match(new RegExp(v.replace(/\./g, '\\.'), 'g')) || []).length;
-  check(`A6 版本串 ${VER}（index×15/decor×6）+ 旧串（${VER_PREV}）零残留`,
-    countStr(index, VER) === 15 && countStr(decor, VER) === 6 &&
+  // 任务书 #61-WP1 锚点适配：钉现行实查值——index 经 #59/#60 递增至 20260923.83×15；
+  // decor 维持 20260923.82×5（#59-WP3 重定向壳化后引用行 6→5；#60 裁定不随 index 追平，见 #60 报告 §3.4）
+  check(`A6 版本串实查（index 20260923.83×15 / decor 20260923.82×5）+ 旧串（${VER_PREV}）零残留`,
+    countStr(index, '20260923.83') === 15 && countStr(decor, '20260923.82') === 5 &&
     countStr(index, VER_PREV) === 0 && countStr(decor, VER_PREV) === 0);
   const porcelain = spawnSync('git', ['-c', 'core.quotepath=false', 'status', '--porcelain'], { cwd: ROOT, encoding: 'utf8' }).stdout.split('\n').filter(Boolean);
-  const allowed = new Set(['server.js', 'index.html', 'decor.html', 'docs/开发规范.md', 'docs/问题与需求清单.md',
-    'scripts/verify-task58-wp2-3.js', 'docs/TASK-058-WP2-3-修改报告.md']);
   const touched = porcelain.map(l => l.slice(3).replace(/"/g, ''));
-  check('A7 红线零越界：改动仅限本 WP 白名单（track.js/app.js/decorData.js/cloud.js/css/sql/data.html 零触碰）',
-    touched.length > 0 && touched.every(f => allowed.has(f)),
+  // 任务书 #61-WP1 锚点适配：排他白名单锚点在送审制下恒红（任何后续批未提交文件即破），
+  // 改钉本脚本守卫目的本身——#58 全链冻结文件反向钉（app.js/data.html/sql 已经 #60/#61 合法改动，出列；
+  // server.js 的 TRACK 段口径由 A1/A2 锚点接管守卫）
+  const frozen = ['js/track.js', 'js/decorData.js', 'js/cloud.js', 'css/'];
+  check('A7 红线零越界：#58 全链冻结文件零触碰（track.js/decorData.js/cloud.js/css 不在 diff）',
+    touched.every(f => !frozen.some(z => f === z || f.startsWith(z))),
     `diff 清单=${touched.join(',')}`);
   for (const f of ['server.js', 'scripts/verify-task58-wp2-3.js']) {
     const r = spawnSync(process.execPath, ['--check', f], { cwd: ROOT, encoding: 'utf8' });
