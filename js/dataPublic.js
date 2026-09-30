@@ -841,6 +841,52 @@
     return out;
   }
 
+  // REQ-151（任务书 #62 §6）：筛选平铺态按「实例 → BOSS」两级分组——复用浏览态 dp-raid/dp-boss 结构与
+  // 折叠记忆（collapse id 同源：boss:/raid:/dungeon:/pool:），空组不渲染；遍历顺序与 flatOrderedItems
+  // 完全一致（团本→秘境→BOSS 内序），命中计数口径不变。与「按 BOSS 三级浏览」并存：浏览态不变，
+  // 筛选态由平铺堆叠改为同构分组（最小侵入：零新组件零新类名，分组头/折叠/计数全复用）。
+  function flatGroupHtml() {
+    const parts = [];
+    state.raids.filter(r => r.season_id === state.seasonId && r.type !== 'world')
+      .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0))
+      .forEach(raid => {
+        let raidCount = 0;
+        const bossHtml = state.bosses.filter(b => b.raid_id === raid.id).sort((a, b) => (a.boss_order || 0) - (b.boss_order || 0))
+          .map(boss => {
+            const items = state.loot.filter(l => l.boss_id === boss.id && matchItem(l));
+            if (!items.length) return '';
+            raidCount += items.length;
+            return bossBlockHtml('boss:' + boss.id, `${boss.boss_order}号 · ${esc(boss.name)}`, items);
+          }).join('');
+        if (!bossHtml) return;
+        const rid = 'raid:' + raid.id;
+        parts.push(`<div class="dp-raid${getCollapsed().has(rid) ? ' collapsed' : ''}">
+          <div class="dp-raid-name" data-collapse="${esc(rid)}">${CARET_BTN}${esc(raid.name)}${raid.type === 'lair' ? '<span class="dp-badge dp-badge-lair">巢穴</span>' : ''}<span class="dp-count">${raidCount}</span></div>
+          <div class="dp-raid-body">${bossHtml}</div>
+        </div>`);
+      });
+    state.dungeons.filter(d => d.season_id === state.seasonId)
+      .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0))
+      .forEach(d => {
+        const all = state.dungeonLoot.filter(l => l.instance_id === d.id && matchItem(l));
+        if (!all.length) return;
+        const groups = state.bosses.filter(b => b.dungeon_id === d.id).sort((a, b) => (a.boss_order || 0) - (b.boss_order || 0))
+          .map(boss => {
+            const items = all.filter(l => l.boss_id === boss.id);
+            if (!items.length) return '';
+            return bossBlockHtml('boss:' + boss.id, `${boss.boss_order}号 · ${esc(boss.name)}`, items);
+          });
+        const poolItems = all.filter(l => !l.boss_id);
+        if (poolItems.length) groups.push(bossBlockHtml('pool:' + d.id, '整体池', poolItems));
+        const did = 'dungeon:' + d.id;
+        parts.push(`<div class="dp-raid${getCollapsed().has(did) ? ' collapsed' : ''}">
+          <div class="dp-raid-name" data-collapse="${esc(did)}">${CARET_BTN}${esc(d.name)}${d.is_new ? '<span class="dp-badge dp-badge-new">新本</span>' : ''}<span class="dp-count">${all.length}</span></div>
+          <div class="dp-raid-body">${groups.join('')}</div>
+        </div>`);
+      });
+    return parts.join('');
+  }
+
   function render(enterAnim) {
     // 一级区块级折叠（团本/大秘境两大区块，默认展开，sessionStorage 记忆）
     const collapsed = getCollapsed();
@@ -862,13 +908,13 @@
     // 任务书 #43（REQ-098）：命中计数恒显——浏览态「共 N 件」/ 筛选态「命中 X 件 · N 项生效」（两态同行首行内）
     const flatHead = $('dpFlatHead');
     if (flat) {
-      // 平铺态：命中卡片直接铺满网格；0 命中空态 + 重置引导；
+      // 平铺态：命中卡片按「实例 → BOSS」两级分组铺满（REQ-151，任务书 #62 §6）；0 命中空态 + 重置引导；
       // 来源（含实例级）退化为纯过滤（matchItem 已收口，不触发折叠/分组）
       const items = flatOrderedItems();
       flatHead.innerHTML = `命中 <span class="dp-count">${items.length}</span> 件 · ${activeFilterCount()} 项生效`;
       main.innerHTML = `<section class="dp-section">
         ${items.length
-          ? `<div class="dp-items">${items.map(itemCard).join('')}</div>`
+          ? flatGroupHtml()
           : `<div class="dp-empty">无符合条件装备<div class="dp-empty-actions"><button type="button" class="btn btn-secondary" id="dpEmptyReset">重置筛选</button></div></div>`}
       </section>` + tiersSection;
       const emptyReset = $('dpEmptyReset');

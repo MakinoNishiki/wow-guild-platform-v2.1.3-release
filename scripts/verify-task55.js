@@ -194,7 +194,7 @@ function staticAsserts() {
   // A3 版本串（任务书 #61-WP1 锚点适配：钉现行实查值——index 经 #56~#60 递增至 .83×15；
   // decor/data 自 #60 起不随 index 追平（裁定见 #60 报告 §3.4：规约对象=index.html 及被其引用资源），维持 .82×5/×8）
   const countStr = (s, v) => (s.match(new RegExp(v.replace(/\./g, '\\.'), 'g')) || []).length;
-  const VER_IDX = '20260923.83', VER_SHELL = '20260923.82';
+  const VER_IDX = '20260923.84', VER_SHELL = '20260923.84'; // 任务书 #62：三壳同 .84（main.css 共享 + dataPublic.js 变更）
   check(`A3 版本串三壳实查（index ${VER_IDX}×15 / decor ${VER_SHELL}×5 / data ${VER_SHELL}×8）+ 旧串 ${VER_OLD} 零残留 + 各壳无异版本串`,
     countStr(index, VER_IDX) === 15 && countStr(decor, VER_SHELL) === 5 && countStr(data, VER_SHELL) === 8 &&
     countStr(index, VER_OLD) === 0 && countStr(decor, VER_OLD) === 0 && countStr(data, VER_OLD) === 0 &&

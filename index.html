@@ -4,13 +4,13 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>魔兽管家</title>
-<!-- 静态资源版本号：20260923.83（任务书 #22 WP3-②：凡改动 js/css 的 commit 必须同步递增此处与所有 ?v= 查询串，见 docs/开发规范.md 第五章） -->
+<!-- 静态资源版本号：20260923.84（任务书 #22 WP3-②：凡改动 js/css 的 commit 必须同步递增此处与所有 ?v= 查询串，见 docs/开发规范.md 第五章） -->
 <link rel="icon" type="image/png" sizes="32x32" href="assets/brand/favicon-32.png">
 <link rel="icon" type="image/png" sizes="16x16" href="assets/brand/favicon-16.png">
-<link rel="stylesheet" href="css/main.css?v=20260923.83">
-<link rel="stylesheet" href="css/data-public.css?v=20260923.83"><!-- 任务书 #28 WP5：副本掉落 tab（选择器全 .dp- 前缀 + #page-lootdrop 作用域，零泄漏） -->
-<link rel="stylesheet" href="css/decor-public.css?v=20260923.83"><!-- 任务书 #51：家宅图鉴（选择器全 .dh- 前缀，零泄漏，双壳共用） -->
-<script src="assets/vendor/supabase-js-2.js?v=20260923.83"></script>
+<link rel="stylesheet" href="css/main.css?v=20260923.84">
+<link rel="stylesheet" href="css/data-public.css?v=20260923.84"><!-- 任务书 #28 WP5：副本掉落 tab（选择器全 .dp- 前缀 + #page-lootdrop 作用域，零泄漏） -->
+<link rel="stylesheet" href="css/decor-public.css?v=20260923.84"><!-- 任务书 #51：家宅图鉴（选择器全 .dh- 前缀，零泄漏，双壳共用） -->
+<script src="assets/vendor/supabase-js-2.js?v=20260923.84"></script>
 </head>
 <body>
 
@@ -192,8 +192,10 @@
     </div>
     <!-- 任务书 #59 WP1：门户化 IA——一级 tab 栏 + 二级导航（侧边栏纵导航退役，CSS 隐藏保留 DOM） -->
     <div class="ia-topbar" id="iaTopbar">
-      <div class="ia-brand"><img src="assets/brand/logo_B_64.png" alt="魔兽管家" class="ia-brand-logo"><span class="ia-brand-name">魔兽管家</span><span class="ia-brand-sub">WoW Butler</span></div>
+      <!-- 任务书 #62 §1（BUG-109）：品牌区整体可点回 #/home（走 iaSwitchTab('home') 既有通道，埋点单次） -->
+      <div class="ia-brand" onclick="iaSwitchTab('home')" title="返回首页"><img src="assets/brand/logo_B_64.png" alt="魔兽管家" class="ia-brand-logo"><span class="ia-brand-name">魔兽管家</span><span class="ia-brand-sub">WoW Butler</span></div>
       <nav class="ia-tabs" aria-label="一级导航">
+        <button type="button" class="ia-tab" data-ia-tab="home" onclick="iaSwitchTab('home')">首页</button>
         <button type="button" class="ia-tab" data-ia-tab="team" onclick="iaSwitchTab('team')">团队管理</button>
         <button type="button" class="ia-tab" data-ia-tab="house" onclick="iaSwitchTab('house')">家宅房屋</button>
       </nav>
@@ -492,11 +494,9 @@
           <div class="toolbar">
             <div class="toolbar-left">
               <input type="text" class="search-input" placeholder="搜索装备名称..." id="lootSearch" oninput="lootRender()">
+              <!-- 任务书 #62 §2（BUG-106）：团本筛选选项改 lootRender 动态构建（MasterData 主数据 + 记录内自定义名），选项随字典刷新 -->
               <select class="loot-filter-select" id="lootRaidFilter" onchange="lootRender()">
                 <option value="">全部团本</option>
-                <option value="虚影尖塔">虚影尖塔</option>
-                <option value="梦境裂隙">梦境裂隙</option>
-                <option value="进军奎尔丹纳斯">进军奎尔丹纳斯</option>
               </select>
               <select class="loot-filter-select" id="lootDifficultyFilter" onchange="lootRender()">
                 <option value="">全部难度</option>
@@ -525,6 +525,11 @@
                 <option value="P2">P2</option>
                 <option value="P3">P3</option>
               </select>
+              <!-- 任务书 #62 §4（REQ-147）：按成员筛选（下拉 id 化）+ 成员搜索（名字模糊） -->
+              <select class="loot-filter-select" id="lootMemberFilter" onchange="lootRender()">
+                <option value="">全部成员</option>
+              </select>
+              <input type="text" class="search-input" placeholder="搜索成员..." id="lootMemberSearch" oninput="lootRender()">
             </div>
             <div class="toolbar-right">
               <button class="btn btn-primary edit-only" onclick="lootShowModal()">+ 添加装备</button>
@@ -2154,21 +2159,21 @@
   </div>
 </div>
 
-<script src="js/cloud.js?v=20260923.83"></script>
+<script src="js/cloud.js?v=20260923.84"></script>
 <!-- 任务书 #14：主数据层（快照兜底 + 加载层），须在 app.js 之前 -->
-<script src="js/masterDataSnapshot.js?v=20260923.83"></script>
-<script src="js/masterData.js?v=20260923.83"></script>
+<script src="js/masterDataSnapshot.js?v=20260923.84"></script>
+<script src="js/masterData.js?v=20260923.84"></script>
 <!-- 任务书 #22 WP2：职业/专精/职责图标集中映射（全站唯一取图处） -->
-<script src="js/iconMap.js?v=20260923.83"></script>
+<script src="js/iconMap.js?v=20260923.84"></script>
 <!-- 任务书 #31（REQ-097）：装备分类词表单一真源（公示页 chips / picker 过滤 / BUG-057 回填三处消费，须在 dataPublic.js 与 app.js 之前） -->
-<script src="js/lootTaxonomy.js?v=20260923.83"></script>
+<script src="js/lootTaxonomy.js?v=20260923.84"></script>
 <!-- 任务书 #28 WP5：副本掉落渲染层（双壳同源；无 data-public-body 不自动启动，由 app.js 懒挂载，须在 app.js 之前） -->
-<script src="js/dataPublic.js?v=20260923.83"></script>
+<script src="js/dataPublic.js?v=20260923.84"></script>
 <!-- 任务书 #51（REQ-137 一期）：家宅图鉴词表单一真源（价格/分类/尺寸/来源词表，须在 decorData.js 之前） -->
-<script src="js/decorDict.js?v=20260923.83"></script>
+<script src="js/decorDict.js?v=20260923.84"></script>
 <!-- 任务书 #51：家宅图鉴数据层+渲染层（双壳同源；无 data-decor-body 不自动启动，由 app.js 懒挂载，须在 app.js 之前） -->
-<script src="js/decorData.js?v=20260923.83"></script>
-<script src="js/app.js?v=20260923.83"></script>
-<script src="js/track.js?v=20260923.83"></script><!-- 任务书 #54 WP1：全站埋点采集层（REQ-141，零依赖静默兜底） -->
+<script src="js/decorData.js?v=20260923.84"></script>
+<script src="js/app.js?v=20260923.84"></script>
+<script src="js/track.js?v=20260923.84"></script><!-- 任务书 #54 WP1：全站埋点采集层（REQ-141，零依赖静默兜底） -->
 </body>
 </html>

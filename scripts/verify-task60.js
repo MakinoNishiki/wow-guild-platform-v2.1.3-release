@@ -12,8 +12,8 @@ const path = require('path');
 const { spawnSync } = require('child_process');
 
 const ROOT = path.join(__dirname, '..');
-const VER = '20260923.83';
-const VER_OLD = '20260923.82';
+const VER = '20260923.84'; // 任务书 #62：三壳同 .84（main.css 共享 + dataPublic.js 变更，两壳随批递增）
+const VER_OLD = '20260923.83';
 
 let pass = 0, fail = 0;
 function check(name, ok, detail) {
@@ -74,10 +74,10 @@ check('A4b ANX_TAB_LABEL 补 home/team-guide/decor-plan/community 四键', missN
 const idx = read('index.html'), dec = read('decor.html'), dat = read('data.html');
 check(`A5a index.html 版本串 ${VER} ×15 且旧串零残留`, countStr(idx, VER) === 15 && countStr(idx, VER_OLD) === 0,
   `.83=${countStr(idx, VER)} .82=${countStr(idx, VER_OLD)}`);
-check(`A5b decor.html 本批未触碰维持 ${VER_OLD} ×5`, countStr(dec, VER_OLD) === 5 && countStr(dec, VER) === 0,
-  `.82=${countStr(dec, VER_OLD)} .83=${countStr(dec, VER)}`);
-check(`A5c data.html 本批未触碰维持 ${VER_OLD} ×8`, countStr(dat, VER_OLD) === 8 && countStr(dat, VER) === 0,
-  `.82=${countStr(dat, VER_OLD)} .83=${countStr(dat, VER)}`);
+check(`A5b decor.html 版本串 ${VER} ×5（#62 起三壳同串）且旧串零残留`, countStr(dec, VER) === 5 && countStr(dec, VER_OLD) === 0,
+  `.84=${countStr(dec, VER)} .83=${countStr(dec, VER_OLD)}`);
+check(`A5c data.html 版本串 ${VER} ×8（#62 起三壳同串）且旧串零残留`, countStr(dat, VER) === 8 && countStr(dat, VER_OLD) === 0,
+  `.84=${countStr(dat, VER)} .83=${countStr(dat, VER_OLD)}`);
 
 // ---------- A6 冻结项 ----------
 // 任务书 #61-WP1 连带适配：原白名单正钉（diff 恰为 #60 三文件）在送审制/后续批下恒红，改反钉——

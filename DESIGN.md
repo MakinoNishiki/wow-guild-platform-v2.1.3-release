@@ -109,3 +109,11 @@
 - `.content-area > .page` max-width 1400px 居中；`#page-lootdrop` / `#page-decor` / `#page-decor-plan` 1600px（家宅/公示类宽页）
 - `.page-title` 22px/700/-0.02em；`.data-table td` 纵向 padding 12→9.6px（-20%）、`#page-reports .stats-rank-table td` 10→8px
 - `.dh-grid` minmax 190→210 / `.dp-items` minmax 240→210、gap 10→12；dp/dh 版心 1100→1600
+
+## 任务书 #62 登记（反馈快赢批，2026-09-30）
+
+### 既有类行为变更（不改旧规则，main.css 末尾 #62 节覆盖）
+- `.ia-brand` —— 品牌区可点击回 `#/home`（BUG-109：cursor:pointer + hover 时 `.ia-brand-name` 金色高亮，色取 `--gold-light` 既有变量）
+
+### 新增类
+- `.loot-item-icon` —— 装备分配/心愿单列表装备名前置 20px 小图标（REQ-150；#46 掉落卡片同族口径：空值不渲染、404 onerror 隐藏不占位、lazy 加载；装备分配与心愿单两列表共用此类）

@@ -4999,3 +4999,10 @@ img.class-icon[src$=".png"] { border-radius: 3px; }
 /* 存量 <32px 实查提档：顶栏登录钮(29) / 用户中心钮(31) / 二级导航 pill(31) / 报表范围钮(30) / 行内图标钮(30×30) */
 .ia-login-btn, .ia-uc-btn, .ia-pill, .filter-btn { min-height: var(--btn-h-ghost); }
 .icon-btn { width: var(--btn-h-ghost); height: var(--btn-h-ghost); }
+
+/* ==================== 任务书 #62：反馈快赢批（2026-09-30；纯 CSS 变量，深色主题，零新色值） ==================== */
+/* §1（BUG-109）：品牌区可点回首页——pointer + hover 金色高亮（取既有金色变量） */
+.ia-brand { cursor: pointer; }
+.ia-brand:hover .ia-brand-name { color: var(--gold-light); }
+/* §5（REQ-150）：装备分配/心愿单列表装备名前置小图标（#46 掉落卡片同族：空值不渲染、404 onerror 隐藏不占位） */
+.loot-item-icon { width: 20px; height: 20px; vertical-align: -4px; margin-right: 6px; border-radius: 4px; }

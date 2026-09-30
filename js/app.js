@@ -2635,7 +2635,9 @@ function iaRenderTeamGuide() {
 
 // IA 导航态绘制：一级 tab active / 二级导航显隐 / pill active / QQ 悬浮钮（仅导航页）
 function iaPaintRoute(page, tab, activeKey) {
-  document.querySelectorAll('.ia-tab').forEach(t => t.classList.toggle('active', t.dataset.iaTab === tab));
+  // 任务书 #62 §1（BUG-109）：# 首页门户态（tab=null）高亮「首页」tab；无公会态 tab=null 其余逻辑不变
+  const effTab = page === 'home' ? 'home' : tab;
+  document.querySelectorAll('.ia-tab').forEach(t => t.classList.toggle('active', t.dataset.iaTab === effTab));
   const subTeam = document.getElementById('iaSubnavTeam');
   const subHouse = document.getElementById('iaSubnavHouse');
   if (subTeam) subTeam.style.display = tab === 'team' ? '' : 'none';
@@ -2729,7 +2731,9 @@ window.addEventListener('hashchange', () => {
 // 一级 tab 点击（埋点 level:1；导航内联不转调 iaGoKey，避免一次点击双事件）
 function iaSwitchTab(tab) {
   if (window.WBTrack) WBTrack.event('tab_click', { level: 1, key: tab });
-  if (tab === 'house') {
+  if (tab === 'home') {
+    iaSetHash('#/home'); // 任务书 #62 §1（BUG-109）：首页 tab / 品牌区回门户
+  } else if (tab === 'house') {
     iaSetHash('#/house/decor');
   } else if (iaHasGuild()) {
     iaSetHash('#/team/dashboard');
@@ -3017,22 +3021,12 @@ function getAttendanceStatsCore(activities, matchFn) {
   return { present, absent, late, sub, leave, total, rate };
 }
 
+// 任务书 #27 WP2：已删除成员的考勤记录保留——考勤详情按 member_name 快照灰显「已删除」展示不篡改；
+// BUG-107 补丁（任务书 #62 终审裁定）起各统计排行同口径剔除已删除成员，原伪行聚合函数随裁定移除
 function getAttendanceStats(memberId, activities) {
   return getAttendanceStatsCore(activities, a => a.member_id === memberId);
 }
 
-// 任务书 #27 WP2：已删除成员的考勤仍计入历史出勤率（统计口径硬指标）——
-// member_id 为空的考勤行按 member_name 快照聚合成伪成员，报表中灰色「已删除」展示
-function getDeletedMemberStats(activities) {
-  const names = new Set();
-  (activities || []).forEach(act => (act.attendees || []).forEach(a => {
-    if (!a.member_id && a.member_name) names.add(a.member_name);
-  }));
-  return [...names].map(name => ({
-    member: { id: 'deleted:' + name, name, class: '', deleted: true },
-    ...getAttendanceStatsCore(activities, a => !a.member_id && a.member_name === name),
-  }));
-}
 
 function calculateAvgAttendanceRate(activities) {
   // BUG-014：与成员级口径同源 = 全成员（非离队）出勤率的平均
@@ -3059,15 +3053,14 @@ function renderRankList(containerId, limit, activities) {
 
 // BUG-014：活动集由调用方显式传入（仪表盘 Top5 传全量；统计报表传用户自选范围），
 // 不再隐式依赖报表页的 reportRange，算法统一走 getAttendanceStats。
-function getAttendanceRankings(activities, includeDeleted) {
+// BUG-107 补丁（任务书 #62 终审裁定）：已删除成员不再聚合成伪行——各排行统一只含在册（非离队）成员
+function getAttendanceRankings(activities) {
   const members = appData.members.filter(m => m.status !== '离队');
 
   const rows = members.map(member => {
     const stats = getAttendanceStats(member.id, activities);
     return { member, ...stats };
   });
-  // 任务书 #27 WP2：报表口径含已删除成员伪行（仪表盘 Top5 不传 includeDeleted，与离队同规则不含）
-  if (includeDeleted) rows.push(...getDeletedMemberStats(activities));
   return rows.sort((a, b) => b.rate - a.rate || b.present - a.present);
 }
 
@@ -4724,8 +4717,12 @@ function renderActivityList() {
   }
   
   container.innerHTML = activities.map(a => {
-    const present = a.attendees.filter(att => att.status === '出席' || att.status === '替补' || att.status === '迟到').length;
-    const absent = a.attendees.filter(att => att.status === '缺席').length;
+    // BUG-107（任务书 #62 §3）：统计剔除已删除成员考勤行——判定口径同 #27-补丁2（id 优先、状态回退）：
+    // id 命中成员表（含离队）= 在案；id 定位不到 / id 为空（硬删除 DB 置 NULL，member_name 快照保留）= 已删除。
+    // 只改统计口径，考勤记录与明细灰显「已删除」不动。
+    const attActive = a.attendees.filter(att => att.member_id && appData.members.some(m => m.id === att.member_id));
+    const present = attActive.filter(att => att.status === '出席' || att.status === '替补' || att.status === '迟到').length;
+    const absent = attActive.filter(att => att.status === '缺席').length;
     const total = appData.members.filter(m => m.status !== '离队').length;
     const rate = total > 0 ? Math.round((present / total) * 100) : 0;
     // REQ-020：已取消活动灰显 + 徽标
@@ -5611,8 +5608,9 @@ function setReportRange(days) {
 
 function renderReports() {
   // BUG-014：报表页尊重用户自选时间范围，算法与仪表盘/成员列表同源
-  // 任务书 #27 WP2：报表含已删除成员伪行（灰色「已删除」，其历史考勤仍计入）
-  const rankings = getAttendanceRankings(getFilteredActivities(), true);
+  // BUG-107 补丁（任务书 #62 终审裁定）：主排名表同步剔除已删除成员——与活动卡/缺席榜同口径；
+  // 考勤明细灰显「已删除」保留不篡改（#27 WP2「报表含伪行」口径自此收口）
+  const rankings = getAttendanceRankings(getFilteredActivities());
   
   // 排名表格
   const tbody = document.getElementById('rankTableBody');
@@ -5622,16 +5620,11 @@ function renderReports() {
   } else {
     tbody.innerHTML = rankings.map((item, i) => {
       const cls = classMap[item.member.class] || '';
-      // 已删除伪成员：名字灰色黯淡 + 「已删除」小徽标，职业列无数据
-      // BUG-071（任务书 #33）：伪行名字 td 加 rank-deleted-name 专属类（徽标折行修最小选择器锚点，文案/语义零改动）；
-      // 名字与徽标间的折行空格去掉（间距由徽标 margin-left 承担，压缩名字列 min-content 保 468 无横滚）
-      const nameHtml = item.member.deleted
-        ? `<span class="member-departed" style="font-weight:500">${item.member.name}</span><span class="tag tag-grey">已删除</span>`
-        : `<span style="font-weight:500">${memberDisplayName(item.member)}</span>`;
+      const nameHtml = `<span style="font-weight:500">${memberDisplayName(item.member)}</span>`;
       return `
         <tr>
           <td><div class="rank-num" style="margin:auto">${i + 1}</div></td>
-          <td class="class-${cls}${item.member.deleted ? ' rank-deleted-name' : ''}">${nameHtml}</td>
+          <td class="class-${cls}">${nameHtml}</td>
           <td>${item.member.class || '—'}</td>
           <td style="color:var(--success)">${item.present}</td>
           <td style="color:var(--info)">${item.sub}</td>
@@ -5645,11 +5638,12 @@ function renderReports() {
   }
   
   // 缺席榜
+  // BUG-107（任务书 #62 §3 + 补丁终审裁定）：已删除成员不计缺席——排行/主排名表同口径剔除
   const absentRank = [...rankings].sort((a, b) => b.absent - a.absent).slice(0, 5);
   const absentHtml = absentRank.filter(r => r.absent > 0).map((item, i) => `
     <div class="rank-item">
       <div class="rank-num" style="background:rgba(248,81,73,0.3);color:var(--danger)">${i + 1}</div>
-      <div class="rank-name class-${classMap[item.member.class] || ''}">${item.member.deleted ? item.member.name : memberDisplayName(item.member)}${item.member.deleted ? ' <span class="tag tag-grey">已删除</span>' : ''}</div>
+      <div class="rank-name class-${classMap[item.member.class] || ''}">${memberDisplayName(item.member)}</div>
       <div class="rank-rate" style="color:var(--danger)">${item.absent} 次</div>
     </div>
   `).join('');
@@ -6234,10 +6228,62 @@ function rollClamp() {
 }
 
 // 渲染装备列表
+// REQ-150（任务书 #62 §5）：装备名 → icon_id 查找（数据源 = boss_loot 主数据，与 #46 掉落卡片同规则路径
+// assets/icons/items/{icon_id}.png；命中优先级 = 名字+团本+BOSS 复合 → 全库唯一同名；查不到/同名多图标 → 不渲染）
+let itemIconIdxCache = null;
+function getItemIconId(name, raid, boss) {
+  if (!name || !window.MasterData || !MasterData.isLoaded()) return null;
+  if (!itemIconIdxCache) {
+    itemIconIdxCache = { full: new Map(), byName: new Map() };
+    MasterData.getRaids().forEach(r => {
+      MasterData.getBosses(r.id).forEach(b => {
+        MasterData.getLoot(b.id).forEach(l => {
+          if (l.icon_id == null || !/^\d+$/.test(String(l.icon_id))) return;
+          const id = String(l.icon_id);
+          itemIconIdxCache.full.set(`${l.item_name}|${r.name}|${b.name}`, id);
+          if (!itemIconIdxCache.byName.has(l.item_name)) itemIconIdxCache.byName.set(l.item_name, id);
+          else if (itemIconIdxCache.byName.get(l.item_name) !== id) itemIconIdxCache.byName.set(l.item_name, '');
+        });
+      });
+    });
+  }
+  const full = itemIconIdxCache.full.get(`${name}|${raid || ''}|${boss || ''}`);
+  if (full) return full;
+  return itemIconIdxCache.byName.get(name) || null;
+}
+// 图标 img 片段（#46 口径：懒加载、空值不渲染、404 onerror 隐藏不占位）
+function itemIconImgHtml(name, raid, boss) {
+  const id = getItemIconId(name, raid, boss);
+  return id ? `<img class="loot-item-icon" src="assets/icons/items/${id}.png" loading="lazy" alt="" onerror="this.style.display='none'">` : '';
+}
+
 function lootRender() {
   const tbody = document.getElementById('lootTableBody');
   if (!tbody) return;
-  
+
+  // 任务书 #62 §2（BUG-106）：团本筛选项动态构建——主数据团本清单（含当前赛季团本，随字典刷新联动）
+  // + 记录内出现的名单外自定义名（历史数据可筛），保留当前选择
+  const raidSel = document.getElementById('lootRaidFilter');
+  if (raidSel) {
+    const curRaid = raidSel.value;
+    const names = getGameRaidNames();
+    const extras = [...new Set((appData.loots || []).map(l => l.raid).filter(r => r && !names.includes(r)))].sort();
+    raidSel.innerHTML = '<option value="">全部团本</option>' +
+      names.map(n => `<option value="${n}">${n}</option>`).join('') +
+      extras.map(n => `<option value="${n}">${n}</option>`).join('');
+    raidSel.value = curRaid;
+  }
+  // 任务书 #62 §4（REQ-147）：成员筛选下拉动态构建（数据源与 lootInitMemberSelect 一致=全员含离队按名排序，
+  // 显示名 memberDisplayName 消歧、value=id 同名按 id 区分），保留当前选择
+  const memberSel = document.getElementById('lootMemberFilter');
+  if (memberSel) {
+    const curMember = memberSel.value;
+    const sorted = [...(appData.members || [])].sort((a, b) => a.name.localeCompare(b.name, 'zh-CN'));
+    memberSel.innerHTML = '<option value="">全部成员</option>' +
+      sorted.map(m => `<option value="${m.id}">${memberDisplayName(m)}</option>`).join('');
+    memberSel.value = curMember;
+  }
+
   let loots = [...(appData.loots || [])];
   
   // 搜索过滤
@@ -6250,6 +6296,16 @@ function lootRender() {
   const raidFilter = document.getElementById('lootRaidFilter')?.value || '';
   if (raidFilter) {
     loots = loots.filter(l => l.raid === raidFilter);
+  }
+
+  // 任务书 #62 §4（REQ-147）：成员筛选（id 精确，与既有条件叠加）+ 成员搜索（分配人名字快照模糊匹配，存量无 id 行可搜）
+  const memberFilter = document.getElementById('lootMemberFilter')?.value || '';
+  if (memberFilter) {
+    loots = loots.filter(l => l.character_id === memberFilter);
+  }
+  const memberKw = (document.getElementById('lootMemberSearch')?.value || '').trim().toLowerCase();
+  if (memberKw) {
+    loots = loots.filter(l => (l.assignedTo || '').toLowerCase().includes(memberKw));
   }
   
   // 难度筛选
@@ -6341,7 +6397,7 @@ function lootRender() {
     
     return `
       <tr>
-        <td><span class="loot-name">${loot.name}</span>${loot.effect ? `<div class="loot-effect-green" style="font-size:11px;margin-top:2px" title="${loot.effect.replace(/"/g, '&quot;')}">${loot.effect.length > 30 ? loot.effect.slice(0, 30) + '…' : loot.effect}</div>` : ''}</td>
+        <td><span class="loot-name">${itemIconImgHtml(loot.name, loot.raid, loot.boss)}${loot.name}</span>${loot.effect ? `<div class="loot-effect-green" style="font-size:11px;margin-top:2px" title="${loot.effect.replace(/"/g, '&quot;')}">${loot.effect.length > 30 ? loot.effect.slice(0, 30) + '…' : loot.effect}</div>` : ''}</td>
         <td class="center">${wishlistBadge}</td>
         <td><span class="wishlist-raid-tag">${loot.raid || '-'}</span></td>
         <td>${loot.difficulty || ''}</td>
@@ -6989,7 +7045,7 @@ function wishlistRender() {
     return `
       <tr>
         <td><input type="checkbox" class="wishlist-row-checkbox" value="${w.id}" onchange="wishlistOnRowCheckboxChange()" ${wishlistSelectedIds.has(w.id) ? 'checked' : ''}></td>
-        <td><span class="wishlist-item-name">${w.itemName}</span></td>
+        <td><span class="wishlist-item-name">${itemIconImgHtml(w.itemName, w.raid, w.boss)}${w.itemName}</span></td>
         <td><span class="wishlist-raid-tag">${w.raid || '-'}</span></td>
         <td>${w.boss || '-'}</td>
         <td>${w.slot || '-'}</td>

@@ -119,16 +119,18 @@ function staticAsserts() {
   const countStr = (s, v) => (s.match(new RegExp(v.replace(/\./g, '\\.'), 'g')) || []).length;
   // 任务书 #61-WP1 锚点适配：钉现行实查值——index 经 #59/#60 递增至 20260923.83×15；
   // decor 维持 20260923.82×5（#59-WP3 重定向壳化后引用行 6→5；#60 裁定不随 index 追平，见 #60 报告 §3.4）
-  check(`A6 版本串实查（index 20260923.83×15 / decor 20260923.82×5）+ 旧串（${VER_PREV}）零残留`,
-    countStr(index, '20260923.83') === 15 && countStr(decor, '20260923.82') === 5 &&
+  // 任务书 #62 再适配：三壳同 .84（main.css 共享 + dataPublic.js 变更，两壳随批递增）
+  check(`A6 版本串实查（index 20260923.84×15 / decor 20260923.84×5）+ 旧串（${VER_PREV}）零残留`,
+    countStr(index, '20260923.84') === 15 && countStr(decor, '20260923.84') === 5 &&
     countStr(index, VER_PREV) === 0 && countStr(decor, VER_PREV) === 0);
   const porcelain = spawnSync('git', ['-c', 'core.quotepath=false', 'status', '--porcelain'], { cwd: ROOT, encoding: 'utf8' }).stdout.split('\n').filter(Boolean);
   const touched = porcelain.map(l => l.slice(3).replace(/"/g, ''));
   // 任务书 #61-WP1 锚点适配：排他白名单锚点在送审制下恒红（任何后续批未提交文件即破），
   // 改钉本脚本守卫目的本身——#58 全链冻结文件反向钉（app.js/data.html/sql 已经 #60/#61 合法改动，出列；
   // server.js 的 TRACK 段口径由 A1/A2 锚点接管守卫）
-  const frozen = ['js/track.js', 'js/decorData.js', 'js/cloud.js', 'css/'];
-  check('A7 红线零越界：#58 全链冻结文件零触碰（track.js/decorData.js/cloud.js/css 不在 diff）',
+  // 任务书 #62 再适配：css/ 出列（#62 起 main.css 可经 DESIGN.md 登记合法变更）；守卫核心收敛为采集三件套
+  const frozen = ['js/track.js', 'js/decorData.js', 'js/cloud.js'];
+  check('A7 红线零越界：#58 全链冻结文件零触碰（track.js/decorData.js/cloud.js 不在 diff）',
     touched.every(f => !frozen.some(z => f === z || f.startsWith(z))),
     `diff 清单=${touched.join(',')}`);
   for (const f of ['server.js', 'scripts/verify-task58-wp2-3.js']) {
