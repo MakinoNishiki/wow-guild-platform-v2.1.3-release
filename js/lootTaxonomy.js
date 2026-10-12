@@ -75,11 +75,28 @@ window.LootTaxonomy = (function () {
   // 消费：公示页毒咒筛选组 chips（js/dataPublic.js）+ 数据中心录入下拉（js/app.js #37 表单）——同源禁分叉
   const VENOMCURSE_LABEL = '毒咒';
 
+  // ---- REQ-148（任务书 #64）：职业→护甲类型 与 套装兑换物族→护甲 ----
+  // 职业→护甲 = REQ-091 运营补定口径「护甲类型与职业一一对应」（板=战骑DK／锁=猎萨唤／皮=德贼僧DH／布=法术牧）。
+  // 键名以 game_classes.name_zh 库内现值为准：盗贼（非「潜行者」）、萨满（非「萨满祭司」）——REQ-091 文档措辞
+  // 为旧称，键名错配会导致对应职业套装卡不渲染「共X件」（任务书 #64 B1 实测抓获）。
+  // 12.0 起套装兑换物（代币）按护甲分组（官方代币分组机制），S2 毒渊族名实证：
+  // 毒织=布甲 / 毒咒=皮甲 / 毒锻=锁甲 / 毒铸=板甲。族名随赛季更换，新赛季按当季代币名更新 ARMOR_TOKEN_FAMILY；
+  // 词表未覆盖的赛季/职业自然降级（套装卡不渲染「共X件」标识），不得编造映射。
+  // 消费：公示页套装一览「共X件」展开明细（js/dataPublic.js）；REQ-091 职业筛选落地时同源复用，禁第三份映射。
+  const CLASS_ARMOR = {
+    '战士': '板甲', '圣骑士': '板甲', '死亡骑士': '板甲',
+    '猎人': '锁甲', '萨满': '锁甲', '唤魔师': '锁甲',
+    '盗贼': '皮甲', '武僧': '皮甲', '德鲁伊': '皮甲', '恶魔猎手': '皮甲',
+    '牧师': '布甲', '法师': '布甲', '术士': '布甲'
+  };
+  const ARMOR_TOKEN_FAMILY = { '布甲': '毒织', '皮甲': '毒咒', '锁甲': '毒锻', '板甲': '毒铸' };
+
   return {
     SLOT_OPTIONS, WEAPON_GROUPS, WEAPON_MAIN_HAND, ARMOR_TYPES,
     PICKER_EXCLUDED_SLOTS, isMiscSlot, isPickerExcludedSlot,
     slotCategoryOf, matchWeapon, matchArmor, matchSlot,
     DC_EXTRA_SLOTS, MISC_ITEM_TYPES, DC_SLOT_OPTIONS, DC_ITEM_TYPE_OPTIONS, // 任务书 #40：数据中心表单下拉词表
-    VENOMCURSE_LABEL // 任务书 #43
+    VENOMCURSE_LABEL, // 任务书 #43
+    CLASS_ARMOR, ARMOR_TOKEN_FAMILY // 任务书 #64（REQ-148）
   };
 })();

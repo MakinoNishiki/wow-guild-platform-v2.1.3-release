@@ -38,6 +38,9 @@
   margin-bottom: 6px;
   font-weight: 600;
 }
+/* 任务书 #64（BUG-108 前端批）：组说明小注——「主题风格」组口径澄清（非加入版本），
+   灰色小字一行、紧贴组头、可换行不截断 */
+.dh-group-note { font-size: 11px; color: var(--text-muted); margin: -2px 0 6px; line-height: 15px; }
 .dh-chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .dh-chip {
   border: 1px solid var(--border-color);

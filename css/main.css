@@ -2942,6 +2942,15 @@ body {
 .item-card-source { position: absolute; top: 8px; right: 10px; font-size: 10px; color: var(--text-muted); background: rgba(0,0,0,0.3); padding: 2px 6px; border-radius: 4px; }
 .item-db-empty { text-align: center; padding: 40px 20px; color: var(--text-muted); font-size: 14px; }
 .item-db-count { font-size: 12px; color: var(--text-muted); margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid var(--border-color); }
+/* 任务书 #64（REQ-149）：picker 历史赛季折叠组——默认收起（.open 展开），组头虚线分隔降一档，
+   箭头 ▸ 展开时旋转 90°；筛选生效时 JS 侧自动加 .open（搜索/筛选结果不藏） */
+.item-db-history { margin-top: 4px; border-top: 1px dashed var(--border-color); padding-top: 8px; }
+.item-db-history-head { font-size: 12px; color: var(--text-muted); padding: 6px 4px; cursor: pointer; user-select: none; display: flex; align-items: center; gap: 6px; border-radius: 6px; }
+.item-db-history-head:hover { color: var(--gold); }
+.item-db-history-caret { display: inline-block; transition: transform 0.2s ease; }
+.item-db-history.open .item-db-history-caret { transform: rotate(90deg); }
+.item-db-history-body { display: none; }
+.item-db-history.open .item-db-history-body { display: block; }
 .quality-epic { color: #a335ee !important; }
 .quality-rare { color: #0070dd !important; }
 

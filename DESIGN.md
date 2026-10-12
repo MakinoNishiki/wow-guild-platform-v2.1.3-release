@@ -117,3 +117,10 @@
 
 ### 新增类
 - `.loot-item-icon` —— 装备分配/心愿单列表装备名前置 20px 小图标（REQ-150；#46 掉落卡片同族口径：空值不渲染、404 onerror 隐藏不占位、lazy 加载；装备分配与心愿单两列表共用此类）
+
+## 任务书 #64 登记（体验批，2026-10-13）
+
+### 新增类
+- `.dp-tier-count` / `.dp-tier-pieces` / `.dp-tier-piece` / `.dp-tier-piece-name`（data-public.css）—— REQ-148 套装一览「共X件」展开钮与明细行：胶囊钮 22px 高 11px 字（.dp-count 同族），箭头默认收起向右 -90°、.open 归位向下；明细行与 .dp-tier-bonus 同排版规格（部位 .dp-tag + 兑换物名），REQ-089 落地后仅换数据源样式不动
+- `.item-db-history` / `.item-db-history-head` / `.item-db-history-caret` / `.item-db-history-body`（main.css）—— REQ-149 picker 历史赛季折叠组：默认收起（.open 展开），组头虚线分隔降一档、箭头 ▸ 展开旋转 90°；任一筛选生效 JS 自动加 .open
+- `.dh-group-note`（decor-public.css）—— 筛选组说明小注（11px 灰、紧贴组头、可换行），首发于 BUG-108「主题风格」组口径说明

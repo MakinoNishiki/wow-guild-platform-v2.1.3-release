@@ -358,6 +358,24 @@
 .dp-tier-bonus { font-size: 12px; color: var(--text-secondary); margin-top: 4px; display: flex; gap: 6px; align-items: flex-start; }
 .dp-tier-bonus .dp-tag { flex-shrink: 0; margin-top: 1px; }
 .dp-tier-bonus-text { flex: 1; min-width: 0; }
+/* 任务书 #64（REQ-148）：套装卡「共X件」展开钮——.dp-count 同族尺寸（11px/弱色底胶囊），
+   热区并入胶囊本体（高 22px 贴近 chip 24 下限观感）；箭头默认收起向右（-90°），open 归位向下 */
+.dp-tier-count {
+  display: inline-flex; align-items: center; gap: 2px;
+  margin-left: auto; padding: 0 8px 0 0; height: 22px;
+  font-size: 11px; color: var(--text-secondary);
+  background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 11px;
+  cursor: pointer; user-select: none;
+}
+.dp-tier-count:hover { color: var(--gold); border-color: var(--gold); }
+.dp-tier-count .dp-collapse-btn { width: 20px; height: 20px; }
+.dp-tier-count .dp-collapse-btn svg { transform: rotate(-90deg); }
+.dp-tier-count.open .dp-collapse-btn svg { transform: rotate(0); }
+/* 展开明细：部位 dp-tag + 兑换物名，与 .dp-tier-bonus 同排版规格（REQ-089 落地后仅换数据源，样式不动） */
+.dp-tier-pieces { margin-top: 6px; padding-top: 6px; border-top: 1px dashed var(--border-color); }
+.dp-tier-piece { font-size: 12px; color: var(--text-secondary); margin-top: 4px; display: flex; gap: 6px; align-items: flex-start; }
+.dp-tier-piece .dp-tag { flex-shrink: 0; margin-top: 1px; }
+.dp-tier-piece-name { flex: 1; min-width: 0; }
 
 .dp-empty {
   text-align: center;

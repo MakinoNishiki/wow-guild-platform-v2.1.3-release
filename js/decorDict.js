@@ -108,7 +108,9 @@
     { key: 'none', label: '无来源' },
   ];
 
-  // ---- 资料片筛选（tags 组：tag id → 中文名原生在 tags 值里，此处仅定顺序与 id 集） ----
+  // ---- 主题风格（BUG-108 勘定裁定 2026-10-01：tags 99–110 = 暴雪官方 Housing 目录 dataTagsByID 原样入库，
+  //      语义为主题风格出处而非「加入版本」，数据面维持原值零改动；前端组名随任务书 #64 改「主题风格」+说明文案。
+  //      tag id → 中文名原生在 tags 值里，此处仅定顺序与 id 集；常量名维持 EXPANSION_TAGS 零逻辑改动） ----
   const EXPANSION_TAGS = [
     { id: 99, label: '经典旧世' },
     { id: 100, label: '燃烧的远征' },

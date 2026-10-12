@@ -26,7 +26,7 @@
     search: '',
     category: 0,         // 主类 id（0=全部）
     source: '',          // 来源类型 key（''=全部，'none'=无来源）
-    expansion: 0,        // 资料片 tag id（0=全部）
+    expansion: 0,        // 主题风格 tag id（0=全部；BUG-108 勘定：暴雪主题风格标签非「加入版本」，键名维持 expansion 零逻辑改动）
     costTier: '',        // 容量档 key
     env: '',             // 摆放环境 key
     petOnly: false,      // 可放宠物（subcategory 含 53，方案 A 终审）
@@ -114,7 +114,7 @@
       <div class="dh-filter-rows" id="dhFilterRows">
         <div class="dh-group"><div class="dh-group-head">分类<span class="dh-chip-n">（单选）</span></div><div class="dh-chips" id="dhCatChips"></div></div>
         <div class="dh-group"><div class="dh-group-head">来源<span class="dh-chip-n">（单选）</span></div><div class="dh-chips" id="dhSrcChips"></div></div>
-        <div class="dh-group"><div class="dh-group-head">资料片<span class="dh-chip-n">（单选）</span></div><div class="dh-chips" id="dhExpChips"></div></div>
+        <div class="dh-group"><div class="dh-group-head">主题风格<span class="dh-chip-n">（单选）</span></div><div class="dh-group-note">按装饰的主题风格归类，非物品加入版本</div><div class="dh-chips" id="dhExpChips"></div></div>
         <div class="dh-group"><div class="dh-group-head">容量<span class="dh-chip-n">（单选）</span></div><div class="dh-chips" id="dhCostChips"></div></div>
         <div class="dh-group"><div class="dh-group-head">摆放环境<span class="dh-chip-n">（单选）</span></div><div class="dh-chips" id="dhEnvChips"></div></div>
         <div class="dh-group"><div class="dh-group-head">特性</div><div class="dh-chips" id="dhFeatChips"></div></div>
@@ -134,7 +134,7 @@
       state.source = srcDefs[i].key; state.page = 1; refreshChips(); render(true);
     });
 
-    // 资料片（tags 组单选）
+    // 主题风格（tags 组单选；BUG-108 勘定裁定：99–110=暴雪官方主题风格标签，非「加入版本」）
     const expDefs = [{ id: 0, label: '全部' }, ...D.EXPANSION_TAGS];
     $('dhExpChips').innerHTML = expDefs.map(e =>
       chip(e.label, state.expansion === e.id, e.id ? countBy(r => r.tags && r.tags[String(e.id)]) : null)).join('');

@@ -763,6 +763,30 @@
   // 修正项①：先按职业（game_classes.class_key）再按专精（game_specs.spec_key）排序，同职业连续
   // 修正项②：职业 / 职责（由专精推导）/ 专精 三维筛选
   const ROLE_LABELS = { TANK: '坦克', HEALER: '治疗', DAMAGE: '输出' };
+  // REQ-148（任务书 #64）：套装「共X件」明细——当前数据口径 = 该职业护甲族的套装兑换物（代币）行，
+  // 部位由兑换物 effect 文本（「制造一件…套装头盔/护肩/胸甲/护手/护腿」）解析；职业→护甲→族词表 =
+  // js/lootTaxonomy.js CLASS_ARMOR / ARMOR_TOKEN_FAMILY（单一真源）。真实套装件名待 REQ-089 展开落地后
+  // 切换数据源（规则表送审中，禁止编造件名）。赛季归属链路：兑换物 boss_id → game_bosses → raid_id →
+  // game_raids.season_id，与套装卡 season_id 对齐；赛季无对应族代币（如 S1 仅珍玩）→ 返回空，卡面不渲染标识。
+  const TIER_TOKEN_SLOT_WORDS = [['套装头盔', '头部'], ['套装护肩', '肩部'], ['套装胸甲', '胸部'], ['套装护手', '手部'], ['套装护腿', '腿部']];
+  function tierTokenPieces(t, cls) {
+    if (!window.LootTaxonomy) return [];
+    const armor = LootTaxonomy.CLASS_ARMOR[(cls && cls.name_zh) || ''];
+    const fam = armor && LootTaxonomy.ARMOR_TOKEN_FAMILY[armor];
+    if (!fam) return [];
+    const out = [];
+    state.loot.filter(l => l.slot === '套装兑换物' && (l.item_name || '').startsWith(fam)).forEach(l => {
+      const boss = state.bosses.find(b => b.id === l.boss_id);
+      const raid = boss && state.raids.find(r => r.id === boss.raid_id);
+      if (!raid || raid.season_id !== t.season_id) return;
+      const hit = TIER_TOKEN_SLOT_WORDS.find(([w]) => (l.effect || '').includes(w));
+      if (!hit) return;
+      out.push({ slot: hit[1], name: l.item_name });
+    });
+    const order = LootTaxonomy.SLOT_OPTIONS;
+    return out.sort((a, b) => order.indexOf(a.slot) - order.indexOf(b.slot));
+  }
+
   function renderTierSets() {
     const classRank = new Map([...state.classes].sort((a, b) => (a.class_key || 0) - (b.class_key || 0)).map((c, i) => [c.id, i]));
     const specRank = new Map(state.specs.map(s => [s.id, s.spec_key != null ? s.spec_key : 999]));
@@ -789,14 +813,23 @@
       const spec = state.specs.find(s => s.id === t.spec_id);
       const color = (window.IconMap && IconMap.classColor(cls.name_zh)) || cls.color || '#8b949e';
       const icon = (window.IconMap && IconMap.classIcon(cls.name_zh)) || cls.icon || '';
+      // REQ-148（任务书 #64）：「共X件」标识 + 点击展开兑换物明细（部位·名称，按部位排序）。
+      // 展开态记忆复用 dp23:collapsed 折叠集——注意语义按前缀分化：区块/副本/BOSS 级「在集合=折叠」，
+      // tier: 前缀「在集合=展开」（默认收起），toggleCollapse 为纯翻面通用件，两侧解释各自承担。
+      const pieces = tierTokenPieces(t, cls);
+      const tid = 'tier:' + t.id;
+      const expanded = getCollapsed().has(tid);
       return `<div class="dp-tier" style="--cc:${esc(color)}">
         <div class="dp-tier-head">
           ${icon ? `<img class="dp-tier-icon" src="${esc(icon)}" alt="" onerror="this.style.display='none'">` : ''}
           <span class="dp-tier-class">${esc(cls.name_zh || '')}${spec ? ' · ' + esc(spec.name_zh) : ''}</span>
           <span class="dp-tier-name">${esc(t.set_name)}</span>
+          ${pieces.length ? `<button type="button" class="dp-tier-count${expanded ? ' open' : ''}" data-collapse="${esc(tid)}" aria-expanded="${expanded}">${CARET_BTN}共${pieces.length}件</button>` : ''}
         </div>
         ${t.bonus_2 ? `<div class="dp-tier-bonus"><span class="dp-tag">2 件</span><span class="dp-tier-bonus-text">${esc(t.bonus_2)}</span></div>` : ''}
         ${t.bonus_4 ? `<div class="dp-tier-bonus"><span class="dp-tag">4 件</span><span class="dp-tier-bonus-text">${esc(t.bonus_4)}</span></div>` : ''}
+        ${pieces.length && expanded ? `<div class="dp-tier-pieces">${pieces.map(p =>
+          `<div class="dp-tier-piece"><span class="dp-tag">${esc(p.slot)}</span><span class="dp-tier-piece-name">${esc(p.name)}</span></div>`).join('')}</div>` : ''}
       </div>`;
     }).join('');
     return rows || emptyText(tierFiltered ? '没有符合筛选条件的套装' : '该赛季套装数据维护中');

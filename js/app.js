@@ -7616,6 +7616,48 @@ function lootFillAssignedTo(idOrName) {
 // ==================== 更新日志 ====================
 const changelogData = [
   {
+    id: 'v3.2.0-task64-req148',
+    version: 'v3.2.0',
+    date: '2026-10-13',
+    type: 'feature',
+    typeLabel: '新增功能',
+    title: '副本掉落「套装一览」共X件标识 + 点击展开兑换物明细（任务书 #64 / REQ-148）',
+    summary: '套装一览每张套装卡头部新增「共X件」胶囊标识，点击就地展开该职业护甲族的五件套装兑换物明细（部位 · 名称，按部位 头/肩/胸/手/腿 排序），展开状态 sessionStorage 记忆（切换赛季/筛选不丢）。数据口径：职业→护甲→兑换物族词表收编 js/lootTaxonomy.js 单一真源（12.0 起官方代币按护甲分组：毒织=布甲/毒咒=皮甲/毒锻=锁甲/毒铸=板甲），部位由兑换物说明文本解析；真实套装件名待 REQ-089 兑换物展开落地后切换数据源。赛季无对应族代币时（如 S1）自然降级不渲染标识。公示页与主应用副本掉落页签双壳同源生效。',
+    details: [
+      '展开态复用 dp23:collapsed 折叠集，tier: 前缀「在集合=展开」与区块级「在集合=折叠」语义分化（注释钉死）',
+      'REQ-089 规则表仍送审中：本功能只读既有兑换物行，零数据写入、基线 308/104/204 不动',
+      '纯前端：dataPublic.js + data-public.css + lootTaxonomy.js，零后端零迁移'
+    ]
+  },
+  {
+    id: 'v3.2.0-task64-req149',
+    version: 'v3.2.0',
+    date: '2026-10-13',
+    type: 'improve',
+    typeLabel: '体验优化',
+    title: '装备库 picker 默认只显示当前赛季团本，历史赛季折叠收起（任务书 #64 / REQ-149）',
+    summary: '「从装备库选择」弹窗默认只列出当前赛季（S2）团本装备，历史赛季装备收进底部「历史赛季团本（N 件）」折叠组，点击展开；使用任一搜索/筛选条件时历史组自动展开（结果不藏），收起弹窗后再次打开恢复默认折叠。赛季口径 = 主数据 game_seasons.is_current，装备分配与心愿单两面板同一弹窗同治。',
+    details: [
+      '条目赛季经 raidId → game_raids.season_id 推导，与 REQ-063 赛季回填同链路',
+      '未设当前赛季（is_current 缺失）时不分组全量直显，绝不空列表',
+      '纯前端：app.js renderItemDbList + main.css 折叠组样式，零后端零迁移'
+    ]
+  },
+  {
+    id: 'v3.2.0-task64-bug108',
+    version: 'v3.2.0',
+    date: '2026-10-13',
+    type: 'fix',
+    typeLabel: '问题修复',
+    title: '家宅图鉴筛选组「资料片」更名「主题风格」+ 口径说明文案（任务书 #64 / BUG-108 前端批）',
+    summary: '勘定终审（2026-10-01）实证：装饰 tags 99–110 为暴雪官方 Housing 目录主题风格标签原样入库，语义是主题风格出处而非「加入版本」，旧组名「资料片」误导口径。随本批将筛选组更名「主题风格」并加说明文案「按装饰的主题风格归类，非物品加入版本」；数据面维持暴雪原值零改动，内部键名不变。',
+    details: [
+      'BUG-108 数据面已于任务书 #63 WP1 销号，本批仅落地前端呈现修正',
+      '双壳同源：decorData.js 筛选组结构 + decor-public.css 小注样式，公示/主应用同步生效',
+      '顺手修：台账 BUG-108 优先级 P1→P2、勘定报告批次号补全「转 #64 批」'
+    ]
+  },
+  {
     id: 'v3.2.0-task56-analytics-events',
     version: 'v3.2.0',
     date: '2026-09-23',
@@ -12593,8 +12635,10 @@ let itemDbCallback = null;
 
 // 打开装备库选择器
 let itemDbPickerMode = 'wishlist';
+let itemDbHistoryOpen = false; // REQ-149（任务书 #64）：历史赛季组手动展开态（仅本次打开内有效）
 function openItemDbPicker(mode = 'wishlist') {
   itemDbPickerMode = mode;
+  itemDbHistoryOpen = false; // REQ-149：每次打开复位为「历史赛季折叠」默认态
   selectedDbItem = null;
   document.getElementById('itemDbSearch').value = '';
   document.getElementById('itemDbRaidFilter').value = '';
@@ -12758,8 +12802,25 @@ function renderItemDbList() {
     if (statFilter && !item.stats.secondary.includes(statFilter)) return false;
     return true;
   });
-  
-  document.getElementById('itemDbCount').textContent = `共 ${filtered.length} 件装备`;
+
+  // REQ-149（任务书 #64）：picker 默认只显示当前赛季团本装备，历史赛季折叠收起。
+  // 当前赛季 = game_seasons.is_current（MasterData.getCurrentSeason）；条目赛季经 raidId → game_raids.season_id。
+  // 任一筛选生效时历史组自动展开（搜索/筛选结果不藏），手动展开态仅在本次打开内有效（openItemDbPicker 复位）；
+  // 未设当前赛季（is_current 缺失）时不分组全量直显。装备分配/心愿单两面板同一弹窗同治。
+  const curSeason = (typeof MasterData !== 'undefined' && MasterData.getCurrentSeason) ? MasterData.getCurrentSeason() : null;
+  const raidSeasonOf = item => {
+    const raid = item.raidId && MasterData.getRaids().find(r => r.id === item.raidId);
+    return raid ? raid.season_id : '';
+  };
+  const anyFilter = !!(search || raidFilter || bossFilter || slotFilter || weaponFilter || armorFilter || statFilter);
+  const historyOpen = itemDbHistoryOpen || anyFilter;
+  let currentItems = filtered, historyItems = [];
+  if (curSeason) {
+    currentItems = filtered.filter(i => raidSeasonOf(i) === curSeason.id);
+    historyItems = filtered.filter(i => raidSeasonOf(i) !== curSeason.id);
+  }
+
+  document.getElementById('itemDbCount').textContent = `共 ${currentItems.length} 件装备`;
   
   const listEl = document.getElementById('itemDbList');
   if (base.length === 0) {
@@ -12771,13 +12832,13 @@ function renderItemDbList() {
     return;
   }
   
-  listEl.innerHTML = filtered.map(item => {
+  const cardHtml = item => {
     const isSelected = selectedDbItem && selectedDbItem.id === item.id;
     const qualityClass = item.quality === 'epic' ? 'quality-epic' : 'quality-rare';
     const primaryStatHtml = renderPrimaryStat(item.stats.primary, item.stats.primaryDetail);
     const secondaryStatHtml = renderSecondaryStats(item.stats.secondary, item.stats.secondaryDetail);
     const sourceText = `${item.raidName} · ${item.bossIndex} ${item.boss}`;
-    
+
     return `
       <div class="item-card ${isSelected ? 'selected' : ''}" onclick="selectDbItem('${item.id}')">
         <div class="item-card-icon">${item.icon}</div>
@@ -12793,7 +12854,20 @@ function renderItemDbList() {
         <div class="item-card-source">${sourceText}</div>
       </div>
     `;
-  }).join('');
+  };
+
+  listEl.innerHTML = currentItems.map(cardHtml).join('') +
+    (historyItems.length ? `
+      <div class="item-db-history${historyOpen ? ' open' : ''}">
+        <div class="item-db-history-head" onclick="toggleItemDbHistory()"><span class="item-db-history-caret">▸</span>历史赛季团本（${historyItems.length} 件）</div>
+        <div class="item-db-history-body">${historyItems.map(cardHtml).join('')}</div>
+      </div>` : '');
+}
+
+// REQ-149（任务书 #64）：历史赛季组手动展开/收起（展开态仅本次打开内有效）
+function toggleItemDbHistory() {
+  itemDbHistoryOpen = !itemDbHistoryOpen;
+  renderItemDbList();
 }
 
 // 选择装备
