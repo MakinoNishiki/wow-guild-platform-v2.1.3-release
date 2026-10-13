@@ -7901,6 +7901,20 @@ function lootFillAssignedTo(idOrName) {
 // ==================== 更新日志 ====================
 const changelogData = [
   {
+    id: 'v3.2.0-task68-decor-race',
+    version: 'v3.2.0',
+    date: '2026-10-13',
+    type: 'feature',
+    typeLabel: '新增功能',
+    title: '家宅图鉴新增「种族」筛选维度 + 「主题风格」改名「资料片分类」（任务书 #68 / REQ-160）',
+    summary: '家宅图鉴筛选栏新增「种族（单选）」组：30 个种族标签（矮人/人类/精灵/兽人/龙希尔/鱼人等，词表 DecorDict.RACE_TAGS），每个胶囊带件数计数，与分类/来源/资料片分类/容量/环境/特性全维度 AND 组合，重置筛选一并归位。原「主题风格」组改名「资料片分类」（纯文案，内部键名 expansion/EXPANSION_TAGS 维持不变），与「种族」形成上下位区分。',
+    details: [
+      '口径裁定：83「精灵」作上位标签保留；80「暴风城」剔除（严格种族定义不含地名）；龙希尔归种族',
+      '筛选维度由七维升八维，双壳同一渲染层 decorData.js 单一真源，零 SQL 零后端',
+      '版本串三壳 20261013.90'
+    ]
+  },
+  {
     id: 'v3.2.0-task65-patch-primary-stat',
     version: 'v3.2.0',
     date: '2026-10-13',

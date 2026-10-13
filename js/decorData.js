@@ -26,7 +26,8 @@
     search: '',
     category: 0,         // 主类 id（0=全部）
     source: '',          // 来源类型 key（''=全部，'none'=无来源）
-    expansion: 0,        // 主题风格 tag id（0=全部；BUG-108 勘定：暴雪主题风格标签非「加入版本」，键名维持 expansion 零逻辑改动）
+    expansion: 0,        // 资料片分类 tag id（0=全部；BUG-108 勘定：暴雪主题风格标签非「加入版本」，键名维持 expansion 零逻辑改动）
+    race: 0,             // 种族 tag id（0=全部；任务书 #68，词表 DecorDict.RACE_TAGS）
     costTier: '',        // 容量档 key
     env: '',             // 摆放环境 key
     petOnly: false,      // 可放宠物（subcategory 含 53，方案 A 终审）
@@ -64,6 +65,7 @@
     if (state.category) n++;
     if (state.source) n++;
     if (state.expansion) n++;
+    if (state.race) n++;
     if (state.costTier) n++;
     if (state.env) n++;
     if (state.petOnly) n++;
@@ -81,6 +83,7 @@
       if (state.source === 'none') { if (Array.isArray(r.sources) && r.sources.length) return false; }
       else if (state.source && !(Array.isArray(r.sources) && r.sources.some(s => s.type === state.source))) return false;
       if (state.expansion && !(r.tags && r.tags[String(state.expansion)])) return false;
+      if (state.race && !(r.tags && r.tags[String(state.race)])) return false;
       if (tier && !tier.match(r.placement_cost || 0)) return false;
       if (env && !env.match(r)) return false;
       if (state.petOnly && !(Array.isArray(r.subcategory_ids) && r.subcategory_ids.includes(D.PET_SUBCATEGORY_ID))) return false;
@@ -114,7 +117,8 @@
       <div class="dh-filter-rows" id="dhFilterRows">
         <div class="dh-group"><div class="dh-group-head">分类<span class="dh-chip-n">（单选）</span></div><div class="dh-chips" id="dhCatChips"></div></div>
         <div class="dh-group"><div class="dh-group-head">来源<span class="dh-chip-n">（单选）</span></div><div class="dh-chips" id="dhSrcChips"></div></div>
-        <div class="dh-group"><div class="dh-group-head">主题风格<span class="dh-chip-n">（单选）</span></div><div class="dh-group-note">按装饰的主题风格归类，非物品加入版本</div><div class="dh-chips" id="dhExpChips"></div></div>
+        <div class="dh-group"><div class="dh-group-head">资料片分类<span class="dh-chip-n">（单选）</span></div><div class="dh-group-note">按装饰的主题风格归类，非物品加入版本</div><div class="dh-chips" id="dhExpChips"></div></div>
+        <div class="dh-group"><div class="dh-group-head">种族<span class="dh-chip-n">（单选）</span></div><div class="dh-group-note">按装饰的种族风格筛选</div><div class="dh-chips" id="dhRaceChips"></div></div>
         <div class="dh-group"><div class="dh-group-head">容量<span class="dh-chip-n">（单选）</span></div><div class="dh-chips" id="dhCostChips"></div></div>
         <div class="dh-group"><div class="dh-group-head">摆放环境<span class="dh-chip-n">（单选）</span></div><div class="dh-chips" id="dhEnvChips"></div></div>
         <div class="dh-group"><div class="dh-group-head">特性</div><div class="dh-chips" id="dhFeatChips"></div></div>
@@ -134,12 +138,20 @@
       state.source = srcDefs[i].key; state.page = 1; refreshChips(); render(true);
     });
 
-    // 主题风格（tags 组单选；BUG-108 勘定裁定：99–110=暴雪官方主题风格标签，非「加入版本」）
+    // 资料片分类（tags 组单选；BUG-108 勘定裁定：99–110=暴雪官方主题风格标签，非「加入版本」）
     const expDefs = [{ id: 0, label: '全部' }, ...D.EXPANSION_TAGS];
     $('dhExpChips').innerHTML = expDefs.map(e =>
       chip(e.label, state.expansion === e.id, e.id ? countBy(r => r.tags && r.tags[String(e.id)]) : null)).join('');
     [...$('dhExpChips').children].forEach((btn, i) => btn.onclick = () => {
       state.expansion = expDefs[i].id; state.page = 1; refreshChips(); render(true);
+    });
+
+    // 种族（tags 组单选；任务书 #68，词表 DecorDict.RACE_TAGS 30 项）
+    const raceDefs = [{ id: 0, label: '全部' }, ...D.RACE_TAGS];
+    $('dhRaceChips').innerHTML = raceDefs.map(e =>
+      chip(e.label, state.race === e.id, e.id ? countBy(r => r.tags && r.tags[String(e.id)]) : null)).join('');
+    [...$('dhRaceChips').children].forEach((btn, i) => btn.onclick = () => {
+      state.race = raceDefs[i].id; state.page = 1; refreshChips(); render(true);
     });
 
     // 容量档（单选）
@@ -189,6 +201,7 @@
     paint('dhCatChips', i => (i === 0 ? !state.category : state.category === D.CATEGORY_FILTER_ORDER[i - 1]));
     paint('dhSrcChips', i => state.source === (i === 0 ? '' : D.SOURCE_TYPES[i - 1].key));
     paint('dhExpChips', i => state.expansion === (i === 0 ? 0 : D.EXPANSION_TAGS[i - 1].id));
+    paint('dhRaceChips', i => state.race === (i === 0 ? 0 : D.RACE_TAGS[i - 1].id));
     paint('dhCostChips', i => state.costTier === (i === 0 ? '' : D.COST_TIERS[i - 1].key));
     paint('dhEnvChips', i => state.env === (i === 0 ? '' : D.ENV_OPTIONS[i - 1].key));
     paint('dhFeatChips', i => (i === 0 ? state.petOnly : state.roomsOnly));
@@ -201,7 +214,7 @@
   }
 
   function resetFilters() {
-    Object.assign(state, { search: '', category: 0, source: '', expansion: 0, costTier: '', env: '', petOnly: false, roomsOnly: false, page: 1 });
+    Object.assign(state, { search: '', category: 0, source: '', expansion: 0, race: 0, costTier: '', env: '', petOnly: false, roomsOnly: false, page: 1 });
     const si = $('dhSearch'); if (si) { si.value = ''; $('dhSearchClear').style.display = 'none'; }
   }
 

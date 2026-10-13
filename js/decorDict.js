@@ -109,7 +109,8 @@
   ];
 
   // ---- 主题风格（BUG-108 勘定裁定 2026-10-01：tags 99–110 = 暴雪官方 Housing 目录 dataTagsByID 原样入库，
-  //      语义为主题风格出处而非「加入版本」，数据面维持原值零改动；前端组名随任务书 #64 改「主题风格」+说明文案。
+  //      语义为主题风格出处而非「加入版本」，数据面维持原值零改动；前端组名随任务书 #64 改「主题风格」+说明文案，
+  //      任务书 #68 起组名再改「资料片分类」（与新增「种族」筛选上下位区分，纯文案）。
   //      tag id → 中文名原生在 tags 值里，此处仅定顺序与 id 集；常量名维持 EXPANSION_TAGS 零逻辑改动） ----
   const EXPANSION_TAGS = [
     { id: 99, label: '经典旧世' },
@@ -124,6 +125,42 @@
     { id: 108, label: '巨龙时代' },
     { id: 109, label: '地心之战' },
     { id: 110, label: '至暗之夜' },
+  ];
+
+  // ---- 种族（任务书 #68：单选筛选维度；tag id → 中文名原生在 tags 值里，此处仅定顺序与 id 集） ----
+  // 口径裁定：83「精灵」作上位标签保留（与 84-87 并存）；80「暴风城」剔除（严格种族定义不含主城/势力地名）；
+  // 484「龙希尔」=可玩种族归种族；147「邪能」/150「机械」不归种族（后续如需可扩展风格维度）。
+  const RACE_TAGS = [
+    { id: 74,  label: '矮人' },
+    { id: 75,  label: '蛮锤矮人' },
+    { id: 76,  label: '铜须矮人' },
+    { id: 77,  label: '黑铁矮人' },
+    { id: 78,  label: '土灵' },
+    { id: 79,  label: '人类' },
+    { id: 81,  label: '库尔提拉斯人' },
+    { id: 82,  label: '吉尔尼斯人' },
+    { id: 83,  label: '精灵' },
+    { id: 84,  label: '血精灵' },
+    { id: 85,  label: '暗夜精灵' },
+    { id: 86,  label: '虚空精灵' },
+    { id: 87,  label: '夜之子' },
+    { id: 88,  label: '牛头人' },
+    { id: 89,  label: '德莱尼' },
+    { id: 90,  label: '兽人' },
+    { id: 91,  label: '地精' },
+    { id: 92,  label: '狐人' },
+    { id: 93,  label: '巨魔' },
+    { id: 95,  label: '赞达拉巨魔' },
+    { id: 96,  label: '亡灵' },
+    { id: 97,  label: '侏儒' },
+    { id: 98,  label: '熊猫人' },
+    { id: 157, label: '维库人' },
+    { id: 452, label: '哈籁尼尔' },
+    { id: 484, label: '龙希尔' },
+    { id: 505, label: '鱼人' },
+    { id: 620, label: '机械侏儒' },
+    { id: 631, label: '玛格汉兽人' },
+    { id: 639, label: '阿曼尼巨魔' },
   ];
 
   // ---- 容量档（placement_cost 分档；房间类高价值 12/16/18/20/100 落 5+ 档） ----
@@ -145,7 +182,7 @@
     CURRENCY_NAMES, ITEM_NAMES, TEXTURE_CURRENCY_NAMES,
     CATEGORY_NAMES, CATEGORY_FILTER_ORDER, SUBCATEGORY_NAMES,
     PET_SUBCATEGORY_ID, SIZE_NAMES, QUALITY_NAMES,
-    SOURCE_TYPES, EXPANSION_TAGS, COST_TIERS, ENV_OPTIONS,
+    SOURCE_TYPES, EXPANSION_TAGS, RACE_TAGS, COST_TIERS, ENV_OPTIONS,
     PAGE_SIZE: 60, // ⑥ 定案：每页 60 件 + img lazy
   };
 })();
