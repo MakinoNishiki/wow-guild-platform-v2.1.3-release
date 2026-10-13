@@ -2887,7 +2887,9 @@ const modalDirtyChecks = {
   // 任务书 #35 WP1（BUG-074）：批量彻底删除确认弹窗——确认词输入框有内容即算未保存
   memberBatchHardDeleteModal: () => isModalFormDirty('memberBatchHardDeleteModal'),
   activityModal: () => isModalFormDirty('activityModal'),
-  lootModal: () => isModalFormDirty('lootModal'),
+  // 任务书 #65 WP3.2：套装模式下的职业/专精（select 走快照比对）与部位胶囊选择（tierSlotSel）同样算未保存内容
+  lootModal: () => isModalFormDirty('lootModal') || tierSlotSel.loot !== '',
+  wishlistModal: () => isModalFormDirty('wishlistModal') || tierSlotSel.wishlist !== '',
   // REQ-094（任务书 #29 WP1）：用户中心含可编辑字段（显示名/修改密码表单），纳入防误关
   userCenterModal: () => isModalFormDirty('userCenterModal'),
   // 公会设置：成员角色变更即时保存不算未保存内容，只跟踪公会资料三字段
@@ -6125,6 +6127,158 @@ const lootSlotMap = {
   '饰品': ['饰品']
 };
 
+// ==================== 任务书 #65 WP3.2：套装快捷录入（lootModal / wishlistModal 同源逻辑） ====================
+// 部位后缀表（任务书 3.2 原文）；胶囊单选——原文「单选/多选」未定，按线框图单选实现（一次添加一件），待运营确认点。
+// 数据源 = tier_sets 在线表（MasterData 直读，不依赖 sql/37 的 tier_set_pieces）；保存链路零改动（走既有 lootSave/wishlistSave）。
+const TIER_SLOT_SUFFIX = { '头部': '头盔', '肩部': '肩甲', '胸部': '胸甲', '手部': '护手', '腿部': '腿甲' };
+// 模式与选中部位按弹窗作用域分持；弹窗每次打开由 tierSetReset 复位 normal
+const tierModeState = { loot: 'normal', wishlist: 'normal' };
+const tierSlotSel = { loot: '', wishlist: '' };
+
+// 作用域 → 既有表单控件映射（两弹窗同源逻辑的唯一差异点）
+function tierScopeMap(scope) {
+  return scope === 'loot'
+    ? { pfx: 'lootTier', nameId: 'lootName', catId: 'lootCategory', slotUpdate: lootUpdateSlotOptions }
+    : { pfx: 'wishlistTier', nameId: 'wishlistItemName', catId: 'wishlistCategory', slotUpdate: wishlistUpdateSlotOptions };
+}
+
+// 当前赛季 + 选中职业/专精 → tier_sets 行（未加载/未选全/未命中返回 null）
+function tierCurrentSet(scope) {
+  const m = tierScopeMap(scope);
+  const clsName = (document.getElementById(`${m.pfx}Class`) || {}).value || '';
+  const specName = (document.getElementById(`${m.pfx}Spec`) || {}).value || '';
+  if (!clsName || !specName || !window.MasterData || !MasterData.isLoaded()) return null;
+  const cls = MasterData.getClasses().find(c => c.name_zh === clsName);
+  if (!cls) return null;
+  const spec = MasterData.getSpecs(cls.id).find(s => s.name_zh === specName);
+  if (!spec) return null;
+  const cur = MasterData.getCurrentSeason();
+  if (!cur) return null;
+  return MasterData.getTierSets(cur.id).find(t => t.class_id === cls.id && t.spec_id === spec.id) || null;
+}
+
+// 部位胶囊渲染（激活态 + 无套装记录时禁用）
+function tierSlotCapsRender(scope) {
+  const m = tierScopeMap(scope);
+  const box = document.getElementById(`${m.pfx}Slots`);
+  if (!box) return;
+  const t = tierCurrentSet(scope);
+  const enabled = !!(t && t.set_name);
+  box.innerHTML = Object.keys(TIER_SLOT_SUFFIX).map(slot =>
+    `<span class="tier-slot-cap${tierSlotSel[scope] === slot ? ' active' : ''}${enabled ? '' : ' disabled'}" onclick="tierSetSlotPick('${scope}','${slot}')">${slot}</span>`
+  ).join('');
+}
+
+// 套装名称只读行：命中显示 set_name；未命中灰字提示且胶囊禁用
+function tierSetNameRender(scope) {
+  const m = tierScopeMap(scope);
+  const el = document.getElementById(`${m.pfx}SetName`);
+  if (!el) return;
+  const t = tierCurrentSet(scope);
+  if (t && t.set_name) {
+    el.textContent = t.set_name;
+    el.classList.remove('tier-set-empty');
+  } else {
+    const clsName = (document.getElementById(`${m.pfx}Class`) || {}).value || '';
+    const specName = (document.getElementById(`${m.pfx}Spec`) || {}).value || '';
+    el.textContent = (clsName && specName) ? '该职业专精当前赛季无套装记录' : '—';
+    el.classList.add('tier-set-empty');
+  }
+  tierSlotCapsRender(scope);
+}
+
+function tierSetSlotReset(scope) {
+  tierSlotSel[scope] = '';
+  tierSlotCapsRender(scope);
+}
+
+// 专精下拉联动：未选职业禁用占位；换职业清空重填（先例 getGameSpecs :265/:1033/:3691）
+function tierSetSpecReset(scope) {
+  const m = tierScopeMap(scope);
+  const specSel = document.getElementById(`${m.pfx}Spec`);
+  if (!specSel) return;
+  const clsName = document.getElementById(`${m.pfx}Class`).value;
+  if (!clsName) {
+    specSel.innerHTML = '<option value="">请先选择职业</option>';
+    specSel.disabled = true;
+  } else {
+    const specs = getGameSpecs(clsName); // 访问层：MasterData 优先，classSpecMap 常量回退
+    specSel.innerHTML = '<option value="">请选择专精</option>' + specs.map(s => `<option value="${s}">${s}</option>`).join('');
+    specSel.disabled = false;
+  }
+}
+
+function tierSetClassChange(scope) {
+  tierSetSpecReset(scope);
+  tierSetNameRender(scope);
+  tierSetSlotReset(scope);
+  // 套装上下文已变——清掉旧自动拼接名（任务书：名称仅在重新选部位/专精时重写，此外不覆盖用户手改）
+  document.getElementById(tierScopeMap(scope).nameId).value = '';
+}
+
+function tierSetSpecChange(scope) {
+  tierSetNameRender(scope);
+  tierSetSlotReset(scope);
+  document.getElementById(tierScopeMap(scope).nameId).value = '';
+}
+
+function tierSetSlotPick(scope, slot) {
+  const t = tierCurrentSet(scope);
+  if (!t || !t.set_name) return; // 无套装记录时胶囊视觉禁用，此处双保险
+  tierSlotSel[scope] = slot;
+  tierSlotCapsRender(scope);
+  const m = tierScopeMap(scope);
+  // 自动拼接装备名称：setName + 部位后缀（名称框保持可编辑，本函数之外不覆写）
+  document.getElementById(m.nameId).value = `${t.set_name} ${TIER_SLOT_SUFFIX[slot]}`;
+  // 同步既有表单 大类/部位：胶囊文字与 lootSlotMap「防具」下选项值一致（头部/肩部/胸部/手部/腿部），
+  // 直接置值无需映射；任务书线框写「护甲」属示意，实际大类选项值为「防具」
+  document.getElementById(m.catId).value = '防具';
+  m.slotUpdate(slot);
+}
+
+// 模式切换：普通=既有表单零变化；套装=显示套装块并按最新主数据重建职业下拉
+function tierSetMode(scope, mode) {
+  tierModeState[scope] = mode === 'tier' ? 'tier' : 'normal';
+  const isTier = tierModeState[scope] === 'tier';
+  const btnN = document.getElementById(`${scope}ModeNormal`);
+  const btnT = document.getElementById(`${scope}ModeTier`);
+  if (btnN) btnN.classList.toggle('btn-primary', !isTier);
+  if (btnT) btnT.classList.toggle('btn-primary', isTier);
+  const m = tierScopeMap(scope);
+  const block = document.getElementById(`${m.pfx}Block`);
+  if (block) block.style.display = isTier ? '' : 'none';
+  if (!isTier) return; // 切回普通：仅隐藏套装块，名称/大类等表单值保留（用户可见可改，不静默清空）
+  const clsSel = document.getElementById(`${m.pfx}Class`);
+  // 职业清单：MasterData.getClasses() name_zh 全量；未加载回退 classSpecMap 键
+  const names = (window.MasterData && MasterData.isLoaded())
+    ? MasterData.getClasses().map(c => c.name_zh)
+    : Object.keys(classSpecMap);
+  clsSel.innerHTML = '<option value="">请选择职业</option>' + names.map(n => `<option value="${n}">${n}</option>`).join('');
+  tierSetSpecReset(scope);
+  tierSetNameRender(scope);
+  tierSetSlotReset(scope);
+}
+
+// 弹窗每次打开复位 normal 模式 + 清空套装块状态（lootShowModal/wishlistShowModal openModal 前调用）
+function tierSetReset(scope) {
+  tierModeState[scope] = 'normal';
+  tierSlotSel[scope] = '';
+  const m = tierScopeMap(scope);
+  const btnN = document.getElementById(`${scope}ModeNormal`);
+  const btnT = document.getElementById(`${scope}ModeTier`);
+  if (btnN) btnN.classList.add('btn-primary');
+  if (btnT) btnT.classList.remove('btn-primary');
+  const block = document.getElementById(`${m.pfx}Block`);
+  if (block) block.style.display = 'none';
+  const clsSel = document.getElementById(`${m.pfx}Class`);
+  if (clsSel) clsSel.innerHTML = '<option value="">请选择职业</option>';
+  const specSel = document.getElementById(`${m.pfx}Spec`);
+  if (specSel) { specSel.innerHTML = '<option value="">请先选择职业</option>'; specSel.disabled = true; }
+  const nameEl = document.getElementById(`${m.pfx}SetName`);
+  if (nameEl) { nameEl.textContent = '—'; nameEl.classList.add('tier-set-empty'); }
+  tierSlotCapsRender(scope);
+}
+
 // 状态标签映射
 const lootStatusBadgeMap = {
   '待分配': 'badge-loot-pending',
@@ -6298,6 +6452,15 @@ function itemIconImgHtml(name, raid, boss) {
   return id ? `<img class="loot-item-icon" src="assets/icons/items/${id}.png" loading="lazy" alt="" onerror="this.style.display='none'">` : '';
 }
 
+// 任务书 #65 WP3.3：装备分配列表套装标识——装备名以任一 tier_sets.set_name 开头即视为套装件。
+// MasterData 未加载/无命中返回 ''（不阻塞渲染）；仅装备分配列表使用（任务书 3.3 未点名心愿单列表，勿扩）。
+function tierSetBadgeHtml(name) {
+  if (!name || !window.MasterData || !MasterData.isLoaded || !MasterData.isLoaded()) return '';
+  const hit = MasterData.getSeasons().some(s =>
+    MasterData.getTierSets(s.id).some(t => t.set_name && name.startsWith(t.set_name)));
+  return hit ? ' <span class="tag tag-gold" title="套装装备">🏷️套装</span>' : '';
+}
+
 function lootRender() {
   const tbody = document.getElementById('lootTableBody');
   if (!tbody) return;
@@ -6438,7 +6601,7 @@ function lootRender() {
     
     return `
       <tr>
-        <td><span class="loot-name">${itemIconImgHtml(loot.name, loot.raid, loot.boss)}${loot.name}</span>${loot.effect ? `<div class="loot-effect-green" style="font-size:11px;margin-top:2px" title="${loot.effect.replace(/"/g, '&quot;')}">${loot.effect.length > 30 ? loot.effect.slice(0, 30) + '…' : loot.effect}</div>` : ''}</td>
+        <td><span class="loot-name">${itemIconImgHtml(loot.name, loot.raid, loot.boss)}${loot.name}${tierSetBadgeHtml(loot.name)}</span>${loot.effect ? `<div class="loot-effect-green" style="font-size:11px;margin-top:2px" title="${loot.effect.replace(/"/g, '&quot;')}">${loot.effect.length > 30 ? loot.effect.slice(0, 30) + '…' : loot.effect}</div>` : ''}</td>
         <td class="center">${wishlistBadge}</td>
         <td><span class="wishlist-raid-tag">${loot.raid || '-'}</span></td>
         <td>${loot.difficulty || ''}</td>
@@ -6686,7 +6849,10 @@ async function lootShowModal(lootId = null) {
 
   // 根据分配方式切换字段显示
   lootOnDistributionMethodChange();
-  
+
+  // 任务书 #65 WP3.2：套装快捷录入——每次打开复位普通模式
+  tierSetReset('loot');
+
   openModal('lootModal');
 }
 
@@ -7300,6 +7466,9 @@ async function wishlistShowModal(wishId = null, presetData = null) {
     }
   }
 
+  // 任务书 #65 WP3.2：套装快捷录入——每次打开复位普通模式
+  tierSetReset('wishlist');
+
   openModal('wishlistModal');
 }
 
@@ -7660,6 +7829,48 @@ function lootFillAssignedTo(idOrName) {
 // ==================== 初始化 ====================
 // ==================== 更新日志 ====================
 const changelogData = [
+  {
+    id: 'v3.2.0-task65-tier-import',
+    version: 'v3.2.0',
+    date: '2026-10-13',
+    type: 'feature',
+    typeLabel: '新增功能',
+    title: '数据中心「套装数据导入」入口（任务书 #65 WP2 / REQ-156）',
+    summary: '数据中心 → 套装 tab 新增「📥 套装数据导入」：粘贴插件（v1.1.0+）导出的套装 JSON，解析预览（赛季/职业/专精/套装名/件数逐套列出，未匹配项标红注明原因），确认后幂等写入新表 tier_set_pieces（赛季×套装×部位唯一，重复导入不重复）。配套 sql/37：boss_loot/dungeon_loot 加 icon_name 列（与 icon_id 共存、可空逐步填充）+ 新建 tier_set_pieces 表（公开只读 RLS）。',
+    details: [
+      '解析校验 version≥1.1.0 且 exportType=tier_sets；旧版插件 JSON 正常拒绝不报错',
+      '匹配链：season 名→game_seasons、职业/专精中文名→game_classes/game_specs→tier_sets 行',
+      '幂等导入 = PostgREST upsert on_conflict(season_id,tier_set_id,slot)；sql/37 待运营执行后开放实导'
+    ]
+  },
+  {
+    id: 'v3.2.0-task65-tier-quickentry',
+    version: 'v3.2.0',
+    date: '2026-10-13',
+    type: 'feature',
+    typeLabel: '新增功能',
+    title: '装备分配/心愿单「套装快捷录入」+ 装备列表套装徽标（任务书 #65 WP3 / REQ-158）',
+    summary: '手动添加表单新增「普通装备 / 套装装备」切换：套装模式下选职业→专精（联动），自动带出当前赛季套装名（tier_sets 主数据），点选部位（头/肩/胸/手/腿）后装备名称自动拼接「套装名 + 部位后缀」（可手动编辑），大类/部位自动置位，保存走既有链路。装备分配列表中名称命中套装名前缀的装备显示 🏷️套装 徽标。',
+    details: [
+      '部位胶囊为单选（一次添加一件；任务书「单选/多选」未定，按线框图单选实现，待运营确认）',
+      '套装名读取 MasterData tier_sets（不依赖 sql/37）；职业专精当前赛季无套装记录时明示并禁选部位',
+      '心愿单弹窗同源实现；心愿单弹窗自此纳入未保存二次确认（规范 4.6 强制登记）'
+    ]
+  },
+  {
+    id: 'v3.2.0-task65-picker-icon',
+    version: 'v3.2.0',
+    date: '2026-10-13',
+    type: 'improve',
+    typeLabel: '体验优化',
+    title: 'picker 装备卡图标接通 Blizzard CDN（任务书 #65 WP3 / REQ-157）',
+    summary: 'picker 装备卡图标位接通 boss_loot.icon_name → Blizzard render CDN（render.worldofwarcraft.com/icons/56/），loading=lazy 不拖慢打开、加载失败 onerror 回退 📦；icon_name 为空（含迁移前全量）维持 📦 占位。图标名白名单校验防注入。icon_id（数字 fileDataID）与 CDN 不兼容，仅作历史字段保留不动。插件 v1.1.0 导出回补 icon_name 后图标自动亮图。',
+    details: [
+      '仅 picker 卡片生效，公示页/装备分配列表/心愿单列表图标链路不动',
+      'CDN 可达性已实测（56/36 两规格 200）；国内可达性波动由 onerror 兜底',
+      '纯前端：app.js getMasterLootItems + cardHtml + main.css .item-card-icon-img'
+    ]
+  },
   {
     id: 'v3.2.0-task66-optgroup-fix',
     version: 'v3.2.0',
@@ -12796,6 +13007,8 @@ function getMasterLootItems() {
           boss: boss.name, bossId: boss.id, bossIndex: `${boss.boss_order}号`,
           armorType: l.item_type || '', slot: l.slot || '',
           icon: '📦', quality: 'epic', itemLevel: l.ilvl || '', // 任务书 #66（1.3）：接 boss_loot.ilvl 列
+          // 任务书 #65 WP3.1：接 boss_loot.icon_name 列（sql/37，迁移前 undefined → '' 全量 📦 属预期）
+          iconName: l.icon_name || '',
           stats: { primary: (l.primary_stats || []).join('/'), secondary: l.secondary_stats || [], primaryDetail: null, secondaryDetail: null },
           equipEffect: l.effect || ''
         });
@@ -12930,10 +13143,15 @@ function renderItemDbList() {
     const sourceText = `${item.raidName} · ${item.bossIndex} ${item.boss}`;
     // 任务书 #66（1.3）：meta 行按非空段拼接——装等有值才渲染（与 REQ-116 公示页「非空才渲染」同口径），空段不出裸分隔符
     const metaText = [item.armorType, item.slot, item.itemLevel ? `装等${item.itemLevel}` : ''].filter(Boolean).join(' · ');
+    // 任务书 #65 WP3.1：icon_name 合法（白名单字符防注入）→ Blizzard CDN 56px 图标；
+    // 缺失/非法 → 📦 占位；CDN 加载失败 onerror 回退 📦
+    const iconHtml = /^[A-Za-z0-9_\-]+$/.test(item.iconName || '')
+      ? `<img src="https://render.worldofwarcraft.com/icons/56/${item.iconName}.jpg" class="item-card-icon-img" loading="lazy" alt="" onerror="this.outerHTML='📦'">`
+      : item.icon;
 
     return `
       <div class="item-card ${isSelected ? 'selected' : ''}" onclick="selectDbItem('${item.id}')">
-        <div class="item-card-icon">${item.icon}</div>
+        <div class="item-card-icon">${iconHtml}</div>
         <div class="item-card-info">
           <div class="item-card-name ${qualityClass}">${item.name}</div>
           <div class="item-card-meta">${metaText}</div>
@@ -13896,6 +14114,7 @@ function mdRenderTierSets(panel) {
         ${seasons.map(s => `<option value="${s.id}" ${s.id === mdTierSeasonId ? 'selected' : ''}>${s.name}${s.is_current ? '（当前）' : ''}</option>`).join('')}
       </select>
       <span style="font-size:12px;color:var(--text-muted)">按 职业 → 专精 分行；套装名为职业级概念，改一行可同步同职业其他专精行</span>
+      <button class="btn btn-sm" onclick="mdOpenTierSetImport()">📥 套装数据导入</button>
     </div>
     ${mdTierSeasonId ? mdTable('<th>职业 · 专精</th><th>套装名</th><th>2 件效果</th><th>4 件效果</th>',
       classes.map(c => {
@@ -13943,6 +14162,124 @@ async function mdTierSetSave(classId, specId, label, value, rowId, field) {
     showToast(`${label} 套装已保存`, 'success');
   } catch (e) {
     showToast('保存失败：' + (e.message || '未知错误'), 'error');
+  }
+}
+
+// ---------- 套装数据导入（任务书 #65 WP2.3 / REQ-156：插件 tier_sets JSON 两段式导入，复用 #mdEditorModal） ----------
+// 落库表 tier_set_pieces（sql/37，迁移未执行时表 404——入口仍在，确认导入中文报错不白屏）；
+// 该表不进 MasterData 加载层（WP3 不消费），导入成功后无需 refresh。
+let mdTierImportParsed = null; // 解析预览暂存（确认导入消费）
+
+// 点分版本逐段数值比较：a >= b 返回 true
+function mdVersionGte(a, b) {
+  const pa = String(a || '').split('.').map(x => parseInt(x, 10) || 0);
+  const pb = String(b || '').split('.').map(x => parseInt(x, 10) || 0);
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+    const x = pa[i] || 0, y = pb[i] || 0;
+    if (x !== y) return x > y;
+  }
+  return true;
+}
+
+function mdOpenTierSetImport() {
+  mdEditorCtx = { fields: [], row: {}, onSave: async () => {} };
+  mdTierImportParsed = null;
+  document.getElementById('mdEditorTitle').textContent = '套装数据导入（粘贴插件 ≥1.1.0 导出的套装 JSON）';
+  document.getElementById('mdEditorBody').innerHTML = `
+    <div class="form-group">
+      <label class="form-label">套装 JSON（exportType=tier_sets；逐套按 赛季/职业/专精 匹配 tier_sets 行，未匹配标红跳过）</label>
+      <textarea class="form-textarea" id="mdField__tierimport" style="height:160px" placeholder='{"version":"1.1.0","exportType":"tier_sets","data":[{"season":"S2","className":"死亡骑士","specName":"鲜血","setName":"…","pieces":[{"slot":"头部","itemID":279101,"itemName":"…","iconName":"inv_helm_xxx","ilvl":318,"armorType":"板甲"}]}]}'></textarea>
+    </div>
+    <div id="mdTierImportPreview"></div>`;
+  const btn = document.getElementById('mdEditorSaveBtn');
+  btn.disabled = false;
+  btn.textContent = '解析并预览';
+  btn.onclick = mdTierImportParse;
+  openModal('mdEditorModal');
+}
+
+function mdTierImportParse() {
+  const text = (document.getElementById('mdField__tierimport').value || '').trim();
+  if (!text) { showToast('请先粘贴套装 JSON', 'error'); return; }
+  let json;
+  try { json = JSON.parse(text); } catch (e) { showToast('JSON 解析失败：' + e.message, 'error'); return; }
+  if (!mdVersionGte(json.version, '1.1.0')) {
+    showToast(`插件版本过低（version=${json.version || '缺失'}，需 ≥1.1.0）`, 'error'); return;
+  }
+  if (json.exportType !== 'tier_sets') {
+    showToast(`导出类型不符（exportType=${json.exportType || '缺失'}，需 tier_sets）`, 'error'); return;
+  }
+  const data = Array.isArray(json.data) ? json.data : [];
+  if (!data.length) { showToast('data 为空，无可导入套装', 'error'); return; }
+
+  const seasons = MasterData.getSeasons();
+  const classes = MasterData.getClasses();
+  const rows = []; // 每套一条预览行：{seasonName,className,specName,setName,pieces[],error}
+  data.forEach(set => {
+    const base = {
+      seasonName: set.season || '', className: set.className || '',
+      specName: set.specName || '', setName: set.setName || '', pieces: []
+    };
+    const season = seasons.find(s => s.name === base.seasonName);
+    if (!season) { rows.push({ ...base, error: `赛季「${base.seasonName || '空'}」不存在` }); return; }
+    const cls = classes.find(c => c.name_zh === base.className);
+    if (!cls) { rows.push({ ...base, error: `职业「${base.className || '空'}」不存在` }); return; }
+    const spec = MasterData.getSpecs(cls.id).find(s => s.name_zh === base.specName);
+    if (!spec) { rows.push({ ...base, error: `职业「${base.className}」下无专精「${base.specName || '空'}」` }); return; }
+    const tierSet = MasterData.getTierSets(season.id).find(t => t.class_id === cls.id && t.spec_id === spec.id);
+    if (!tierSet) { rows.push({ ...base, error: `tier_sets 无 ${base.seasonName} ${base.className}·${base.specName} 套装行（先在上方表格建行）` }); return; }
+    base.setName = tierSet.set_name || base.setName;
+    base.pieces = (Array.isArray(set.pieces) ? set.pieces : [])
+      .filter(p => p && p.slot && p.itemName)
+      .map(p => ({
+        season_id: season.id,
+        tier_set_id: tierSet.id,
+        slot: p.slot,
+        item_name: p.itemName,
+        official_item_id: p.itemID ?? null,
+        icon_name: p.iconName ?? null,
+        ilvl: p.ilvl ?? null,
+        armor_type: p.armorType ?? null
+      }));
+    rows.push(base);
+  });
+  mdTierImportParsed = rows;
+  const okRows = rows.filter(r => !r.error);
+  const pieceTotal = okRows.reduce((n, r) => n + r.pieces.length, 0);
+  document.getElementById('mdTierImportPreview').innerHTML =
+    `<div style="margin-top:12px;max-height:220px;overflow-y:auto">${mdTable('<th>赛季</th><th>职业</th><th>专精</th><th>套装名</th><th class="num">件数</th>',
+      rows.map(r => r.error
+        ? `<tr style="color:var(--danger)"><td>${r.seasonName || '-'}</td><td>${r.className || '-'}</td><td>${r.specName || '-'}</td><td style="font-size:12px">${r.error}</td><td class="num">-</td></tr>`
+        : `<tr><td>${r.seasonName}</td><td>${r.className}</td><td>${r.specName}</td><td>${r.setName}</td><td class="num">${r.pieces.length}</td></tr>`).join(''))}</div>
+    <div style="font-size:12px;color:var(--text-muted);margin-top:6px">匹配 ${okRows.length}/${rows.length} 套 · 共 ${pieceTotal} 件${rows.length - okRows.length ? ` · ${rows.length - okRows.length} 套未匹配（红字），确认导入时跳过` : ''}</div>`;
+  const btn = document.getElementById('mdEditorSaveBtn');
+  btn.textContent = `确认导入（${pieceTotal} 件）`;
+  btn.onclick = mdTierImportConfirm;
+}
+
+async function mdTierImportConfirm() {
+  const okRows = (mdTierImportParsed || []).filter(r => !r.error && r.pieces.length);
+  const pieceRows = okRows.flatMap(r => r.pieces);
+  if (!pieceRows.length) { showToast('没有可导入的有效件（全部未匹配或无 pieces）', 'error'); return; }
+  const btn = document.getElementById('mdEditorSaveBtn');
+  btn.disabled = true; btn.textContent = '导入中...';
+  try {
+    // 幂等：on_conflict 显式唯一列（season_id,tier_set_id,slot），重复导入覆盖不重复（BUG-046 教训）
+    await MasterData.mdUpsert('tier_set_pieces', pieceRows, 'season_id,tier_set_id,slot');
+    mdTierImportParsed = null;
+    closeModal('mdEditorModal');
+    showToast(`成功导入 ${pieceRows.length} 件，覆盖 ${okRows.length} 个专精`, 'success');
+  } catch (e) {
+    console.error('套装导入失败:', e);
+    // 迁移门禁：sql/37 未执行时上游 404——中文提示不白屏不静默，弹窗保持打开可重试
+    const msg = e.message || '未知错误';
+    if (e.status === 404 || /does not exist|Not Found|tier_set_pieces/i.test(msg)) {
+      showToast(`tier_set_pieces 表未就绪（sql/37 待执行）：${msg}`, 'error');
+    } else {
+      showToast('套装导入失败：' + msg, 'error');
+    }
+  } finally {
+    btn.disabled = false;
   }
 }
 

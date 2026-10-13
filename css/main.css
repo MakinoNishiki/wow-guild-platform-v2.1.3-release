@@ -2925,6 +2925,8 @@ body {
 .item-card:hover { border-color: var(--gold); background: rgba(240, 192, 96, 0.06); transform: translateY(-1px); }
 .item-card.selected { border-color: var(--gold); background: rgba(240, 192, 96, 0.1); box-shadow: 0 0 0 1px var(--gold); }
 .item-card-icon { width: 44px; height: 44px; border-radius: 6px; background: linear-gradient(135deg, #2a2a3a, #1a1a2a); display: flex; align-items: center; justify-content: center; font-size: 20px; flex-shrink: 0; border: 1px solid var(--border-color); }
+/* 任务书 #65 WP3.1：picker 卡片 Blizzard CDN 图标——填满 .item-card-icon 容器（44px/移动档 40px 自适应），onerror 回退 📦 */
+.item-card-icon-img { width: 100%; height: 100%; border-radius: 5px; object-fit: cover; display: block; }
 .item-card-info { flex: 1; min-width: 0; }
 .item-card-name { font-size: 14px; font-weight: 600; color: var(--gold); margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .item-card-meta { font-size: 11px; color: var(--text-muted); margin-bottom: 6px; }
@@ -5015,3 +5017,16 @@ img.class-icon[src$=".png"] { border-radius: 3px; }
 .ia-brand:hover .ia-brand-name { color: var(--gold-light); }
 /* §5（REQ-150）：装备分配/心愿单列表装备名前置小图标（#46 掉落卡片同族：空值不渲染、404 onerror 隐藏不占位） */
 .loot-item-icon { width: 20px; height: 20px; vertical-align: -4px; margin-right: 6px; border-radius: 4px; }
+
+/* ==================== 任务书 #65（扩展版，2026-10-13）：picker CDN 图标 + 套装快捷录入 ==================== */
+/* WP3.2：弹窗标题行模式切换钮组（右贴关闭钮；激活钮由 JS 加 .btn-primary 高亮，无新色值） */
+.tier-mode-switch { margin-left: auto; margin-right: 10px; display: flex; gap: 6px; align-items: center; }
+/* WP3.2：套装名称只读行 */
+.tier-set-name { padding: 8px 12px; background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 6px; font-size: 13px; color: var(--gold); font-weight: 600; min-height: 20px; }
+.tier-set-name.tier-set-empty { color: var(--text-muted); font-weight: 400; }
+/* WP3.2：部位胶囊钮（复刻 .secondary-stat-tag 族：20px 圆角胶囊、金色 active 渐变；单选语义待运营确认） */
+.tier-slot-caps { display: flex; gap: 8px; flex-wrap: wrap; }
+.tier-slot-cap { padding: 6px 14px; border-radius: 20px; font-size: 13px; font-weight: 500; cursor: pointer; border: 1px solid var(--border-color); background: var(--bg-primary); color: var(--text-secondary); transition: all 0.2s; }
+.tier-slot-cap:hover { border-color: var(--gold); color: var(--text-primary); background: rgba(240, 192, 96, 0.05); }
+.tier-slot-cap.active { background: linear-gradient(135deg, var(--gold-dark), var(--gold)); color: var(--bg-primary); border-color: var(--gold); font-weight: 600; box-shadow: 0 0 10px rgba(240, 192, 96, 0.3); }
+.tier-slot-cap.disabled { opacity: 0.45; cursor: not-allowed; }

@@ -83,7 +83,7 @@
 
 6. **考勤记录**（page:attendance） - 默认列表视图/日历视图（按 userId+guildId 记忆，BUG-023）、活动CRUD、BOSS选择、WCL 日志链接（REQ-014）、WCL 同步考勤（REQ-033：已挂 WCL 链接的活动可一键同步，预览三分区——全勤绿/部分参战黄默认出席/未匹配红，不覆盖手动标记，幂等，成功后写 activities.wcl_snapshot 快照）、筛选条（REQ-018：成员/状态多选/时间范围/含已取消开关+出勤率小计，本赛季=最近90天）、考勤详情勾选批量标记（REQ-017-A）、活动列表勾选批量删除（REQ-017-B）、WCL 已导入提示条（REQ-037：快照存在且非全员已标记时显示，N 取快照 imported 字段）、活动状态（REQ-020：正常/已取消，已取消灰显+徽标、考勤区禁编辑、其考勤不计入任何出勤率，可恢复；status 服务端白名单 normal/cancelled）、团队标签与冲突检测（REQ-028：同标签同日时段交叉只警告不禁止，冲突活动列表黄色高亮；REQ-064 起旧 team_tag 字段并入 team_label 并删列，冲突分组键同步切为团号）、团号徽章（REQ-062：team_label 可空，纯数字显示「N 团」、文字显示「团号：X」、空不显示）、团本下拉（REQ-029：datalist 可手输，最近 3 个按公会置顶，清单为 js 常量待 REQ-003 主数据切换）
 
-7. **装备分配**（page:loot） - 103件装备库、多维筛选、心愿独立列、Roll 点循环输入（1-100）、分配记录、从装备库选择自动带出赛季（REQ-063：按 boss_loot→game_bosses→game_raids→赛季链路回填，缺数据留空不报错）；picker 赛季分组（REQ-149，任务书 #64：默认只直显当前赛季=is_current 团本装备，历史赛季收底部「历史赛季团本（N 件）」折叠组——任一筛选生效自动展开结果不藏、手动展开态仅本次打开内有效 openItemDbPicker 复位、is_current 缺失不分组全量直显，装备分配/心愿单两面板同一弹窗同治；**#64-补丁 2026-10-13**：「所属团本」下拉全面 optgroup 赛季分组——手动添加表单（装备分配/心愿单，默认当前赛季首团本取代写死 S1 虚影尖塔，BOSS 联动不变）+ picker 团本筛选下拉（当前赛季上档/历史赛季下档、「全部团本」置顶），分组助手 seasonOfRaidName/getDefaultRaidName/buildRaidSeasonOptions 收编 app.js 访问层单一真源，赛季标签读 season.name（schema 无 season_key 列））
+7. **装备分配**（page:loot） - 103件装备库、多维筛选、心愿独立列、Roll 点循环输入（1-100）、分配记录、从装备库选择自动带出赛季（REQ-063：按 boss_loot→game_bosses→game_raids→赛季链路回填，缺数据留空不报错）；picker 赛季分组（REQ-149，任务书 #64：默认只直显当前赛季=is_current 团本装备，历史赛季收底部「历史赛季团本（N 件）」折叠组——任一筛选生效自动展开结果不藏、手动展开态仅本次打开内有效 openItemDbPicker 复位、is_current 缺失不分组全量直显，装备分配/心愿单两面板同一弹窗同治；**#64-补丁 2026-10-13**：「所属团本」下拉全面 optgroup 赛季分组——手动添加表单（装备分配/心愿单，默认当前赛季首团本取代写死 S1 虚影尖塔，BOSS 联动不变）+ picker 团本筛选下拉（当前赛季上档/历史赛季下档、「全部团本」置顶），分组助手 seasonOfRaidName/getDefaultRaidName/buildRaidSeasonOptions 收编 app.js 访问层单一真源，赛季标签读 season.name（schema 无 season_key 列））；**#65 WP3 2026-10-13**：picker 卡图标接 Blizzard CDN（REQ-157：icon_name→render.worldofwarcraft.com/icons/56，lazy+onerror 回退 📦，icon_name 空维持占位，icon_id 数字 fileDataID 与 CDN 不兼容仅存档）+ 手动表单「普通/套装」切换套装快捷录入（REQ-158：职业→专精联动→当前赛季 tier_sets 套装名自动带出→部位单选胶囊→名称 SLOT_SUFFIX 自动拼接可手改，两弹窗同源，状态走默认「待分配」）+ 装备分配列表套装名前缀 🏷️ 徽标（心愿单列表不扩））
 
 8. **心愿单**（page:wishlist） - 按成员管理、竞争概览
 
@@ -116,6 +116,8 @@
 * `wishlists` - 心愿单（guild_id, member_id, items JSONB）
 
 * `claim_requests` - 认领申请（任务书 #21 WP2，approval 模式；guild_id, member_id, user_id, status: pending/approved/rejected，同一 member 仅一条 pending 部分唯一索引）
+
+* `tier_set_pieces` - 套装件表（任务书 #65 WP2，sql/37：season_id+tier_set_id+slot 唯一，icon_name/ilvl/armor_type，RLS 公开只读，写仅超管走代理主数据分支；数据源=插件 v1.1.0 套装导出 JSON 经数据中心「套装数据导入」幂等导入）
 
 ### RLS 权限策略
 
@@ -175,7 +177,7 @@
 
 * 加载层 `js/masterData.js`（window.MasterData）：登录后并行拉 9 表 + 5s 超时 + `js/masterDataSnapshot.js` 内置快照兜底（失败 toast 不白屏；任务书 #66：快照 seasons 已补 S1/S2 真实行——空 seasons 曾致快照态 getCurrentSeason()=null、团本 optgroup 分组退化；lootShowModal/wishlistShowModal/openItemDbPicker 三入口渲染前 await MasterData.init() 消时序竞态）；访问函数 getRaids/getBosses/getClasses/getSpecs/getCurrentSeason/getDungeons/getLoot/getTierSets；写助手 mdInsert/mdUpdate/mdDelete/mdUpsert
 
-* 维护页「数据中心」（侧边栏 tab，仅超管可见 + switchPage 守卫）：9 区块 CRUD + 字典导入器（数据源=内置快照 masterDataSnapshot.js，幂等 upsert，BUG-046 起不再依赖外部文件）+ 掉落批量录入；掉落双表单 slot/item_type 为纯 select 词表下拉（任务书 #40 / REQ-114：选项唯一真源 = js/lootTaxonomy.js 的 DC_SLOT_OPTIONS 19 项/DC_ITEM_TYPE_OPTIONS 33 项，库内全量现存值覆盖；mdOpenEditor select 分支通用原值兜底——词表外存量值作额外选项插入并选中不强制改写）
+* 维护页「数据中心」（侧边栏 tab，仅超管可见 + switchPage 守卫）：9 区块 CRUD + 字典导入器（数据源=内置快照 masterDataSnapshot.js，幂等 upsert，BUG-046 起不再依赖外部文件）+ 掉落批量录入 + 套装数据导入（任务书 #65 WP2.3 / REQ-156：套装 tab 工具行「📥 套装数据导入」，插件 v1.1.0 JSON 两段式解析预览→mdUpsert('tier_set_pieces',rows,'season_id,tier_set_id,slot') 幂等，未匹配红标，表未就绪中文报错不白屏）；掉落双表单 slot/item_type 为纯 select 词表下拉（任务书 #40 / REQ-114：选项唯一真源 = js/lootTaxonomy.js 的 DC_SLOT_OPTIONS 19 项/DC_ITEM_TYPE_OPTIONS 33 项，库内全量现存值覆盖；mdOpenEditor select 分支通用原值兜底——词表外存量值作额外选项插入并选中不强制改写）
 
 * 消费方统一走 app.js 访问层：getGameRaidNames/getGameBossNames/getGameSpecs/getGameRaidType/getGameCurrentSeasonStart（MasterData 优先，常量回退）；REQ-018 本赛季口径读 game_seasons.is_current
 

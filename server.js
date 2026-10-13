@@ -780,7 +780,8 @@ async function authorizeProxyRequest(user, table, method, queryString, rawBody) 
   // 决策 #1（运营拍板）：全产品共用一套字典，所有公会只读，仅超管维护。
   // 正常读取前端直连 Supabase（RLS select 放行），代理读仅兜底；写必须超管。
   // dungeon_loot（任务书 #23 WP1）：与既有 9 表同一分支模式，仅加入白名单，不改分支逻辑
-  const MASTER_TABLES = ["game_patches", "game_seasons", "game_raids", "game_bosses", "boss_loot", "dungeon_loot", "tier_sets", "game_dungeons", "game_classes", "game_specs"];
+  // tier_set_pieces（任务书 #65 WP2，sql/37）：套装件表同一分支模式——读公开（RLS select true），写仅超管走本分支
+  const MASTER_TABLES = ["game_patches", "game_seasons", "game_raids", "game_bosses", "boss_loot", "dungeon_loot", "tier_sets", "game_dungeons", "game_classes", "game_specs", "tier_set_pieces"];
   if (MASTER_TABLES.includes(table)) {
     if (method === "GET") return { ok: true };
     const appRole = user.app_metadata && user.app_metadata.role;

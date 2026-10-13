@@ -124,3 +124,11 @@
 - `.dp-tier-count` / `.dp-tier-pieces` / `.dp-tier-piece` / `.dp-tier-piece-name`（data-public.css）—— REQ-148 套装一览「共X件」展开钮与明细行：胶囊钮 22px 高 11px 字（.dp-count 同族），箭头默认收起向右 -90°、.open 归位向下；明细行与 .dp-tier-bonus 同排版规格（部位 .dp-tag + 兑换物名），REQ-089 落地后仅换数据源样式不动
 - `.item-db-history` / `.item-db-history-head` / `.item-db-history-caret` / `.item-db-history-body`（main.css）—— REQ-149 picker 历史赛季折叠组：默认收起（.open 展开），组头虚线分隔降一档、箭头 ▸ 展开旋转 90°；任一筛选生效 JS 自动加 .open
 - `.dh-group-note`（decor-public.css）—— 筛选组说明小注（11px 灰、紧贴组头、可换行），首发于 BUG-108「主题风格」组口径说明
+
+## 任务书 #65 登记（扩展版，2026-10-13）
+
+### 新增类
+- `.item-card-icon-img`（main.css）—— picker 卡片 Blizzard CDN 图标（REQ-156/WP3.1）：填满 `.item-card-icon` 容器（100% 宽高自适应 44px 基档/40px 移动档）、`object-fit: cover`、5px 圆角；`icon_name` 白名单字符校验通过才渲染，CDN 加载失败 onerror 回退 📦（与 #46/.loot-item-icon 同族口径：空值不渲染、lazy 加载）
+- `.tier-mode-switch`（main.css）—— 装备分配/心愿单弹窗标题行「普通装备/套装装备」切换钮组（WP3.2）：margin-left:auto 右贴关闭钮，激活钮加 .btn-primary 高亮
+- `.tier-slot-cap` / `.tier-slot-cap.active` / `.tier-slot-cap.disabled`（main.css）—— 套装部位胶囊钮（WP3.2）：样式复刻 .secondary-stat-tag 族（20px 圆角胶囊、金色 active 渐变），单选语义（任务书 3.2「单选/多选」未定，按线框图单选实现，待运营确认）
+- `.tier-set-name`（main.css）—— 套装名称只读行（WP3.2）：命中显示套装名（金色），未命中灰字「该职业专精当前赛季无套装记录」
