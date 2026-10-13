@@ -83,7 +83,7 @@
 
 6. **考勤记录**（page:attendance） - 默认列表视图/日历视图（按 userId+guildId 记忆，BUG-023）、活动CRUD、BOSS选择、WCL 日志链接（REQ-014）、WCL 同步考勤（REQ-033：已挂 WCL 链接的活动可一键同步，预览三分区——全勤绿/部分参战黄默认出席/未匹配红，不覆盖手动标记，幂等，成功后写 activities.wcl_snapshot 快照）、筛选条（REQ-018：成员/状态多选/时间范围/含已取消开关+出勤率小计，本赛季=最近90天）、考勤详情勾选批量标记（REQ-017-A）、活动列表勾选批量删除（REQ-017-B）、WCL 已导入提示条（REQ-037：快照存在且非全员已标记时显示，N 取快照 imported 字段）、活动状态（REQ-020：正常/已取消，已取消灰显+徽标、考勤区禁编辑、其考勤不计入任何出勤率，可恢复；status 服务端白名单 normal/cancelled）、团队标签与冲突检测（REQ-028：同标签同日时段交叉只警告不禁止，冲突活动列表黄色高亮；REQ-064 起旧 team_tag 字段并入 team_label 并删列，冲突分组键同步切为团号）、团号徽章（REQ-062：team_label 可空，纯数字显示「N 团」、文字显示「团号：X」、空不显示）、团本下拉（REQ-029：datalist 可手输，最近 3 个按公会置顶，清单为 js 常量待 REQ-003 主数据切换）
 
-7. **装备分配**（page:loot） - 103件装备库、多维筛选、心愿独立列、Roll 点循环输入（1-100）、分配记录、从装备库选择自动带出赛季（REQ-063：按 boss_loot→game_bosses→game_raids→赛季链路回填，缺数据留空不报错）；picker 赛季分组（REQ-149，任务书 #64：默认只直显当前赛季=is_current 团本装备，历史赛季收底部「历史赛季团本（N 件）」折叠组——任一筛选生效自动展开结果不藏、手动展开态仅本次打开内有效 openItemDbPicker 复位、is_current 缺失不分组全量直显，装备分配/心愿单两面板同一弹窗同治）
+7. **装备分配**（page:loot） - 103件装备库、多维筛选、心愿独立列、Roll 点循环输入（1-100）、分配记录、从装备库选择自动带出赛季（REQ-063：按 boss_loot→game_bosses→game_raids→赛季链路回填，缺数据留空不报错）；picker 赛季分组（REQ-149，任务书 #64：默认只直显当前赛季=is_current 团本装备，历史赛季收底部「历史赛季团本（N 件）」折叠组——任一筛选生效自动展开结果不藏、手动展开态仅本次打开内有效 openItemDbPicker 复位、is_current 缺失不分组全量直显，装备分配/心愿单两面板同一弹窗同治；**#64-补丁 2026-10-13**：「所属团本」下拉全面 optgroup 赛季分组——手动添加表单（装备分配/心愿单，默认当前赛季首团本取代写死 S1 虚影尖塔，BOSS 联动不变）+ picker 团本筛选下拉（当前赛季上档/历史赛季下档、「全部团本」置顶），分组助手 seasonOfRaidName/getDefaultRaidName/buildRaidSeasonOptions 收编 app.js 访问层单一真源，赛季标签读 season.name（schema 无 season_key 列））
 
 8. **心愿单**（page:wishlist） - 按成员管理、竞争概览
 

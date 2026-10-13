@@ -286,6 +286,48 @@ function getGameCurrentSeasonStart() {
   return null;
 }
 
+// 任务书 #64-补丁②③：团本赛季分组助手（手动表单「所属团本」+ picker 下拉共用，禁第三份映射）。
+// 赛季归属 = raid.season_id → game_seasons；当前赛季 = is_current（MasterData.getCurrentSeason）。
+// 偏差申报：话术要求读 game_seasons.season_key，schema（sql/10）无此列，赛季标签读 season.name（'S1'/'S2' 现值口径）。
+function seasonOfRaidName(raidName) {
+  try {
+    if (!window.MasterData || !MasterData.isLoaded()) return null;
+    const raid = MasterData.getRaidByName(raidName);
+    if (!raid || !raid.season_id) return null;
+    return (MasterData.getSeasons() || []).find(s => s.id === raid.season_id) || null;
+  } catch (e) { return null; }
+}
+// 手动表单「所属团本」默认值 = 当前赛季首个团本；主数据未载/无当前赛季回退原默认「虚影尖塔」
+function getDefaultRaidName() {
+  try {
+    if (window.MasterData && MasterData.isLoaded()) {
+      const cur = MasterData.getCurrentSeason();
+      if (cur) {
+        const raids = MasterData.getRaids(cur.id);
+        if (raids.length) return raids[0].name;
+      }
+    }
+  } catch (e) {}
+  return '虚影尖塔';
+}
+// 团本下拉选项 HTML：当前赛季 optgroup 置顶 + 历史赛季 optgroup 收尾（保留全量团本——编辑历史赛季记录不丢值）。
+// is_current 缺失/主数据未载 → 回退平面全量（既有行为）。appendOther 追加「其他」（手动表单用）。
+function buildRaidSeasonOptions(selectedRaid = '', appendOther = false, raidList = null) {
+  const raids = raidList || getGameRaidNames();
+  const opt = r => `<option value="${r}" ${r === selectedRaid ? 'selected' : ''}>${r}</option>`;
+  const tail = appendOther ? `<option value="其他" ${selectedRaid === '其他' ? 'selected' : ''}>其他</option>` : '';
+  const cur = (window.MasterData && MasterData.isLoaded() && MasterData.getCurrentSeason) ? MasterData.getCurrentSeason() : null;
+  if (!cur) return raids.map(opt).join('') + tail;
+  const current = raids.filter(r => { const s = seasonOfRaidName(r); return s && s.id === cur.id; });
+  const history = raids.filter(r => !current.includes(r));
+  let html = `<optgroup label="当前赛季（${cur.name}）">${current.map(opt).join('')}</optgroup>`;
+  if (history.length) {
+    const histNames = [...new Set(history.map(r => { const s = seasonOfRaidName(r); return s ? s.name : ''; }).filter(Boolean))];
+    html += `<optgroup label="历史赛季（${histNames.join('/')}）">${history.map(opt).join('')}</optgroup>`;
+  }
+  return html + tail;
+}
+
 // REQ-029：「最近使用」团本，按公会记忆最近 3 个
 function getRecentRaidNamesKey() {
   const guild = window.CloudSync && window.CloudSync.getCurrentGuild && window.CloudSync.getCurrentGuild();
@@ -6113,16 +6155,13 @@ function lootOnCategoryChange() {
   lootUpdateSlotOptions();
 }
 
-// 初始化团本下拉选项
-function lootInitRaidSelect(selectedRaid = '虚影尖塔', selectedBoss = '') {
+// 初始化团本下拉选项（任务书 #64-补丁②：按赛季 optgroup 分组，默认当前赛季首个团本）
+function lootInitRaidSelect(selectedRaid = '', selectedBoss = '') {
   const raidSelect = document.getElementById('lootRaid');
   if (!raidSelect) return;
-  
-  const raids = getGameRaidNames().concat(['其他']); // 任务书 #14：团本清单读主数据
-  raidSelect.innerHTML = raids.map(r => 
-    `<option value="${r}" ${r === selectedRaid ? 'selected' : ''}>${r}</option>`
-  ).join('');
-  
+  if (!selectedRaid) selectedRaid = getDefaultRaidName();
+  raidSelect.innerHTML = buildRaidSeasonOptions(selectedRaid, true);
+
   // 更新BOSS下拉
   lootUpdateBossOptions(selectedBoss);
 }
@@ -6580,7 +6619,7 @@ function lootShowModal(lootId = null) {
     if (loot) {
       document.getElementById('lootName').value = loot.name || '';
       // 初始化团本下拉
-      lootInitRaidSelect(loot.raid || '虚影尖塔', loot.boss || '');
+      lootInitRaidSelect(loot.raid || '', loot.boss || '');
       document.getElementById('lootDifficulty').value = loot.difficulty || '普通';
       document.getElementById('lootCategory').value = loot.category || '武器';
       lootUpdateSlotOptions(loot.slot || '');
@@ -6607,7 +6646,7 @@ function lootShowModal(lootId = null) {
   } else {
     document.getElementById('lootModalTitle').textContent = '添加装备';
     document.getElementById('lootName').value = '';
-    lootInitRaidSelect('虚影尖塔');
+    lootInitRaidSelect(); // 任务书 #64-补丁②：默认当前赛季首个团本（原写死 S1「虚影尖塔」）
     document.getElementById('lootDifficulty').value = '普通';
     document.getElementById('lootCategory').value = '武器';
     lootUpdateSlotOptions();
@@ -7169,10 +7208,9 @@ function wishlistShowModal(wishId = null, presetData = null) {
   document.getElementById('wishlistMemberMulti').style.display = isEdit ? 'none' : 'block';
   memberSelect.style.display = isEdit ? 'block' : 'none';
 
-  // 填充团本下拉（任务书 #14：主数据清单 + 其他）
+  // 填充团本下拉（任务书 #64-补丁②：按赛季 optgroup 分组，主数据清单 + 其他）
   const raidSelect = document.getElementById('wishlistRaid');
-  const raidOptions = getGameRaidNames().map(r => `<option value="${r}">${r}</option>`).join(''); // 任务书 #14：团本清单读主数据
-  raidSelect.innerHTML = raidOptions + '<option value="其他">其他</option>';
+  raidSelect.innerHTML = buildRaidSeasonOptions('', true);
 
   if (isEdit) {
     document.getElementById('wishlistModalTitle').textContent = '编辑心愿';
@@ -7182,7 +7220,7 @@ function wishlistShowModal(wishId = null, presetData = null) {
       document.getElementById('wishlistItemName').value = wish.itemName || '';
 
       // 设置团本
-      const raidVal = wish.raid || '虚影尖塔';
+      const raidVal = wish.raid || getDefaultRaidName();
       if (getGameRaidNames().includes(raidVal)) {
         raidSelect.value = raidVal;
       } else {
@@ -7216,7 +7254,7 @@ function wishlistShowModal(wishId = null, presetData = null) {
     if (presetData) {
       document.getElementById('wishlistItemName').value = presetData.itemName || '';
       
-      const raidVal = presetData.raid || '虚影尖塔';
+      const raidVal = presetData.raid || getDefaultRaidName();
       if (getGameRaidNames().includes(raidVal)) {
         raidSelect.value = raidVal;
       } else {
@@ -7240,8 +7278,8 @@ function wishlistShowModal(wishId = null, presetData = null) {
       document.getElementById('wishlistNote').value = '';
     } else {
       document.getElementById('wishlistItemName').value = '';
-      // 默认选第一个团本
-      const firstRaid = getGameRaidNames()[0] || '其他';
+      // 默认选当前赛季首个团本（任务书 #64-补丁②）
+      const firstRaid = getDefaultRaidName();
       raidSelect.value = firstRaid;
       wishlistOnRaidChange();
       document.getElementById('wishlistCategory').value = '武器';
@@ -7615,6 +7653,20 @@ function lootFillAssignedTo(idOrName) {
 // ==================== 初始化 ====================
 // ==================== 更新日志 ====================
 const changelogData = [
+  {
+    id: 'v3.2.0-task64-patch',
+    version: 'v3.2.0',
+    date: '2026-10-13',
+    type: 'improve',
+    typeLabel: '体验优化',
+    title: '手动添加装备表单按赛季分组 + picker「所属团本」下拉赛季分组（任务书 #64-补丁）',
+    summary: '装备分配与心愿单的「手动添加」表单「所属团本」下拉改为按赛季 optgroup 分组：当前赛季（S2）置顶并默认选中其首个团本（原默认写死 S1 虚影尖塔），历史赛季（S1）收底部分组，选中团本后「掉落BOSS」下拉照常联动过滤；picker 弹窗左侧「所属团本」下拉同步改 optgroup 分组（当前赛季上半区/历史赛季下半区），「全部团本」置顶行为不变（列表区维持 REQ-149 赛季折叠）。赛季口径统一读主数据 game_seasons.is_current + season.name，is_current 异常时回退全量平面列表。另核查销项：登录壳副本掉落页套装区「共X件」+ 展开明细经真浏览器实测本就在场（REQ-148 双壳同源，与公示页同一渲染层），补丁①零改动。',
+    details: [
+      '团本赛季分组助手收编 app.js 访问层单一真源（seasonOfRaidName/getDefaultRaidName/buildRaidSeasonOptions），手动表单两面板与 picker 三处共用',
+      '编辑/复制历史赛季记录不丢值：分组保留全量团本，仅分组与默认态变化',
+      '纯前端：仅 app.js + 三壳版本串 20261013.86，零后端零迁移；verify-task64-patch.js 24/24 全绿'
+    ]
+  },
   {
     id: 'v3.2.0-task64-req148',
     version: 'v3.2.0',
@@ -12783,12 +12835,13 @@ function renderItemDbList() {
   itemDbPickerItems = base; // selectDbItem 查找池
 
   // 左侧团本筛选同步只列有掉落的主数据团本（每次渲染重建，保留当前选择）
+  // 任务书 #64-补丁③：按赛季 optgroup 分组（上半区当前赛季/下半区历史赛季，标签读 season.name——schema 无 season_key 列）；
+  // 「全部团本」置顶行为不变（列表区 REQ-149 赛季折叠）；is_current 缺失时 buildRaidSeasonOptions 回退平面全量。
   const raidSelect = document.getElementById('itemDbRaidFilter');
   if (raidSelect) {
     const cur = raidSelect.value;
     const keys = [...new Set(base.map(i => i.raid))];
-    raidSelect.innerHTML = '<option value="">全部团本</option>' +
-      keys.map(k => `<option value="${k}" ${k === cur ? 'selected' : ''}>${k}</option>`).join('');
+    raidSelect.innerHTML = '<option value="">全部团本</option>' + buildRaidSeasonOptions(cur, false, keys);
   }
 
   let filtered = base.filter(item => {
