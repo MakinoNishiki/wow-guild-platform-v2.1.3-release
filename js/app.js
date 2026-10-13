@@ -311,7 +311,8 @@ function getDefaultRaidName() {
   return '虚影尖塔';
 }
 // 团本下拉选项 HTML：当前赛季 optgroup 置顶 + 历史赛季 optgroup 收尾（保留全量团本——编辑历史赛季记录不丢值）。
-// is_current 缺失/主数据未载 → 回退平面全量（既有行为）。appendOther 追加「其他」（手动表单用）。
+// is_current 缺失/主数据未载/当前赛季组为空（快照态团本无 season_id，任务书 #66 1.2 补防） → 回退平面全量（既有行为）。
+// appendOther 追加「其他」（手动表单用）。
 function buildRaidSeasonOptions(selectedRaid = '', appendOther = false, raidList = null) {
   const raids = raidList || getGameRaidNames();
   const opt = r => `<option value="${r}" ${r === selectedRaid ? 'selected' : ''}>${r}</option>`;
@@ -319,11 +320,12 @@ function buildRaidSeasonOptions(selectedRaid = '', appendOther = false, raidList
   const cur = (window.MasterData && MasterData.isLoaded() && MasterData.getCurrentSeason) ? MasterData.getCurrentSeason() : null;
   if (!cur) return raids.map(opt).join('') + tail;
   const current = raids.filter(r => { const s = seasonOfRaidName(r); return s && s.id === cur.id; });
+  if (!current.length) return raids.map(opt).join('') + tail; // 当前赛季组空（快照兜底态）不出空 optgroup
   const history = raids.filter(r => !current.includes(r));
   let html = `<optgroup label="当前赛季（${cur.name}）">${current.map(opt).join('')}</optgroup>`;
   if (history.length) {
     const histNames = [...new Set(history.map(r => { const s = seasonOfRaidName(r); return s ? s.name : ''; }).filter(Boolean))];
-    html += `<optgroup label="历史赛季（${histNames.join('/')}）">${history.map(opt).join('')}</optgroup>`;
+    html += `<optgroup label="${histNames.length ? `历史赛季（${histNames.join('/')}）` : '历史赛季'}">${history.map(opt).join('')}</optgroup>`;
   }
   return html + tail;
 }
@@ -6609,7 +6611,10 @@ function lootOnDistributionMethodChange() {
 }
 
 // 显示添加/编辑装备弹窗
-function lootShowModal(lootId = null) {
+async function lootShowModal(lootId = null) {
+  // 任务书 #66（1.2）：渲染前等待主数据就绪——未加载完成时 buildRaidSeasonOptions 会走 !cur 平面回退；
+  // init() 内部失败已快照兜底不拒绝，此处 await 不阻塞用户操作
+  if (window.MasterData && !MasterData.isLoaded()) await MasterData.init();
   lootEditingId = lootId;
   lootSelectedSecondaryStats = [];
   
@@ -7192,7 +7197,9 @@ async function wishlistBatchDelete() {
 }
 
 // 显示添加/编辑心愿弹窗
-function wishlistShowModal(wishId = null, presetData = null) {
+async function wishlistShowModal(wishId = null, presetData = null) {
+  // 任务书 #66（1.2）：渲染前等待主数据就绪（同 lootShowModal 口径）
+  if (window.MasterData && !MasterData.isLoaded()) await MasterData.init();
   wishlistEditingId = wishId;
   const isEdit = !!wishId;
 
@@ -7653,6 +7660,34 @@ function lootFillAssignedTo(idOrName) {
 // ==================== 初始化 ====================
 // ==================== 更新日志 ====================
 const changelogData = [
+  {
+    id: 'v3.2.0-task66-optgroup-fix',
+    version: 'v3.2.0',
+    date: '2026-10-13',
+    type: 'fix',
+    typeLabel: '问题修复',
+    title: '团本下拉赛季分组线上未生效根治（任务书 #66 / REQ-152）',
+    summary: '「所属团本」optgroup 分组线上未生效的根因双修：①masterDataSnapshot.js 内置快照 seasons 补全 S1/S2 真实数据（此前为空数组，主数据加载超时/失败走快照兜底时 getCurrentSeason() 返回 null，分组退化平面列表）；②装备分配/心愿单手动表单与 picker 三个弹窗入口在渲染前 await MasterData.init() 等待主数据就绪（消除「弹窗打开早于字典加载完成」的时序竞态）。分组助手加固：快照态团本无 season_id 导致当前赛季组为空时回退平面列表，不出空分组。',
+    details: [
+      '快照 seasons 两行四键与 DB game_seasons 逐字段核对一致（真实 UUID，S2 is_current）',
+      'init() 内部失败已快照兜底不拒绝，await 不阻塞用户操作；断网模拟实测快照态下拉正常',
+      '纯前端：masterDataSnapshot.js + app.js，零后端零迁移'
+    ]
+  },
+  {
+    id: 'v3.2.0-task66-ux',
+    version: 'v3.2.0',
+    date: '2026-10-13',
+    type: 'improve',
+    typeLabel: '体验优化',
+    title: 'picker 装备卡装等接通+条件渲染、HTML 壳缓存头强化（任务书 #66 / REQ-153、REQ-154）',
+    summary: 'picker 装备卡 meta 行接通 boss_loot.ilvl 列并按非空段拼接：有装等的装备显示「装等 xxx」，无装等（S1 存量/装饰类）不再出现裸「装等」标签与空分隔符，与公示页 REQ-116「非空才渲染」同口径。三壳 HTML 响应缓存头由 no-cache 强化为 no-cache, no-store, must-revalidate（+Pragma/Expires），版本更新后用户免手动强刷即取最新页面；带版本串的 js/css 缓存策略不变。',
+    details: [
+      '仅 picker 卡片渲染改动，装备分配/心愿单/公示页链路零触碰',
+      'picker 真实物品图标（REQ-155）因 zamimg CDN 不支持数字 icon_id 取图挂起待运营定夺，维持 📦 占位',
+      'server.js 仅 HTML 响应头三行，版本串三壳 20261013.87'
+    ]
+  },
   {
     id: 'v3.2.0-task64-patch',
     version: 'v3.2.0',
@@ -12688,7 +12723,9 @@ let itemDbCallback = null;
 // 打开装备库选择器
 let itemDbPickerMode = 'wishlist';
 let itemDbHistoryOpen = false; // REQ-149（任务书 #64）：历史赛季组手动展开态（仅本次打开内有效）
-function openItemDbPicker(mode = 'wishlist') {
+async function openItemDbPicker(mode = 'wishlist') {
+  // 任务书 #66（1.2）：渲染前等待主数据就绪（同 lootShowModal 口径）
+  if (window.MasterData && !MasterData.isLoaded()) await MasterData.init();
   itemDbPickerMode = mode;
   itemDbHistoryOpen = false; // REQ-149：每次打开复位为「历史赛季折叠」默认态
   selectedDbItem = null;
@@ -12758,7 +12795,7 @@ function getMasterLootItems() {
           raid: raid.name, raidName: raid.name, raidId: raid.id,
           boss: boss.name, bossId: boss.id, bossIndex: `${boss.boss_order}号`,
           armorType: l.item_type || '', slot: l.slot || '',
-          icon: '📦', quality: 'epic', itemLevel: '',
+          icon: '📦', quality: 'epic', itemLevel: l.ilvl || '', // 任务书 #66（1.3）：接 boss_loot.ilvl 列
           stats: { primary: (l.primary_stats || []).join('/'), secondary: l.secondary_stats || [], primaryDetail: null, secondaryDetail: null },
           equipEffect: l.effect || ''
         });
@@ -12891,13 +12928,15 @@ function renderItemDbList() {
     const primaryStatHtml = renderPrimaryStat(item.stats.primary, item.stats.primaryDetail);
     const secondaryStatHtml = renderSecondaryStats(item.stats.secondary, item.stats.secondaryDetail);
     const sourceText = `${item.raidName} · ${item.bossIndex} ${item.boss}`;
+    // 任务书 #66（1.3）：meta 行按非空段拼接——装等有值才渲染（与 REQ-116 公示页「非空才渲染」同口径），空段不出裸分隔符
+    const metaText = [item.armorType, item.slot, item.itemLevel ? `装等${item.itemLevel}` : ''].filter(Boolean).join(' · ');
 
     return `
       <div class="item-card ${isSelected ? 'selected' : ''}" onclick="selectDbItem('${item.id}')">
         <div class="item-card-icon">${item.icon}</div>
         <div class="item-card-info">
           <div class="item-card-name ${qualityClass}">${item.name}</div>
-          <div class="item-card-meta">${item.armorType} · ${item.slot} · 装等${item.itemLevel}</div>
+          <div class="item-card-meta">${metaText}</div>
           <div class="item-card-stats">
             <div><span class="stat-label">主属性：</span>${primaryStatHtml}</div>
             <div><span class="stat-label">副属性：</span>${secondaryStatHtml}</div>

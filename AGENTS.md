@@ -173,7 +173,7 @@
 
 * 权限（运营拍板）：全产品共用一套字典，全登录用户可读（RLS select authenticated），仅产品超管可写（`app_metadata.role='superadmin'`；server.js 代理主数据分支校验，RLS 为直连最后防线）；超管设置 = 运营在 Supabase Dashboard 给本人账号写 app_metadata
 
-* 加载层 `js/masterData.js`（window.MasterData）：登录后并行拉 9 表 + 5s 超时 + `js/masterDataSnapshot.js` 内置快照兜底（失败 toast 不白屏）；访问函数 getRaids/getBosses/getClasses/getSpecs/getCurrentSeason/getDungeons/getLoot/getTierSets；写助手 mdInsert/mdUpdate/mdDelete/mdUpsert
+* 加载层 `js/masterData.js`（window.MasterData）：登录后并行拉 9 表 + 5s 超时 + `js/masterDataSnapshot.js` 内置快照兜底（失败 toast 不白屏；任务书 #66：快照 seasons 已补 S1/S2 真实行——空 seasons 曾致快照态 getCurrentSeason()=null、团本 optgroup 分组退化；lootShowModal/wishlistShowModal/openItemDbPicker 三入口渲染前 await MasterData.init() 消时序竞态）；访问函数 getRaids/getBosses/getClasses/getSpecs/getCurrentSeason/getDungeons/getLoot/getTierSets；写助手 mdInsert/mdUpdate/mdDelete/mdUpsert
 
 * 维护页「数据中心」（侧边栏 tab，仅超管可见 + switchPage 守卫）：9 区块 CRUD + 字典导入器（数据源=内置快照 masterDataSnapshot.js，幂等 upsert，BUG-046 起不再依赖外部文件）+ 掉落批量录入；掉落双表单 slot/item_type 为纯 select 词表下拉（任务书 #40 / REQ-114：选项唯一真源 = js/lootTaxonomy.js 的 DC_SLOT_OPTIONS 19 项/DC_ITEM_TYPE_OPTIONS 33 项，库内全量现存值覆盖；mdOpenEditor select 分支通用原值兜底——词表外存量值作额外选项插入并选中不强制改写）
 

@@ -3,7 +3,12 @@
 // 主数据表上线并录入数据后，本快照仅在离线/超时等加载失败场景生效。
 window.MASTER_DATA_SNAPSHOT = {
   patches: [],
-  seasons: [],
+  // 任务书 #66（1.1）：seasons 快照补全（2026-10-13 与 DB game_seasons 逐字段核对一致，id 为真实 UUID）。
+  // 用途=快照兜底态下的赛季分组/当前赛季判定；start_date 取 DB 实值仅用于排序。
+  seasons: [
+    { id: 'f4d458b5-b4fb-4fdc-bdc8-721265b4a485', name: 'S1', is_current: false, start_date: '2026-03-19', end_date: null },
+    { id: '370c4590-5fa0-47ba-a97a-d8a4436cbeea', name: 'S2', is_current: true, start_date: '2026-08-20', end_date: null }
+  ],
   raids: [
     { id: 'snap-raid-1', name: '尼鲁巴尔王宫', type: 'raid', min_players: 20, max_players: 20, sort_order: 1 },
     { id: 'snap-raid-2', name: '虚影尖塔', type: 'raid', min_players: 20, max_players: 20, sort_order: 2 },

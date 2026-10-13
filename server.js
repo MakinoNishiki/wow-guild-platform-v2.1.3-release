@@ -1120,9 +1120,9 @@ async function handleWclRequest(req, res, corsHeaders, withSnapshot) {
 function serveFile(res, filePath, req) {
   const ext = path.extname(filePath).toLowerCase();
   const contentType = MIME[ext] || "application/octet-stream";
-  // 任务书 #23-补丁 修正项⑤：.html 文档（含 / 根路径映射的 index.html）统一加
-  // Cache-Control: no-cache——每次回源校验，配合 Last-Modified / If-Modified-Since
-  // 新鲜则 304 不重传，兼顾性能；带 ?v= 的 js/css 等静态资源维持现状不动。
+  // 任务书 #23-补丁 修正项⑤（任务书 #66 1.5 强化）：.html 文档（含 / 根路径映射的 index.html）
+  // 缓存头升为 no-cache, no-store, must-revalidate + Pragma/Expires——push 后用户免 F5 即取新版；
+  // 带 ?v= 的 js/css 等静态资源维持现状不动（版本串失效机制）。
   const isHtml = ext === ".html";
 
   fs.stat(filePath, (serr, stats) => {
@@ -1133,7 +1133,9 @@ function serveFile(res, filePath, req) {
     }
     const headers = { "Content-Type": contentType };
     if (isHtml) {
-      headers["Cache-Control"] = "no-cache";
+      headers["Cache-Control"] = "no-cache, no-store, must-revalidate";
+      headers["Pragma"] = "no-cache";
+      headers["Expires"] = "0";
       headers["Last-Modified"] = stats.mtime.toUTCString();
       const ims = req && req.headers["if-modified-since"];
       if (ims && !Number.isNaN(Date.parse(ims)) && Date.parse(ims) >= Math.floor(stats.mtimeMs / 1000) * 1000) {
