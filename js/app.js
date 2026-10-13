@@ -6131,15 +6131,41 @@ const lootSlotMap = {
 // 部位后缀表（任务书 3.2 原文）；胶囊单选——原文「单选/多选」未定，按线框图单选实现（一次添加一件），待运营确认点。
 // 数据源 = tier_sets 在线表（MasterData 直读，不依赖 sql/37 的 tier_set_pieces）；保存链路零改动（走既有 lootSave/wishlistSave）。
 const TIER_SLOT_SUFFIX = { '头部': '头盔', '肩部': '肩甲', '胸部': '胸甲', '手部': '护手', '腿部': '腿甲' };
+
+// 任务书 #65-补丁 WP1.1：主属性按「职业+专精」联动映射（'*' = 职业级默认兜底；与 WP2 插件端 Lua 常量必须完全一致）
+const CLASS_SPEC_PRIMARY_STAT = {
+  '死亡骑士': { '*': '力量' },
+  '恶魔猎手': { '浩劫': '敏捷', '复仇': '敏捷', '噬灭': '智力' },
+  '德鲁伊':   { '平衡': '智力', '恢复': '智力', '野性': '敏捷', '守护': '敏捷' },
+  '唤魔师':   { '*': '智力' },
+  '猎人':     { '*': '敏捷' },
+  '法师':     { '*': '智力' },
+  '武僧':     { '织雾': '智力', '*': '敏捷' },
+  '圣骑士':   { '神圣': '智力', '*': '力量' },
+  '牧师':     { '*': '智力' },
+  '潜行者':   { '*': '敏捷' },
+  '萨满':     { '元素': '智力', '恢复': '智力', '*': '敏捷' },
+  '术士':     { '*': '智力' },
+  '战士':     { '*': '力量' },
+};
+
+function getPrimaryStat(className, specName) {
+  const classMap = CLASS_SPEC_PRIMARY_STAT[className];
+  if (!classMap) return '力量'; // 兜底
+  return classMap[specName] || classMap['*'] || '力量';
+}
 // 模式与选中部位按弹窗作用域分持；弹窗每次打开由 tierSetReset 复位 normal
 const tierModeState = { loot: 'normal', wishlist: 'normal' };
 const tierSlotSel = { loot: '', wishlist: '' };
 
 // 作用域 → 既有表单控件映射（两弹窗同源逻辑的唯一差异点）
+// WP1：bossIds=首领控件（含自定义输入形态）、bossHintId=首领禁用提示、primaryId=主属性下拉（心愿单无此字段为 ''）、secHintId=副属性占位提示
 function tierScopeMap(scope) {
   return scope === 'loot'
-    ? { pfx: 'lootTier', nameId: 'lootName', catId: 'lootCategory', slotUpdate: lootUpdateSlotOptions }
-    : { pfx: 'wishlistTier', nameId: 'wishlistItemName', catId: 'wishlistCategory', slotUpdate: wishlistUpdateSlotOptions };
+    ? { pfx: 'lootTier', nameId: 'lootName', catId: 'lootCategory', slotUpdate: lootUpdateSlotOptions,
+        bossIds: ['lootBoss', 'lootBossCustom'], bossHintId: 'lootTierBossHint', primaryId: 'lootPrimaryStat', secHintId: 'lootTierSecHint' }
+    : { pfx: 'wishlistTier', nameId: 'wishlistItemName', catId: 'wishlistCategory', slotUpdate: wishlistUpdateSlotOptions,
+        bossIds: ['wishlistBoss', 'wishlistBossText'], bossHintId: 'wishlistTierBossHint', primaryId: '', secHintId: '' };
 }
 
 // 当前赛季 + 选中职业/专精 → tier_sets 行（未加载/未选全/未命中返回 null）
@@ -6220,6 +6246,47 @@ function tierSetSpecChange(scope) {
   tierSetNameRender(scope);
   tierSetSlotReset(scope);
   document.getElementById(tierScopeMap(scope).nameId).value = '';
+  tierPrimaryStatSync(scope); // WP1.1：选定专精即联动主属性（任务书：选职业不动、选专精才更新）
+}
+
+// WP1.1：主属性联动——职业+专精选全才更新（选职业阶段不动，等专精）；心愿单弹窗无主属性字段天然跳过
+function tierPrimaryStatSync(scope) {
+  const m = tierScopeMap(scope);
+  if (!m.primaryId) return;
+  const p = document.getElementById(m.primaryId);
+  if (!p) return;
+  const clsName = (document.getElementById(`${m.pfx}Class`) || {}).value || '';
+  const specName = (document.getElementById(`${m.pfx}Spec`) || {}).value || '';
+  if (!clsName || !specName) return;
+  p.value = getPrimaryStat(clsName, specName);
+}
+
+// WP1.2/1.3：套装模式字段锁——首领控件禁用+清空+提示（套装由兑换物兑换，首领映射待 WP2 插件导出）；
+// 装备分配弹窗另锁主属性下拉（禁手改，值由 tierPrimaryStatSync 联动）+ 显示副属性占位提示
+function tierFieldLock(scope, lock) {
+  const m = tierScopeMap(scope);
+  for (const id of m.bossIds) {
+    const el = document.getElementById(id);
+    if (!el) continue;
+    el.disabled = lock;
+    if (lock) el.value = ''; // 防锁定态残留固定值（如默认首 BOSS）随保存入库
+  }
+  const bossHint = document.getElementById(m.bossHintId);
+  if (bossHint) bossHint.style.display = lock ? '' : 'none';
+  if (m.primaryId) {
+    const p = document.getElementById(m.primaryId);
+    if (p) p.disabled = lock;
+  }
+  if (m.secHintId) {
+    const s = document.getElementById(m.secHintId);
+    if (s) s.style.display = lock ? '' : 'none';
+  }
+}
+
+// WP1.2 后援：套装模式下团本切换会重建 BOSS 控件（下拉首项自动选中回填脏值），重建后保持锁定与清空
+function tierBossRearm(scope) {
+  if (tierModeState[scope] !== 'tier') return;
+  tierFieldLock(scope, true);
 }
 
 function tierSetSlotPick(scope, slot) {
@@ -6247,6 +6314,7 @@ function tierSetMode(scope, mode) {
   const m = tierScopeMap(scope);
   const block = document.getElementById(`${m.pfx}Block`);
   if (block) block.style.display = isTier ? '' : 'none';
+  tierFieldLock(scope, isTier); // WP1.2/1.3：进套装模式锁首领/主属性+提示，回普通模式全解锁
   if (!isTier) return; // 切回普通：仅隐藏套装块，名称/大类等表单值保留（用户可见可改，不静默清空）
   const clsSel = document.getElementById(`${m.pfx}Class`);
   // 职业清单：MasterData.getClasses() name_zh 全量；未加载回退 classSpecMap 键
@@ -6277,6 +6345,7 @@ function tierSetReset(scope) {
   const nameEl = document.getElementById(`${m.pfx}SetName`);
   if (nameEl) { nameEl.textContent = '—'; nameEl.classList.add('tier-set-empty'); }
   tierSlotCapsRender(scope);
+  tierFieldLock(scope, false); // WP1：复位普通模式时确保字段锁全解除（弹窗复开不残留禁用态）
 }
 
 // 状态标签映射
@@ -6364,10 +6433,11 @@ function lootUpdateBossOptions(selectedBoss = '') {
       customInput.style.display = 'none';
     }
     bossSelect.style.display = '';
-    bossSelect.innerHTML = bosses.map(b => 
+    bossSelect.innerHTML = bosses.map(b =>
       `<option value="${b}" ${b === selectedBoss ? 'selected' : ''}>${b}</option>`
     ).join('');
   }
+  tierBossRearm('loot'); // WP1.2：套装模式下重建后保持首领锁定+清空
 }
 
 // 获取BOSS值（兼容下拉和自定义输入）
@@ -7140,6 +7210,7 @@ function wishlistOnRaidChange() {
       bossSelect.innerHTML = '<option value="">暂无BOSS数据</option>';
     }
   }
+  tierBossRearm('wishlist'); // WP1.2：套装模式下重建后保持首领锁定+清空
 }
 
 // 切换已获取日期显示
@@ -7829,6 +7900,20 @@ function lootFillAssignedTo(idOrName) {
 // ==================== 初始化 ====================
 // ==================== 更新日志 ====================
 const changelogData = [
+  {
+    id: 'v3.2.0-task65-patch-primary-stat',
+    version: 'v3.2.0',
+    date: '2026-10-13',
+    type: 'fix',
+    typeLabel: '问题修复',
+    title: '套装快捷录入：主属性按职业+专精动态联动、首领掉落锁定（任务书 #65-补丁 WP1 / REQ-159）',
+    summary: '套装快捷录入修正两处错配：①主属性不再硬编码「力量」，按职业+专精映射表自动带出（如圣骑士·神圣=智力、德鲁伊·守护=敏捷、恶魔猎手·噬灭=智力），套装模式下主属性下拉锁定禁手改，切换专精实时更新；②套装模式下「掉落BOSS」下拉禁用并清空（套装由兑换物兑换，非 BOSS 直接掉落），显示提示「首领待插件导出后匹配」，切回普通装备模式即恢复正常可选。副属性不动交互，套装模式加占位提示「待插件导出后自动填充」。心愿单弹窗同步首领锁定（心愿单无主属性/副属性字段，主属性联动不适用）。',
+    details: [
+      '映射表 CLASS_SPEC_PRIMARY_STAT 与 WP2 插件端 Lua 常量口径一致；未收录专精回退职业级默认，再兜底力量',
+      '套装模式下切换团本重建 BOSS 下拉后保持锁定+清空，防首项自动回填脏值随保存入库',
+      '普通装备模式全字段零变化；纯前端补丁（app.js + index.html），零 SQL 零后端'
+    ]
+  },
   {
     id: 'v3.2.0-task65-tier-import',
     version: 'v3.2.0',
