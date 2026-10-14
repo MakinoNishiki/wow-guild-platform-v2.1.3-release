@@ -5431,6 +5431,57 @@ async function wclToggleAutoCreate() {
   }
 }
 
+// ==================== 任务书 #72：WCL 团本中文映射 ====================
+// WCL API 的 zone 名为英文且无本地化；前端显示层统一走 getZoneName 转中文。
+// 口径说明：任务书原案按 zone.id 键控，但 zone.id 需改 server.js 查询才下发（本批红线不改 server.js），
+// 故改按英文 zone name 键控（WCL zone 名稳定唯一，效果等价），id 留在注释备查。
+// 字典英文键实测自 worldData.expansions.zones（2026-10-14），中文 12.x 取项目实证译名
+// （虚影尖塔/梦境裂隙/进军奎尔丹纳斯/孢陨幽境/烈毒之渊/潮缚石窟），历史团本取国服官方译名。
+const WCL_ZONE_NAMES = {
+  // 12.x Midnight（实测 zone id：46/50/53/57）
+  'VS / DR / MQD': '虚影尖塔·梦境裂隙·进军奎尔丹纳斯', // id 46（三团本合并区）
+  'Sporefall': '孢陨幽境', // id 50
+  'The Venomous Abyss': '烈毒之渊', // id 53
+  'The Tidebound Grotto': '潮缚石窟', // id 57
+  // 11.x The War Within
+  'Nerub-ar Palace': '尼鲁巴尔王宫', // id 38
+  'Blackrock Depths': '黑石深渊', // id 40
+  'Liberation of Undermine': '解放安德麦', // id 42
+  'Manaforge Omega': '法力熔炉：欧米伽', // id 44
+  // 10.x Dragonflight
+  'Vault of the Incarnates': '化身巨龙牢窟', // id 31
+  'Aberrus, the Shadowed Crucible': '亚贝鲁斯，焰影熔炉', // id 33
+  'Amirdrassil, the Dream\'s Hope': '阿梅达希尔，梦境之愿', // id 35
+  // 9.x Shadowlands
+  'Castle Nathria': '纳斯利亚堡', // id 26
+  'Sanctum of Domination': '统御圣所', // id 28
+  'Sepulcher of the First Ones': '初诞者圣墓', // id 29
+  // 8.x Battle for Azeroth
+  'Uldir': '奥迪尔', // id 19
+  'Battle of Dazar\'alor': '达萨罗之战', // id 21
+  'Crucible of Storms': '风暴熔炉', // id 22
+  'The Eternal Palace': '永恒王宫', // id 23
+  'Ny\'alotha': '尼奥罗萨', // id 24
+  // 7.x Legion
+  'Emerald Nightmare': '翡翠梦魇', // id 10
+  'Trial of Valor': '勇气试炼', // id 12
+  'The Nighthold': '暗夜要塞', // id 11
+  'Tomb of Sargeras': '萨格拉斯之墓', // id 13
+  'Antorus, The Burning Throne': '安托鲁斯，燃烧王座', // id 17
+  // 6.x Warlords of Draenor
+  'Highmaul': '悬槌堡', // id 6
+  'Blackrock Foundry': '黑石铸造厂', // id 7
+  'Hellfire Citadel': '地狱火堡垒', // id 8
+  // 5.x Mists of Pandaria
+  'Throne of Thunder': '雷电王座', // id 4
+  'Siege of Orgrimmar': '决战奥格瑞玛', // id 5
+};
+
+// 统一取中文团本名；字典未收录时回退英文原名（兜底），再空则「未知团本」
+function getZoneName(zoneNameEn, fallback) {
+  return WCL_ZONE_NAMES[zoneNameEn] || zoneNameEn || fallback || '未知团本';
+}
+
 // ---- 活动页：同步 WCL 报告 + 新报告 banner ----
 let wclReportsBusy = false;
 let wclReportCache = []; // 最近一次同步的完整列表（忽略操作后本地重渲染用）
@@ -5466,7 +5517,7 @@ function wclRenderNewReportsBanner() {
   if (!fresh.length) { banner.style.display = 'none'; return; }
   banner.innerHTML = '<div style="font-weight:600">📋 检测到 WCL 新报告</div>' + fresh.map(r => {
     const d = new Date(r.startTime);
-    const label = `${d.getMonth() + 1}月${d.getDate()}日 ${r.zoneName || r.title || '未命名'}`;
+    const label = `${d.getMonth() + 1}月${d.getDate()}日 ${getZoneName(r.zoneName, r.title)}`; // 任务书 #72：中文团本名
     const dur = wclFormatDuration(r.startTime, r.endTime);
     return `<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">` +
       `<span style="flex:1;min-width:200px">「${wcl70Esc(label)}」${dur ? ' — ' + dur : ''}</span>` +
@@ -5514,7 +5565,7 @@ function wclCreateActivityFromReport(code) {
   const d = new Date(r.startTime);
   const day = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   document.getElementById('activityDate').value = day;
-  document.getElementById('activityRaidName').value = r.zoneName || '';
+  document.getElementById('activityRaidName').value = getZoneName(r.zoneName, ''); // 任务书 #72：预填中文团本名
   document.getElementById('activityWclUrl').value = `https://www.warcraftlogs.com/reports/${r.code}`;
   showToast('已按 WCL 报告预填，确认后保存', 'info');
 }
@@ -5553,9 +5604,12 @@ async function renderWclRaidBoard(activity) {
       return `<tr><td>${wcl70Esc(b.name)}</td><td>${b.kill ? '✅' : '❌'}</td><td>${b.attempts}</td><td>${best}</td></tr>`;
     }).join('');
     const wclUrl = activity.wcl_url || `https://www.warcraftlogs.com/reports/${code}`;
+    // 任务书 #72：看板标题用 日期+中文团本名（报告原标题挪副行保留）
+    const bd = activity.date ? activity.date.slice(5).replace('-', '月') + '日' : '';
+    const zoneCN = getZoneName(activity.raid_name, '');
     const html = `<div style="border:1px solid var(--border-color);border-radius:6px;padding:12px">` +
-      `<div style="font-weight:600;margin-bottom:6px">📊 团本速览 — ${wcl70Esc(data.title || activity.raid_name)}</div>` +
-      `<div style="font-size:12px;color:var(--text-muted);margin-bottom:8px">${dur ? `总用时：${dur}　` : ''}尝试首领：${bosses.length}　击杀：${kills}/${bosses.length}</div>` +
+      `<div style="font-weight:600;margin-bottom:6px">📊 团本速览 — ${wcl70Esc((bd ? bd + ' ' : '') + zoneCN)}</div>` +
+      `<div style="font-size:12px;color:var(--text-muted);margin-bottom:8px">${dur ? `总用时：${dur}　` : ''}尝试首领：${bosses.length}　击杀：${kills}/${bosses.length}${data.title ? `　报告：${wcl70Esc(data.title)}` : ''}</div>` +
       (bosses.length ? `<table style="width:100%;font-size:13px;border-collapse:collapse"><thead><tr style="color:var(--text-muted);text-align:left"><th style="padding:4px">首领</th><th style="padding:4px">击杀</th><th style="padding:4px">尝试</th><th style="padding:4px">最佳进度</th></tr></thead><tbody>${rows}</tbody></table>` : '<div style="font-size:12px;color:var(--text-muted)">该报告无首领战斗记录</div>') +
       `<div style="margin-top:8px"><a href="${wcl70Esc(wclUrl)}" target="_blank" rel="noopener noreferrer" style="font-size:12px;color:var(--blue-highlight)">去 WCL 看详细数据 →</a></div>` +
       `</div>`;
@@ -8196,6 +8250,19 @@ function lootFillAssignedTo(idOrName) {
 // ==================== 初始化 ====================
 // ==================== 更新日志 ====================
 const changelogData = [
+  {
+    id: 'v3.2.0-task72-wcl-zone-zh',
+    version: 'v3.2.0',
+    date: '2026-10-14',
+    type: 'improve',
+    typeLabel: '功能优化',
+    title: 'WCL 团本中文映射：新报告提示/创建预填/团本速览全显示中文团本名（任务书 #72）',
+    summary: 'WCL API 返回的团本名为英文（如 Nerub-ar Palace），管家页面统一改显中文。新增前端字典 WCL_ZONE_NAMES（28 个团本，覆盖 5.x~12.x 全资料片，英文键实测自 WCL worldData 接口，12.x 译名取项目实证：虚影尖塔·梦境裂隙·进军奎尔丹纳斯/孢陨幽境/烈毒之渊/潮缚石窟），统一走 getZoneName() 兜底函数：字典未收录的团本回退英文原名，不影响显示。三个落点：考勤页新报告 banner、创建活动预填的团本名、活动详情「团本速览」看板标题（报告原标题挪副行保留）。纯前端补丁，零数据库零后端改动。',
+    details: [
+      '口径说明：任务书原案按 zone.id 键控，因 zone.id 需改 server.js 查询下发（本批红线不改后端），改按英文 zone name 键控，WCL zone 名稳定唯一，效果等价',
+      '版本串三壳 20261014.92（index 15 / data 8 / decor 5，旧串零残留）'
+    ]
+  },
   {
     id: 'v3.2.0-task70-wcl-guild-binding',
     version: 'v3.2.0',
