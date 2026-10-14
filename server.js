@@ -1203,7 +1203,7 @@ query ($code: String!) {
       title
       startTime
       endTime
-      fights { encounterID name kill fightPercentage startTime endTime }
+      fights { encounterID name kill fightPercentage difficulty startTime endTime }
     }
   }
 }`;

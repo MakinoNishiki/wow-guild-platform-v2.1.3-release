@@ -20,7 +20,7 @@ const EMAIL = 't72p-exp@example.com';
 const PWD = 'T72p-Exp-2026!';
 const GUILD_NAME = 'T72P测试会';
 const REPORT_CODE = 'RXYfr6gtCMbhFdc7'; // 运营公会真实公开报告（VS/DR/MQD），侦察实测在场
-const VER = '20261014.93';
+const VER = '20261014.95';
 
 const EXPECTED = {
   'Imperator Averzian': '元首阿福扎恩',
@@ -139,15 +139,15 @@ function staticAsserts() {
     /`\$\{f\.name\}\|\$\{f\.difficulty \|\| 0\}`/.test(app) &&
     /\$\{hasDifficulty \? `<td>\$\{getDifficultyText\(b\.difficulty\)\}<\/td>` : ''\}/.test(app) &&
     /\$\{hasDifficulty \? '<th style="padding:4px">难度<\/th>' : ''\}/.test(app), '');
-  check('A3c server.js 零改动（红线）：WCL_REPORT_FIGHTS_QUERY 未加 difficulty（难度列待裁定激活）',
-    /fights \{ encounterID name kill fightPercentage startTime endTime \}/.test(read('server.js')), '');
+  check('A3c server.js fights 选择集已含 difficulty（2026-10-14 运营裁定一词激活，响应整对象透传零其他改动）',
+    /fights \{ encounterID name kill fightPercentage difficulty startTime endTime \}/.test(read('server.js')), '');
 
   const cnt = (f, s) => (read(f).match(new RegExp(s.replace(/\./g, '\\.'), 'g')) || []).length;
   check('A4a 版本串 ' + VER + ' 三壳递增（index 15 / data 8 / decor 5）',
     cnt('index.html', VER) === 15 && cnt('data.html', VER) === 8 && cnt('decor.html', VER) === 5,
     `index=${cnt('index.html', VER)} data=${cnt('data.html', VER)} decor=${cnt('decor.html', VER)}`);
-  check('A4b 旧串 20261014.92 三壳零残留',
-    cnt('index.html', '20261014.92') === 0 && cnt('data.html', '20261014.92') === 0 && cnt('decor.html', '20261014.92') === 0, '');
+  check('A4b 旧串 20261014.94 三壳零残留',
+    cnt('index.html', '20261014.94') === 0 && cnt('data.html', '20261014.94') === 0 && cnt('decor.html', '20261014.94') === 0, '');
 
   check('A5 changelog 补录（v3.2.0-task72-patch-boss-zh）+ 台账 REQ-161 登记',
     app.includes("id: 'v3.2.0-task72-patch-boss-zh'") && /\| REQ-161 \|/.test(read('docs/问题与需求清单.md')), '');
@@ -249,18 +249,24 @@ async function liveAsserts() {
     const b = document.getElementById('wclRaidBoard');
     return {
       headers: [...b.querySelectorAll('thead th')].map(h => h.textContent.trim()),
-      bossCells: [...b.querySelectorAll('tbody tr')].map(tr => tr.querySelector('td').textContent.trim()),
+      rows: [...b.querySelectorAll('tbody tr')].map(tr => [...tr.querySelectorAll('td')].map(td => td.textContent.trim())),
       text: b.textContent,
     };
   });
-  check('B1a 看板渲染成功（真实 WCL 报告 ' + REPORT_CODE + '）', b1.bossCells.length > 0, `行数=${b1.bossCells.length}`);
-  const cnShown = b1.bossCells.filter(n => Object.values(EXPECTED).includes(n));
-  const enLeak = b1.bossCells.filter(n => n in EXPECTED);
-  check('B1b 首领名全中文：字典内英文原名零残留',
-    cnShown.length === b1.bossCells.length && enLeak.length === 0 && cnShown.length === bossEn.length,
-    `中文行=${cnShown.length}/${b1.bossCells.length} 英文残留=${enLeak.join('|') || '无'} 样本=${b1.bossCells.slice(0, 3).join('/')}`);
-  check('B1c 难度列降级：server.js 未下发 difficulty → 表头维持 4 列（首领/击杀/尝试/最佳进度）零回归',
-    b1.headers.join('/') === '首领/击杀/尝试/最佳进度', b1.headers.join('/'));
+  check('B1a 看板渲染成功（真实 WCL 报告 ' + REPORT_CODE + '）', b1.rows.length > 0, `行数=${b1.rows.length}`);
+  const bossCells = b1.rows.map(r => r[0]);
+  const cnShown = bossCells.filter(n => Object.values(EXPECTED).includes(n));
+  const enLeak = bossCells.filter(n => n in EXPECTED);
+  const distinctRows = new Set(bossCells);
+  check('B1b 首领名全中文：字典内英文原名零残留、覆盖报告全部首领（混难度同首领分行仍同名中文）',
+    enLeak.length === 0 && distinctRows.size === bossEn.length && cnShown.length === bossCells.length,
+    `行=${b1.rows.length} 首领=${distinctRows.size}/${bossEn.length} 英文残留=${enLeak.join('|') || '无'} 样本=${bossCells.slice(0, 3).join('/')}`);
+  const DIFFS = ['随机', '普通', '英雄', '史诗', '未知'];
+  const diffCells = b1.rows.map(r => r[1]);
+  check('B1c 难度列已激活：表头五列（首领/难度/击杀/尝试/最佳进度）+ 每行难度值合法（混难度报告同首领按难度分行）',
+    b1.headers.join('/') === '首领/难度/击杀/尝试/最佳进度' &&
+    diffCells.every(d => DIFFS.includes(d)) && diffCells.every(d => d !== '未知'),
+    `headers=${b1.headers.join('/')} 难度值=${[...new Set(diffCells)].join('/')}`);
 
   // B2 映射函数单元态（页面上下文直调）
   const b2 = await pg.evaluate(() => ({
