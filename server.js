@@ -1446,6 +1446,55 @@ async function handleWclReportFights(req, res, corsHeaders, query) {
   }
 }
 
+// 任务书 #72-补丁2②（运营裁定）：服务端 WCL 团本中文映射字典——与 js/app.js 的 WCL_ZONE_NAMES 同源双写
+// （裁定口径：最小侵入，不引入共用文件依赖；后续新团本补丁两边同步更新，verify-task72-patch2 A8 锁双写一致）。
+// 用途：sweep 自动创建活动时 raid/name/去重键统一写中文名，与手动流程（前端 getZoneName 预填）对齐，
+// 根治「英文区名入库 + 中英文去重键错位」（挽歌 2026-10-14 污染事件病根）。
+const WCL_ZONE_NAMES = {
+  // 12.x Midnight（实测 zone id：46/50/53/57）
+  "VS / DR / MQD": "虚影尖塔·梦境裂隙·进军奎尔丹纳斯", // id 46（三团本合并区）
+  "Sporefall": "孢陨幽境", // id 50
+  "The Venomous Abyss": "烈毒之渊", // id 53
+  "The Tidebound Grotto": "潮缚石窟", // id 57
+  // 11.x The War Within
+  "Nerub-ar Palace": "尼鲁巴尔王宫", // id 38
+  "Blackrock Depths": "黑石深渊", // id 40
+  "Liberation of Undermine": "解放安德麦", // id 42
+  "Manaforge Omega": "法力熔炉：欧米伽", // id 44
+  // 10.x Dragonflight
+  "Vault of the Incarnates": "化身巨龙牢窟", // id 31
+  "Aberrus, the Shadowed Crucible": "亚贝鲁斯，焰影熔炉", // id 33
+  "Amirdrassil, the Dream's Hope": "阿梅达希尔，梦境之愿", // id 35
+  // 9.x Shadowlands
+  "Castle Nathria": "纳斯利亚堡", // id 26
+  "Sanctum of Domination": "统御圣所", // id 28
+  "Sepulcher of the First Ones": "初诞者圣墓", // id 29
+  // 8.x Battle for Azeroth
+  "Uldir": "奥迪尔", // id 19
+  "Battle of Dazar'alor": "达萨罗之战", // id 21
+  "Crucible of Storms": "风暴熔炉", // id 22
+  "The Eternal Palace": "永恒王宫", // id 23
+  "Ny'alotha": "尼奥罗萨", // id 24
+  // 7.x Legion
+  "Emerald Nightmare": "翡翠梦魇", // id 10
+  "Trial of Valor": "勇气试炼", // id 12
+  "The Nighthold": "暗夜要塞", // id 11
+  "Tomb of Sargeras": "萨格拉斯之墓", // id 13
+  "Antorus, The Burning Throne": "安托鲁斯，燃烧王座", // id 17
+  // 6.x Warlords of Draenor
+  "Highmaul": "悬槌堡", // id 6
+  "Blackrock Foundry": "黑石铸造厂", // id 7
+  "Hellfire Citadel": "地狱火堡垒", // id 8
+  // 5.x Mists of Pandaria
+  "Throne of Thunder": "雷电王座", // id 4
+  "Siege of Orgrimmar": "决战奥格瑞玛", // id 5
+};
+
+// 英文 zone name → 中文；未收录回退英文原名（宁存英文不存错名，与前端 getZoneName 同口径）
+function wclZoneNameCN(zoneNameEn) {
+  return WCL_ZONE_NAMES[zoneNameEn] || zoneNameEn;
+}
+
 // 定时 sweep（任务书 #70 §6.1 策略二 + §7 自动创建活动）：
 // 进程内每小时扫一次「已绑定且开启自动创建」的公会，新报告按 自然日+副本 去重直插 activities。
 // 规范 1.2.2 批处理/自动化例外：服务端定时任务无用户会话，走 service_role 直写，
@@ -1462,22 +1511,43 @@ async function wclAutoCreateSweep() {
       const fresh = reports.filter((r) => !r.is_linked);
       const seenDayZone = new Set();
       for (const r of fresh) {
+        // 任务书 #72-补丁2①：垃圾活动过滤（挽歌 2026-10-14 污染事件实证——单次 sweep 回填 14 条英文区名活动+1 条空区名活动）
+        // ①未知团本：zone 为 null 或 Unknown Zone 的报告不建活动（空 raid 活动=硬垃圾）
+        if (!r.zoneName || r.zoneName === "Unknown Zone") {
+          console.log(`[wcl-sweep] guild=${guild.id} code=${r.code} 跳过：未知团本（zone 为空/Unknown Zone）`);
+          continue;
+        }
+        // ②陈旧回填：报告超过 7 天不建（任务书 #72-补丁2③ 运营裁定水位线 30→7——
+        // 本次污染 14 条英文区名报告全 ≤30 天，30 天闸零拦截；7 天只扫近一周新报告）
+        const daysAgo = (Date.now() - r.startTime) / 86400000;
+        if (daysAgo > 7) {
+          console.log(`[wcl-sweep] guild=${guild.id} code=${r.code} 跳过：报告超过 7 天（${Math.floor(daysAgo)} 天前）`);
+          continue;
+        }
+        // 注：③report_code 级去重已由 fetchGuildReportsMarked 的 is_linked 覆盖（拉本公会
+        // wcl_report_code 非空活动组 Set 判定，与通知方案同构，此处不重复实现）；
+        // ④通知的「无战斗数据跳过」未实施：报告列表查询（WCL_GUILD_REPORTS_QUERY）不含 fights，
+        // 逐报告补拉 fights 将放大 WCL 免费档点数消耗（3600/小时，sweep 每小时×全公会），
+        // 且实测垃圾报告中无「有 zone 但零战斗」样本——未知团本过滤已覆盖实测垃圾类，待裁定后议。
+        // 任务书 #72-补丁2②：raid/name/去重键统一中文名（与手动流程对齐，根治中英去重键错位）；
+        // 字典未收录的新团本回退英文原名（wclZoneNameCN 同前端口径），不阻塞创建
+        const zoneCN = wclZoneNameCN(r.zoneName);
         const day = new Date(r.startTime).toISOString().slice(0, 10);
-        const dayZone = `${day}|${r.zoneName}`;
+        const dayZone = `${day}|${zoneCN}`;
         if (seenDayZone.has(dayZone)) continue;
         seenDayZone.add(dayZone);
-        // 自然日+副本 已存在活动则跳过（含手动建的无 WCL 链接活动）
+        // 自然日+副本 已存在活动则跳过（含手动建的无 WCL 链接活动；中文键与手动流程同口径）
         const { body: exist } = await supabaseRestGet(
-          `/rest/v1/activities?guild_id=eq.${encodeURIComponent(guild.id)}&activity_date=eq.${day}&raid=eq.${encodeURIComponent(r.zoneName)}&select=id&limit=1`
+          `/rest/v1/activities?guild_id=eq.${encodeURIComponent(guild.id)}&activity_date=eq.${day}&raid=eq.${encodeURIComponent(zoneCN)}&select=id&limit=1`
         );
         if (Array.isArray(exist) && exist[0]) continue;
         const d = new Date(r.startTime);
-        const name = `${d.getMonth() + 1}月${d.getDate()}日 ${r.zoneName}`;
+        const name = `${d.getMonth() + 1}月${d.getDate()}日 ${zoneCN}`;
         const wr = await supabaseRestWrite("POST", "/rest/v1/activities", {
           guild_id: guild.id,
           name,
           activity_date: day,
-          raid: r.zoneName,
+          raid: zoneCN,
           wcl_url: `https://www.warcraftlogs.com/reports/${r.code}`,
           wcl_report_code: r.code,
           status: "normal",

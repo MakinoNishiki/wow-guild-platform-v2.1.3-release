@@ -8302,6 +8302,20 @@ function lootFillAssignedTo(idOrName) {
 // ==================== 更新日志 ====================
 const changelogData = [
   {
+    id: 'v3.2.0-task72-patch2-sweep-filter',
+    version: 'v3.2.0',
+    date: '2026-10-14',
+    type: 'fix',
+    typeLabel: '问题修复',
+    title: 'WCL 自动创建活动 sweep 垃圾治理：未知团本跳过 + 7 天水位线 + 中文名入库（任务书 #72-补丁2 / REQ-162）',
+    summary: 'WCL 绑定公会开启「自动创建活动」后，定时 sweep 会把最近 20 份报告一次性回填成活动（挽歌公会实测单次被建 14 条英文区名活动 + 1 条空区名垃圾活动，考勤列表被污染；15 条已按运营裁定全删，关联考勤 0 行零损失，备份在 backup/2026-10-14-wcl-sweep-cleanup/）。sweep 创建前新增过滤：zone 为空 / Unknown Zone 跳过；报告超过 7 天不回填（30 天闸对本次污染零拦截，运营裁定收紧）。同时根治病根：server.js 内置 WCL_ZONE_NAMES 中文映射（与前端 app.js 同源双写），sweep 创建活动的团本名/活动名/去重键统一写中文，与手动创建流程对齐，不再出现英文区名活动和中英文去重键错位。report_code 级去重沿用既有 is_linked 机制。',
+    details: [
+      '纯服务端：server.js 字典+helper+两道 guard+中文名写入，零 schema 改动',
+      '「无战斗数据跳过」未实施：报告列表查询不含 fights 字段，逐份补拉会放大 WCL 免费档点数消耗，待裁定',
+      '版本串三壳 20261014.94'
+    ]
+  },
+  {
     id: 'v3.2.0-task72-patch-boss-zh',
     version: 'v3.2.0',
     date: '2026-10-14',
