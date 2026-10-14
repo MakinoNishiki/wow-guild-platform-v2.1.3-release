@@ -5482,6 +5482,52 @@ function getZoneName(zoneNameEn, fallback) {
   return WCL_ZONE_NAMES[zoneNameEn] || zoneNameEn || fallback || '未知团本';
 }
 
+// ==================== 任务书 #72-补丁①：WCL 首领中文映射 ====================
+// WCL fights.name 为英文原名。字典键实测自 WCL worldData expansion(id:7) zones 46/50/53 的
+// encounters 官方英文名（2026-10-14 抓取，与真实报告 fights.name 逐字符一致——已用公会报告实测
+// 「Chimaerus, the Undreamt God」等吻合）；中文名=项目主数据 game_bosses（插件 EJ 游戏内采集=
+// 国服官方译名）同本逐对音义核对；Kith'ix 为 12.1.5 新首领（DB 未收录），译名取暴雪官方中文站
+// 新闻口径「基希克斯」。键含单引号/空格/逗号，必须与 WCL 返回完全匹配；未收录回退英文原名。
+const WCL_BOSS_NAMES = {
+  // 虚影尖塔（WCL 合并区 VS / DR / MQD）
+  'Imperator Averzian': '元首阿福扎恩',
+  'Vorasius': '弗拉希乌斯',
+  'Fallen-King Salhadaar': '陨落之王萨哈达尔',
+  'Vaelgor & Ezzorak': '威厄高尔和艾佐拉克',
+  'Lightblinded Vanguard': '光盲先锋军',
+  'Crown of the Cosmos': '宇宙之冕',
+  // 梦境裂隙
+  'Chimaerus, the Undreamt God': '奇美鲁斯，未梦之神',
+  // 进军奎尔丹纳斯
+  'Belo\'ren, Child of Al\'ar': '贝洛朗，奥的子嗣',
+  'Midnight Falls': '至暗之夜降临',
+  // 孢陨幽境
+  'Rotmire': '腐沼',
+  // 烈毒之渊（WCL zone 53 同时覆盖潮缚石窟与 12.1.5 新首领）
+  'Nek\'zali the Soulcoiler': '盘魂者内克扎莉',
+  'Entombed Sentinels': '陵寝哨兵',
+  'Vashnik the Malignant': '万毒邪祟者瓦什尼克',
+  'The Lost Explorers': '迷失的探险者',
+  'Sszorak': '斯索拉克',
+  'The Twin Fangs': '双子毒牙',
+  'The Coiled Altar': '盘卷祭坛',
+  'Ula\'tek': '乌拉特克',
+  'Nymrissa Wavecaller': '尼姆瑞莎·唤波者', // 潮缚石窟首领（WCL 并入 zone 53）
+  'Kith\'ix': '基希克斯', // 12.1.5 单首领团本「基希克斯破封」，暴雪官方中文站译名
+};
+
+function getBossName(enName) {
+  return WCL_BOSS_NAMES[enName] || enName;
+}
+
+// 任务书 #72-补丁②：难度映射（WCL fights.difficulty 实测值：1=随机 3=普通 4=英雄 5=史诗，
+// 2 为部分旧本普通档兼容位）。注意：一份报告可混含多难度（实测同报告 4/5 并存），故难度按 fight 粒度取。
+const WCL_DIFFICULTY = { 1: '随机', 2: '普通', 3: '普通', 4: '英雄', 5: '史诗' };
+
+function getDifficultyText(difficultyId) {
+  return WCL_DIFFICULTY[difficultyId] || '未知';
+}
+
 // ---- 活动页：同步 WCL 报告 + 新报告 banner ----
 let wclReportsBusy = false;
 let wclReportCache = []; // 最近一次同步的完整列表（忽略操作后本地重渲染用）
@@ -5586,10 +5632,14 @@ async function renderWclRaidBoard(activity) {
   board.innerHTML = '<div style="font-size:13px;color:var(--text-muted);padding:8px">📊 团本速览加载中...</div>';
   try {
     const data = await wclApiGet('/api/wcl/report-fights', { guildId: guild.id, code });
+    // 任务书 #72-补丁②：难度按 fight 粒度聚合（一份报告可混难度，实测同报告 4/5 并存）；
+    // server.js 查询未选 difficulty 时 f.difficulty 为 undefined → 聚合键退化纯首领名、难度列整体不渲染（零回归）
+    const hasDifficulty = (data.fights || []).some(f => typeof f.difficulty === 'number');
     const byBoss = new Map();
     for (const f of (data.fights || [])) {
-      let b = byBoss.get(f.name);
-      if (!b) { b = { name: f.name, attempts: 0, kill: false, bestPct: null }; byBoss.set(f.name, b); }
+      const key = hasDifficulty ? `${f.name}|${f.difficulty || 0}` : f.name;
+      let b = byBoss.get(key);
+      if (!b) { b = { name: f.name, difficulty: f.difficulty, attempts: 0, kill: false, bestPct: null }; byBoss.set(key, b); }
       b.attempts++;
       if (f.kill) b.kill = true;
       else if (typeof f.fightPercentage === 'number') {
@@ -5601,7 +5651,8 @@ async function renderWclRaidBoard(activity) {
     const dur = wclFormatDuration(data.startTime, data.endTime);
     const rows = bosses.map(b => {
       const best = b.kill ? '100%' : (b.bestPct === null ? '—' : `剩余 ${Math.round(b.bestPct)}%`);
-      return `<tr><td>${wcl70Esc(b.name)}</td><td>${b.kill ? '✅' : '❌'}</td><td>${b.attempts}</td><td>${best}</td></tr>`;
+      // 任务书 #72-补丁①：首领名走中文映射（未收录回退英文原名）
+      return `<tr><td>${wcl70Esc(getBossName(b.name))}</td>${hasDifficulty ? `<td>${getDifficultyText(b.difficulty)}</td>` : ''}<td>${b.kill ? '✅' : '❌'}</td><td>${b.attempts}</td><td>${best}</td></tr>`;
     }).join('');
     const wclUrl = activity.wcl_url || `https://www.warcraftlogs.com/reports/${code}`;
     // 任务书 #72：看板标题用 日期+中文团本名（报告原标题挪副行保留）
@@ -5610,7 +5661,7 @@ async function renderWclRaidBoard(activity) {
     const html = `<div style="border:1px solid var(--border-color);border-radius:6px;padding:12px">` +
       `<div style="font-weight:600;margin-bottom:6px">📊 团本速览 — ${wcl70Esc((bd ? bd + ' ' : '') + zoneCN)}</div>` +
       `<div style="font-size:12px;color:var(--text-muted);margin-bottom:8px">${dur ? `总用时：${dur}　` : ''}尝试首领：${bosses.length}　击杀：${kills}/${bosses.length}${data.title ? `　报告：${wcl70Esc(data.title)}` : ''}</div>` +
-      (bosses.length ? `<table style="width:100%;font-size:13px;border-collapse:collapse"><thead><tr style="color:var(--text-muted);text-align:left"><th style="padding:4px">首领</th><th style="padding:4px">击杀</th><th style="padding:4px">尝试</th><th style="padding:4px">最佳进度</th></tr></thead><tbody>${rows}</tbody></table>` : '<div style="font-size:12px;color:var(--text-muted)">该报告无首领战斗记录</div>') +
+      (bosses.length ? `<table style="width:100%;font-size:13px;border-collapse:collapse"><thead><tr style="color:var(--text-muted);text-align:left"><th style="padding:4px">首领</th>${hasDifficulty ? '<th style="padding:4px">难度</th>' : ''}<th style="padding:4px">击杀</th><th style="padding:4px">尝试</th><th style="padding:4px">最佳进度</th></tr></thead><tbody>${rows}</tbody></table>` : '<div style="font-size:12px;color:var(--text-muted)">该报告无首领战斗记录</div>') +
       `<div style="margin-top:8px"><a href="${wcl70Esc(wclUrl)}" target="_blank" rel="noopener noreferrer" style="font-size:12px;color:var(--blue-highlight)">去 WCL 看详细数据 →</a></div>` +
       `</div>`;
     wclBoardCache.set(activity.id, html);
@@ -8250,6 +8301,20 @@ function lootFillAssignedTo(idOrName) {
 // ==================== 初始化 ====================
 // ==================== 更新日志 ====================
 const changelogData = [
+  {
+    id: 'v3.2.0-task72-patch-boss-zh',
+    version: 'v3.2.0',
+    date: '2026-10-14',
+    type: 'fix',
+    typeLabel: '问题修复',
+    title: '团本速览看板首领名中文化 + 难度列（任务书 #72-补丁 / REQ-161）',
+    summary: '「📊 团本速览」看板首领名由英文原文改显中文：新增前端字典 WCL_BOSS_NAMES（20 个首领全覆盖当前 12.x 活跃团本——虚影尖塔 6/梦境裂隙 1/进军奎尔丹纳斯 2/孢陨幽境 1/烈毒之渊+潮缚石窟+基希克斯 10），英文键实测自 WCL worldData 官方值并与真实报告 fights.name 逐字符核对，中文名取游戏内冒险手册官方译名（基希克斯取暴雪官方中文站口径）；未收录首领回退英文原名。看板新增「难度」列，按 fight 粒度聚合（一份报告可混难度，实测同报告英雄/史诗并存），难度数据在场才渲染——当前 server.js 查询未下发 difficulty 字段，列暂不显示、看板四列零回归，激活仅需查询选择集补一词（待运营裁定）。',
+    details: [
+      '映射键含单引号/空格/逗号（如 Belo\'ren, Child of Al\'ar），与 WCL 返回逐字符匹配',
+      '难度映射：1=随机 2/3=普通 4=英雄 5=史诗，未识别值显示「未知」',
+      '纯前端显示层：app.js 字典+看板渲染，零数据库改动、server.js 零改动'
+    ]
+  },
   {
     id: 'v3.2.0-task72-wcl-zone-zh',
     version: 'v3.2.0',
