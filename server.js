@@ -680,6 +680,11 @@ async function authorizeProxyRequest(user, table, method, queryString, rawBody) 
       return { ok: true };
     }
     // PATCH/DELETE：仅 owner
+    // 任务书 #70：wcl_* 绑定字段只走 /api/wcl/bind-*、/api/wcl/unbind-guild 专用端点
+    // （服务端核实 WCL 公会名、统一中文报错、token 密文不落明文），通用代理一律拦截
+    if (method === "PATCH" && rows.some((row) => row && Object.keys(row).some((k) => k.startsWith("wcl_")))) {
+      return deny("WCL 绑定字段仅可通过 WCL 专用端点修改");
+    }
     const ids = filters.id || [];
     if (ids.length === 0) return badRequest("修改或删除公会必须提供公会 ID");
     for (const guildId of ids) {
@@ -1118,6 +1123,385 @@ async function handleWclRequest(req, res, corsHeaders, withSnapshot) {
   }
 }
 
+// ==================== 任务书 #70 WCL 公会绑定与报告同步（WP1：方案A + 共用功能） ====================
+// 五个端点：guild-lookup / bind-guild-paste / unbind-guild / reports / report-fights。
+// 安全纪律同任务书 #11：鉴权全部通过后才接触 WCL 凭证 / API；
+// 绑定字段（guilds.wcl_*）只允许经本区端点写入——通用 /api/db 代理已拦截 wcl_ 前缀键
+// （见 authorizeProxyRequest guilds 分支）。看板查询只拉首领级聚合字段，不碰玩家个人数据。
+
+// service_role 通用写（仅本区端点与定时 sweep 使用；POST/PATCH 不自动重试，防重复落库）
+function supabaseRestWrite(method, restPath, bodyObj) {
+  return new Promise((resolve) => {
+    proxyToSupabase(method, restPath, { "content-type": "application/json" }, JSON.stringify(bodyObj), (result) => {
+      let body = null;
+      try { body = JSON.parse(result.body); } catch { body = null; }
+      resolve({ status: result.statusCode, body });
+    });
+  });
+}
+
+// WCL 公开 API（/api/v2/client，client_credentials）通用 GraphQL 查询，错误映射与 fetchWclReportSummary 同口径
+async function wclClientQuery(query, variables) {
+  const token = await getWclAccessToken();
+  let res;
+  try {
+    res = await wclHttpsRequest(
+      {
+        hostname: "www.warcraftlogs.com",
+        path: "/api/v2/client",
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      },
+      JSON.stringify({ query, variables: variables || {} })
+    );
+  } catch (e) {
+    if (e && e.code === "WCL_TIMEOUT") throw wclError(504, "WCL 接口请求超时，请稍后再试");
+    throw wclError(502, "WCL 接口请求失败，请稍后再试");
+  }
+  let json = null;
+  try { json = JSON.parse(res.body); } catch { json = null; }
+  const hasGraphqlErrors = !!(json && json.errors && json.errors.length);
+  const rateLimited =
+    res.status === 429 ||
+    (hasGraphqlErrors && json.errors.some((e) => /rate ?limit/i.test((e && e.message) || "")));
+  if (rateLimited) throw wclError(429, "WCL 接口速率超限，请稍后再试");
+  if (!json || (res.status >= 500 && !hasGraphqlErrors)) {
+    throw wclError(502, "WCL 服务暂时不可用，请稍后再试");
+  }
+  if (res.status !== 200 || hasGraphqlErrors) {
+    throw wclError(502, "WCL 查询失败，请稍后再试");
+  }
+  return json.data;
+}
+
+const WCL_GUILD_BY_ID_QUERY = `
+query ($id: Int!) {
+  guildData { guild(id: $id) { id name server { name } } }
+}`;
+const WCL_GUILD_BY_NAME_QUERY = `
+query ($name: String!, $server: String!, $region: String!) {
+  guildData { guild(name: $name, serverSlug: $server, serverRegion: $region) { id name server { name } } }
+}`;
+// 首领级聚合字段——红线：不拉玩家个人数据（无 masterData.actors / friendlyPlayers）
+// 注：任务书 §6.2 伪代码的 guildReports 在实际 schema 中不存在，正确字段为 reportData.reports(guildID:)（实测订正）
+const WCL_GUILD_REPORTS_QUERY = `
+query ($gid: Int!, $limit: Int!) {
+  reportData {
+    reports(guildID: $gid, limit: $limit) {
+      total
+      data { code title startTime endTime zone { name } }
+    }
+  }
+}`;
+const WCL_REPORT_FIGHTS_QUERY = `
+query ($code: String!) {
+  reportData {
+    report(code: $code) {
+      title
+      startTime
+      endTime
+      fights { encounterID name kill fightPercentage startTime endTime }
+    }
+  }
+}`;
+
+// 查 WCL 公会信息；支持 id 直查或 中文名+服务器+大区 组合（serverSlug 传中文，#69 实测命中）
+async function fetchWclGuildInfo(params) {
+  let guild = null;
+  if (params.id) {
+    const data = await wclClientQuery(WCL_GUILD_BY_ID_QUERY, { id: params.id });
+    guild = data && data.guildData && data.guildData.guild;
+  } else {
+    const data = await wclClientQuery(WCL_GUILD_BY_NAME_QUERY, {
+      name: params.name, server: params.server, region: params.region,
+    });
+    guild = data && data.guildData && data.guildData.guild;
+  }
+  if (!guild || !guild.id) return null;
+  return {
+    id: guild.id,
+    name: guild.name || "",
+    serverName: (guild.server && guild.server.name) || "",
+    region: params.region || "cn",
+  };
+}
+
+// 绑定/解绑/同步/看板共用：JWT → 公会角色鉴权 → 读公会行
+// roleFloor: 'editor' = owner/editor；'member' = 任意公会成员
+async function wclGuildAuth(req, send, guildId, roleFloor) {
+  const authHeader = req.headers["authorization"] || "";
+  const token = authHeader.replace("Bearer ", "");
+  if (!token) { send(401, { message: "未登录或登录已过期，请重新登录" }); return null; }
+  const user = await verifyTokenCached(token);
+  if (!user) { send(401, { message: "登录状态无效，请重新登录" }); return null; }
+  if (!guildId) { send(400, { message: "缺少公会 ID（guildId）" }); return null; }
+  const role = await getGuildRoleCached(guildId, user.id);
+  if (roleFloor === "member") {
+    if (!role) { send(403, { message: "无权访问该公会数据" }); return null; }
+  } else if (role !== "owner" && role !== "editor") {
+    send(403, { message: "无权修改该公会数据（需要编辑或以上权限）" });
+    return null;
+  }
+  const { body } = await supabaseRestGet(
+    `/rest/v1/guilds?id=eq.${encodeURIComponent(guildId)}&select=id,wcl_guild_id,wcl_guild_name,wcl_server_name,wcl_region,wcl_bind_method,wcl_auto_create_event&limit=1`
+  );
+  const guild = Array.isArray(body) && body[0] ? body[0] : null;
+  if (!guild) { send(404, { message: "公会不存在" }); return null; }
+  return { user, role, guild };
+}
+
+// GET /api/wcl/guild-lookup?guildId=&id= 或 ?guildId=&name=&server=&region=
+async function handleWclGuildLookup(req, res, corsHeaders, query) {
+  const send = (status, obj) => {
+    res.writeHead(status, { "Content-Type": "application/json", ...corsHeaders });
+    res.end(JSON.stringify(obj));
+  };
+  try {
+    const auth = await wclGuildAuth(req, send, query.guildId, "editor");
+    if (!auth) return;
+    const params = { region: (query.region || "cn").toLowerCase() };
+    const rawId = String(query.id || "").trim();
+    if (rawId) {
+      if (!/^\d+$/.test(rawId)) return send(400, { message: "WCL 公会 ID 必须是数字" });
+      params.id = Number(rawId);
+    } else {
+      const name = String(query.name || "").trim();
+      const server = String(query.server || "").trim();
+      if (!name || !server) return send(400, { message: "缺少公会名或服务器名" });
+      params.name = name;
+      params.server = server;
+    }
+    const info = await fetchWclGuildInfo(params);
+    if (!info) return send(404, { message: "未找到该 WCL 公会（请核对链接/名称与服务器）" });
+    send(200, info);
+  } catch (e) {
+    send(e.wclStatus || 500, { message: e.message || "服务器内部错误" });
+  }
+}
+
+// POST /api/wcl/bind-guild-paste { guildId, wclGuildId }
+// 服务端重新向 WCL 核实公会名（防前端伪造名称），再落库
+async function handleWclBindPaste(req, res, corsHeaders) {
+  const send = (status, obj) => {
+    res.writeHead(status, { "Content-Type": "application/json", ...corsHeaders });
+    res.end(JSON.stringify(obj));
+  };
+  try {
+    const rawBody = await readBody(req);
+    let payload = {};
+    try { payload = JSON.parse(rawBody || "{}"); } catch { payload = {}; }
+    const auth = await wclGuildAuth(req, send, payload.guildId, "editor");
+    if (!auth) return;
+    if (auth.guild.wcl_guild_id) return send(409, { message: "已绑定 WCL 公会，请先解绑再重新绑定" });
+    const wclGuildId = Number(payload.wclGuildId);
+    if (!Number.isInteger(wclGuildId) || wclGuildId <= 0) return send(400, { message: "WCL 公会 ID 必须是数字" });
+    const info = await fetchWclGuildInfo({ id: wclGuildId, region: "cn" });
+    if (!info) return send(404, { message: "未找到该 WCL 公会（请核对链接/名称与服务器）" });
+    const wr = await supabaseRestWrite("PATCH", `/rest/v1/guilds?id=eq.${encodeURIComponent(payload.guildId)}`, {
+      wcl_guild_id: info.id,
+      wcl_guild_name: info.name,
+      wcl_server_name: info.serverName,
+      wcl_region: info.region,
+      wcl_bind_method: "paste",
+      wcl_bound_at: new Date().toISOString(),
+    });
+    if (wr.status === 409 || (wr.body && wr.body.code === "23505")) {
+      return send(409, { message: "该 WCL 公会已被其他管家公会绑定" });
+    }
+    if (wr.status >= 300) return send(502, { message: "绑定写入失败，请稍后再试" });
+    roleCache.clear(); // guilds 写成功 → 角色缓存失效惯例（同 /api/db 转发回调）
+    send(200, { ok: true, wclGuild: info });
+  } catch (e) {
+    send(e.statusCode || e.wclStatus || 500, { message: e.message || "服务器内部错误" });
+  }
+}
+
+// POST /api/wcl/set-auto-create { guildId, enabled } —— 自动创建活动开关（wcl_ 前缀被通用代理拦截，走此专用端点）
+async function handleWclSetAutoCreate(req, res, corsHeaders) {
+  const send = (status, obj) => {
+    res.writeHead(status, { "Content-Type": "application/json", ...corsHeaders });
+    res.end(JSON.stringify(obj));
+  };
+  try {
+    const rawBody = await readBody(req);
+    let payload = {};
+    try { payload = JSON.parse(rawBody || "{}"); } catch { payload = {}; }
+    const auth = await wclGuildAuth(req, send, payload.guildId, "editor");
+    if (!auth) return;
+    if (!auth.guild.wcl_guild_id) return send(400, { message: "当前公会尚未绑定 WCL，请先绑定" });
+    const wr = await supabaseRestWrite("PATCH", `/rest/v1/guilds?id=eq.${encodeURIComponent(payload.guildId)}`, {
+      wcl_auto_create_event: !!payload.enabled,
+    });
+    if (wr.status >= 300) return send(502, { message: "开关保存失败，请稍后再试" });
+    roleCache.clear();
+    send(200, { ok: true, enabled: !!payload.enabled });
+  } catch (e) {
+    send(e.statusCode || e.wclStatus || 500, { message: e.message || "服务器内部错误" });
+  }
+}
+
+// POST /api/wcl/unbind-guild { guildId } —— 清空 wcl_* 字段；已关联活动的报告链接不动
+async function handleWclUnbind(req, res, corsHeaders) {
+  const send = (status, obj) => {
+    res.writeHead(status, { "Content-Type": "application/json", ...corsHeaders });
+    res.end(JSON.stringify(obj));
+  };
+  try {
+    const rawBody = await readBody(req);
+    let payload = {};
+    try { payload = JSON.parse(rawBody || "{}"); } catch { payload = {}; }
+    const auth = await wclGuildAuth(req, send, payload.guildId, "editor");
+    if (!auth) return;
+    if (!auth.guild.wcl_guild_id) return send(400, { message: "当前公会尚未绑定 WCL" });
+    const wr = await supabaseRestWrite("PATCH", `/rest/v1/guilds?id=eq.${encodeURIComponent(payload.guildId)}`, {
+      wcl_guild_id: null,
+      wcl_guild_name: null,
+      wcl_server_name: null,
+      wcl_region: null,
+      wcl_bind_method: null,
+      wcl_token: null,
+      wcl_bound_at: null,
+      wcl_auto_create_event: false,
+    });
+    if (wr.status >= 300) return send(502, { message: "解绑失败，请稍后再试" });
+    roleCache.clear();
+    send(200, { ok: true });
+  } catch (e) {
+    send(e.statusCode || e.wclStatus || 500, { message: e.message || "服务器内部错误" });
+  }
+}
+
+// 拉公会 WCL 报告列表并标注已关联（供同步端点与定时 sweep 共用）
+async function fetchGuildReportsMarked(guild) {
+  const data = await wclClientQuery(WCL_GUILD_REPORTS_QUERY, { gid: guild.wcl_guild_id, limit: 20 });
+  const gr = data && data.reportData && data.reportData.reports;
+  const reports = (gr && gr.data) || [];
+  const total = (gr && gr.total) || 0;
+  const { body } = await supabaseRestGet(
+    `/rest/v1/activities?guild_id=eq.${encodeURIComponent(guild.id)}&wcl_report_code=not.is.null&select=wcl_report_code`
+  );
+  const linked = new Set((Array.isArray(body) ? body : []).map((a) => a.wcl_report_code));
+  return {
+    total,
+    reports: reports.map((r) => ({
+      code: r.code,
+      title: r.title || "",
+      startTime: r.startTime,
+      endTime: r.endTime,
+      zoneName: (r.zone && r.zone.name) || "",
+      is_linked: linked.has(r.code),
+    })),
+  };
+}
+
+// GET /api/wcl/reports?guildId= —— 手动同步（owner/editor）
+async function handleWclReports(req, res, corsHeaders, query) {
+  const send = (status, obj) => {
+    res.writeHead(status, { "Content-Type": "application/json", ...corsHeaders });
+    res.end(JSON.stringify(obj));
+  };
+  try {
+    const auth = await wclGuildAuth(req, send, query.guildId, "editor");
+    if (!auth) return;
+    if (!auth.guild.wcl_guild_id) return send(400, { message: "当前公会尚未绑定 WCL，请先在公会设置中绑定" });
+    const result = await fetchGuildReportsMarked(auth.guild);
+    send(200, { ...result, syncedAt: Date.now() });
+  } catch (e) {
+    send(e.wclStatus || 500, { message: e.message || "服务器内部错误" });
+  }
+}
+
+// GET /api/wcl/report-fights?guildId=&code= —— 团本速览看板（公会成员含 viewer 可看）
+// 防线：code 必须是本公会已关联活动的报告，防止被当开放式 WCL 代理用
+async function handleWclReportFights(req, res, corsHeaders, query) {
+  const send = (status, obj) => {
+    res.writeHead(status, { "Content-Type": "application/json", ...corsHeaders });
+    res.end(JSON.stringify(obj));
+  };
+  try {
+    const auth = await wclGuildAuth(req, send, query.guildId, "member");
+    if (!auth) return;
+    const code = parseReportCode(query.code);
+    if (!code) return send(400, { message: "无法识别的 WCL 报告代码" });
+    const { body } = await supabaseRestGet(
+      `/rest/v1/activities?guild_id=eq.${encodeURIComponent(query.guildId)}&wcl_report_code=eq.${encodeURIComponent(code)}&select=id&limit=1`
+    );
+    if (!Array.isArray(body) || !body[0]) {
+      return send(403, { message: "该报告未关联到本公会活动" });
+    }
+    const data = await wclClientQuery(WCL_REPORT_FIGHTS_QUERY, { code });
+    const report = data && data.reportData && data.reportData.report;
+    if (!report) return send(502, { message: "无法读取该 WCL 报告（不存在或为私有日志）" });
+    send(200, {
+      title: report.title || "",
+      startTime: report.startTime,
+      endTime: report.endTime,
+      fights: (report.fights || []).filter((f) => f.encounterID > 0),
+    });
+  } catch (e) {
+    send(e.wclStatus || 500, { message: e.message || "服务器内部错误" });
+  }
+}
+
+// 定时 sweep（任务书 #70 §6.1 策略二 + §7 自动创建活动）：
+// 进程内每小时扫一次「已绑定且开启自动创建」的公会，新报告按 自然日+副本 去重直插 activities。
+// 规范 1.2.2 批处理/自动化例外：服务端定时任务无用户会话，走 service_role 直写，
+// 不经 cloudCrud（前端写路径纪律不适用）；失败静默记 console，不影响主服务。
+const WCL_SWEEP_INTERVAL_MS = 60 * 60 * 1000;
+async function wclAutoCreateSweep() {
+  const { body } = await supabaseRestGet(
+    "/rest/v1/guilds?wcl_auto_create_event=eq.true&wcl_guild_id=not.is.null&select=id,wcl_guild_id,wcl_guild_name"
+  );
+  const guilds = Array.isArray(body) ? body : [];
+  for (const guild of guilds) {
+    try {
+      const { reports } = await fetchGuildReportsMarked(guild);
+      const fresh = reports.filter((r) => !r.is_linked);
+      const seenDayZone = new Set();
+      for (const r of fresh) {
+        const day = new Date(r.startTime).toISOString().slice(0, 10);
+        const dayZone = `${day}|${r.zoneName}`;
+        if (seenDayZone.has(dayZone)) continue;
+        seenDayZone.add(dayZone);
+        // 自然日+副本 已存在活动则跳过（含手动建的无 WCL 链接活动）
+        const { body: exist } = await supabaseRestGet(
+          `/rest/v1/activities?guild_id=eq.${encodeURIComponent(guild.id)}&activity_date=eq.${day}&raid=eq.${encodeURIComponent(r.zoneName)}&select=id&limit=1`
+        );
+        if (Array.isArray(exist) && exist[0]) continue;
+        const d = new Date(r.startTime);
+        const name = `${d.getMonth() + 1}月${d.getDate()}日 ${r.zoneName}`;
+        const wr = await supabaseRestWrite("POST", "/rest/v1/activities", {
+          guild_id: guild.id,
+          name,
+          activity_date: day,
+          raid: r.zoneName,
+          wcl_url: `https://www.warcraftlogs.com/reports/${r.code}`,
+          wcl_report_code: r.code,
+          status: "normal",
+        });
+        if (wr.status >= 300) {
+          console.log(`[wcl-sweep] guild=${guild.id} code=${r.code} 创建活动失败 status=${wr.status}`);
+        } else {
+          console.log(`[wcl-sweep] guild=${guild.id} code=${r.code} 自动创建活动「${name}」`);
+        }
+      }
+    } catch (e) {
+      console.log(`[wcl-sweep] guild=${guild.id} 失败：${e.message}`);
+    }
+  }
+}
+function startWclAutoCreateSweep() {
+  setTimeout(() => {
+    wclAutoCreateSweep().catch((e) => console.log(`[wcl-sweep] 异常：${e.message}`));
+    setInterval(() => {
+      wclAutoCreateSweep().catch((e) => console.log(`[wcl-sweep] 异常：${e.message}`));
+    }, WCL_SWEEP_INTERVAL_MS);
+  }, 5 * 60 * 1000);
+}
+
 function serveFile(res, filePath, req) {
   const ext = path.extname(filePath).toLowerCase();
   const contentType = MIME[ext] || "application/octet-stream";
@@ -1216,6 +1600,35 @@ const server = http.createServer(async (req, res) => {
   }
   if (urlPath === "/api/wcl/attendance-snapshot" && req.method === "POST") {
     handleWclRequest(req, res, corsHeaders, true);
+    return;
+  }
+
+  // API: WCL 公会绑定与报告同步（任务书 #70 WP1）——鉴权栈同 #11，详见各处理器注释
+  if (urlPath === "/api/wcl/guild-lookup" && req.method === "GET") {
+    const q = Object.fromEntries(new URL(req.url, "http://x").searchParams);
+    handleWclGuildLookup(req, res, corsHeaders, q);
+    return;
+  }
+  if (urlPath === "/api/wcl/bind-guild-paste" && req.method === "POST") {
+    handleWclBindPaste(req, res, corsHeaders);
+    return;
+  }
+  if (urlPath === "/api/wcl/set-auto-create" && req.method === "POST") {
+    handleWclSetAutoCreate(req, res, corsHeaders);
+    return;
+  }
+  if (urlPath === "/api/wcl/unbind-guild" && req.method === "POST") {
+    handleWclUnbind(req, res, corsHeaders);
+    return;
+  }
+  if (urlPath === "/api/wcl/reports" && req.method === "GET") {
+    const q = Object.fromEntries(new URL(req.url, "http://x").searchParams);
+    handleWclReports(req, res, corsHeaders, q);
+    return;
+  }
+  if (urlPath === "/api/wcl/report-fights" && req.method === "GET") {
+    const q = Object.fromEntries(new URL(req.url, "http://x").searchParams);
+    handleWclReportFights(req, res, corsHeaders, q);
     return;
   }
 
@@ -1566,6 +1979,7 @@ function startServer() {
   return server.listen(PORT, HOST, () => {
     process.stderr.write(`Server listening on ${HOST}:${PORT}\n`);
     scheduleAnalyticsPurge(); // 任务书 #55 WP1：90 天滚动清理（10 分钟首跑 + 每 24h）
+    startWclAutoCreateSweep(); // 任务书 #70：WCL 新报告自动创建活动（启动 5 分钟首跑 + 每小时）
   });
 }
 

@@ -1886,6 +1886,8 @@ async function openGuildSettings() {
   }
   refreshDirtyHint();
 
+  renderWclBindCard(); // 任务书 #70：WCL 公会绑定卡回填
+
   openModal('guildSettingsModal');
   await loadGuildMembers();
 }
@@ -2903,7 +2905,10 @@ const modalDirtyChecks = {
       // 任务书 #18 WP2 R4：认领人标签开关同样纳入未保存判定（默认开）
       (claimerEl && claimerEl.checked !== (g.show_claimer_label !== false)) ||
       // 任务书 #21 WP2：认领方式三档纳入未保存判定（默认 free）
-      (claimModeEl && claimModeEl.value !== (g.claim_mode || 'free'));
+      (claimModeEl && claimModeEl.value !== (g.claim_mode || 'free')) ||
+      // 任务书 #70：WCL 绑定卡——已检测出公会待确认 / 输入框有内容，视为有未保存操作
+      !!wclPendingLookup ||
+      (() => { const el = document.getElementById('wclGuildInput'); return !!(el && el.value.trim()); })();
   }
 };
 
@@ -4462,6 +4467,12 @@ function syncAttendanceViewUI() {
   });
   document.getElementById('calendarView').style.display = view === 'calendar' ? 'block' : 'none';
   document.getElementById('listView').style.display = view === 'list' ? 'block' : 'none';
+  // 任务书 #70：已绑定 WCL 公会才显示「同步 WCL 报告」入口（viewer 由 edit-only 类隐藏）
+  const wclSyncBtn = document.getElementById('wclReportsSyncBtn');
+  if (wclSyncBtn) {
+    const g = window.CloudSync && window.CloudSync.getCurrentGuild();
+    wclSyncBtn.style.display = (g && g.wcl_guild_id) ? '' : 'none';
+  }
   renderAttendance();
 }
 
@@ -4984,6 +4995,7 @@ function openAttendanceDetail(activityId) {
 
   renderAttendanceMembers(activity);
   updateWclImportedBanner(activity); // REQ-037
+  renderWclRaidBoard(activity); // 任务书 #70：团本速览看板（有 WCL 报告才渲染）
   openModal('attendanceDetailModal');
 }
 
@@ -5268,6 +5280,290 @@ async function wclApiPost(path, body) {
   try { data = await resp.json(); } catch { data = null; }
   if (!resp.ok) throw new Error((data && data.message) || `WCL 请求失败 (${resp.status})`);
   return data;
+}
+
+// ==================== 任务书 #70：WCL 公会绑定与报告同步（WP1 方案A + 共用功能） ====================
+// 绑定走 server.js 专用端点（/api/wcl/bind-* 等，服务端鉴权 owner/editor + 核实公会名后落库）；
+// 本区只调端点不直写库，不触发 cloudCrud——绑定状态刷新用 CloudSync.selectGuild 重载公会。
+// 方案 C（OAuth）为 WP2，前端仅占位。
+
+// 本区新增 DOM 一律经此转义（WCL 返回的公会/首领名为外部数据）
+function wcl70Esc(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+async function wclApiGet(path, params) {
+  const token = await window.CloudSync.getAccessToken();
+  if (!token) throw new Error('未登录，请先登录');
+  const qs = new URLSearchParams(params || {}).toString();
+  const resp = await fetch(path + (qs ? `?${qs}` : ''), {
+    headers: { 'Authorization': `Bearer ${token}` }
+  });
+  let data = null;
+  try { data = await resp.json(); } catch { data = null; }
+  if (!resp.ok) throw new Error((data && data.message) || `WCL 请求失败 (${resp.status})`);
+  return data;
+}
+
+// 解析用户粘贴的 WCL 公会链接 / 纯数字 ID → {id} 或 {region, server, name}
+function wclParseGuildInput(raw) {
+  const s = String(raw || '').trim();
+  if (!s) return null;
+  let m = s.match(/warcraftlogs\.com\/guild\/id\/(\d+)/i);
+  if (m) return { id: m[1] };
+  m = s.match(/warcraftlogs\.com\/guild\/([^/]+)\/([^/]+)\/([^/?#]+)/i);
+  if (m) return { region: decodeURIComponent(m[1]), server: decodeURIComponent(m[2]), name: decodeURIComponent(m[3]) };
+  if (/^\d+$/.test(s)) return { id: s };
+  return null;
+}
+
+let wclPendingLookup = null; // 检测成功待确认的公会 {id,name,serverName,region}
+let wclBindBusy = false;
+
+// 公会设置弹窗打开时回填绑定卡（在 openGuildSettings 中调用）
+function renderWclBindCard() {
+  const guild = window.CloudSync.getCurrentGuild();
+  const bound = document.getElementById('wclBindBound');
+  const unbound = document.getElementById('wclBindUnbound');
+  if (!bound || !unbound) return;
+  wclPendingLookup = null;
+  const result = document.getElementById('wclLookupResult');
+  if (result) result.style.display = 'none';
+  const input = document.getElementById('wclGuildInput');
+  if (input) input.value = '';
+  if (guild && guild.wcl_guild_id) {
+    bound.style.display = '';
+    unbound.style.display = 'none';
+    document.getElementById('wclBoundName').textContent = `${guild.wcl_guild_name || ''} - ${guild.wcl_server_name || ''}`;
+    const methodText = guild.wcl_bind_method === 'oauth' ? '账号授权' : '粘贴绑定';
+    const boundAt = guild.wcl_bound_at ? formatDate(new Date(guild.wcl_bound_at)) : '';
+    document.getElementById('wclBoundMeta').textContent = `（${methodText}${boundAt ? ' · ' + boundAt : ''}）`;
+    const cb = document.getElementById('wclAutoCreateEvent');
+    if (cb) cb.checked = !!guild.wcl_auto_create_event;
+  } else {
+    bound.style.display = 'none';
+    unbound.style.display = '';
+  }
+}
+
+async function wclLookupGuild() {
+  if (wclBindBusy) return;
+  const guild = window.CloudSync.getCurrentGuild();
+  if (!guild) return;
+  const parsed = wclParseGuildInput(document.getElementById('wclGuildInput').value);
+  if (!parsed) { showToast('无法识别的 WCL 公会链接，支持 guild/id/数字 或 guild/cn/服务器/公会名 格式', 'error'); return; }
+  wclBindBusy = true;
+  const btn = document.getElementById('wclLookupBtn');
+  if (btn) { btn.disabled = true; btn.textContent = '检测中...'; }
+  try {
+    const params = { guildId: guild.id };
+    if (parsed.id) params.id = parsed.id;
+    else { params.name = parsed.name; params.server = parsed.server; params.region = parsed.region || 'cn'; }
+    const info = await wclApiGet('/api/wcl/guild-lookup', params);
+    wclPendingLookup = info;
+    document.getElementById('wclLookupText').textContent = `检测到公会：${info.name} - ${info.serverName}（ID: ${info.id}）`;
+    document.getElementById('wclLookupResult').style.display = '';
+  } catch (e) {
+    showToast(e.message, 'error');
+  } finally {
+    wclBindBusy = false;
+    if (btn) { btn.disabled = false; btn.textContent = '检测公会'; }
+  }
+}
+
+function wclCancelLookup() {
+  wclPendingLookup = null;
+  document.getElementById('wclLookupResult').style.display = 'none';
+}
+
+async function wclConfirmBind() {
+  if (wclBindBusy || !wclPendingLookup) return;
+  const guild = window.CloudSync.getCurrentGuild();
+  if (!guild) return;
+  wclBindBusy = true;
+  try {
+    await wclApiPost('/api/wcl/bind-guild-paste', { guildId: guild.id, wclGuildId: wclPendingLookup.id });
+    showToast(`已绑定 WCL 公会：${wclPendingLookup.name}`, 'success');
+    wclPendingLookup = null;
+    await window.CloudSync.selectGuild(guild.id); // 重载公会行拿最新绑定字段
+    renderWclBindCard();
+    syncAttendanceViewUI(); // 同步按钮显隐联动
+  } catch (e) {
+    showToast(e.message, 'error');
+  } finally {
+    wclBindBusy = false;
+  }
+}
+
+async function wclUnbind() {
+  if (wclBindBusy) return;
+  const guild = window.CloudSync.getCurrentGuild();
+  if (!guild || !guild.wcl_guild_id) return;
+  if (!confirm(`确定解绑 WCL 公会「${guild.wcl_guild_name || ''}」吗？\n已关联到活动的报告链接会保留。`)) return;
+  wclBindBusy = true;
+  try {
+    await wclApiPost('/api/wcl/unbind-guild', { guildId: guild.id });
+    showToast('已解绑 WCL 公会', 'success');
+    await window.CloudSync.selectGuild(guild.id);
+    renderWclBindCard();
+    syncAttendanceViewUI();
+    const banner = document.getElementById('wclNewReportsBanner');
+    if (banner) banner.style.display = 'none';
+  } catch (e) {
+    showToast(e.message, 'error');
+  } finally {
+    wclBindBusy = false;
+  }
+}
+
+async function wclToggleAutoCreate() {
+  const guild = window.CloudSync.getCurrentGuild();
+  const cb = document.getElementById('wclAutoCreateEvent');
+  if (!guild || !cb) return;
+  const enabled = cb.checked;
+  try {
+    await wclApiPost('/api/wcl/set-auto-create', { guildId: guild.id, enabled });
+    guild.wcl_auto_create_event = enabled; // 本地状态即时对齐（服务端已落库）
+    showToast(enabled ? '已开启自动创建活动（每小时检测一次）' : '已关闭自动创建活动', 'success');
+  } catch (e) {
+    cb.checked = !enabled; // 失败回滚
+    showToast(e.message, 'error');
+  }
+}
+
+// ---- 活动页：同步 WCL 报告 + 新报告 banner ----
+let wclReportsBusy = false;
+let wclReportCache = []; // 最近一次同步的完整列表（忽略操作后本地重渲染用）
+
+function wclDismissedSet() {
+  const guild = window.CloudSync.getCurrentGuild();
+  try {
+    return new Set(JSON.parse(localStorage.getItem(`wcl70:dismissed:${guild ? guild.id : ''}`) || '[]'));
+  } catch { return new Set(); }
+}
+function wclDismissReport(code) {
+  const guild = window.CloudSync.getCurrentGuild();
+  if (!guild) return;
+  const set = wclDismissedSet();
+  set.add(code);
+  localStorage.setItem(`wcl70:dismissed:${guild.id}`, JSON.stringify([...set]));
+  wclRenderNewReportsBanner();
+}
+
+function wclFormatDuration(startTime, endTime) {
+  const ms = (endTime || 0) - (startTime || 0);
+  if (ms <= 0) return '';
+  const min = Math.round(ms / 60000);
+  return min >= 60 ? `${Math.floor(min / 60)}小时${min % 60}分` : `${min}分钟`;
+}
+
+// 依据缓存重渲染 banner（同步后与忽略后共用）
+function wclRenderNewReportsBanner() {
+  const banner = document.getElementById('wclNewReportsBanner');
+  if (!banner) return;
+  const dismissed = wclDismissedSet();
+  const fresh = wclReportCache.filter(r => !r.is_linked && !dismissed.has(r.code));
+  if (!fresh.length) { banner.style.display = 'none'; return; }
+  banner.innerHTML = '<div style="font-weight:600">📋 检测到 WCL 新报告</div>' + fresh.map(r => {
+    const d = new Date(r.startTime);
+    const label = `${d.getMonth() + 1}月${d.getDate()}日 ${r.zoneName || r.title || '未命名'}`;
+    const dur = wclFormatDuration(r.startTime, r.endTime);
+    return `<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">` +
+      `<span style="flex:1;min-width:200px">「${wcl70Esc(label)}」${dur ? ' — ' + dur : ''}</span>` +
+      `<button class="btn btn-sm btn-primary" onclick="wclCreateActivityFromReport('${wcl70Esc(r.code)}')">创建活动并关联</button>` +
+      `<button class="btn btn-sm" onclick="wclDismissReport('${wcl70Esc(r.code)}')">忽略</button>` +
+      `</div>`;
+  }).join('');
+  banner.style.display = 'flex';
+}
+
+async function wclSyncReports() {
+  if (wclReportsBusy) return;
+  const guild = window.CloudSync.getCurrentGuild();
+  if (!guild) return;
+  if (!guild.wcl_guild_id) { showToast('尚未绑定 WCL 公会，请先在 公会设置 中绑定', 'warning'); return; }
+  wclReportsBusy = true;
+  const btn = document.getElementById('wclReportsSyncBtn');
+  if (btn) { btn.disabled = true; btn.textContent = '🔄 同步中...'; }
+  const statusLine = document.getElementById('wclSyncStatusLine');
+  try {
+    const data = await wclApiGet('/api/wcl/reports', { guildId: guild.id });
+    wclReportCache = data.reports || [];
+    wclRenderNewReportsBanner();
+    const dismissed = wclDismissedSet();
+    const freshCount = wclReportCache.filter(r => !r.is_linked && !dismissed.has(r.code)).length;
+    if (statusLine) {
+      const t = new Date();
+      const hhmm = `${String(t.getHours()).padStart(2, '0')}:${String(t.getMinutes()).padStart(2, '0')}`;
+      statusLine.textContent = `上次同步：${hhmm}｜${freshCount ? `发现 ${freshCount} 份新报告` : 'WCL 暂无新公开报告'}`;
+      statusLine.style.display = '';
+    }
+  } catch (e) {
+    showToast(e.message, 'error');
+  } finally {
+    wclReportsBusy = false;
+    if (btn) { btn.disabled = false; btn.textContent = '🔄 同步 WCL 报告'; }
+  }
+}
+
+// 从 banner 创建活动：打开活动弹窗并预填 日期/团本/WCL 链接
+function wclCreateActivityFromReport(code) {
+  const r = wclReportCache.find(x => x.code === code);
+  if (!r) return;
+  showActivityModal(null);
+  const d = new Date(r.startTime);
+  const day = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  document.getElementById('activityDate').value = day;
+  document.getElementById('activityRaidName').value = r.zoneName || '';
+  document.getElementById('activityWclUrl').value = `https://www.warcraftlogs.com/reports/${r.code}`;
+  showToast('已按 WCL 报告预填，确认后保存', 'info');
+}
+
+// ---- 活动详情：团本速览看板（首领级聚合；viewer 可看，无玩家个人数据） ----
+const wclBoardCache = new Map(); // activityId → html 渲染数据（本次会话内）
+
+async function renderWclRaidBoard(activity) {
+  const board = document.getElementById('wclRaidBoard');
+  if (!board) return;
+  const code = activity.wcl_report_code || ((parseWclUrl(activity.wcl_url) || {}).code);
+  if (!code) { board.style.display = 'none'; return; }
+  const guild = window.CloudSync.getCurrentGuild();
+  if (!guild) { board.style.display = 'none'; return; }
+  board.style.display = '';
+  const cached = wclBoardCache.get(activity.id);
+  if (cached) { board.innerHTML = cached; return; }
+  board.innerHTML = '<div style="font-size:13px;color:var(--text-muted);padding:8px">📊 团本速览加载中...</div>';
+  try {
+    const data = await wclApiGet('/api/wcl/report-fights', { guildId: guild.id, code });
+    const byBoss = new Map();
+    for (const f of (data.fights || [])) {
+      let b = byBoss.get(f.name);
+      if (!b) { b = { name: f.name, attempts: 0, kill: false, bestPct: null }; byBoss.set(f.name, b); }
+      b.attempts++;
+      if (f.kill) b.kill = true;
+      else if (typeof f.fightPercentage === 'number') {
+        b.bestPct = b.bestPct === null ? f.fightPercentage : Math.min(b.bestPct, f.fightPercentage);
+      }
+    }
+    const bosses = [...byBoss.values()];
+    const kills = bosses.filter(b => b.kill).length;
+    const dur = wclFormatDuration(data.startTime, data.endTime);
+    const rows = bosses.map(b => {
+      const best = b.kill ? '100%' : (b.bestPct === null ? '—' : `剩余 ${Math.round(b.bestPct)}%`);
+      return `<tr><td>${wcl70Esc(b.name)}</td><td>${b.kill ? '✅' : '❌'}</td><td>${b.attempts}</td><td>${best}</td></tr>`;
+    }).join('');
+    const wclUrl = activity.wcl_url || `https://www.warcraftlogs.com/reports/${code}`;
+    const html = `<div style="border:1px solid var(--border-color);border-radius:6px;padding:12px">` +
+      `<div style="font-weight:600;margin-bottom:6px">📊 团本速览 — ${wcl70Esc(data.title || activity.raid_name)}</div>` +
+      `<div style="font-size:12px;color:var(--text-muted);margin-bottom:8px">${dur ? `总用时：${dur}　` : ''}尝试首领：${bosses.length}　击杀：${kills}/${bosses.length}</div>` +
+      (bosses.length ? `<table style="width:100%;font-size:13px;border-collapse:collapse"><thead><tr style="color:var(--text-muted);text-align:left"><th style="padding:4px">首领</th><th style="padding:4px">击杀</th><th style="padding:4px">尝试</th><th style="padding:4px">最佳进度</th></tr></thead><tbody>${rows}</tbody></table>` : '<div style="font-size:12px;color:var(--text-muted)">该报告无首领战斗记录</div>') +
+      `<div style="margin-top:8px"><a href="${wcl70Esc(wclUrl)}" target="_blank" rel="noopener noreferrer" style="font-size:12px;color:var(--blue-highlight)">去 WCL 看详细数据 →</a></div>` +
+      `</div>`;
+    wclBoardCache.set(activity.id, html);
+    board.innerHTML = html;
+  } catch (e) {
+    board.innerHTML = `<div style="font-size:13px;color:var(--text-muted);padding:8px">📊 团本速览加载失败：${wcl70Esc(e.message)}</div>`;
+  }
 }
 
 // activity_attendance 直写 server.js 代理（与 cloud.js syncActivity 内批量插入同一途径）
@@ -7900,6 +8196,22 @@ function lootFillAssignedTo(idOrName) {
 // ==================== 初始化 ====================
 // ==================== 更新日志 ====================
 const changelogData = [
+  {
+    id: 'v3.2.0-task70-wcl-guild-binding',
+    version: 'v3.2.0',
+    date: '2026-10-14',
+    type: 'feature',
+    typeLabel: '新增功能',
+    title: 'WCL 公会绑定与报告同步 WP1：粘贴绑定 + 新报告提示 + 团本速览看板（任务书 #70）',
+    summary: '公会设置新增「🔗 WCL 公会绑定」卡：粘贴 WCL 公会链接（guild/id/数字 或 guild/cn/服务器/公会名 格式）→ 检测公会 → 确认绑定，同一 WCL 公会在全平台只能绑定一个管家公会（数据库唯一索引兜底）。绑定后考勤记录页出现「🔄 同步 WCL 报告」按钮，检测到新公开报告时顶部弹出关联提示条，可一键「创建活动并关联」（自动预填日期/团本/报告链接）或忽略。已关联 WCL 报告的活动详情新增「📊 团本速览」看板：首领级聚合（击杀/尝试次数/最佳进度），不含任何玩家个人数据。公会设置内还有「自动创建活动」可选开关（默认关闭）：开启后服务端每小时自动为新报告创建活动（自然日+副本去重）。支持随时解绑，解绑后已关联活动的报告链接保留。方案二「WCL 账号授权绑定」为后续 WP2，本批占位。',
+    details: [
+      '后端新增 6 个端点：guild-lookup / bind-guild-paste / unbind-guild / set-auto-create / reports / report-fights，鉴权复用 JWT+公会角色栈（绑定类 owner/editor，看板全体公会成员含 viewer 可看）',
+      '通用写代理拦截 guilds 表 wcl_ 前缀字段，绑定信息只走专用端点；数据库 wcl_token 列对前端角色撤销 SELECT（密文不出服务端）',
+      'WCL 公会名由服务端二次核实（防伪造）；绑定冲突/未绑定/未找到公会均为中文报错',
+      '团本速览只拉首领级聚合字段（fights 名称/击杀/最佳进度），红线遵守：不拉玩家个人 DPS/HPS',
+      '版本串 index.html 20261014.91（15 处）；data.html/decor.html 重定向壳引用未变，按任务书 #61-WP1 规则不联动'
+    ]
+  },
   {
     id: 'v3.2.0-task68-decor-race',
     version: 'v3.2.0',

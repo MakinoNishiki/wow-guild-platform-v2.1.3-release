@@ -4,13 +4,13 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>魔兽管家</title>
-<!-- 静态资源版本号：20261013.90（任务书 #22 WP3-②：凡改动 js/css 的 commit 必须同步递增此处与所有 ?v= 查询串，见 docs/开发规范.md 第五章） -->
+<!-- 静态资源版本号：20261014.91（任务书 #22 WP3-②：凡改动 js/css 的 commit 必须同步递增此处与所有 ?v= 查询串，见 docs/开发规范.md 第五章） -->
 <link rel="icon" type="image/png" sizes="32x32" href="assets/brand/favicon-32.png">
 <link rel="icon" type="image/png" sizes="16x16" href="assets/brand/favicon-16.png">
-<link rel="stylesheet" href="css/main.css?v=20261013.90">
-<link rel="stylesheet" href="css/data-public.css?v=20261013.90"><!-- 任务书 #28 WP5：副本掉落 tab（选择器全 .dp- 前缀 + #page-lootdrop 作用域，零泄漏） -->
-<link rel="stylesheet" href="css/decor-public.css?v=20261013.90"><!-- 任务书 #51：家宅图鉴（选择器全 .dh- 前缀，零泄漏，双壳共用） -->
-<script src="assets/vendor/supabase-js-2.js?v=20261013.90"></script>
+<link rel="stylesheet" href="css/main.css?v=20261014.91">
+<link rel="stylesheet" href="css/data-public.css?v=20261014.91"><!-- 任务书 #28 WP5：副本掉落 tab（选择器全 .dp- 前缀 + #page-lootdrop 作用域，零泄漏） -->
+<link rel="stylesheet" href="css/decor-public.css?v=20261014.91"><!-- 任务书 #51：家宅图鉴（选择器全 .dh- 前缀，零泄漏，双壳共用） -->
+<script src="assets/vendor/supabase-js-2.js?v=20261014.91"></script>
 </head>
 <body>
 
@@ -407,10 +407,16 @@
               <div class="view-tab active" onclick="switchAttendanceView('list')">列表视图</div>
             </div>
             <div style="display:flex;gap:8px">
+              <!-- 任务书 #70：已绑定 WCL 公会的同步入口（显隐由 syncAttendanceViewUI 控制） -->
+              <button class="btn edit-only" id="wclReportsSyncBtn" style="display:none" onclick="wclSyncReports()">🔄 同步 WCL 报告</button>
               <button class="btn edit-only" onclick="showWCLImportModal()">🔗 WCL 导入</button>
               <button class="btn btn-primary edit-only" onclick="showActivityModal()">+ 创建活动</button>
             </div>
           </div>
+
+          <!-- 任务书 #70：WCL 新报告关联提示 banner（默认隐藏，同步后有新报告才显示） -->
+          <div id="wclNewReportsBanner" class="attendance-wcl-banner" style="display:none;flex-direction:column;gap:8px;margin-bottom:12px"></div>
+          <div id="wclSyncStatusLine" style="display:none;font-size:12px;color:var(--text-muted);margin-bottom:8px"></div>
 
           <!-- 日历视图（REQ-011：默认列表视图，日历为用户自选） -->
           <div id="calendarView" style="display:none">
@@ -1198,6 +1204,8 @@
       <div id="attendanceCancelledBanner" class="attendance-cancelled-banner" style="display:none">⚠ 活动已取消：考勤记录保留，但不再计入出勤率统计</div>
       <!-- REQ-037：WCL 同步成功后的常驻提示条（全部成员均已标记后自动消失） -->
       <div id="attendanceWclBanner" class="attendance-wcl-banner" style="display:none"></div>
+      <!-- 任务书 #70：团本速览看板（已关联 WCL 报告的活动显示；首领级聚合，无玩家个人数据） -->
+      <div id="wclRaidBoard" style="display:none;margin-bottom:12px"></div>
       <!-- REQ-055：考勤实时统计行（任何勾选/下拉变更实时刷新，0 项灰显不隐藏） -->
       <div id="attendanceStatsLine" class="attendance-stats-line"></div>
       <!-- REQ-109（任务书 #34 WP4）：批量按钮精简——仅保留「全部出席」（共享 handler setAllAttendance 保留） -->
@@ -1902,6 +1910,40 @@
         </div>
       </div>
 
+      <!-- 任务书 #70：WCL 公会绑定（可选；绑定/解绑/开关仅 owner/editor，viewer 只读状态） -->
+      <div class="card" style="margin-bottom:16px">
+        <div class="card-header">
+          <div class="card-title">🔗 WCL 公会绑定（可选）</div>
+        </div>
+        <div class="card-body">
+          <!-- 已绑定状态 -->
+          <div id="wclBindBound" style="display:none">
+            <div style="font-size:14px;color:var(--text-primary)">已绑定：<b id="wclBoundName"></b> <span id="wclBoundMeta" style="font-size:12px;color:var(--text-muted)"></span></div>
+            <label class="att-filter-toggle edit-only" style="margin-top:10px;display:block"><input type="checkbox" id="wclAutoCreateEvent" onchange="wclToggleAutoCreate()"> 自动创建活动（检测到新报告时自动创建并关联）</label>
+            <div style="font-size:12px;color:var(--text-muted);margin-top:4px">⚠️ 开启后 WCL 有新公开报告时管家每小时自动创建活动（自然日+副本去重），活动时间以 WCL 报告为准，可能需手动调整。</div>
+            <button class="btn btn-sm edit-only" id="wclUnbindBtn" style="margin-top:10px" onclick="wclUnbind()">解绑</button>
+          </div>
+          <!-- 未绑定状态 -->
+          <div id="wclBindUnbound">
+            <div style="font-size:13px;color:var(--text-secondary);margin-bottom:6px">方式一：粘贴 WCL 公会链接</div>
+            <div class="edit-only" style="display:flex;gap:8px">
+              <input class="form-input" id="wclGuildInput" placeholder="https://www.warcraftlogs.com/guild/id/766716 或纯数字 ID" style="flex:1">
+              <button class="btn btn-sm btn-primary" id="wclLookupBtn" onclick="wclLookupGuild()">检测公会</button>
+            </div>
+            <div id="wclLookupResult" style="display:none;margin-top:10px;padding:10px;border:1px solid var(--border-color);border-radius:6px">
+              <div style="font-size:13px;color:var(--text-primary)" id="wclLookupText"></div>
+              <div style="display:flex;gap:8px;margin-top:8px">
+                <button class="btn btn-sm btn-primary edit-only" onclick="wclConfirmBind()">确认绑定</button>
+                <button class="btn btn-sm edit-only" onclick="wclCancelLookup()">取消</button>
+              </div>
+            </div>
+            <div style="font-size:12px;color:var(--text-muted);margin-top:8px">💡 复制你的 WCL 公会页面链接粘贴即可；绑定后活动页可一键同步新报告</div>
+            <div style="font-size:13px;color:var(--text-secondary);margin-top:12px">方式二：WCL 账号授权</div>
+            <button class="btn btn-sm" disabled title="即将上线">WCL 登录授权（即将上线）</button>
+          </div>
+        </div>
+      </div>
+
       <!-- 成员管理 -->
       <div class="card">
         <div class="card-header">
@@ -2221,21 +2263,21 @@
   </div>
 </div>
 
-<script src="js/cloud.js?v=20261013.90"></script>
+<script src="js/cloud.js?v=20261014.91"></script>
 <!-- 任务书 #14：主数据层（快照兜底 + 加载层），须在 app.js 之前 -->
-<script src="js/masterDataSnapshot.js?v=20261013.90"></script>
-<script src="js/masterData.js?v=20261013.90"></script>
+<script src="js/masterDataSnapshot.js?v=20261014.91"></script>
+<script src="js/masterData.js?v=20261014.91"></script>
 <!-- 任务书 #22 WP2：职业/专精/职责图标集中映射（全站唯一取图处） -->
-<script src="js/iconMap.js?v=20261013.90"></script>
+<script src="js/iconMap.js?v=20261014.91"></script>
 <!-- 任务书 #31（REQ-097）：装备分类词表单一真源（公示页 chips / picker 过滤 / BUG-057 回填三处消费，须在 dataPublic.js 与 app.js 之前） -->
-<script src="js/lootTaxonomy.js?v=20261013.90"></script>
+<script src="js/lootTaxonomy.js?v=20261014.91"></script>
 <!-- 任务书 #28 WP5：副本掉落渲染层（双壳同源；无 data-public-body 不自动启动，由 app.js 懒挂载，须在 app.js 之前） -->
-<script src="js/dataPublic.js?v=20261013.90"></script>
+<script src="js/dataPublic.js?v=20261014.91"></script>
 <!-- 任务书 #51（REQ-137 一期）：家宅图鉴词表单一真源（价格/分类/尺寸/来源词表，须在 decorData.js 之前） -->
-<script src="js/decorDict.js?v=20261013.90"></script>
+<script src="js/decorDict.js?v=20261014.91"></script>
 <!-- 任务书 #51：家宅图鉴数据层+渲染层（双壳同源；无 data-decor-body 不自动启动，由 app.js 懒挂载，须在 app.js 之前） -->
-<script src="js/decorData.js?v=20261013.90"></script>
-<script src="js/app.js?v=20261013.90"></script>
-<script src="js/track.js?v=20261013.90"></script><!-- 任务书 #54 WP1：全站埋点采集层（REQ-141，零依赖静默兜底） -->
+<script src="js/decorData.js?v=20261014.91"></script>
+<script src="js/app.js?v=20261014.91"></script>
+<script src="js/track.js?v=20261014.91"></script><!-- 任务书 #54 WP1：全站埋点采集层（REQ-141，零依赖静默兜底） -->
 </body>
 </html>
