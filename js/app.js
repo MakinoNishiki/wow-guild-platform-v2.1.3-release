@@ -8,7 +8,8 @@ let appData = {
   members: [],
   activities: [],
   loots: [],
-  wishlist: []
+  wishlist: [],
+  lootDrops: [] // 任务书 #75-Day2：拾取记录（loot_drops，懒加载，不落 localStorage 缓存——流水量体不适合缓存）
 };
 
 // 暴露 appData 到 window 供 cloud.js 使用
@@ -2287,7 +2288,9 @@ function gotoActivityInAttendance(activityId) {
   document.getElementById('attFilterIncludeCancelled').checked = true;
   attFilterChange(); // 内部重读 DOM → 同步 attFilter → renderActivityList
   // 决策②：当次强制列表视图（手动同步 tab/容器显隐，不碰 getAttendanceView 记忆键）
-  document.querySelectorAll('.view-tab').forEach((tab, i) => {
+  // 任务书 #75-Day2：作用域收窄 #page-attendance——装备分配页新增 .view-tab 子标签后，
+  // 全局 '.view-tab' 会误伤 loot/数据中心 tab 激活态（mdTabs 被考勤视图切换剥 active 系由此发现的存量隐患）
+  document.querySelectorAll('#page-attendance .view-tab').forEach((tab, i) => {
     tab.classList.toggle('active', i === 1); // i=1 为列表视图 tab
   });
   document.getElementById('calendarView').style.display = 'none';
@@ -4462,7 +4465,8 @@ function switchAttendanceView(view) {
 // REQ-011：按当前视图偏好同步 tab 高亮与视图容器显隐（页面初始化/切页时也要调）
 function syncAttendanceViewUI() {
   const view = getAttendanceView();
-  document.querySelectorAll('.view-tab').forEach((tab, i) => {
+  // 任务书 #75-Day2：作用域收窄 #page-attendance（同 gotoActivityInAttendance，理由见其注释）
+  document.querySelectorAll('#page-attendance .view-tab').forEach((tab, i) => {
     tab.classList.toggle('active', (view === 'calendar' && i === 0) || (view === 'list' && i === 1));
   });
   document.getElementById('calendarView').style.display = view === 'calendar' ? 'block' : 'none';
@@ -6749,6 +6753,306 @@ function tierSetReset(scope) {
   tierFieldLock(scope, false); // WP1：复位普通模式时确保字段锁全解除（弹窗复开不残留禁用态）
 }
 
+// ==================== 任务书 #75-Day2：拾取记录视图 + 插件导入（loot_drops，REQ-163） ====================
+// 数据链：插件 WoWButlerCollector → SavedVariables → scripts/export-collector-to-json.js → 本页导入 → loot_drops。
+// 视图形态：装备分配页内 .view-tab 子标签（复用数据中心既有组件族，非新组件，§10 评审闸不触发）。
+// 迁移门禁：sql/42 未执行时（表 42P01/404）中文提示不白屏（任务书 #65 WP2.3 先例）。
+
+let lootViewMode = 'assign';      // 'assign' 分配记录 | 'drops' 拾取记录（会话内记忆，不落盘）
+let lootDropsLoadedFor = null;    // 懒加载锚：已加载的公会 id（切公会/导入成功后重置）
+let lootDropsLoadError = '';      // 加载失败原因（门禁/网络），渲染层据此给中文提示
+
+// 本区块局部转义器（拾取记录字段来自插件/外部 JSON，不走 app.js 历史裸插口径）
+const dropEsc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+function lootSwitchView(view) {
+  lootViewMode = view === 'drops' ? 'drops' : 'assign';
+  document.querySelectorAll('#lootViewTabs .view-tab').forEach(t =>
+    t.classList.toggle('active', t.dataset.lootview === lootViewMode));
+  const assign = document.getElementById('lootViewAssign');
+  const drops = document.getElementById('lootViewDrops');
+  if (assign) assign.style.display = lootViewMode === 'assign' ? '' : 'none';
+  if (drops) drops.style.display = lootViewMode === 'drops' ? '' : 'none';
+  if (lootViewMode === 'drops') lootDropsRender();
+}
+
+// 懒加载：每公会首次切到拾取记录才拉表（登录初始加载零膨胀）
+async function lootDropsEnsureLoaded() {
+  const guild = window.CloudSync.getCurrentGuild();
+  if (!guild) return false;
+  if (lootDropsLoadedFor === guild.id) return true;
+  lootDropsLoadError = '';
+  try {
+    await window.CloudSync.reloadData('lootDrops');
+    lootDropsLoadedFor = guild.id;
+    return true;
+  } catch (e) {
+    const msg = String((e && e.message) || (e && e.code) || '');
+    lootDropsLoadError = /loot_drops|42P01|PGRST|404/.test(msg)
+      ? '拾取记录表未就绪（sql/42 待运营执行）'
+      : ('拾取记录加载失败：' + msg);
+    return false;
+  }
+}
+
+function lootDropsRender() {
+  const tbody = document.getElementById('lootDropsTableBody');
+  if (!tbody) return;
+  if (lootDropsLoadedFor !== ((window.CloudSync.getCurrentGuild() || {}).id) && !lootDropsLoadError) {
+    tbody.innerHTML = '<tr><td colspan="8"><div class="empty-state"><div class="empty-text">拾取记录加载中...</div></div></td></tr>';
+    lootDropsEnsureLoaded().then(() => lootDropsRenderTable());
+    return;
+  }
+  lootDropsRenderTable();
+}
+
+function lootDropsRenderTable() {
+  const tbody = document.getElementById('lootDropsTableBody');
+  if (!tbody) return;
+  if (lootDropsLoadError) {
+    // 迁移门禁/加载失败：中文提示 + 重试入口，不白屏
+    tbody.innerHTML = `<tr><td colspan="8"><div class="empty-state"><div class="empty-icon">⚠️</div><div class="empty-text">${dropEsc(lootDropsLoadError)}</div><button class="btn btn-secondary" onclick="lootDropsRender()">重试</button></div></td></tr>`;
+    return;
+  }
+  // 副本筛选项动态构建（数据驱动，保留当前选择）
+  const instSel = document.getElementById('lootDropsInstanceFilter');
+  if (instSel) {
+    const cur = instSel.value;
+    const insts = [...new Set((appData.lootDrops || []).map(d => d.instance_name).filter(Boolean))].sort();
+    instSel.innerHTML = '<option value="">全部副本</option>' + insts.map(n => `<option value="${n}">${dropEsc(n)}</option>`).join('');
+    instSel.value = cur;
+  }
+
+  let rows = [...(appData.lootDrops || [])];
+  const kw = (document.getElementById('lootDropsSearch')?.value || '').trim().toLowerCase();
+  if (kw) rows = rows.filter(d => (d.player_name || '').toLowerCase().includes(kw) || (d.item_name || '').toLowerCase().includes(kw));
+  const inst = document.getElementById('lootDropsInstanceFilter')?.value || '';
+  if (inst) rows = rows.filter(d => d.instance_name === inst);
+  const day = document.getElementById('lootDropsDateFilter')?.value || '';
+  if (day) rows = rows.filter(d => d.timestamp && String(d.timestamp).slice(0, 10) === day);
+
+  if (!(appData.lootDrops || []).length) {
+    // §4.9 空态：文案 + 引导动作（导入钮 viewer 由 edit-only 门控）
+    tbody.innerHTML = `<tr><td colspan="8"><div class="empty-state"><div class="empty-icon">🎁</div><div class="empty-text">暂无拾取记录，用插件 WoWButlerCollector 采集后点击「导入拾取」入库</div><button class="btn btn-primary edit-only" onclick="lootDropImportOpen()">📥 导入拾取</button></div></td></tr>`;
+    return;
+  }
+  if (!rows.length) {
+    tbody.innerHTML = '<tr><td colspan="8"><div class="empty-state"><div class="empty-text">当前筛选无匹配的拾取记录</div></div></td></tr>';
+    return;
+  }
+  const fmtTs = ts => {
+    const d = new Date(ts);
+    if (isNaN(d)) return '—';
+    return `${d.getMonth() + 1}月${d.getDate()}日 ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+  };
+  tbody.innerHTML = rows.map(d => {
+    // REQ-092 口径：规则路径 assets/icons/items/{icon_id}.png + lazy + 404 onerror 隐藏不占位
+    const icon = d.icon_id != null
+      ? `<img class="loot-item-icon" src="assets/icons/items/${d.icon_id}.png" loading="lazy" alt="" onerror="this.remove()">`
+      : '';
+    return `<tr>
+      <td>${fmtTs(d.timestamp)}</td>
+      <td>${dropEsc(d.player_name || '—')}</td>
+      <td><span class="loot-name">${icon}${dropEsc(d.item_name || '—')}</span></td>
+      <td class="num">${d.ilvl != null ? d.ilvl : '—'}</td>
+      <td>${dropEsc(d.slot_cn || d.slot || '—')}</td>
+      <td class="center">${dropEsc(d.difficulty || '—')}</td>
+      <td>${dropEsc(d.boss_name || '—')}</td>
+      <td>${dropEsc(d.instance_name || '—')}</td>
+    </tr>`;
+  }).join('');
+}
+
+// ---- 导入弹窗 ----
+let lootDropImportRows = []; // 解析后的待入库行（含 checked/dup/valid 标记）
+
+function lootDropImportOpen() {
+  lootDropImportRows = [];
+  const ta = document.getElementById('lootDropImportText');
+  if (ta) ta.value = '';
+  const pv = document.getElementById('lootDropImportPreview');
+  if (pv) { pv.style.display = 'none'; pv.innerHTML = ''; }
+  const btn = document.getElementById('lootDropImportConfirmBtn');
+  if (btn) { btn.disabled = true; btn.textContent = '确认入库'; }
+  lootDropBindZone();
+  openModal('lootDropImportModal');
+}
+
+function lootDropImportFile(input) {
+  const f = input.files && input.files[0];
+  if (f) lootDropReadFile(f);
+  input.value = ''; // 允许重复选同一文件
+}
+
+let lootDropZoneBound = false;
+function lootDropBindZone() {
+  if (lootDropZoneBound) return;
+  const zone = document.getElementById('lootDropZone');
+  if (!zone) return;
+  lootDropZoneBound = true;
+  zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('dragover'); });
+  zone.addEventListener('dragleave', () => zone.classList.remove('dragover'));
+  zone.addEventListener('drop', e => {
+    e.preventDefault();
+    zone.classList.remove('dragover');
+    const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+    if (f) lootDropReadFile(f);
+  });
+}
+
+function lootDropReadFile(f) {
+  const reader = new FileReader();
+  reader.onload = () => {
+    document.getElementById('lootDropImportText').value = String(reader.result || '');
+    lootDropImportParse();
+  };
+  reader.onerror = () => showToast('文件读取失败', 'error');
+  reader.readAsText(f);
+}
+
+// 重复判定键：拾取者+物品+时刻（与 sql/42 唯一索引 uq_loot_drops_event 同口径）
+function lootDropDupKey(playerName, itemId, ts) {
+  const t = typeof ts === 'number' ? new Date(ts * 1000).toISOString() : new Date(ts).toISOString();
+  return `${playerName}|${itemId}|${t}`;
+}
+
+function lootDropImportParse() {
+  const raw = (document.getElementById('lootDropImportText').value || '').trim();
+  if (!raw) { showToast('请先拖入 JSON 文件或粘贴 JSON 文本', 'error'); return; }
+  let data;
+  try { data = JSON.parse(raw); } catch (e) { showToast('JSON 解析失败：' + e.message, 'error'); return; }
+  if (!Array.isArray(data) || !data.length) { showToast('JSON 内容不是非空数组', 'error'); return; }
+
+  const existKeys = new Set((appData.lootDrops || []).map(d => {
+    try { return lootDropDupKey(d.player_name, d.official_item_id, d.timestamp); } catch { return ''; }
+  }));
+  lootDropImportRows = data.map(r => {
+    const item = {
+      player_name: String(r.playerName || '').trim(),
+      item_name: String(r.itemName || '').trim(),
+      official_item_id: typeof r.itemID === 'number' ? r.itemID : null,
+      icon_id: typeof r.iconID === 'number' ? r.iconID : null,
+      quality: typeof r.quality === 'number' ? r.quality : null,
+      ilvl: typeof r.ilvl === 'number' ? r.ilvl : null,
+      slot: typeof r.slot === 'string' ? r.slot : '',
+      slot_cn: typeof r.slotCN === 'string' ? r.slotCN : '',
+      item_type: typeof r.itemType === 'string' ? r.itemType : '',
+      boss_name: typeof r.bossName === 'string' ? r.bossName : '',
+      instance_name: typeof r.instanceName === 'string' ? r.instanceName : '',
+      difficulty: typeof r.difficulty === 'string' ? r.difficulty : '',
+      difficulty_id: typeof r.difficultyID === 'number' ? r.difficultyID : null,
+      timestamp: r.timestampISO || (typeof r.timestamp === 'number' ? new Date(r.timestamp * 1000).toISOString() : null),
+      source: 'plugin',
+    };
+    let dup = false;
+    try { dup = item.official_item_id != null && !!item.timestamp && existKeys.has(lootDropDupKey(item.player_name, item.official_item_id, item.timestamp)); } catch { dup = false; }
+    const valid = !!(item.player_name && item.item_name && item.official_item_id != null && item.timestamp);
+    return { ...item, dup, valid, checked: valid && !dup };
+  });
+  lootDropImportRenderPreview();
+}
+
+function lootDropImportRenderPreview() {
+  const pv = document.getElementById('lootDropImportPreview');
+  const btn = document.getElementById('lootDropImportConfirmBtn');
+  const total = lootDropImportRows.length;
+  const dupN = lootDropImportRows.filter(r => r.dup).length;
+  const invalidN = lootDropImportRows.filter(r => !r.valid).length;
+  const readyN = lootDropImportRows.filter(r => r.valid && !r.dup).length;
+  const checkedN = lootDropImportRows.filter(r => r.checked && r.valid && !r.dup).length;
+  pv.style.display = '';
+  pv.innerHTML = `
+    <div style="font-size:12px;color:var(--text-muted);margin:10px 0 6px">
+      共 ${total} 条 · 可入库 ${readyN} 条 · 已存在跳过 ${dupN} 条 · 缺字段 ${invalidN} 条
+      ${readyN ? `<span class="quick-action" style="margin-left:10px;cursor:pointer;color:var(--blue-highlight)" onclick="lootDropImportToggleAll(true)">全选</span> <span style="color:var(--text-muted)">|</span> <span class="quick-action" style="cursor:pointer;color:var(--blue-highlight)" onclick="lootDropImportToggleAll(false)">清空</span>` : ''}
+    </div>
+    <div class="drop-import-preview-wrap">
+      <table class="data-table">
+        <thead><tr><th class="center"></th><th>玩家</th><th>装备</th><th class="num">装等</th><th>部位</th><th>来源</th><th>时间</th><th class="center">状态</th></tr></thead>
+        <tbody>
+          ${lootDropImportRows.map((r, i) => `<tr${r.dup || !r.valid ? ' style="opacity:.55"' : ''}>
+            <td class="center"><input type="checkbox" data-dropidx="${i}" ${r.checked ? 'checked' : ''} ${(!r.valid || r.dup) ? 'disabled' : ''} onchange="lootDropImportToggle(${i}, this.checked)"></td>
+            <td>${dropEsc(r.player_name)}</td>
+            <td>${dropEsc(r.item_name)}</td>
+            <td class="num">${r.ilvl != null ? r.ilvl : '—'}</td>
+            <td>${dropEsc(r.slot_cn || r.slot || '—')}</td>
+            <td>${dropEsc([r.instance_name, r.boss_name].filter(Boolean).join(' · ') || '—')}</td>
+            <td>${r.timestamp ? r.timestamp.slice(0, 10) : '—'}</td>
+            <td class="center">${r.dup ? '<span class="tag">已存在</span>' : (!r.valid ? '<span class="tag" style="color:var(--danger)">缺字段</span>' : '<span class="tag tag-gold">待入库</span>')}</td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>`;
+  btn.disabled = checkedN === 0;
+  btn.textContent = checkedN ? `确认入库（${checkedN} 条）` : '确认入库';
+}
+
+function lootDropImportToggle(i, checked) {
+  if (lootDropImportRows[i]) lootDropImportRows[i].checked = !!checked;
+  lootDropImportRenderPreview();
+}
+
+function lootDropImportToggleAll(checked) {
+  lootDropImportRows.forEach(r => { if (r.valid && !r.dup) r.checked = !!checked; });
+  lootDropImportRenderPreview();
+}
+
+let lootDropImportSaving = false;
+async function lootDropImportConfirm() {
+  if (lootDropImportSaving) return;
+  const rows = lootDropImportRows.filter(r => r.checked && r.valid && !r.dup);
+  if (!rows.length) { showToast('没有可入库的记录', 'error'); return; }
+  const btn = document.getElementById('lootDropImportConfirmBtn');
+  lootDropImportSaving = true;
+  if (btn) { btn.disabled = true; btn.textContent = '入库中...'; }
+
+  let ok = 0, fail = 0, gateHit = false;
+  // 规范 1.2.2 批处理例外：批量导入循环 saveCloudData（每行独立写），完成后统一 reload 一次（智能导入先例）
+  for (const r of rows) {
+    const { checked, dup, valid, ...payload } = r;
+    try {
+      await window.CloudSync.saveCloudData('lootDrops', 'add', payload);
+      ok++;
+    } catch (e) {
+      fail++;
+      const msg = String((e && e.message) || '');
+      if (/loot_drops|42P01|PGRST|404/.test(msg)) { gateHit = true; break; } // 迁移门禁：表未就绪，中止剩余
+    }
+  }
+
+  let reloadOk = true;
+  if (ok > 0) {
+    try {
+      await window.CloudSync.reloadData('lootDrops');
+      lootDropsLoadedFor = (window.CloudSync.getCurrentGuild() || {}).id;
+      saveData();
+    } catch (e) { reloadOk = false; }
+  }
+  lootDropImportSaving = false;
+
+  if (gateHit) {
+    showToast('拾取记录表未就绪（sql/42 待运营执行）', 'error');
+    if (btn) { btn.disabled = false; btn.textContent = `确认入库（${rows.length} 条）`; }
+    return; // 弹窗保持打开（失败路径不吞现场）
+  }
+  if (fail > 0) {
+    showToast(`部分失败：成功 ${ok} 条，失败 ${fail} 条（未入库行可重新导入，重复检测会自动跳过已入库部分）`, 'error');
+    if (btn) { btn.disabled = false; btn.textContent = `确认入库`; }
+    if (ok > 0) { lootDropImportParse(); } // 刷新重复标记
+    return;
+  }
+  if (!reloadOk) {
+    showToast(`已写入 ${ok} 条，但刷新列表失败，请手动刷新页面`, 'warning');
+  } else {
+    showToast(`拾取记录入库成功（${ok} 条）`, 'success');
+  }
+  closeModal('lootDropImportModal');
+  lootSwitchView('drops');
+}
+
+// 规范 4.6 登记：导入弹窗——粘贴文本有内容或已解析待入库行即算未保存内容
+modalDirtyChecks.lootDropImportModal = () => isModalFormDirty('lootDropImportModal') || lootDropImportRows.length > 0;
+
 // 状态标签映射
 const lootStatusBadgeMap = {
   '待分配': 'badge-loot-pending',
@@ -7094,6 +7398,9 @@ function lootRender() {
       </tr>
     `;
   }).join('');
+
+  // 任务书 #75-Day2：子标签视图同步——切页/写后重渲时保持当前视图（drops 态触发其渲染）
+  lootSwitchView(lootViewMode);
 }
 
 // 初始化装备分配-成员下拉选择
@@ -8301,6 +8608,20 @@ function lootFillAssignedTo(idOrName) {
 // ==================== 初始化 ====================
 // ==================== 更新日志 ====================
 const changelogData = [
+  {
+    id: 'v3.2.0-task75-day2-lootdrops',
+    version: 'v3.2.0',
+    date: '2026-10-15',
+    type: 'feature',
+    typeLabel: '新增功能',
+    title: '装备分配新增「拾取记录」子标签 + 插件拾取导入（任务书 #75 / REQ-163）',
+    summary: '装备分配页新增「分配记录 / 拾取记录」子标签。拾取记录展示插件 WoWButlerCollector 自动采集的公会拾取流水（时间/玩家/装备/装等/部位/难度/首领/副本，装备名前置图标），支持玩家/装备名搜索、副本筛选、日期筛选。「📥 导入拾取」弹窗支持拖放 JSON 文件或粘贴文本，解析预览（勾选/全选/已存在跳过/缺字段标红），确认后批量入库 loot_drops 表（重复记录按 拾取者+物品+时刻 自动识别跳过）。sql/42 未执行时给出中文门禁提示不白屏。',
+    details: [
+      '批量导入走规范 1.2.2 批处理例外：逐行写库后统一 reload 一次；部分失败保留弹窗现场可重试',
+      '拾取记录表 loot_drops 为公会私有流水（sql/42），与公共掉落字典严格分离；viewer 只读',
+      '附带修正：考勤视图切换的 .view-tab 全局选择器收窄到考勤页作用域（新增子标签后全局选择器会误伤，顺带修复其误伤数据中心 tab 的存量隐患）'
+    ]
+  },
   {
     id: 'v3.2.0-task72-patch2-sweep-filter',
     version: 'v3.2.0',

@@ -1,0 +1,9 @@
+## Interface: 120105
+## Title: WoWButlerCollector
+## Notes: 魔兽管家自动拾取记录插件
+## Author: WoW Butler
+## Version: 1.0.0
+## SavedVariables: WoWButlerCollectorDB
+
+locales\zhCN.lua
+core.lua

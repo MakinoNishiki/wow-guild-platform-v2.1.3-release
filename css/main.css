@@ -2039,6 +2039,26 @@ body {
   margin-top: 4px;
 }
 
+/* ========== 任务书 #75-Day2：拾取导入弹窗（拖放区 + 预览表滚动区；深色 WoW 主题，圆角≤8px） ========== */
+.drop-import-zone {
+  border: 2px dashed var(--border-color);
+  border-radius: 6px;
+  padding: 22px;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 13px;
+  cursor: pointer;
+}
+.drop-import-zone:hover, .drop-import-zone.dragover {
+  border-color: var(--gold);
+  color: var(--text-primary);
+}
+.drop-import-preview-wrap {
+  max-height: 320px;
+  overflow-y: auto;
+  margin-bottom: 4px;
+}
+
 /* ========== 心愿单 ========== */
 .wishlist-item-name {
   color: var(--gold);
