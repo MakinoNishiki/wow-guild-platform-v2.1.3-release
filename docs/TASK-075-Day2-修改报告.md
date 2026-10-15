@@ -1,7 +1,7 @@
 # 任务书 #75-Day2 修改报告：拾取记录子标签 + 插件导入页
 
 > 日期：2026-10-15 ｜ 执行：Kimi Code ｜ 范围：Day 2 前端导入页（REQ-163）
-> 验证：`scripts/verify-task75-day2.js` **19/19 全绿**（A 静态 11 + B 门禁组 6 + C 清零 1+前置 1；全链路组 B4-B6 因 sql/42 未执行 SKIP，执行后复跑自动走全链路）
+> 验证：`scripts/verify-task75-day2.js` 门禁组 19/19 + **全链路组 24/24 全绿**（sql/42 执行后复跑；A 静态 11 + B 浏览器 12 + C 清零 1）
 > 版本串：三壳 `20261014.95` → `20261015.96`（15/8/5，旧串零残留）
 > **未 commit 未 push**：改动在工作区待开核
 
@@ -42,7 +42,7 @@
 
 ## 五、待办与申报
 
-1. **sql/42 执行在运营侧**：本机无 SSH_PASS 执行通道（.s6-ssh/run.js 需环境变量）。通知里的 scp 路径有误（`/mnt/agents/output/sql/42-loot-drops-table.sql`），实际文件 = 仓库 `sql/42_task075_loot_drops.sql`。执行后复跑 `node scripts/verify-task75-day2.js` 即走全链路组。
+1. **sql/42 已执行**（2026-10-15，SSH 通道 docker exec，凭据会话级注入零落盘）：CREATE TABLE + COMMENT + 3 索引 + RLS + 策略 + NOTIFY 全序成功；复核 \dt 在场、COUNT=0、索引四件（pkey/guild/timestamp/uq_loot_drops_event）、relrowsecurity=t、loot_drops_select_member 策略在册。**复跑 verify-task75-day2.js 全链路组 24/24 全绿**（解析预览 3 条=可入库 2+缺字段 1 → 确认入库落 2 行字段族完整 → 自动切拾取视图渲染新行 → 重复导入 2 条全标「已存在跳过」且确认钮禁用 → 搜索筛选收窄/恢复 → 清零复核）。
 2. **导入按钮/空态引导钮均 edit-only**：viewer 不可见导入入口（服务端代理鉴权为最终防线）。
 3. **拾取记录不落 localStorage 缓存**（流水量体不适合缓存，appData 内存态 + 懒加载）。
 4. 插件真机测试（Day1 申报）与 sql/42 执行是两道运营侧闸门，均完成后本批闭环。
