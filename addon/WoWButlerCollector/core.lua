@@ -1,13 +1,15 @@
 -- ============================================================
--- WoWButlerCollector core.lua —— 魔兽管家自动拾取记录（任务书 #75 子任务 A1）
+-- WoWButlerCollector core.lua —— 魔兽管家自动拾取记录（任务书 #75 子任务 A1；#75-补丁1 改版）
 --
 -- 职责边界（与 WoWButlerExporter 互补，不重叠）：
 --   Exporter = EJ 静态字典采集（掉落池/套装）；本插件 = 运行时拾取事件记录。
 --
 -- 持久化唯一通道 = SavedVariables（WoW 沙盒无任意写文件 API）：
 --   记录进全局表 WoWButlerCollectorDB，客户端在 /reload 或退出登录时序列化落盘
---   WTF\Account\<账号>\SavedVariables\WoWButlerCollector.lua（Lua 表，非 JSON）；
---   JSON 转换由仓库 scripts/export-collector-to-json.js 完成（REQ-121 工作流同源）。
+--   WTF\Account\<账号>\SavedVariables\WoWButlerCollector.lua（Lua 表，非 JSON）。
+-- 导出通道（#75-补丁1 起）：/wbc export 插件内零依赖 JSON 编码 + 弹窗剪贴板直出，
+--   粘贴进网站导入弹窗即可；仓库侧 SavedVariables→JSON 本地转换脚本已废弃删除，
+--   INVTYPE→中文部位映射由前端 app.js 导入解析器承接。
 --
 -- 字段口径修正（先查证再断言）：
 --   ①icon：WoW API 只能拿到图标 fileID 数字（GetItemInfo 第 10 返回值），拿不到字符串
@@ -75,8 +77,13 @@ local function recordLoot(itemID, itemLink, looterName)
   if classID and EXCLUDE_CLASS[classID] then return end
   if not itemName then return end -- 冷缓存未就绪：拾取瞬间物品已入包，理论必就绪；防御性跳过
 
+  -- 只记录团本（任务书 #75-补丁1）：raid=团本 ✅；party=大秘境/地下城 ❌；none=世界BOSS/野外 ❌
+  local instName, instanceType, difficultyID, difficultyName = GetInstanceInfo()
+  if instanceType ~= "raid" then return end
+
   local ilvl = (GetDetailedItemLevelInfo and itemLink and GetDetailedItemLevelInfo(itemLink)) or baseIlvl
-  local instName, _, difficultyID, difficultyName = GetInstanceInfo()
+  -- 难度存中文名（#75-补丁1）：GetDifficultyInfo 返回本地化难度名（"史诗"/"英雄"/"普通"/"随机团队"）
+  local difficulty = (GetDifficultyInfo and difficultyID and GetDifficultyInfo(difficultyID)) or difficultyName or "未知"
 
   -- 首领归属：击杀窗优先；窗口外尝试已死亡目标；均无则留空（不编值）
   local bossName
@@ -96,7 +103,7 @@ local function recordLoot(itemID, itemLink, looterName)
     itemType = itemType,       -- 本地化大类（武器/护甲）
     bossName = bossName,
     instanceName = instName,
-    difficulty = difficultyName,
+    difficulty = difficulty,
     difficultyID = difficultyID,
     timestamp = time(),
     playerName = looterName,
@@ -151,6 +158,61 @@ frame:SetScript("OnEvent", function(_, event, ...)
   end
 end)
 
+-- ---- JSON 导出（任务书 #75-补丁1：插件内零依赖编码器 + 剪贴板弹窗，替代仓库转换脚本） ----
+local function JSONEncode(tbl)
+  local parts = {"["}
+  for i, item in ipairs(tbl) do
+    if i > 1 then table.insert(parts, ",") end
+    table.insert(parts, "{")
+    local fields = {}
+    for k, v in pairs(item) do
+      local val
+      if type(v) == "string" then
+        val = "\"" .. v:gsub("\\", "\\\\"):gsub("\"", "\\\"") .. "\""
+      elseif type(v) == "number" then
+        val = tostring(v)
+      end
+      if val then -- nil/布尔等非预期类型跳过该字段（当前记录仅 string/number，防御性兜底）
+        table.insert(fields, "\"" .. k .. "\":" .. val)
+      end
+    end
+    table.insert(parts, table.concat(fields, ","))
+    table.insert(parts, "}")
+  end
+  table.insert(parts, "]")
+  return table.concat(parts)
+end
+
+local function showExportFrame(json)
+  local frame = _G.WoWButlerExportFrame -- 复用已建框架，避免重复 CreateFrame 泄漏
+  if not frame then
+    frame = CreateFrame("Frame", "WoWButlerExportFrame", UIParent, "BasicFrameTemplateWithInset")
+    frame:SetSize(500, 400)
+    frame:SetPoint("CENTER")
+    frame.TitleBg:SetHeight(30)
+    frame.title = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+    frame.title:SetPoint("TOP", frame.TitleBg, "TOP", 0, -8)
+
+    local scroll = CreateFrame("ScrollFrame", nil, frame, "UIPanelScrollFrameTemplate")
+    scroll:SetPoint("TOPLEFT", 10, -40)
+    scroll:SetPoint("BOTTOMRIGHT", -30, 10)
+
+    local editBox = CreateFrame("EditBox", nil, scroll)
+    editBox:SetMultiLine(true)
+    editBox:SetFontObject("ChatFontNormal")
+    editBox:SetWidth(440)
+    editBox:SetScript("OnEscapePressed", function() frame:Hide() end)
+    scroll:SetScrollChild(editBox)
+    frame.editBox = editBox
+  end
+  frame.title:SetText(L.EXPORT_TITLE or "WoWButler 拾取记录导出")
+  frame.editBox:SetText(json)
+  frame:Show()
+  frame.editBox:SetFocus()
+  frame.editBox:HighlightText() -- 先聚焦再高亮，保证 Ctrl+C 一键复制全文
+  print(L.EXPORT_DONE or "WoWButler: JSON 已生成，请按 Ctrl+C 复制全部内容")
+end
+
 -- ---- 斜杠命令 ----
 SLASH_WBC1 = "/wbc"
 SlashCmdList["WBC"] = function(msg)
@@ -163,14 +225,21 @@ SlashCmdList["WBC"] = function(msg)
   elseif msg == "count" then
     print(string.format(L.COUNT or "%d", #WoWButlerCollectorDB))
   elseif msg == "export" then
-    print(L.EXPORT_HINT_1 or "")
-    print(L.EXPORT_HINT_2 or "")
-    print(L.EXPORT_HINT_3 or "")
+    showExportFrame(JSONEncode(WoWButlerCollectorDB))
   elseif msg == "clear" then
-    print(L.CLEAR_CONFIRM or "")
-  elseif msg == "clear confirm" then
-    wipe(WoWButlerCollectorDB)
-    print(L.CLEARED or "cleared")
+    StaticPopupDialogs["WBC_CLEAR_CONFIRM"] = {
+      text = L.CLEAR_CONFIRM_TEXT or "确定清空所有拾取记录？",
+      button1 = L.BTN_OK or "确定",
+      button2 = L.BTN_CANCEL or "取消",
+      OnAccept = function()
+        wipe(WoWButlerCollectorDB)
+        print(L.CLEARED or "拾取记录已清空")
+      end,
+      timeout = 0,
+      whileDead = true,
+      hideOnEscape = true,
+    }
+    StaticPopup_Show("WBC_CLEAR_CONFIRM")
   else
     print(L.HELP_1 or "commands:")
   end

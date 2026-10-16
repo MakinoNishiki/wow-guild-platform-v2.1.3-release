@@ -1,7 +1,9 @@
-// 任务书 #75 Day1 验证：WoWButlerCollector 插件 + 导出转换脚本 + sql/42 loot_drops + 代理白名单
-// A 静态锚点 + B 转换脚本合成样本端到端（Lua SavedVariables → JSON 字段断言）。
-// 申报：本机无 Lua VM/游戏客户端，插件语法/事件行为真机验证属运营侧（REQ-121 工作流），
-//       本脚本只锁文件结构/口径锚点与转换链路。
+// 任务书 #75 Day1 验证：WoWButlerCollector 插件 + sql/42 loot_drops + 代理白名单
+// #75-补丁1 改版：插件 /wbc export 剪贴板 JSON 直出（插件内零依赖编码器）+ 团本过滤 + 难度中文；
+//   转换脚本 scripts/export-collector-to-json.js 废弃删除（原 A4/B 组随之撤除），
+//   INVTYPE→中文部位映射由前端 app.js 导入解析器承接（B 组改为前端锚点）。
+// 申报：本机无 Lua VM/游戏客户端，插件语法用 tools/luacheck（luaparse）静态校验，
+//       事件行为/弹窗交互真机验证属运营侧（REQ-121 工作流），本脚本只锁文件结构/口径锚点。
 // 用法: node scripts/verify-task75-day1.js
 const fs = require('fs');
 const path = require('path');
@@ -44,15 +46,32 @@ check('A3d iconID 数字口径（GetItemInfo 第 10 返回值，与 Exporter REQ
 check('A3e 首领归属 180s 窗 + 容量护栏 2000 + 去重防抖 2s',
   /BOSS_WINDOW_SEC = 180/.test(core) && /MAX_ENTRIES = 2000/.test(core) &&
   /lastLoot\.itemID == itemID and lastLoot\.looter == looter/.test(core), '');
-check('A3f 斜杠命令 /wbc（count/export 提示/clear 二次确认）',
-  /SLASH_WBC1 = "\/wbc"/.test(core) && /clear confirm/.test(core) && /wipe\(WoWButlerCollectorDB\)/.test(core), '');
+check('A3f 斜杠命令 /wbc（export 弹窗直出 + clear StaticPopup 二次确认）',
+  /SLASH_WBC1 = "\/wbc"/.test(core) && /showExportFrame\(JSONEncode\(WoWButlerCollectorDB\)\)/.test(core) &&
+  /StaticPopup_Show\("WBC_CLEAR_CONFIRM"\)/.test(core) && /wipe\(WoWButlerCollectorDB\)/.test(core), '');
 
-// A4 转换脚本锚点
-const conv = read('scripts/export-collector-to-json.js');
-check('A4a 转换脚本：Lua 解析器 + INVTYPE 中文映射 + export/ 输出',
-  /function tokenize\(src\)/.test(conv) && /function parseLua\(src\)/.test(conv) &&
-  /INVTYPE_HEAD: '头部'/.test(conv) && /wowbutler_collector_/.test(conv), '');
-check('A4b .gitignore 已收 /export/（转换产物不入库）', /^\/?export\//m.test(read('.gitignore')), '');
+// A4 #75-补丁1 锚点
+check('A4a 插件内零依赖 JSON 编码器（字符串转义 + 数字直出 + nil 字段跳过兜底）',
+  /local function JSONEncode\(tbl\)/.test(core) && /gsub\("\\\\", "\\\\\\\\"\)/.test(core) &&
+  /if val then/.test(core), '');
+check('A4b 团本过滤：instanceType ~= "raid" 即弃（party=大秘境/地下城、none=世界BOSS/野外全排除）',
+  /instanceType ~= "raid" then return/.test(core), '');
+check('A4c 难度中文名：GetDifficultyInfo 优先 + GetInstanceInfo 难度名回退 + 「未知」兜底',
+  /GetDifficultyInfo\(difficultyID\)\) or difficultyName or "未知"/.test(core) &&
+  /difficulty = difficulty,/.test(core), '');
+check('A4d 导出弹窗：BasicFrameTemplateWithInset + 多行 EditBox + 先聚焦再高亮 + ESC 关闭 + 框架复用',
+  /BasicFrameTemplateWithInset/.test(core) && /SetMultiLine\(true\)/.test(core) &&
+  /SetFocus\(\)\s*\n\s*frame\.editBox:HighlightText\(\)/.test(core) &&
+  /OnEscapePressed/.test(core) && /_G\.WoWButlerExportFrame/.test(core), '');
+// A4e 转换脚本删除核验：文件不在场 + 运行时代码零引用；
+// app.js 允许唯一 1 处提及=更新日志删除公告条目（用户可见的废弃说明，属正当留痕）
+const appRefHits = (read('js/app.js').match(/export-collector-to-json/g) || []).length;
+check('A4e 转换脚本已删除 + 运行时代码零引用（app.js 仅更新日志公告 1 处；docs/backup 历史存档除外）',
+  !fs.existsSync(path.join(ROOT, 'scripts/export-collector-to-json.js')) &&
+  !/export-collector-to-json/.test(core) &&
+  !/export-collector-to-json/.test(read('addon/WoWButlerCollector/locales/zhCN.lua')) &&
+  appRefHits === 1 &&
+  !/export-collector-to-json/.test(read('index.html')), `app.js 命中=${appRefHits}`);
 
 // A5 sql/42 锚点
 const sql = read('sql/42_task075_loot_drops.sql');
@@ -71,38 +90,30 @@ check('A6 代理白名单 loot_drops 双落点（行归属联查 + 业务表分�
 
 // A7 node --check 全量
 const jsFiles = fs.readdirSync(path.join(ROOT, 'js')).filter(f => f.endsWith('.js')).map(f => 'js/' + f)
-  .concat(['server.js', 'scripts/export-collector-to-json.js']);
+  .concat(['server.js']);
 let allOk = true, bad = '';
 for (const f of jsFiles) {
   const r = spawnSync(process.execPath, ['--check', f], { cwd: ROOT, encoding: 'utf8' });
   if (r.status !== 0) { allOk = false; bad = f; }
 }
-check('A7 node --check 全量通过（js/ + server.js + 转换脚本）', allOk, bad);
+check('A7 node --check 全量通过（js/ + server.js）', allOk, bad);
 
 // A8 台账 + AGENTS.md 登记
 check('A8 台账 REQ-163 + AGENTS.md 工作流节登记',
   /\| REQ-163 \|/.test(read('docs/问题与需求清单.md')) && /WoWButlerCollector/.test(read('AGENTS.md')), '');
 
-// ==================== B 转换脚本端到端（合成样本） ====================
-console.log('== B. 转换脚本合成样本端到端 ==');
-const sample = path.join(ROOT, 'backup/_pytmp/WoWButlerCollector-sample.lua');
-const run = spawnSync(process.execPath, ['scripts/export-collector-to-json.js', sample], { cwd: ROOT, encoding: 'utf8' });
-check('B1 转换脚本跑通（合成 WoW 序列化样本，退出码 0）', run.status === 0, (run.stderr || '').slice(0, 200));
-
-if (run.status === 0) {
-  const exportDir = path.join(ROOT, 'export');
-  const files = fs.readdirSync(exportDir).filter(f => f.startsWith('wowbutler_collector_')).sort();
-  const data = JSON.parse(fs.readFileSync(path.join(exportDir, files[files.length - 1]), 'utf8'));
-  check('B2 JSON 结构：2 条记录 + 字段族完整（itemID/iconID/slotCN/timestampISO/playerName）',
-    data.length === 2 && data[0].itemID === 271876 && data[0].iconID === 237510 &&
-    data[0].slotCN === '胸部' && /^\d{4}-\d{2}-\d{2}T/.test(data[0].timestampISO) && data[0].playerName === '战子',
-    `rows=${data.length} slotCN=${data[0].slotCN}/${data[1].slotCN}`);
-  check('B3 缺字段容差：第二条无 iconID/bossName → null/空串不报错 + 覆盖统计打印',
-    data[1].iconID === null && data[1].bossName === '' && /iconID 覆盖 1\/2/.test(run.stdout), '');
-  // 清理产物（验证用输出不留存）
-  for (const f of files) fs.unlinkSync(path.join(exportDir, f));
-  fs.rmdirSync(exportDir);
-}
+// ==================== B. 前端导入解析器锚点（#75-补丁1：承接转换脚本职责） ====================
+console.log('== B. 前端导入解析器（slotCN 承接） ==');
+const app = read('js/app.js');
+check('B1 INVTYPE→中文部位映射入 app.js（词表与原转换脚本同口径）',
+  /const LOOT_DROP_INVTYPE_ZH = \{/.test(app) && /INVTYPE_HEAD: '头部'/.test(app) &&
+  /INVTYPE_ROBE: '胸部'/.test(app) && /INVTYPE_HOLDABLE: '副手'/.test(app), '');
+check('B2 解析器 slot_cn 回退链：slotCN 优先 → INVTYPE 映射 → 空串',
+  /slot_cn: \(typeof r\.slotCN === 'string' && r\.slotCN\) \? r\.slotCN : \(LOOT_DROP_INVTYPE_ZH\[r\.slot\] \|\| ''\)/.test(app), '');
+const idx = read('index.html');
+check('B3 导入弹窗：/wbc export 粘贴主通道提示 + 拖放降备选',
+  /\/wbc export<\/code>，复制弹窗中的 JSON 内容，粘贴到下方/.test(idx) &&
+  /备选通道：拖放 JSON 文件到此/.test(idx), '');
 
 const fails = results.filter(r => !r.ok);
 console.log(`\n===== 结果：${results.length - fails.length}/${results.length} 通过 =====`);

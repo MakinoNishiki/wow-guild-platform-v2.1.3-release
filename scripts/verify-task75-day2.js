@@ -17,7 +17,7 @@ const EMAIL = 't75d2-exp@example.com';
 const PWD = 'T75d2-Exp-2026!';
 const GUILD_NAME = 'T75D2测试会';
 const MEMBER_NAME = 'T75D2测试员';
-const VER = '20261015.96';
+const VER = '20261015.97'; // #75-补丁1 递增（.96→.97）
 
 const SAMPLE_JSON = JSON.stringify([
   { itemName: '觉醒恐牙胸甲', itemID: 271876, iconID: 237510, quality: 4, ilvl: 324, slot: 'INVTYPE_CHEST', slotCN: '胸部', itemType: '护甲', bossName: '盘魂者内克扎莉', instanceName: '烈毒之渊', difficulty: '史诗', difficultyID: 16, timestamp: 1791902400, timestampISO: '2026-10-13T14:40:00.000Z', playerName: MEMBER_NAME },
@@ -92,7 +92,7 @@ function staticAsserts() {
     /`\$\{playerName\}\|\$\{itemId\}\|\$\{t\}`/.test(app), '');
   check('A2d .view-tab 全局选择器收窄（两处 #page-attendance 作用域）+ lootRender 末尾视图同步钩',
     (app.match(/#page-attendance \.view-tab/g) || []).length === 2 &&
-    /lootSwitchView\(lootViewMode\);\n\}/.test(app), '');
+    /lootSwitchView\(lootViewMode\);\r?\n\}/.test(app), '');
   check('A3 index.html：子标签双视图 + 拾取工具区/表格 + 导入弹窗 DOM + 两处导入按钮 edit-only',
     index.includes('id="lootViewTabs"') && index.includes('data-lootview="drops"') &&
     index.includes('id="lootViewDrops"') && index.includes('id="lootDropsTableBody"') &&
@@ -107,8 +107,8 @@ function staticAsserts() {
   check('A5a 版本串 ' + VER + ' 三壳递增（index 15 / data 8 / decor 5）',
     cnt('index.html', VER) === 15 && cnt('data.html', VER) === 8 && cnt('decor.html', VER) === 5,
     `index=${cnt('index.html', VER)} data=${cnt('data.html', VER)} decor=${cnt('decor.html', VER)}`);
-  check('A5b 旧串 20261014.95 三壳零残留',
-    cnt('index.html', '20261014.95') === 0 && cnt('data.html', '20261014.95') === 0 && cnt('decor.html', '20261014.95') === 0, '');
+  check('A5b 旧串 20261015.96 三壳零残留',
+    cnt('index.html', '20261015.96') === 0 && cnt('data.html', '20261015.96') === 0 && cnt('decor.html', '20261015.96') === 0, '');
   check('A6 changelog 补录（v3.2.0-task75-day2-lootdrops）+ 台账 REQ-163 Day2 段',
     app.includes("id: 'v3.2.0-task75-day2-lootdrops'") &&
     /REQ-163[\s\S]*Day2 已实现待验收/.test(read('docs/问题与需求清单.md')), '');

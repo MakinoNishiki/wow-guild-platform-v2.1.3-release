@@ -6754,7 +6754,8 @@ function tierSetReset(scope) {
 }
 
 // ==================== 任务书 #75-Day2：拾取记录视图 + 插件导入（loot_drops，REQ-163） ====================
-// 数据链：插件 WoWButlerCollector → SavedVariables → scripts/export-collector-to-json.js → 本页导入 → loot_drops。
+// 数据链：插件 WoWButlerCollector → /wbc export 弹窗剪贴板 JSON（#75-补丁1 起）→ 本页粘贴导入 → loot_drops。
+// #75-补丁1：SavedVariables→JSON 本地转换脚本废弃删除，INVTYPE→中文部位映射由本页解析器承接。
 // 视图形态：装备分配页内 .view-tab 子标签（复用数据中心既有组件族，非新组件，§10 评审闸不触发）。
 // 迁移门禁：sql/42 未执行时（表 42P01/404）中文提示不白屏（任务书 #65 WP2.3 先例）。
 
@@ -6916,6 +6917,18 @@ function lootDropDupKey(playerName, itemId, ts) {
   return `${playerName}|${itemId}|${t}`;
 }
 
+// INVTYPE → 中文部位（任务书 #75-补丁1：转换脚本删除后前端承接槽位中文化；
+// 词表口径与原转换脚本一致，与 js/lootTaxonomy.js 对齐）
+const LOOT_DROP_INVTYPE_ZH = {
+  INVTYPE_HEAD: '头部', INVTYPE_SHOULDER: '肩部', INVTYPE_CHEST: '胸部', INVTYPE_ROBE: '胸部',
+  INVTYPE_WRIST: '腕部', INVTYPE_HAND: '手部', INVTYPE_WAIST: '腰部', INVTYPE_LEGS: '腿部',
+  INVTYPE_FEET: '脚部', INVTYPE_CLOAK: '背部', INVTYPE_NECK: '颈部', INVTYPE_FINGER: '手指',
+  INVTYPE_TRINKET: '饰品',
+  INVTYPE_WEAPON: '武器', INVTYPE_2HWEAPON: '武器', INVTYPE_WEAPONMAINHAND: '武器',
+  INVTYPE_WEAPONOFFHAND: '武器', INVTYPE_RANGED: '武器', INVTYPE_RANGEDRIGHT: '武器',
+  INVTYPE_SHIELD: '副手', INVTYPE_HOLDABLE: '副手',
+};
+
 function lootDropImportParse() {
   const raw = (document.getElementById('lootDropImportText').value || '').trim();
   if (!raw) { showToast('请先拖入 JSON 文件或粘贴 JSON 文本', 'error'); return; }
@@ -6935,7 +6948,7 @@ function lootDropImportParse() {
       quality: typeof r.quality === 'number' ? r.quality : null,
       ilvl: typeof r.ilvl === 'number' ? r.ilvl : null,
       slot: typeof r.slot === 'string' ? r.slot : '',
-      slot_cn: typeof r.slotCN === 'string' ? r.slotCN : '',
+      slot_cn: (typeof r.slotCN === 'string' && r.slotCN) ? r.slotCN : (LOOT_DROP_INVTYPE_ZH[r.slot] || ''),
       item_type: typeof r.itemType === 'string' ? r.itemType : '',
       boss_name: typeof r.bossName === 'string' ? r.bossName : '',
       instance_name: typeof r.instanceName === 'string' ? r.instanceName : '',
@@ -8608,6 +8621,30 @@ function lootFillAssignedTo(idOrName) {
 // ==================== 初始化 ====================
 // ==================== 更新日志 ====================
 const changelogData = [
+  {
+    id: 'v3.2.0-task75-patch1-wbc-export',
+    version: 'v3.2.0',
+    date: '2026-10-15',
+    type: 'feature',
+    typeLabel: '新增功能',
+    title: '插件 /wbc export 剪贴板 JSON 直出 + 团本过滤 + 难度中文（任务书 #75-补丁1 / REQ-163）',
+    summary: '拾取插件 WoWButlerCollector 新增 /wbc export：游戏内弹出 JSON 导出框（插件内零依赖编码器），全选 Ctrl+C 复制后直接粘贴进网站「导入拾取」弹窗，免去 SavedVariables 落盘 + 本地转换脚本的旧链路。采集侧两项收紧：只记录团本拾取（大秘境/地下城/世界BOSS/野外不再入记录），难度字段改存本地化中文名（史诗/英雄/普通/随机团队）。/wbc clear 改为弹窗二次确认。',
+    details: [
+      '导入弹窗主通道改为粘贴 JSON（拖放/文件保留为备选），解析器新增 INVTYPE→中文部位映射（承接已删除转换脚本的槽位中文化）',
+      '插件真机验证走 REQ-121 运营真机流程（本机无游戏客户端）',
+      '版本串三壳 20261015.97'
+    ]
+  },
+  {
+    id: 'v3.2.0-task75-patch1-drop-converter',
+    version: 'v3.2.0',
+    date: '2026-10-15',
+    type: 'refactor',
+    typeLabel: '模块调整',
+    title: '废弃拾取转换脚本 scripts/export-collector-to-json.js（任务书 #75-补丁1）',
+    summary: '插件 /wbc export 直出 JSON 后，SavedVariables Lua → JSON 的本地转换脚本失去存在意义，已从仓库删除；其 INVTYPE→中文部位映射职责由前端导入解析器承接，词表口径不变。',
+    details: []
+  },
   {
     id: 'v3.2.0-task75-day2-lootdrops',
     version: 'v3.2.0',
