@@ -292,15 +292,16 @@
   position: absolute;
   top: 8px;
   right: 8px;
-  width: 22px;
-  height: 22px;
+  /* 任务书 #81：图标 22px → 48px；名称/meta 行 padding-right 同步 26→56px（48+8 间距防重叠） */
+  width: 48px;
+  height: 48px;
   border-radius: 4px;
 }
 /* 任务书 #28 WP3-v3（R3）：名称行单行截断、内容驱动（废恒占行高）；
    REQ-092（任务书 #46 WP3）：padding-right 给右上角图标留位，防长名压图 */
-.dp-item-name { font-size: 13px; font-weight: 600; color: var(--gold); margin-bottom: 6px; line-height: 18px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-right: 26px; }
+.dp-item-name { font-size: 13px; font-weight: 600; color: var(--gold); margin-bottom: 6px; line-height: 18px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-right: 56px; }
 /* meta 行单行（部位/类型，溢出隐藏不换行；无星标，overflow 保留） */
-.dp-item-meta { display: flex; flex-wrap: nowrap; overflow: hidden; gap: 4px; }
+.dp-item-meta { display: flex; flex-wrap: nowrap; overflow: hidden; gap: 4px; padding-right: 56px; }
 /* 装备/套装 meta 标签同并轨：几何同 .tag（字重 400→600、圆角 4→5、高 18→20），
    语义色与 main.css .tag-grey/.tag-blue/.tag-green 同值 */
 /* WP4（2026-08-09 灰色系对比度整改）：灰 tag 文字色 var(--text-secondary)=rgb(139,148,158) → rgb(165,173,185)

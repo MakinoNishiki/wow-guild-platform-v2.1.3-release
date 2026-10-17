@@ -8640,6 +8640,20 @@ function lootFillAssignedTo(idOrName) {
 // ==================== 更新日志 ====================
 const changelogData = [
   {
+    id: 'v3.2.0-task81-item-icon-48',
+    version: 'v3.2.0',
+    date: '2026-10-17',
+    type: 'improve',
+    typeLabel: '体验优化',
+    title: '副本掉落装备卡图标放大至 48px（任务书 #81 / REQ-170）',
+    summary: '副本掉落公示页装备卡右上角图标由 22px 放大至 48px（实测原值 22px 非通知口径的约 36px），名称行与 meta 行右侧留白同步由 26px 扩至 56px（48+8 间距），放大后图标与文字不重叠、卡片布局不溢出。',
+    details: [
+      '仅 css/data-public.css 两处尺寸与两处留白调整，渲染层零改动',
+      '装备分配/心愿单列表 .loot-item-icon（20px）不在本批范围',
+      '版本串三壳 20261015.101'
+    ]
+  },
+  {
     id: 'v3.2.0-task80-list-icon-cdn',
     version: 'v3.2.0',
     date: '2026-10-17',
