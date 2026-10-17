@@ -238,7 +238,18 @@
 --   无难度维（世界首领类）normal 单档路径不补（无 link 扫描，且该类掉落不入库）；
 --   基础行既有 ilvl 字段与 parseStatLines 本体零改动）
 -- ============================================================
-local ADDON_VERSION = "1.0.27"
+local ADDON_VERSION = "1.0.28"
+
+-- 12.1.5 兼容性适配（任务书 #77）：GetItemInfo 全局函数在 12.1.5 中被移除（调用即 attempt to call a nil value），
+-- C_Item.GetItemInfo 返回与旧 GetItemInfo 完全相同的 18 个值。优先 C_Item 命名空间，回退旧全局（向前/向后双兼容）。
+local function safeGetItemInfo(itemID)
+  if C_Item and type(C_Item.GetItemInfo) == "function" then
+    return C_Item.GetItemInfo(itemID)
+  elseif type(GetItemInfo) == "function" then
+    return GetItemInfo(itemID)
+  end
+  return nil
+end
 
 local function msg(s) DEFAULT_CHAT_FRAME:AddMessage("|cffffd200[wjdc]|r " .. s) end
 local function err(s) DEFAULT_CHAT_FRAME:AddMessage("|cffff4040[wjdc]|r " .. s) end
@@ -391,7 +402,7 @@ local function parseItemDetail(itemID)
   -- （冒险手册预览与实物 tooltip 来源差异嫌疑面），回退 GetItemInfo 物品链接的 SetHyperlink 通道补扫；
   -- 属性行两通道同值经 addUnique 去重，effect/venomcurse 首条命中守卫语义不变
   if d.effect == "" or d.venomcurse == "" then
-    local _, link = GetItemInfo(itemID)
+    local _, link = safeGetItemInfo(itemID)
     if link then
       local l2 = scanLink(link)
       if l2 then parseStatLines(l2, d) end
@@ -878,7 +889,7 @@ local function isItemDataReady(itemID)
     local ok, cached = pcall(C_Item.IsItemDataCachedByID, itemID)
     if ok then return cached and true or false end
   end
-  return GetItemInfo(itemID) ~= nil
+  return safeGetItemInfo(itemID) ~= nil
 end
 
 -- 就绪即执行 fn()；未就绪先 RequestLoad 再挂 ContinueOnItemLoad
@@ -937,10 +948,10 @@ end
 -- 未缓存先 RequestLoadItemDataByID 重试一次，仍拿不到或装等非法 → 返回 nil 走 failed（禁 ilvl=44 类错位值）；
 -- 1.0.9（REQ-092）：第 10 返回值 = icon fileID，透传 iconID 字段
 local function getItemBasics(itemID)
-  local name, _, _, ilvl, _, _, subType, _, equipLoc, iconID = GetItemInfo(itemID)
+  local name, _, _, ilvl, _, _, subType, _, equipLoc, iconID = safeGetItemInfo(itemID)
   if not name and C_Item and C_Item.RequestLoadItemDataByID then
     pcall(C_Item.RequestLoadItemDataByID, itemID)
-    name, _, _, ilvl, _, _, subType, _, equipLoc, iconID = GetItemInfo(itemID)
+    name, _, _, ilvl, _, _, subType, _, equipLoc, iconID = safeGetItemInfo(itemID)
   end
   if not name or type(ilvl) ~= "number" or ilvl <= 0 then return nil end
   return { name = name, ilvl = ilvl, type = subType or "", slot = (equipLoc and _G[equipLoc]) or "",
