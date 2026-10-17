@@ -8622,6 +8622,20 @@ function lootFillAssignedTo(idOrName) {
 // ==================== 更新日志 ====================
 const changelogData = [
   {
+    id: 'v3.2.0-task79-decor-price-currency',
+    version: 'v3.2.0',
+    date: '2026-10-17',
+    type: 'fix',
+    typeLabel: '问题修复',
+    title: '家宅图鉴详情页价格补全货币名（任务书 #79 / REQ-167）',
+    summary: '家宅装饰详情弹窗中，仅带裸 source_text（sources 为空）的商品价格此前只显示「价格：350」这类裸数字——货币超链接与金币图标码在文本剥离时被一并去掉，读不出币种。现按原文三种形态还原：货币链接（350 × 要塞物资）、金币（250 金）、双价并存（200 × 要塞物资 + 200 金）。货币名取 DecorDict 既有词表（已覆盖新数据全部 6 个货币 ID：要塞物资/职业大厅资源/战争物资/贮藏心能/巨龙群岛补给/晦幽铸币/虚光灰岩），未收录回退「货币 ID」。',
+    details: [
+      '仅改 renderSourceBlock 裸文本路径；结构化 sources 的 priceText 既有链路不动',
+      '图标维持本地 assets/decor-icons 管道 + 占位图回退（数字 fileDataID 拼 render CDN 不可行，REQ-155/157 已判死，实测 403）',
+      'data.html 装备卡片图标为 REQ-092/150/157 既有实现，本批不重复建设'
+    ]
+  },
+  {
     id: 'v3.2.0-task75-patch1-wbc-export',
     version: 'v3.2.0',
     date: '2026-10-15',

@@ -415,11 +415,29 @@
       .trim();
   }
 
+  // 任务书 #79：裸 source_text 价格行货币名还原——sources=[] 时 |Hcurrency|h 与金币图标码
+  // 被 stripRawText 剥离后价格只剩裸数字（「价格：350」读不出币种），按原文三种形态还原：
+  // 货币链接（价格：|rN|Hcurrency:ID|h）/ 金币图标（N|T...UI-GOLDICON...|t）/ 双价并存（N×货币 + N 金）。
+  // 货币名取 DecorDict.CURRENCY_NAMES 单一真源（已覆盖 824/1220/1560/1813/2003/2803/3316 全值域），
+  // 未收录回退「货币 ID」不编名；render.worldofwarcraft.com 数字 fileDataID 出图不可行（REQ-155/157 已判死），
+  // 图标仍走本地 assets/decor-icons 管道不动。
+  function rawPriceLabel(s) {
+    const parts = [];
+    const cm = String(s || '').match(/价格：\|r(\d+)\|Hcurrency:(\d+)\|h/);
+    if (cm) parts.push(`${cm[1]} × ${D.CURRENCY_NAMES[cm[2]] || `货币 ${cm[2]}`}`);
+    const gm = String(s || '').match(/(\d+)\|T[^|]*UI-GOLDICON[^|]*\|t/);
+    if (gm) parts.push(`${gm[1]} 金`);
+    return parts.join(' + ');
+  }
+
   function renderSourceBlock(r) {
     if (Array.isArray(r.sources) && r.sources.length) {
       return r.sources.map(s => `<div class="dh-src-item">${esc(sourceText(s))}</div>`).join('');
     }
-    const raw = stripRawText(r.source_text);
+    let raw = stripRawText(r.source_text);
+    // 任务书 #79：价格行补货币名（剥离后的「价格：N（ N）」裸数字行整行替换为含币种完整行）
+    const priceLabel = rawPriceLabel(r.source_text);
+    if (priceLabel) raw = raw.replace(/价格：[\d\s]+/g, `价格：${priceLabel}`);
     if (raw) return `<div class="dh-src-item dh-src-raw">${raw.split('\n').filter(Boolean).map(esc).join('<br>')}</div>`;
     return '<div class="dh-src-item dh-src-raw">来源未知</div>';
   }
