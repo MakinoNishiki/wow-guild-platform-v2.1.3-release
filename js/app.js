@@ -2257,8 +2257,25 @@ function renderCurrentPage() {
     case 'dashboard': renderDashboard(); break;
     case 'members': renderMembers(); break;
     case 'attendance': renderAttendance(); break;
-    case 'loot': lootRender(); break; // BUG-034：修正未定义函数名（原 renderLoot 不存在，ReferenceError）
-    case 'wishlist': wishlistRender(); break; // 同上（原 renderWishlist）
+    case 'loot':
+      lootRender(); // BUG-034：修正未定义函数名（原 renderLoot 不存在，ReferenceError）
+      // 任务书 #80：MasterData 未加载完成时首渲染无图标（getItemIconId 返回 null），
+      // init 完成后补一次重渲补齐图标（快照兜底态 isLoaded 终为 true，不阻塞）
+      if (window.MasterData && !MasterData.isLoaded()) {
+        MasterData.init().then(() => {
+          if (document.querySelector('.nav-item.active')?.getAttribute('data-page') === 'loot') lootRender();
+        });
+      }
+      break;
+    case 'wishlist':
+      wishlistRender(); // 同上（原 renderWishlist）
+      // 任务书 #80：同 loot 的图标补齐重渲钩子
+      if (window.MasterData && !MasterData.isLoaded()) {
+        MasterData.init().then(() => {
+          if (document.querySelector('.nav-item.active')?.getAttribute('data-page') === 'wishlist') wishlistRender();
+        });
+      }
+      break;
     case 'reports': renderReports(); break;
     case 'data': renderDataPage(); break;
   }
@@ -6847,9 +6864,9 @@ function lootDropsRenderTable() {
     return `${d.getMonth() + 1}月${d.getDate()}日 ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
   };
   tbody.innerHTML = rows.map(d => {
-    // REQ-092 口径：规则路径 assets/icons/items/{icon_id}.png + lazy + 404 onerror 隐藏不占位
+    // #79-Patch1 起：Blizzard render CDN 数字 fileDataID + onerror 占位图（不再隐藏裂图）
     const icon = d.icon_id != null
-      ? `<img class="loot-item-icon" src="assets/icons/items/${d.icon_id}.png" loading="lazy" alt="" onerror="this.remove()">`
+      ? `<img class="loot-item-icon" src="https://render.worldofwarcraft.com/icons/56/${d.icon_id}.jpg" loading="lazy" alt="" onerror="this.onerror=null;this.src='assets/decor-icons/_placeholder.png'">`
       : '';
     return `<tr>
       <td>${fmtTs(d.timestamp)}</td>
@@ -7234,10 +7251,11 @@ function getItemIconId(name, raid, boss) {
   if (full) return full;
   return itemIconIdxCache.byName.get(name) || null;
 }
-// 图标 img 片段（#46 口径：懒加载、空值不渲染、404 onerror 隐藏不占位）
+// 图标 img 片段（#79-Patch1 起：Blizzard render CDN 数字 fileDataID（实测 17/17=200）+ onerror 占位图；
+// 空值不渲染、lazy 保留。本地 assets/icons/items 空目录问题根治）
 function itemIconImgHtml(name, raid, boss) {
   const id = getItemIconId(name, raid, boss);
-  return id ? `<img class="loot-item-icon" src="assets/icons/items/${id}.png" loading="lazy" alt="" onerror="this.style.display='none'">` : '';
+  return id ? `<img class="loot-item-icon" src="https://render.worldofwarcraft.com/icons/56/${id}.jpg" loading="lazy" alt="" onerror="this.onerror=null;this.src='assets/decor-icons/_placeholder.png'">` : '';
 }
 
 // 任务书 #65 WP3.3：装备分配列表套装标识——装备名以任一 tier_sets.set_name 开头即视为套装件。
@@ -8621,6 +8639,20 @@ function lootFillAssignedTo(idOrName) {
 // ==================== 初始化 ====================
 // ==================== 更新日志 ====================
 const changelogData = [
+  {
+    id: 'v3.2.0-task80-list-icon-cdn',
+    version: 'v3.2.0',
+    date: '2026-10-17',
+    type: 'fix',
+    typeLabel: '问题修复',
+    title: '装备分配/心愿单/拾取记录列表图标同走 Blizzard CDN（任务书 #80 / REQ-169）',
+    summary: '装备分配列表、心愿单列表（itemIconImgHtml）与拾取记录表格的装备图标，由本地 assets/icons/items/ 路径统一改走 Blizzard render CDN + 占位图回退，与 #79-Patch1 公示页装备卡同链路，根治本地空目录导致的图标不显示；加载失败显示占位图（不再隐藏裂图）。数字 fileDataID 实测 17/17 = 200。',
+    details: [
+      'icon_id 索引解析（名字+团本+BOSS 复合优先、唯一同名回退）与空值不渲染逻辑不变',
+      '家宅 decor 图标维持本地管道（实测 10/10 = 403 不可走 CDN）',
+      '版本串三壳 20261015.100'
+    ]
+  },
   {
     id: 'v3.2.0-task79-patch1-item-icon-cdn',
     version: 'v3.2.0',
