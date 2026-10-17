@@ -8622,6 +8622,20 @@ function lootFillAssignedTo(idOrName) {
 // ==================== 更新日志 ====================
 const changelogData = [
   {
+    id: 'v3.2.0-task79-patch1-item-icon-cdn',
+    version: 'v3.2.0',
+    date: '2026-10-17',
+    type: 'fix',
+    typeLabel: '问题修复',
+    title: '副本掉落装备图标改走 Blizzard CDN + 占位图回退（任务书 #79-Patch1 / REQ-168）',
+    summary: '副本掉落（data.html / 登录壳 #page-lootdrop 同源渲染层）装备卡图标由本地 assets/icons/items/ 路径改走 Blizzard render CDN（render.worldofwarcraft.com/icons/56/{icon_id}.jpg），根治本地目录空文件导致的全量 404；加载失败回退本地占位图（非裂图），icon_id 空值不渲染。家宅 decor 图标不改走该 CDN（实测 10/10 = 403，改走会把现在正常显示的旧图标也打回占位），维持本地管道 + 占位回退。',
+    details: [
+      '实测：装备数字 fileDataID 17/17 = 200（S1/S2 团本大米样本）；decor fileDataID 10/10 = 403',
+      '仅 dataPublic.js 一处图标 URL + onerror 回退改动；picker 的 icon_name CDN 链路（REQ-157）不动',
+      '装备分配/心愿单列表的 itemIconImgHtml 同源问题未纳入本批（可后续同款处理）'
+    ]
+  },
+  {
     id: 'v3.2.0-task79-decor-price-currency',
     version: 'v3.2.0',
     date: '2026-10-17',
