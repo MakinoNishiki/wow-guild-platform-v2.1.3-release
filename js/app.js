@@ -8640,6 +8640,20 @@ function lootFillAssignedTo(idOrName) {
 // ==================== 更新日志 ====================
 const changelogData = [
   {
+    id: 'v3.2.0-task81-patch1-icon-border-meta',
+    version: 'v3.2.0',
+    date: '2026-10-17',
+    type: 'fix',
+    typeLabel: '问题修复',
+    title: '装备卡图标加微白边框 + meta 多 tab 自动换行（任务书 #81-Patch1 / REQ-171）',
+    summary: '副本掉落装备卡两处样式微调：①48px 图标增加 1px 微白边框（rgba(255,255,255,0.15)）与微弱阴影，提升深色卡底辨识度；②meta 行（部位/类型/装等/毒咒等 tag）由 nowrap 改为 wrap，多 tab 时自动换行，不再挤压或截断右上角图标。',
+    details: [
+      'meta 行实际类名为 .dp-item-meta（通知的 .dp-item-tags 不存在）；gap 维持 4px 不新增规格',
+      '「霜铸的秘法蔓叶」库内不存在（虚构样本），验证改用真实多 tag 装备「觉醒恐牙胸甲」（ilvl+胸部+皮甲+毒咒 4 个 tag）',
+      '版本串三壳 20261015.102'
+    ]
+  },
+  {
     id: 'v3.2.0-task81-item-icon-48',
     version: 'v3.2.0',
     date: '2026-10-17',
