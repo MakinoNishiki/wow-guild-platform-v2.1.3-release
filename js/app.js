@@ -8640,6 +8640,20 @@ function lootFillAssignedTo(idOrName) {
 // ==================== 更新日志 ====================
 const changelogData = [
   {
+    id: 'v3.2.0-task82-wp2-housing-icons-1215',
+    version: 'v3.2.0',
+    date: '2026-10-26',
+    type: 'improve',
+    typeLabel: '功能优化',
+    title: '家宅图鉴补齐 12.1.5 新增家具图标（任务书 #82-WP2 / REQ-137）',
+    summary: '为 12.1.5 新增家宅目录中 225 条带 icon_file_id 的装饰补入本地图标，沿用现有 assets/decor-icons/{icon_file_id}.png 渲染路径；26 条无 icon_file_id 的记录继续使用统一占位图。',
+    details: [
+      '素材由 wow.export 在线 CASC 管线从 WoW 12.1.5.70575 导出，225/225 成功、0 失败；400×400 原图按既有管线压至 128×128',
+      '新增 PNG 合计 2,074,212 B；assets/decor-icons/ 入库后总量约 21.23 MiB',
+      '不改数据库、图标渲染逻辑或插件；静态资源版本串 20261026.103'
+    ]
+  },
+  {
     id: 'v3.2.0-task81-patch1-icon-border-meta',
     version: 'v3.2.0',
     date: '2026-10-17',
