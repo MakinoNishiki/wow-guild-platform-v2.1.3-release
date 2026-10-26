@@ -8640,6 +8640,20 @@ function lootFillAssignedTo(idOrName) {
 // ==================== 更新日志 ====================
 const changelogData = [
   {
+    id: 'v3.2.0-task82-patch1-housing-icons',
+    version: 'v3.2.0',
+    date: '2026-10-26',
+    type: 'improve',
+    typeLabel: '功能优化',
+    title: '补齐 12.1.5 家宅图鉴余缺 26 个家具图标（任务书 #82-Patch1 / REQ-137）',
+    summary: '针对新增目录中原本没有 icon_file_id 的 26 条记录，按 item_id 从 Wowhead tooltip 反查 FileDataID，并从当前 WoW 12.1.5.70575 CASC 导出本地 PNG。图鉴继续使用原有本地图标路径与占位机制，不改渲染代码。',
+    details: [
+      '26/26 ID 在当前 CASC build 成功读取并解码；素材为原生 64×64 PNG，按既有规则不放大，图标与对应家具逐件核对',
+      '本地 12.1.5 新增目录 JSON 已补齐 icon_file_id；经运营明确授权通过 Supabase REST API 条件更新目录 26 行并读回核验 26/26。配套条件 SQL 保留作可复核的手工执行脚本',
+      '本批不连接 SSH、不部署；静态资源版本串 20261026.105'
+    ]
+  },
+  {
     id: 'v3.2.0-task82-wp2-housing-icons-1215',
     version: 'v3.2.0',
     date: '2026-10-26',
