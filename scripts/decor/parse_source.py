@@ -68,6 +68,7 @@ TYPE_KEYS = {
     "事件": ("event", "event"),
     "只能在美酒节期间获得": ("festival_note", "note"),
     "可在美酒节开始前购买": ("festival_note", "note"),
+    "可在万圣节开始前购买": ("festival_note", "note"),
 }
 
 # 字段键（归属当前元素）；名望实测为条目内字段，定夺①落 reputation（见头注释）

@@ -1,0 +1,139 @@
+[
+  {
+    "record_id": 1433,
+    "item_id": 244350,
+    "name": "碎裂的阿曼尼仪式瓮",
+    "source_text": "|cFFFFD200掉落：|r世界生物|n|n|cFFFFD200宝藏：|r世界|cffA335EE古代储物箱掉落|n|n|cFFFFD200采集：|r世界错放的宝藏节点",
+    "sources": [
+      {
+        "type": "drop",
+        "drop": "世界生物",
+        "zones": []
+      },
+      {
+        "type": "treasure",
+        "treasure": "世界|cffA335EE古代储物箱掉落",
+        "zones": []
+      }
+    ],
+    "anomalies": [
+      "清单外新键: 采集"
+    ]
+  },
+  {
+    "record_id": 8992,
+    "item_id": 252044,
+    "name": "阿曼尼兽角杯",
+    "source_text": "|cFFFFD200掉落：|r世界生物|n|n|cFFFFD200宝藏：|r世界|cffA335EE古代储物箱掉落|n|n|cFFFFD200采集：|r世界错放的宝藏节点",
+    "sources": [
+      {
+        "type": "drop",
+        "drop": "世界生物",
+        "zones": []
+      },
+      {
+        "type": "treasure",
+        "treasure": "世界|cffA335EE古代储物箱掉落",
+        "zones": []
+      }
+    ],
+    "anomalies": [
+      "清单外新键: 采集"
+    ]
+  },
+  {
+    "record_id": 15161,
+    "item_id": 263321,
+    "name": "破旧的阿曼尼供品篮",
+    "source_text": "|cFFFFD200掉落：|r世界生物|n|n|cFFFFD200宝藏：|r世界|cffA335EE古代储物箱掉落|n|n|cFFFFD200采集：|r世界错放的宝藏节点",
+    "sources": [
+      {
+        "type": "drop",
+        "drop": "世界生物",
+        "zones": []
+      },
+      {
+        "type": "treasure",
+        "treasure": "世界|cffA335EE古代储物箱掉落",
+        "zones": []
+      }
+    ],
+    "anomalies": [
+      "清单外新键: 采集"
+    ]
+  },
+  {
+    "record_id": 15491,
+    "item_id": 264256,
+    "name": "壁挂式阿曼尼动物战利品",
+    "source_text": "|cFFFFD200掉落：|r世界生物|n|n|cFFFFD200宝藏：|r世界|cffA335EE古代储物箱掉落|n|n|cFFFFD200采集：|r世界错放的宝藏节点",
+    "sources": [
+      {
+        "type": "drop",
+        "drop": "世界生物",
+        "zones": []
+      },
+      {
+        "type": "treasure",
+        "treasure": "世界|cffA335EE古代储物箱掉落",
+        "zones": []
+      }
+    ],
+    "anomalies": [
+      "清单外新键: 采集"
+    ]
+  },
+  {
+    "record_id": 15748,
+    "item_id": 264484,
+    "name": "蓝色阿曼尼挂毯",
+    "source_text": "|cFFFFD200掉落：|r世界生物|n|n|cFFFFD200宝藏：|r世界|cffA335EE古代储物箱掉落|n|n|cFFFFD200采集：|r世界错放的宝藏节点",
+    "sources": [
+      {
+        "type": "drop",
+        "drop": "世界生物",
+        "zones": []
+      },
+      {
+        "type": "treasure",
+        "treasure": "世界|cffA335EE古代储物箱掉落",
+        "zones": []
+      }
+    ],
+    "anomalies": [
+      "清单外新键: 采集"
+    ]
+  },
+  {
+    "record_id": 25129,
+    "item_id": 284359,
+    "name": "锈蚀的阿曼尼灯台",
+    "source_text": "|cFFFFD200掉落：|r世界生物|n|n|cFFFFD200宝藏：|r世界|cffA335EE古代储物箱掉落|n|n|cFFFFD200采集：|r世界错放的宝藏节点",
+    "sources": [
+      {
+        "type": "drop",
+        "drop": "世界生物",
+        "zones": []
+      },
+      {
+        "type": "treasure",
+        "treasure": "世界|cffA335EE古代储物箱掉落",
+        "zones": []
+      }
+    ],
+    "anomalies": [
+      "清单外新键: 采集"
+    ]
+  },
+  {
+    "record_id": 28632,
+    "item_id": 282164,
+    "name": "艾瑞达斯工作台",
+    "source_text": "|cFFFFD200采集：|r阿古斯",
+    "sources": [],
+    "anomalies": [
+      "清单外新键: 采集",
+      "无可解析来源"
+    ]
+  }
+]

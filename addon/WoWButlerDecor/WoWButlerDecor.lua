@@ -22,7 +22,12 @@
 --   ②国服客户端 API 可用性——若国服阉割，第一次真机跑即暴露（failCount=总数 或 枚举 0 结果）。
 -- ============================================================
 
-local ADDON_VERSION = "0.2.0"
+local ADDON_VERSION = "0.2.1"
+
+-- #84：仅采集 Patch1 26 件的静态图标诊断；缺失项也显式保留 found=false。
+local ICON_TARGET_IDS = {28569,28559,28557,28556,28547,28540,28512,28510,
+  28495,28482,28475,28471,28470,28469,28435,28432,28354,28336,28327,
+  28326,28324,28319,27684,27220,26881,25325}
 
 local function msg(s) DEFAULT_CHAT_FRAME:AddMessage("|cffffd200[wbd]|r " .. s) end
 local function err(s) DEFAULT_CHAT_FRAME:AddMessage("|cffff4040[wbd]|r " .. s) end
@@ -155,6 +160,11 @@ local function tryEnumerate(searcher, diag, useExplicitEmpty)
 end
 
 local function collectAndSave(results, diag, t0)
+  diag.iconTargets = {}
+  for _, rid in ipairs(ICON_TARGET_IDS) do
+    diag.iconTargets[rid] = { recordID = rid, found = false }
+  end
+  diag.scarecrowPepe = { recordID = 26013, found = false }
   local tEnum = GetTime()
   diag.enumShape = shapeOf(results)
   diag.firstResultShape = shapeOf(results[1])
@@ -178,6 +188,20 @@ local function collectAndSave(results, diag, t0)
     if not ok or type(info) ~= "table" then
       fail = fail + 1
     else
+      local rid = type(entryID) == "table" and entryID.recordID or entryID
+      local target = diag.iconTargets[rid]
+      if target then
+        target.found = true
+        target.itemID = info.itemID
+        target.name = info.name
+        target.iconTextureType = type(info.iconTexture)
+        target.iconTexture = deepCopy(info.iconTexture, 0)
+        target.iconAtlasType = type(info.iconAtlas)
+        target.iconAtlas = deepCopy(info.iconAtlas, 0)
+        target.asset = info.asset
+        target.uiModelSceneID = info.uiModelSceneID
+      end
+      if rid == 26013 then diag.scarecrowPepe.found = true end
       -- sourceText 空/非空
       if info.sourceText == nil or info.sourceText == "" then
         stats.sourceText.empty = stats.sourceText.empty + 1
@@ -252,7 +276,7 @@ local function collectAndSave(results, diag, t0)
   if total < 100 or total > 10000 then
     msg("数量异常，可能枚举通道不符预期（判据参照 3000±500）——数据照常落盘")
   end
-  msg("数据已写入 SavedVariables，/reload 后取文件（WTF/Account/<你的账号名>/SavedVariables/WoWButlerDecorDB.lua）")
+  msg("数据已写入 SavedVariables，/reload 后取文件（WTF/Account/<你的账号名>/SavedVariables/WoWButlerDecor.lua）")
 end
 
 local function doScan()
