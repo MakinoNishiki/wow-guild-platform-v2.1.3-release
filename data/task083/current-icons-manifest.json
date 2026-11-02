@@ -1,0 +1,150 @@
+{
+  "build": "12.1.5.70688",
+  "source": "local CASC, public TACTKeys game decryption metadata",
+  "files": [
+    {
+      "id": 7424023,
+      "width": 400,
+      "height": 400,
+      "sha256": "7e9664609a02ecc26e85e5024802454cd4adc5d20eb9378e8026d13b9616f16a"
+    },
+    {
+      "id": 7424027,
+      "width": 400,
+      "height": 400,
+      "sha256": "9f24624b233cd82785884b4a695f84a2651127a5b64f6f204f49407d16498f7e"
+    },
+    {
+      "id": 7425515,
+      "width": 400,
+      "height": 400,
+      "sha256": "32305b33f4d770ed123d16b9cfeb24ae4c48d55180492ff2061e7744ab36164c"
+    },
+    {
+      "id": 8180034,
+      "width": 400,
+      "height": 400,
+      "sha256": "cb9fefa8190a0b5a35f9301271e65527344175296cfcb95294acad17ec58170e"
+    },
+    {
+      "id": 8180037,
+      "width": 400,
+      "height": 400,
+      "sha256": "33e730f15c3decd52210587fa3cec1cbd8103bae136479703395b8b56db8d61b"
+    },
+    {
+      "id": 8180056,
+      "width": 400,
+      "height": 400,
+      "sha256": "92d89da07e22c05630f3f160d78b321fe1c47d239e8fcd789a838cd4085c3594"
+    },
+    {
+      "id": 8186800,
+      "width": 400,
+      "height": 400,
+      "sha256": "9ba2f4f390c7d95aea921bf639e72b93c21c460dc696c1ca68869b1f35396438"
+    },
+    {
+      "id": 8186806,
+      "width": 400,
+      "height": 400,
+      "sha256": "350a05b1739ddc98fd312fb6e8a541bea2de64edf1d5900a05ef71ddd198b30e"
+    },
+    {
+      "id": 8186808,
+      "width": 400,
+      "height": 400,
+      "sha256": "a7c1fb1101a7dac3bac1f7ff39d155bc13049b7f131192e575840048ce5d7cd7"
+    },
+    {
+      "id": 8201892,
+      "width": 400,
+      "height": 400,
+      "sha256": "9299a1d717a89aa5ad7c10faad4b851532646c01ef29ab9961c79a6d2f0f17b2"
+    },
+    {
+      "id": 8201896,
+      "width": 400,
+      "height": 400,
+      "sha256": "fe0241ec41110f445b8c372e239e072cb253625490af3c9c048471f98625eb99"
+    },
+    {
+      "id": 8209012,
+      "width": 400,
+      "height": 400,
+      "sha256": "02bea7f4ba88cacbb9417c62bf40a4132ba11b612b3fd8974e7deb51517f00d8"
+    },
+    {
+      "id": 8244636,
+      "width": 400,
+      "height": 400,
+      "sha256": "14ce05203869a0dbdda34f55a3bca90e28b7f0e11d3f9781401dc3a184ec7e01"
+    },
+    {
+      "id": 8244641,
+      "width": 400,
+      "height": 400,
+      "sha256": "92d5d2878561be8a27eff808477cbbcfb1b2974dfb33ab86659b279cb14f9c88"
+    },
+    {
+      "id": 8267540,
+      "width": 400,
+      "height": 400,
+      "sha256": "60bd764f62f8c7a4882749d37a3794b4a742b151e2db85e5f61f47567222129d"
+    },
+    {
+      "id": 8267542,
+      "width": 400,
+      "height": 400,
+      "sha256": "76614a723bcac46f34b31839a9e9f4a499760bbd254caecfe9ff51d4ae93a8ce"
+    },
+    {
+      "id": 8267548,
+      "width": 400,
+      "height": 400,
+      "sha256": "c746bb0e17707f2a4f4df2c4212d95356041fc88a49db5d9d1e29c89f32fabae"
+    },
+    {
+      "id": 8267551,
+      "width": 400,
+      "height": 400,
+      "sha256": "50a8b51b8c97f936205b036465192c37e26410d012298934da3ea701dfd5c4b8"
+    },
+    {
+      "id": 8270050,
+      "width": 400,
+      "height": 400,
+      "sha256": "debe9aa393f653a91d2c1152babfeef2a1a31f1762e4635bd8b692c0c40d0f1b"
+    },
+    {
+      "id": 8293769,
+      "width": 400,
+      "height": 400,
+      "sha256": "ae6920078a3ff378762fe3b22ae40ac43b57c69b23946f772730cedcee366478"
+    },
+    {
+      "id": 8293771,
+      "width": 400,
+      "height": 400,
+      "sha256": "a074f4ab55e6abf246b161cea85ca037866d7af9df97a67b1e9f4ac1a4742442"
+    },
+    {
+      "id": 8293773,
+      "width": 400,
+      "height": 400,
+      "sha256": "436b31d2cd77af29764bb457f863d44652729585975a637ca039f30a7a3146c0"
+    },
+    {
+      "id": 8419341,
+      "width": 400,
+      "height": 400,
+      "sha256": "d2ddfa8b6a5d02b8ed9e204b766a8d129fa710b485bdbe46be172e54aef1b1a0"
+    },
+    {
+      "id": 8419430,
+      "width": 400,
+      "height": 400,
+      "sha256": "5c61bfa9af48985b0963221a96276f5a8aafa1dccaed3c813034e68dc731c58e"
+    }
+  ]
+}

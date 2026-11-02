@@ -132,3 +132,7 @@
 - `.tier-mode-switch`（main.css）—— 装备分配/心愿单弹窗标题行「普通装备/套装装备」切换钮组（WP3.2）：margin-left:auto 右贴关闭钮，激活钮加 .btn-primary 高亮
 - `.tier-slot-cap` / `.tier-slot-cap.active` / `.tier-slot-cap.disabled`（main.css）—— 套装部位胶囊钮（WP3.2）：样式复刻 .secondary-stat-tag 族（20px 圆角胶囊、金色 active 渐变），单选语义（任务书 3.2「单选/多选」未定，按线框图单选实现，待运营确认）
 - `.tier-set-name`（main.css）—— 套装名称只读行（WP3.2）：命中显示套装名（金色），未命中灰字「该职业专精当前赛季无套装记录」
+
+## 任务书 #84 图标资源选择（2026-11-02）
+
+沿用现有家宅卡片/详情及方案单CSS尺寸。优先目录真实官方图；原物品图替代项可用按record_id登记的512px透明模型缩略图；模型加载失败回原物品图，再失败回占位。映射唯一真源=DecorDict.MODEL_ICON_OVERRIDES，选择入口=decorData.js iconSrc，模型不得冒用FileDataID路径。静态缩略图仅展示实体，动态叠加光效面不作为实体材质显示；失败仍保留原图回退。

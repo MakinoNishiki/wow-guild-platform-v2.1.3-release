@@ -1,5 +1,7 @@
 # 任务书 #84 图标诊断准备报告
 
+> 2026-11-02 家里续接更新：当前状态以 [真机扫描与模型试点报告](TASK-084-真机扫描与模型试点报告.md) 为准：0.2.1真机扫描已完成；26项两图标字段全空；模型试点3成功/1植物失败，未批量替换。
+
 > 2026-11-02｜插件诊断已准备；未运行游戏、未导出模型或替换任何图片。
 
 `addon/WoWButlerDecor` 版本升为 0.2.1。原 `/wbd scan` 仍完整采集目录，额外在 `diag.iconTargets` 对 Patch1 26 个 recordID 保存 found、itemID/name、iconTextureType/value、iconAtlasType/value、asset、uiModelSceneID；每条目标先初始化 found=false，区分没有枚举到与字段为nil。`diag.scarecrowPepe` 单独记录26013是否出现，完整字段仍由原 items 白名单采集。没有新增 API 调用或数据写入通道。

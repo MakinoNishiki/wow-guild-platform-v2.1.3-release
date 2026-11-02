@@ -8640,6 +8640,19 @@ function lootFillAssignedTo(idOrName) {
 // ==================== 更新日志 ====================
 const changelogData = [
   {
+    id: 'v3.2.0-task83-decor-refresh', version: 'v3.2.0', date: '2026-11-02',
+    type: 'fix', typeLabel: '修复BUG', title: '家宅装饰信息同步至12.1.5',
+    summary: '同步2335条家宅目录，补入22条新记录，更新来源价格、名称、分类和标签等游戏信息。',
+    details: ['有明确获取途径的装饰补齐来源分类；来源尚待核实的条目保留游戏原文。']
+  },
+  {
+    id: 'v3.2.0-task84-model-previews', version: 'v3.2.0', date: '2026-11-02',
+    type: 'improve', typeLabel: '功能优化',
+    title: '家宅装饰缩略图高清化',
+    summary: '26件装饰改用透明背景高清模型缩略图，统一卡片、详情与方案单显示。',
+    details: ['植物图标补充透明叶片显示；新图加载失败时自动回退原物品图。', '缩略图展示装饰的静态实体造型，不呈现动态光效。']
+  },
+  {
     id: 'v3.2.0-task82-patch1-housing-icons',
     version: 'v3.2.0',
     date: '2026-10-26',

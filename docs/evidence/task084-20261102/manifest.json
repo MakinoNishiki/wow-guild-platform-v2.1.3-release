@@ -1,0 +1,98 @@
+{
+  "source": "local CASC; remote fallback disabled",
+  "client_build": "12.1.5.70688",
+  "build_key": "0149337da1d526fc64bf43982c650577",
+  "wowexport_commit": "caf2bb0006930e151cd3810fba0f7d55e2e4b562",
+  "renderer": "three 0.180.0 / Chrome headless / SwiftShader",
+  "samples": [
+    {
+      "record_id": 28569,
+      "asset": 3189119,
+      "bytes": 398280,
+      "header": "MD21",
+      "status": "read",
+      "glb_bytes": 950960
+    },
+    {
+      "record_id": 28556,
+      "asset": 3053186,
+      "bytes": 89736,
+      "header": "MD21",
+      "status": "export_failed",
+      "reason": "Cannot read properties of undefined (reading 'textureComboIndex')"
+    },
+    {
+      "record_id": 27684,
+      "asset": 3051536,
+      "bytes": 57960,
+      "header": "MD21",
+      "status": "read",
+      "glb_bytes": 312392
+    },
+    {
+      "record_id": 27220,
+      "asset": 4551444,
+      "bytes": 58772,
+      "header": "MD21",
+      "status": "read",
+      "glb_bytes": 226288
+    }
+  ],
+  "render_results": [
+    {
+      "id": 28569,
+      "bounds": [
+        -1.3544859886169434,
+        -0.021394964307546616,
+        -1.962322473526001,
+        1.4812638759613037,
+        3.3890130519866943,
+        1.962322473526001
+      ],
+      "triangles": 2550,
+      "png_sha256": "7e24508f2bdf1769f9ca2d3aea4f4d5c554cae30cbbff7d2ff9e2d96fcc4c6ff",
+      "png_bytes": 99770,
+      "pixels": [
+        512,
+        512
+      ]
+    },
+    {
+      "id": 27684,
+      "bounds": [
+        -1.962018609046936,
+        -0.33372873067855835,
+        -2.465728282928467,
+        1.9613029956817627,
+        1.5051931142807007,
+        2.42360520362854
+      ],
+      "triangles": 280,
+      "png_sha256": "186c1a65f0044beca9b55f62bd0e0a7896cf011c9ee43b7825041e1fa0497e78",
+      "png_bytes": 74740,
+      "pixels": [
+        512,
+        512
+      ]
+    },
+    {
+      "id": 27220,
+      "bounds": [
+        -0.2950707674026489,
+        -0.06524008512496948,
+        -0.21725381910800934,
+        0.3812831938266754,
+        0.4701988995075226,
+        0.22048549354076385
+      ],
+      "triangles": 476,
+      "png_sha256": "4e51c7832b5204da7b57fa7f63532a2cf22e6a214738170361d7ca09a281d88a",
+      "png_bytes": 59239,
+      "pixels": [
+        512,
+        512
+      ]
+    }
+  ],
+  "acceptance": "技术样本，未完成游戏目录并排比对、未获运营验收；植物失败，停止批量26张"
+}

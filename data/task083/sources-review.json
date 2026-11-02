@@ -1,0 +1,459 @@
+[
+  {
+    "record_id": 26011,
+    "item_id": 282192,
+    "name": "烛光摇曳的尖啸南瓜灯",
+    "source_text": "|cFFFFD200商人出售：|r科杜拉·沃尔夫冈|n|cFFFFD200地区：|r创始者之角|n|cFFFFD200价格：|r20|Hitem:33226|h|TInterface\\ICONS\\Achievement_Halloween_Candy_01.blp:0|t|h|n|n|cFFFFD200商人出售：|r喷肠·呕腹|n|cFFFFD200地区：|r烈风海岸|n|cFFFFD200价格：|r20|Hitem:33226|h|TInterface\\ICONS\\Achievement_Halloween_Candy_01.blp:0|t|h",
+    "sources": [
+      {
+        "type": "vendor",
+        "vendor": "科杜拉·沃尔夫冈",
+        "zones": [
+          "创始者之角"
+        ],
+        "price": [
+          {
+            "item_id": 33226,
+            "amount": 20
+          }
+        ],
+        "reputation": null
+      },
+      {
+        "type": "vendor",
+        "vendor": "喷肠·呕腹",
+        "zones": [
+          "烈风海岸"
+        ],
+        "price": [
+          {
+            "item_id": 33226,
+            "amount": 20
+          }
+        ],
+        "reputation": null
+      },
+      {
+        "type": "festival_note",
+        "note": "万圣节装饰"
+      }
+    ],
+    "anomalies": [],
+    "previous_source_text": "|cFFFFD200商人出售：|r科杜拉·沃尔夫冈|n|cFFFFD200地区：|r创始者之角|n|cFFFFD200价格：|r200|Hitem:33226|h|TInterface\\ICONS\\Achievement_Halloween_Candy_01.blp:0|t|h|n|n|cFFFFD200商人出售：|r喷肠·呕腹|n|cFFFFD200地区：|r烈风海岸|n|cFFFFD200价格：|r200|Hitem:33226|h|TInterface\\ICONS\\Achievement_Halloween_Candy_01.blp:0|t|h",
+    "reason": "当前客户端来源原文已变化，需另审 source_text 与 sources 同步补丁；未进 SQL"
+  },
+  {
+    "record_id": 26012,
+    "item_id": 282194,
+    "name": "烛光摇曳的食人魔南瓜灯",
+    "source_text": "|cFFFFD200商人出售：|r科杜拉·沃尔夫冈|n|cFFFFD200地区：|r创始者之角|n|cFFFFD200价格：|r20|Hitem:33226|h|TInterface\\ICONS\\Achievement_Halloween_Candy_01.blp:0|t|h|n|n|cFFFFD200商人出售：|r喷肠·呕腹|n|cFFFFD200地区：|r烈风海岸|n|cFFFFD200价格：|r20|Hitem:33226|h|TInterface\\ICONS\\Achievement_Halloween_Candy_01.blp:0|t|h",
+    "sources": [
+      {
+        "type": "vendor",
+        "vendor": "科杜拉·沃尔夫冈",
+        "zones": [
+          "创始者之角"
+        ],
+        "price": [
+          {
+            "item_id": 33226,
+            "amount": 20
+          }
+        ],
+        "reputation": null
+      },
+      {
+        "type": "vendor",
+        "vendor": "喷肠·呕腹",
+        "zones": [
+          "烈风海岸"
+        ],
+        "price": [
+          {
+            "item_id": 33226,
+            "amount": 20
+          }
+        ],
+        "reputation": null
+      },
+      {
+        "type": "festival_note",
+        "note": "万圣节装饰"
+      }
+    ],
+    "anomalies": [],
+    "previous_source_text": "|cFFFFD200商人出售：|r科杜拉·沃尔夫冈|n|cFFFFD200地区：|r创始者之角|n|cFFFFD200价格：|r200|Hitem:33226|h|TInterface\\ICONS\\Achievement_Halloween_Candy_01.blp:0|t|h|n|n|cFFFFD200商人出售：|r喷肠·呕腹|n|cFFFFD200地区：|r烈风海岸|n|cFFFFD200价格：|r200|Hitem:33226|h|TInterface\\ICONS\\Achievement_Halloween_Candy_01.blp:0|t|h",
+    "reason": "当前客户端来源原文已变化，需另审 source_text 与 sources 同步补丁；未进 SQL"
+  },
+  {
+    "record_id": 26016,
+    "item_id": 282196,
+    "name": "盛满糖果的糖罐",
+    "source_text": "|cFFFFD200商人出售：|r科杜拉·沃尔夫冈|n|cFFFFD200地区：|r创始者之角|n|cFFFFD200价格：|r20|Hitem:33226|h|TInterface\\ICONS\\Achievement_Halloween_Candy_01.blp:0|t|h|n|n|cFFFFD200商人出售：|r喷肠·呕腹|n|cFFFFD200地区：|r烈风海岸|n|cFFFFD200价格：|r20|Hitem:33226|h|TInterface\\ICONS\\Achievement_Halloween_Candy_01.blp:0|t|h",
+    "sources": [
+      {
+        "type": "vendor",
+        "vendor": "科杜拉·沃尔夫冈",
+        "zones": [
+          "创始者之角"
+        ],
+        "price": [
+          {
+            "item_id": 33226,
+            "amount": 20
+          }
+        ],
+        "reputation": null
+      },
+      {
+        "type": "vendor",
+        "vendor": "喷肠·呕腹",
+        "zones": [
+          "烈风海岸"
+        ],
+        "price": [
+          {
+            "item_id": 33226,
+            "amount": 20
+          }
+        ],
+        "reputation": null
+      },
+      {
+        "type": "festival_note",
+        "note": "万圣节装饰"
+      }
+    ],
+    "anomalies": [],
+    "previous_source_text": "|cFFFFD200商人出售：|r科杜拉·沃尔夫冈|n|cFFFFD200地区：|r创始者之角|n|cFFFFD200价格：|r200|Hitem:33226|h|TInterface\\ICONS\\Achievement_Halloween_Candy_01.blp:0|t|h|n|n|cFFFFD200商人出售：|r喷肠·呕腹|n|cFFFFD200地区：|r烈风海岸|n|cFFFFD200价格：|r200|Hitem:33226|h|TInterface\\ICONS\\Achievement_Halloween_Candy_01.blp:0|t|h",
+    "reason": "当前客户端来源原文已变化，需另审 source_text 与 sources 同步补丁；未进 SQL"
+  },
+  {
+    "record_id": 26052,
+    "item_id": 282198,
+    "name": "未点燃的尖啸南瓜灯",
+    "source_text": "|cFFFFD200商人出售：|r科杜拉·沃尔夫冈|n|cFFFFD200地区：|r创始者之角|n|cFFFFD200价格：|r20|Hitem:33226|h|TInterface\\ICONS\\Achievement_Halloween_Candy_01.blp:0|t|h|n|n|cFFFFD200商人出售：|r喷肠·呕腹|n|cFFFFD200地区：|r烈风海岸|n|cFFFFD200价格：|r20|Hitem:33226|h|TInterface\\ICONS\\Achievement_Halloween_Candy_01.blp:0|t|h",
+    "sources": [
+      {
+        "type": "vendor",
+        "vendor": "科杜拉·沃尔夫冈",
+        "zones": [
+          "创始者之角"
+        ],
+        "price": [
+          {
+            "item_id": 33226,
+            "amount": 20
+          }
+        ],
+        "reputation": null
+      },
+      {
+        "type": "vendor",
+        "vendor": "喷肠·呕腹",
+        "zones": [
+          "烈风海岸"
+        ],
+        "price": [
+          {
+            "item_id": 33226,
+            "amount": 20
+          }
+        ],
+        "reputation": null
+      },
+      {
+        "type": "festival_note",
+        "note": "万圣节装饰"
+      }
+    ],
+    "anomalies": [],
+    "previous_source_text": "|cFFFFD200商人出售：|r科杜拉·沃尔夫冈|n|cFFFFD200地区：|r创始者之角|n|cFFFFD200价格：|r200|Hitem:33226|h|TInterface\\ICONS\\Achievement_Halloween_Candy_01.blp:0|t|h|n|n|cFFFFD200商人出售：|r喷肠·呕腹|n|cFFFFD200地区：|r烈风海岸|n|cFFFFD200价格：|r200|Hitem:33226|h|TInterface\\ICONS\\Achievement_Halloween_Candy_01.blp:0|t|h",
+    "reason": "当前客户端来源原文已变化，需另审 source_text 与 sources 同步补丁；未进 SQL"
+  },
+  {
+    "record_id": 26053,
+    "item_id": 282200,
+    "name": "未点燃的食人魔南瓜灯",
+    "source_text": "|cFFFFD200商人出售：|r科杜拉·沃尔夫冈|n|cFFFFD200地区：|r创始者之角|n|cFFFFD200价格：|r20|Hitem:33226|h|TInterface\\ICONS\\Achievement_Halloween_Candy_01.blp:0|t|h|n|n|cFFFFD200商人出售：|r喷肠·呕腹|n|cFFFFD200地区：|r烈风海岸|n|cFFFFD200价格：|r20|Hitem:33226|h|TInterface\\ICONS\\Achievement_Halloween_Candy_01.blp:0|t|h",
+    "sources": [
+      {
+        "type": "vendor",
+        "vendor": "科杜拉·沃尔夫冈",
+        "zones": [
+          "创始者之角"
+        ],
+        "price": [
+          {
+            "item_id": 33226,
+            "amount": 20
+          }
+        ],
+        "reputation": null
+      },
+      {
+        "type": "vendor",
+        "vendor": "喷肠·呕腹",
+        "zones": [
+          "烈风海岸"
+        ],
+        "price": [
+          {
+            "item_id": 33226,
+            "amount": 20
+          }
+        ],
+        "reputation": null
+      },
+      {
+        "type": "festival_note",
+        "note": "万圣节装饰"
+      }
+    ],
+    "anomalies": [],
+    "previous_source_text": "|cFFFFD200商人出售：|r科杜拉·沃尔夫冈|n|cFFFFD200地区：|r创始者之角|n|cFFFFD200价格：|r200|Hitem:33226|h|TInterface\\ICONS\\Achievement_Halloween_Candy_01.blp:0|t|h|n|n|cFFFFD200商人出售：|r喷肠·呕腹|n|cFFFFD200地区：|r烈风海岸|n|cFFFFD200价格：|r200|Hitem:33226|h|TInterface\\ICONS\\Achievement_Halloween_Candy_01.blp:0|t|h",
+    "reason": "当前客户端来源原文已变化，需另审 source_text 与 sources 同步补丁；未进 SQL"
+  },
+  {
+    "record_id": 26054,
+    "item_id": 282289,
+    "name": "无头骑士的骇人头颅",
+    "source_text": "|cFFFFD200商人出售：|r世界商人|n|cFFFFD200价格：|r20|Hitem:33226|h|TInterface\\ICONS\\Achievement_Halloween_Candy_01.blp:0|t|h",
+    "sources": [
+      {
+        "type": "vendor",
+        "vendor": "世界商人",
+        "zones": [],
+        "price": [
+          {
+            "item_id": 33226,
+            "amount": 20
+          }
+        ],
+        "reputation": null
+      },
+      {
+        "type": "festival_note",
+        "note": "万圣节装饰"
+      }
+    ],
+    "anomalies": [],
+    "previous_source_text": "|cFFFFD200商人出售：|r世界商人|n|cFFFFD200价格：|r200|Hitem:33226|h|TInterface\\ICONS\\Achievement_Halloween_Candy_01.blp:0|t|h",
+    "reason": "当前客户端来源原文已变化，需另审 source_text 与 sources 同步补丁；未进 SQL"
+  },
+  {
+    "record_id": 26880,
+    "item_id": 282213,
+    "name": "高耸的毒心雕像",
+    "source_text": "|cFFFFD200商人出售：|r科杜拉·沃尔夫冈|n|cFFFFD200地区：|r创始者之角|n|cFFFFD200价格：|r25|Hitem:33226|h|TInterface\\ICONS\\Achievement_Halloween_Candy_01.blp:0|t|h|n|n|cFFFFD200商人出售：|r喷肠·呕腹|n|cFFFFD200地区：|r烈风海岸|n|cFFFFD200价格：|r25|Hitem:33226|h|TInterface\\ICONS\\Achievement_Halloween_Candy_01.blp:0|t|h",
+    "sources": [
+      {
+        "type": "vendor",
+        "vendor": "科杜拉·沃尔夫冈",
+        "zones": [
+          "创始者之角"
+        ],
+        "price": [
+          {
+            "item_id": 33226,
+            "amount": 25
+          }
+        ],
+        "reputation": null
+      },
+      {
+        "type": "vendor",
+        "vendor": "喷肠·呕腹",
+        "zones": [
+          "烈风海岸"
+        ],
+        "price": [
+          {
+            "item_id": 33226,
+            "amount": 25
+          }
+        ],
+        "reputation": null
+      },
+      {
+        "type": "festival_note",
+        "note": "万圣节装饰"
+      }
+    ],
+    "anomalies": [],
+    "previous_source_text": "|cFFFFD200商人出售：|r科杜拉·沃尔夫冈|n|cFFFFD200地区：|r创始者之角|n|cFFFFD200价格：|r200|Hitem:33226|h|TInterface\\ICONS\\Achievement_Halloween_Candy_01.blp:0|t|h|n|n|cFFFFD200商人出售：|r喷肠·呕腹|n|cFFFFD200地区：|r烈风海岸|n|cFFFFD200价格：|r200|Hitem:33226|h|TInterface\\ICONS\\Achievement_Halloween_Candy_01.blp:0|t|h",
+    "reason": "当前客户端来源原文已变化，需另审 source_text 与 sources 同步补丁；未进 SQL"
+  },
+  {
+    "record_id": 26881,
+    "item_id": 282202,
+    "name": "精致的毒心仪式标记",
+    "source_text": "|cFFFFD200商人出售：|r科杜拉·沃尔夫冈|n|cFFFFD200地区：|r创始者之角|n|cFFFFD200价格：|r15|Hitem:33226|h|TInterface\\ICONS\\Achievement_Halloween_Candy_01.blp:0|t|h|n|n|cFFFFD200商人出售：|r喷肠·呕腹|n|cFFFFD200地区：|r烈风海岸|n|cFFFFD200价格：|r15|Hitem:33226|h|TInterface\\ICONS\\Achievement_Halloween_Candy_01.blp:0|t|h",
+    "sources": [
+      {
+        "type": "vendor",
+        "vendor": "科杜拉·沃尔夫冈",
+        "zones": [
+          "创始者之角"
+        ],
+        "price": [
+          {
+            "item_id": 33226,
+            "amount": 15
+          }
+        ],
+        "reputation": null
+      },
+      {
+        "type": "vendor",
+        "vendor": "喷肠·呕腹",
+        "zones": [
+          "烈风海岸"
+        ],
+        "price": [
+          {
+            "item_id": 33226,
+            "amount": 15
+          }
+        ],
+        "reputation": null
+      },
+      {
+        "type": "festival_note",
+        "note": "万圣节装饰"
+      }
+    ],
+    "anomalies": [],
+    "previous_source_text": "|cFFFFD200商人出售：|r科杜拉·沃尔夫冈|n|cFFFFD200地区：|r创始者之角|n|cFFFFD200价格：|r150|Hitem:33226|h|TInterface\\ICONS\\Achievement_Halloween_Candy_01.blp:0|t|h|n|n|cFFFFD200商人出售：|r喷肠·呕腹|n|cFFFFD200地区：|r烈风海岸|n|cFFFFD200价格：|r150|Hitem:33226|h|TInterface\\ICONS\\Achievement_Halloween_Candy_01.blp:0|t|h",
+    "reason": "当前客户端来源原文已变化，需另审 source_text 与 sources 同步补丁；未进 SQL"
+  },
+  {
+    "record_id": 26883,
+    "item_id": 282206,
+    "name": "毒心石阵",
+    "source_text": "|cFFFFD200商人出售：|r科杜拉·沃尔夫冈|n|cFFFFD200地区：|r创始者之角|n|cFFFFD200价格：|r15|Hitem:33226|h|TInterface\\ICONS\\Achievement_Halloween_Candy_01.blp:0|t|h|n|n|cFFFFD200商人出售：|r喷肠·呕腹|n|cFFFFD200地区：|r烈风海岸|n|cFFFFD200价格：|r15|Hitem:33226|h|TInterface\\ICONS\\Achievement_Halloween_Candy_01.blp:0|t|h",
+    "sources": [
+      {
+        "type": "vendor",
+        "vendor": "科杜拉·沃尔夫冈",
+        "zones": [
+          "创始者之角"
+        ],
+        "price": [
+          {
+            "item_id": 33226,
+            "amount": 15
+          }
+        ],
+        "reputation": null
+      },
+      {
+        "type": "vendor",
+        "vendor": "喷肠·呕腹",
+        "zones": [
+          "烈风海岸"
+        ],
+        "price": [
+          {
+            "item_id": 33226,
+            "amount": 15
+          }
+        ],
+        "reputation": null
+      },
+      {
+        "type": "festival_note",
+        "note": "万圣节装饰"
+      }
+    ],
+    "anomalies": [],
+    "previous_source_text": "|cFFFFD200商人出售：|r科杜拉·沃尔夫冈|n|cFFFFD200地区：|r创始者之角|n|cFFFFD200价格：|r150|Hitem:33226|h|TInterface\\ICONS\\Achievement_Halloween_Candy_01.blp:0|t|h|n|n|cFFFFD200商人出售：|r喷肠·呕腹|n|cFFFFD200地区：|r烈风海岸|n|cFFFFD200价格：|r150|Hitem:33226|h|TInterface\\ICONS\\Achievement_Halloween_Candy_01.blp:0|t|h",
+    "reason": "当前客户端来源原文已变化，需另审 source_text 与 sources 同步补丁；未进 SQL"
+  },
+  {
+    "record_id": 26884,
+    "item_id": 282208,
+    "name": "毒心旗帜",
+    "source_text": "|cFFFFD200商人出售：|r科杜拉·沃尔夫冈|n|cFFFFD200地区：|r创始者之角|n|cFFFFD200价格：|r25|Hitem:33226|h|TInterface\\ICONS\\Achievement_Halloween_Candy_01.blp:0|t|h|n|n|cFFFFD200商人出售：|r喷肠·呕腹|n|cFFFFD200地区：|r烈风海岸|n|cFFFFD200价格：|r25|Hitem:33226|h|TInterface\\ICONS\\Achievement_Halloween_Candy_01.blp:0|t|h",
+    "sources": [
+      {
+        "type": "vendor",
+        "vendor": "科杜拉·沃尔夫冈",
+        "zones": [
+          "创始者之角"
+        ],
+        "price": [
+          {
+            "item_id": 33226,
+            "amount": 25
+          }
+        ],
+        "reputation": null
+      },
+      {
+        "type": "vendor",
+        "vendor": "喷肠·呕腹",
+        "zones": [
+          "烈风海岸"
+        ],
+        "price": [
+          {
+            "item_id": 33226,
+            "amount": 25
+          }
+        ],
+        "reputation": null
+      },
+      {
+        "type": "festival_note",
+        "note": "万圣节装饰"
+      }
+    ],
+    "anomalies": [],
+    "previous_source_text": "|cFFFFD200商人出售：|r科杜拉·沃尔夫冈|n|cFFFFD200地区：|r创始者之角|n|cFFFFD200价格：|r250|Hitem:33226|h|TInterface\\ICONS\\Achievement_Halloween_Candy_01.blp:0|t|h|n|n|cFFFFD200商人出售：|r喷肠·呕腹|n|cFFFFD200地区：|r烈风海岸|n|cFFFFD200价格：|r250|Hitem:33226|h|TInterface\\ICONS\\Achievement_Halloween_Candy_01.blp:0|t|h",
+    "reason": "当前客户端来源原文已变化，需另审 source_text 与 sources 同步补丁；未进 SQL"
+  },
+  {
+    "record_id": 26885,
+    "item_id": 282204,
+    "name": "不祥的毒心神龛",
+    "source_text": "|cFFFFD200商人出售：|r科杜拉·沃尔夫冈|n|cFFFFD200地区：|r创始者之角|n|cFFFFD200价格：|r25|Hitem:33226|h|TInterface\\ICONS\\Achievement_Halloween_Candy_01.blp:0|t|h|n|n|cFFFFD200商人出售：|r喷肠·呕腹|n|cFFFFD200地区：|r烈风海岸|n|cFFFFD200价格：|r25|Hitem:33226|h|TInterface\\ICONS\\Achievement_Halloween_Candy_01.blp:0|t|h",
+    "sources": [
+      {
+        "type": "vendor",
+        "vendor": "科杜拉·沃尔夫冈",
+        "zones": [
+          "创始者之角"
+        ],
+        "price": [
+          {
+            "item_id": 33226,
+            "amount": 25
+          }
+        ],
+        "reputation": null
+      },
+      {
+        "type": "vendor",
+        "vendor": "喷肠·呕腹",
+        "zones": [
+          "烈风海岸"
+        ],
+        "price": [
+          {
+            "item_id": 33226,
+            "amount": 25
+          }
+        ],
+        "reputation": null
+      },
+      {
+        "type": "festival_note",
+        "note": "万圣节装饰"
+      }
+    ],
+    "anomalies": [],
+    "previous_source_text": "|cFFFFD200商人出售：|r科杜拉·沃尔夫冈|n|cFFFFD200地区：|r创始者之角|n|cFFFFD200价格：|r250|Hitem:33226|h|TInterface\\ICONS\\Achievement_Halloween_Candy_01.blp:0|t|h|n|n|cFFFFD200商人出售：|r喷肠·呕腹|n|cFFFFD200地区：|r烈风海岸|n|cFFFFD200价格：|r250|Hitem:33226|h|TInterface\\ICONS\\Achievement_Halloween_Candy_01.blp:0|t|h",
+    "reason": "当前客户端来源原文已变化，需另审 source_text 与 sources 同步补丁；未进 SQL"
+  }
+]

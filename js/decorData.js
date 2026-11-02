@@ -219,7 +219,20 @@
   }
 
   // ---- 网格渲染 ----
-  function iconSrc(r) { return r.icon_file_id != null ? `assets/decor-icons/${r.icon_file_id}.png` : PLACEHOLDER; }
+  function legacyIconSrc(r) {
+    const model = D.MODEL_ICON_OVERRIDES && D.MODEL_ICON_OVERRIDES[r.record_id];
+    const id = r.icon_file_id != null ? r.icon_file_id : model && model.fallbackIconId;
+    return id != null ? `assets/decor-icons/${id}.png` : PLACEHOLDER;
+  }
+  function iconSrc(r) {
+    const model = D.MODEL_ICON_OVERRIDES && D.MODEL_ICON_OVERRIDES[r.record_id];
+    // 官方目录新增真实图标时自动优先；网站旧物品图映射不冒充目录官方图。
+    if (model && (r.icon_file_id == null || Number(r.icon_file_id) === model.fallbackIconId)) return model.src;
+    return legacyIconSrc(r);
+  }
+  function iconFallback(r) {
+    return iconSrc(r) !== legacyIconSrc(r) ? legacyIconSrc(r) : PLACEHOLDER;
+  }
 
   // ---- 每页件数动态化（任务书 #51-补丁3 第一节：PAGE_SIZE 常量 60 → 实测列数 × 8 行） ----
   // 列数取法=网格渲染后 getComputedStyle(gridEl).gridTemplateColumns 实测，不写死断点、不复制媒体查询逻辑；
@@ -301,7 +314,7 @@
     const src = srcSummaryText(r);
     // 任务书 #58-补丁：角标 ＋ 退役 → 卡片底部通栏按钮「加入方案单 / 已加入 ×N」双态
     return `<div class="dh-card" data-rid="${r.record_id}" tabindex="0" role="button" aria-label="${esc(r.name)}">
-      <div class="dh-icon-wrap"><img src="${iconSrc(r)}" alt="" loading="lazy" onerror="this.onerror=null;this.src='${PLACEHOLDER}'">${cost}</div>
+      <div class="dh-icon-wrap"><img src="${iconSrc(r)}" data-fallback="${iconFallback(r)}" alt="" loading="lazy" onerror="if(this.dataset.fallback){this.src=this.dataset.fallback;delete this.dataset.fallback}else{this.onerror=null;this.src='${PLACEHOLDER}'}">${cost}</div>
       <div class="dh-name dh-q${q}">${esc(r.name)}</div>
       <div class="dh-cat">${esc(catPathText(r))}</div>
       <div class="dh-src${src.unknown ? ' dh-src-unknown' : ''}">${esc(src.text)}</div>
@@ -469,7 +482,7 @@
     modalEl.className = 'dh-modal-overlay';
     modalEl.innerHTML = `<div class="dh-modal" role="dialog" aria-label="${esc(r.name)}">
       <div class="dh-modal-head">
-        <div class="dh-modal-icon"><img src="${iconSrc(r)}" alt="" onerror="this.onerror=null;this.src='${PLACEHOLDER}'"></div>
+        <div class="dh-modal-icon"><img src="${iconSrc(r)}" data-fallback="${iconFallback(r)}" alt="" onerror="if(this.dataset.fallback){this.src=this.dataset.fallback;delete this.dataset.fallback}else{this.onerror=null;this.src='${PLACEHOLDER}'}"></div>
         <div>
           <div class="dh-modal-title dh-q${q}">${esc(r.name)}</div>
           <div class="dh-modal-sub">${esc(D.QUALITY_NAMES[q] || '')}${r.entry_type === 2 ? ' · 房间/户型' : ''}</div>
@@ -781,7 +794,7 @@
       if (!row) return '';
       const q = row.quality != null ? row.quality : 1;
       return `<div class="dh-plan-row" data-rid="${it.record_id}">
-        <span class="dh-plan-icon"><img src="${iconSrc(row)}" alt="" loading="lazy" onerror="this.onerror=null;this.src='${PLACEHOLDER}'"></span>
+        <span class="dh-plan-icon"><img src="${iconSrc(row)}" data-fallback="${iconFallback(row)}" alt="" loading="lazy" onerror="if(this.dataset.fallback){this.src=this.dataset.fallback;delete this.dataset.fallback}else{this.onerror=null;this.src='${PLACEHOLDER}'}"></span>
         <span class="dh-plan-name dh-q${q}" title="${esc(row.name)}">${esc(row.name)}</span>
         <span class="dh-plan-step">
           <button type="button" class="dh-plan-step-btn" data-step="-1" ${it.qty <= 1 ? 'disabled' : ''} aria-label="减少数量">−</button>
@@ -1151,7 +1164,7 @@
     const sub = row.placement_cost != null ? (row.placement_cost * it.qty).toLocaleString() : '—';
     return `<tr data-rid="${it.record_id}">
       <td class="dh-pp-cb"><input type="checkbox" class="dh-pp-sel" data-rid="${it.record_id}" ${planPageSel.has(it.record_id) ? 'checked' : ''} aria-label="选择 ${esc(row.name)}"></td>
-      <td><span class="dh-pp-item"><img class="dh-pp-icon" src="${iconSrc(row)}" alt="" loading="lazy" onerror="this.onerror=null;this.src='${PLACEHOLDER}'"><span class="dh-pp-name dh-q${q}" title="${esc(row.name)}">${esc(row.name)}</span></span></td>
+      <td><span class="dh-pp-item"><img class="dh-pp-icon" src="${iconSrc(row)}" data-fallback="${iconFallback(row)}" alt="" loading="lazy" onerror="if(this.dataset.fallback){this.src=this.dataset.fallback;delete this.dataset.fallback}else{this.onerror=null;this.src='${PLACEHOLDER}'}"><span class="dh-pp-name dh-q${q}" title="${esc(row.name)}">${esc(row.name)}</span></span></td>
       <td class="dh-pp-src${src.unknown ? ' dh-src-unknown' : ''}" title="${esc(src.text)}">${esc(src.text)}</td>
       <td class="dh-pp-qty"><span class="dh-plan-step">
         <button type="button" class="dh-plan-step-btn" data-step="-1" ${it.qty <= 1 ? 'disabled' : ''} aria-label="减少数量">−</button>

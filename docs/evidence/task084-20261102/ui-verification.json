@@ -1,0 +1,269 @@
+{
+  "source": "offline fixture with real decorData.js; no DB connection",
+  "results": [
+    {
+      "width": 1366,
+      "id": 27684,
+      "src": "assets/decor-icons/model-previews/27684.png"
+    },
+    {
+      "width": 1366,
+      "id": 27220,
+      "src": "assets/decor-icons/model-previews/27220.png"
+    },
+    {
+      "width": 1366,
+      "id": 26881,
+      "src": "assets/decor-icons/model-previews/26881.png"
+    },
+    {
+      "width": 1366,
+      "id": 28432,
+      "src": "assets/decor-icons/model-previews/28432.png"
+    },
+    {
+      "width": 1366,
+      "id": 28557,
+      "src": "assets/decor-icons/model-previews/28557.png"
+    },
+    {
+      "width": 1366,
+      "id": 28435,
+      "src": "assets/decor-icons/model-previews/28435.png"
+    },
+    {
+      "width": 1366,
+      "id": 28469,
+      "src": "assets/decor-icons/model-previews/28469.png"
+    },
+    {
+      "width": 1366,
+      "id": 28470,
+      "src": "assets/decor-icons/model-previews/28470.png"
+    },
+    {
+      "width": 1366,
+      "id": 28471,
+      "src": "assets/decor-icons/model-previews/28471.png"
+    },
+    {
+      "width": 1366,
+      "id": 28495,
+      "src": "assets/decor-icons/model-previews/28495.png"
+    },
+    {
+      "width": 1366,
+      "id": 28319,
+      "src": "assets/decor-icons/model-previews/28319.png"
+    },
+    {
+      "width": 1366,
+      "id": 28475,
+      "src": "assets/decor-icons/model-previews/28475.png"
+    },
+    {
+      "width": 1366,
+      "id": 28569,
+      "src": "assets/decor-icons/model-previews/28569.png"
+    },
+    {
+      "width": 1366,
+      "id": 28482,
+      "src": "assets/decor-icons/model-previews/28482.png"
+    },
+    {
+      "width": 1366,
+      "id": 28354,
+      "src": "assets/decor-icons/model-previews/28354.png"
+    },
+    {
+      "width": 1366,
+      "id": 28324,
+      "src": "assets/decor-icons/model-previews/28324.png"
+    },
+    {
+      "width": 1366,
+      "id": 28559,
+      "src": "assets/decor-icons/model-previews/28559.png"
+    },
+    {
+      "width": 1366,
+      "id": 28326,
+      "src": "assets/decor-icons/model-previews/28326.png"
+    },
+    {
+      "width": 1366,
+      "id": 28327,
+      "src": "assets/decor-icons/model-previews/28327.png"
+    },
+    {
+      "width": 1366,
+      "id": 28512,
+      "src": "assets/decor-icons/model-previews/28512.png"
+    },
+    {
+      "width": 1366,
+      "id": 28556,
+      "src": "assets/decor-icons/model-previews/28556.png"
+    },
+    {
+      "width": 1366,
+      "id": 28547,
+      "src": "assets/decor-icons/model-previews/28547.png"
+    },
+    {
+      "width": 1366,
+      "id": 28510,
+      "src": "assets/decor-icons/model-previews/28510.png"
+    },
+    {
+      "width": 1366,
+      "id": 25325,
+      "src": "assets/decor-icons/model-previews/25325.png"
+    },
+    {
+      "width": 1366,
+      "id": 28540,
+      "src": "assets/decor-icons/model-previews/28540.png"
+    },
+    {
+      "width": 1366,
+      "id": 28336,
+      "src": "assets/decor-icons/model-previews/28336.png"
+    },
+    {
+      "width": 1920,
+      "id": 27684,
+      "src": "assets/decor-icons/model-previews/27684.png"
+    },
+    {
+      "width": 1920,
+      "id": 27220,
+      "src": "assets/decor-icons/model-previews/27220.png"
+    },
+    {
+      "width": 1920,
+      "id": 26881,
+      "src": "assets/decor-icons/model-previews/26881.png"
+    },
+    {
+      "width": 1920,
+      "id": 28432,
+      "src": "assets/decor-icons/model-previews/28432.png"
+    },
+    {
+      "width": 1920,
+      "id": 28557,
+      "src": "assets/decor-icons/model-previews/28557.png"
+    },
+    {
+      "width": 1920,
+      "id": 28435,
+      "src": "assets/decor-icons/model-previews/28435.png"
+    },
+    {
+      "width": 1920,
+      "id": 28469,
+      "src": "assets/decor-icons/model-previews/28469.png"
+    },
+    {
+      "width": 1920,
+      "id": 28470,
+      "src": "assets/decor-icons/model-previews/28470.png"
+    },
+    {
+      "width": 1920,
+      "id": 28471,
+      "src": "assets/decor-icons/model-previews/28471.png"
+    },
+    {
+      "width": 1920,
+      "id": 28495,
+      "src": "assets/decor-icons/model-previews/28495.png"
+    },
+    {
+      "width": 1920,
+      "id": 28319,
+      "src": "assets/decor-icons/model-previews/28319.png"
+    },
+    {
+      "width": 1920,
+      "id": 28475,
+      "src": "assets/decor-icons/model-previews/28475.png"
+    },
+    {
+      "width": 1920,
+      "id": 28569,
+      "src": "assets/decor-icons/model-previews/28569.png"
+    },
+    {
+      "width": 1920,
+      "id": 28482,
+      "src": "assets/decor-icons/model-previews/28482.png"
+    },
+    {
+      "width": 1920,
+      "id": 28354,
+      "src": "assets/decor-icons/model-previews/28354.png"
+    },
+    {
+      "width": 1920,
+      "id": 28324,
+      "src": "assets/decor-icons/model-previews/28324.png"
+    },
+    {
+      "width": 1920,
+      "id": 28559,
+      "src": "assets/decor-icons/model-previews/28559.png"
+    },
+    {
+      "width": 1920,
+      "id": 28326,
+      "src": "assets/decor-icons/model-previews/28326.png"
+    },
+    {
+      "width": 1920,
+      "id": 28327,
+      "src": "assets/decor-icons/model-previews/28327.png"
+    },
+    {
+      "width": 1920,
+      "id": 28512,
+      "src": "assets/decor-icons/model-previews/28512.png"
+    },
+    {
+      "width": 1920,
+      "id": 28556,
+      "src": "assets/decor-icons/model-previews/28556.png"
+    },
+    {
+      "width": 1920,
+      "id": 28547,
+      "src": "assets/decor-icons/model-previews/28547.png"
+    },
+    {
+      "width": 1920,
+      "id": 28510,
+      "src": "assets/decor-icons/model-previews/28510.png"
+    },
+    {
+      "width": 1920,
+      "id": 25325,
+      "src": "assets/decor-icons/model-previews/25325.png"
+    },
+    {
+      "width": 1920,
+      "id": 28540,
+      "src": "assets/decor-icons/model-previews/28540.png"
+    },
+    {
+      "width": 1920,
+      "id": 28336,
+      "src": "assets/decor-icons/model-previews/28336.png"
+    }
+  ],
+  "errors": [],
+  "fallbacks": 2,
+  "officialPriority": true,
+  "officialPngDecode": 24
+}

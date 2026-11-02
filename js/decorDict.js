@@ -178,7 +178,113 @@
     { key: 'indoor_only', label: '仅室内', match: r => r.indoors === true && r.outdoors !== true },
   ];
 
+  // #84：静态模型缩略图；新官方目录图优先，原物品图ID只作回退识别。
+  const MODEL_ICON_OVERRIDES = {
+    "28559": { "src": "assets/decor-icons/model-previews/28559.png", "fallbackIconId": 8179967 },
+  "27684": {
+    "src": "assets/decor-icons/model-previews/27684.png",
+    "fallbackIconId": 8168809
+  },
+  "27220": {
+    "src": "assets/decor-icons/model-previews/27220.png",
+    "fallbackIconId": 8140918
+  },
+  "26881": {
+    "src": "assets/decor-icons/model-previews/26881.png",
+    "fallbackIconId": 8033383
+  },
+  "28432": {
+    "src": "assets/decor-icons/model-previews/28432.png",
+    "fallbackIconId": 8179416
+  },
+  "28557": {
+    "src": "assets/decor-icons/model-previews/28557.png",
+    "fallbackIconId": 8179729
+  },
+  "28435": {
+    "src": "assets/decor-icons/model-previews/28435.png",
+    "fallbackIconId": 8179426
+  },
+  "28469": {
+    "src": "assets/decor-icons/model-previews/28469.png",
+    "fallbackIconId": 8148342
+  },
+  "28470": {
+    "src": "assets/decor-icons/model-previews/28470.png",
+    "fallbackIconId": 8174647
+  },
+  "28471": {
+    "src": "assets/decor-icons/model-previews/28471.png",
+    "fallbackIconId": 8174582
+  },
+  "28495": {
+    "src": "assets/decor-icons/model-previews/28495.png",
+    "fallbackIconId": 8148340
+  },
+  "28319": {
+    "src": "assets/decor-icons/model-previews/28319.png",
+    "fallbackIconId": 8179514
+  },
+  "28475": {
+    "src": "assets/decor-icons/model-previews/28475.png",
+    "fallbackIconId": 8174603
+  },
+  "28569": {
+    "src": "assets/decor-icons/model-previews/28569.png",
+    "fallbackIconId": 8179947
+  },
+  "28482": {
+    "src": "assets/decor-icons/model-previews/28482.png",
+    "fallbackIconId": 8174631
+  },
+  "28354": {
+    "src": "assets/decor-icons/model-previews/28354.png",
+    "fallbackIconId": 8179939
+  },
+  "28324": {
+    "src": "assets/decor-icons/model-previews/28324.png",
+    "fallbackIconId": 8179520
+  },
+  "28326": {
+    "src": "assets/decor-icons/model-previews/28326.png",
+    "fallbackIconId": 8179860
+  },
+  "28327": {
+    "src": "assets/decor-icons/model-previews/28327.png",
+    "fallbackIconId": 8179880
+  },
+  "28512": {
+    "src": "assets/decor-icons/model-previews/28512.png",
+    "fallbackIconId": 8148014
+  },
+  "28556": {
+    "src": "assets/decor-icons/model-previews/28556.png",
+    "fallbackIconId": 8179725
+  },
+  "28547": {
+    "src": "assets/decor-icons/model-previews/28547.png",
+    "fallbackIconId": 8179717
+  },
+  "28510": {
+    "src": "assets/decor-icons/model-previews/28510.png",
+    "fallbackIconId": 8148038
+  },
+  "25325": {
+    "src": "assets/decor-icons/model-previews/25325.png",
+    "fallbackIconId": 7949065
+  },
+  "28540": {
+    "src": "assets/decor-icons/model-previews/28540.png",
+    "fallbackIconId": 8180011
+  },
+  "28336": {
+    "src": "assets/decor-icons/model-previews/28336.png",
+    "fallbackIconId": 8179868
+  }
+};
+
   window.DecorDict = {
+    MODEL_ICON_OVERRIDES,
     CURRENCY_NAMES, ITEM_NAMES, TEXTURE_CURRENCY_NAMES,
     CATEGORY_NAMES, CATEGORY_FILTER_ORDER, SUBCATEGORY_NAMES,
     PET_SUBCATEGORY_ID, SIZE_NAMES, QUALITY_NAMES,

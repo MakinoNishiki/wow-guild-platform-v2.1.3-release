@@ -1,9 +1,10 @@
 """#83 离线生成来源候选与条件 SQL；零网络、零凭据。复用 #50 解析器。
 
-用法：python scripts/decor/build_task83_sources.py
+用法：python scripts/decor/build_task83_sources.py（默认核对 2026-11-02 真机扫描证据）
 任何解析异常均整行留待裁定，不发布不完整来源。不会改原始目录 JSON。
 """
 import json
+import argparse
 from collections import Counter
 from pathlib import Path
 from parse_source import parse_source_text
@@ -30,13 +31,28 @@ def literal(value):
 
 
 def main():
+    ap = argparse.ArgumentParser(description=__doc__)
+    ap.add_argument('--scan', type=Path, default=ROOT / 'data/task083/scan-evidence-20261102.json',
+                    help='已审核的 scan-evidence JSON；原文变化整行退出来源 SQL')
+    args = ap.parse_args()
     data = json.loads((ROOT / 'data/decor-catalog-12.1.5-new-items.json').read_text(encoding='utf-8'))
     ids = [r['record_id'] for r in data]
     if len(ids) != 251 or len(set(ids)) != 251 or not HOLIDAY_IDS <= set(ids):
         raise ValueError('目标集与 #76/#83 已核实基线不一致，停止生成')
-    ready, pending, audit = [], [], []
+    current = None
+    if args.scan:
+        scan = json.loads(args.scan.read_text(encoding='utf-8'))
+        current = {r['record_id']: r for r in scan['target_rows']}
+        if (scan['runMeta']['addon'] != '0.2.1' or scan['runMeta']['dataset'] != 'full'
+                or scan['failCount'] != 0 or scan['totalCount'] != scan['uniqueCount']
+                or scan['totalCount'] < len(ids) or set(current) != set(ids)
+                or len(scan['target_rows']) != len(ids)
+                or any(current[r['record_id']]['item_id'] != r['item_id'] for r in data)):
+            raise ValueError('扫描质量、目标集或物品身份不符，停止生成')
+    ready, pending, audit, review = [], [], [], []
     for row in sorted(data, key=lambda r: r['record_id']):
-        elements, anomalies = parse_source_text(row['source_text'])
+        observed = current[row['record_id']] if current is not None else row
+        elements, anomalies = parse_source_text(observed['source_text'])
         sources = [normalize(e) for e in elements]
         if not sources:
             anomalies.append('无可解析来源')
@@ -44,23 +60,33 @@ def main():
             # 仅表示已核实的节日归属，不声称全年均不可购买，不更改官方 tags。
             sources.append(dict(type='festival_note', note='万圣节装饰'))
         result = dict(record_id=row['record_id'], item_id=row['item_id'], name=row['name'],
-                      source_text=row['source_text'], sources=sources, anomalies=anomalies)
-        (pending if anomalies else ready).append(result)
+                      source_text=observed['source_text'], sources=sources, anomalies=anomalies)
+        if observed['source_text'] != row['source_text']:
+            # #83 禁止改 source_text；不能混用旧原文与新价格，整行单独送审。
+            result['previous_source_text'] = row['source_text']
+            result['reason'] = '当前客户端来源原文已变化，需另审 source_text 与 sources 同步补丁；未进 SQL'
+            review.append(result)
+        else:
+            (pending if anomalies else ready).append(result)
         if row['record_id'] in HOLIDAY_IDS:
             audit.append(dict(record_id=row['record_id'], item_id=row['item_id'], name=row['name'],
                               status='本地已存在', types=sorted({e['type'] for e in sources}),
-                              tag117=(row.get('tags') or {}).get('117')))
+                              tag117=(observed.get('tags') or {}).get('117'),
+                              publication='原文变化待审' if observed['source_text'] != row['source_text'] else '来源候选'))
     audit.append(dict(record_id=26013, item_id=282287, name='Scarecrow Pepe',
-                      status='本地缺失，待客户端扫描；未生成 INSERT'))
+                      status=('当前客户端扫描仍缺失；未生成 INSERT' if current is not None
+                              else '本地缺失，待客户端扫描；未生成 INSERT')))
     out = ROOT / 'data/task083'
     out.mkdir(exist_ok=True)
-    for name, value in [('sources-ready.json', ready), ('sources-pending.json', pending), ('halloween-audit.json', audit)]:
+    for name, value in [('sources-ready.json', ready), ('sources-pending.json', pending),
+                        ('sources-review.json', review), ('halloween-audit.json', audit)]:
         (out / name).write_text(json.dumps(value, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
     values = []
     for row in ready:
         values.append('(' + ','.join([str(row['record_id']), str(row['item_id']), literal(row['source_text']),
                                      literal(json.dumps(row['sources'], ensure_ascii=False)) + '::jsonb']) + ')')
-    sql = """-- #83 来源结构化草案：仅限本文件候选集；未执行。运营先备份目标行。
+    sql = f"-- 扫描证据 run_id={scan['runMeta']['run_id']} build={scan['runMeta']['build']}；来源原文未变 {len(ready)} 行；原文变化 {len(review)} 行已排除。\n"
+    sql += """-- #83 来源结构化草案：仅限本文件候选集；未执行。运营先备份目标行。
 -- 不插入 Scarecrow Pepe，不改 tags/source_text/icon_file_id，不触及旧目录。
 -- 任意异常会使事务失败并回滚；执行工具应设置遇错停止，禁止绕过 DO 检查。
 BEGIN;
@@ -98,6 +124,7 @@ COMMIT;
 """
     (ROOT / 'sql/task083_decor_sources.sql').write_text(sql, encoding='utf-8')
     print(json.dumps(dict(total=len(data), ready=len(ready), pending=len(pending),
+                          source_changed_review=len(review),
                           holiday_existing=len(audit)-1, holiday_missing=1,
                           types=dict(Counter(e['type'] for r in ready for e in r['sources']))), ensure_ascii=False))
 

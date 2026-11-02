@@ -1,0 +1,18 @@
+{
+  "models": 26,
+  "official_icons": 24,
+  "card_detail_checks": 52,
+  "fallback_checks": 2,
+  "new_official_icon_priority": true,
+  "sql_parse_statements": 15,
+  "sql_executed": true,
+  "sql_sha256": "9db501f0cb9199c417508b1484de538f06e90702c669530b8cf5a23c8c401d64",
+  "scope": "local build and offline browser fixture; authorized production SQL executed and independently read back; online browser validation timed out",
+  "production_before": 2313,
+  "production_after": 2335,
+  "production_verified_records": 2335,
+  "production_field_mismatches": 0,
+  "production_browser_validation": "timeout; not completed",
+  "frontend_deployed": false,
+  "production_report": "docs/TASK-083-生产执行报告-20261102.md"
+}
