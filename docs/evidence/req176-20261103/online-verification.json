@@ -1,0 +1,1696 @@
+{
+  "read_only": true,
+  "versions": [
+    "20261103.108"
+  ],
+  "scripts_match_local": {
+    "js/decorData.js": true,
+    "js/decorDict.js": true
+  },
+  "images": [
+    {
+      "record_id": 439,
+      "sha_matches": true
+    },
+    {
+      "record_id": 7,
+      "sha_matches": true
+    },
+    {
+      "record_id": 1,
+      "sha_matches": true
+    },
+    {
+      "record_id": 11,
+      "sha_matches": true
+    },
+    {
+      "record_id": 12,
+      "sha_matches": true
+    },
+    {
+      "record_id": 3,
+      "sha_matches": true
+    },
+    {
+      "record_id": 2,
+      "sha_matches": true
+    },
+    {
+      "record_id": 14,
+      "sha_matches": true
+    },
+    {
+      "record_id": 9,
+      "sha_matches": true
+    },
+    {
+      "record_id": 15,
+      "sha_matches": true
+    },
+    {
+      "record_id": 8,
+      "sha_matches": true
+    },
+    {
+      "record_id": 6,
+      "sha_matches": true
+    },
+    {
+      "record_id": 13,
+      "sha_matches": true
+    },
+    {
+      "record_id": 50,
+      "sha_matches": true
+    },
+    {
+      "record_id": 10,
+      "sha_matches": true
+    },
+    {
+      "record_id": 48,
+      "sha_matches": true
+    },
+    {
+      "record_id": 223,
+      "sha_matches": true
+    },
+    {
+      "record_id": 233,
+      "sha_matches": true
+    },
+    {
+      "record_id": 400,
+      "sha_matches": true
+    },
+    {
+      "record_id": 401,
+      "sha_matches": true
+    },
+    {
+      "record_id": 294,
+      "sha_matches": true
+    },
+    {
+      "record_id": 151,
+      "sha_matches": true
+    },
+    {
+      "record_id": 292,
+      "sha_matches": true
+    },
+    {
+      "record_id": 132,
+      "sha_matches": true
+    },
+    {
+      "record_id": 281,
+      "sha_matches": true
+    },
+    {
+      "record_id": 277,
+      "sha_matches": true
+    },
+    {
+      "record_id": 273,
+      "sha_matches": true
+    },
+    {
+      "record_id": 282,
+      "sha_matches": true
+    },
+    {
+      "record_id": 286,
+      "sha_matches": true
+    },
+    {
+      "record_id": 307,
+      "sha_matches": true
+    },
+    {
+      "record_id": 283,
+      "sha_matches": true
+    },
+    {
+      "record_id": 285,
+      "sha_matches": true
+    },
+    {
+      "record_id": 290,
+      "sha_matches": true
+    },
+    {
+      "record_id": 289,
+      "sha_matches": true
+    },
+    {
+      "record_id": 288,
+      "sha_matches": true
+    },
+    {
+      "record_id": 287,
+      "sha_matches": true
+    }
+  ],
+  "target_checks": [
+    {
+      "record_id": 1433,
+      "identity_raw_run_match": true,
+      "sources_match": true,
+      "empty": false
+    },
+    {
+      "record_id": 8992,
+      "identity_raw_run_match": true,
+      "sources_match": true,
+      "empty": false
+    },
+    {
+      "record_id": 15161,
+      "identity_raw_run_match": true,
+      "sources_match": true,
+      "empty": false
+    },
+    {
+      "record_id": 15491,
+      "identity_raw_run_match": true,
+      "sources_match": true,
+      "empty": false
+    },
+    {
+      "record_id": 15748,
+      "identity_raw_run_match": true,
+      "sources_match": true,
+      "empty": false
+    },
+    {
+      "record_id": 25129,
+      "identity_raw_run_match": true,
+      "sources_match": true,
+      "empty": false
+    },
+    {
+      "record_id": 439,
+      "identity_raw_run_match": true,
+      "sources_match": true,
+      "empty": false
+    },
+    {
+      "record_id": 223,
+      "identity_raw_run_match": true,
+      "sources_match": true,
+      "empty": false
+    },
+    {
+      "record_id": 233,
+      "identity_raw_run_match": true,
+      "sources_match": true,
+      "empty": false
+    },
+    {
+      "record_id": 400,
+      "identity_raw_run_match": true,
+      "sources_match": true,
+      "empty": false
+    },
+    {
+      "record_id": 401,
+      "identity_raw_run_match": true,
+      "sources_match": true,
+      "empty": false
+    },
+    {
+      "record_id": 294,
+      "identity_raw_run_match": true,
+      "sources_match": true,
+      "empty": false
+    },
+    {
+      "record_id": 151,
+      "identity_raw_run_match": true,
+      "sources_match": true,
+      "empty": false
+    },
+    {
+      "record_id": 292,
+      "identity_raw_run_match": true,
+      "sources_match": true,
+      "empty": false
+    },
+    {
+      "record_id": 132,
+      "identity_raw_run_match": true,
+      "sources_match": true,
+      "empty": false
+    },
+    {
+      "record_id": 281,
+      "identity_raw_run_match": true,
+      "sources_match": true,
+      "empty": false
+    },
+    {
+      "record_id": 277,
+      "identity_raw_run_match": true,
+      "sources_match": true,
+      "empty": false
+    },
+    {
+      "record_id": 273,
+      "identity_raw_run_match": true,
+      "sources_match": true,
+      "empty": false
+    },
+    {
+      "record_id": 282,
+      "identity_raw_run_match": true,
+      "sources_match": true,
+      "empty": false
+    },
+    {
+      "record_id": 286,
+      "identity_raw_run_match": true,
+      "sources_match": true,
+      "empty": false
+    },
+    {
+      "record_id": 307,
+      "identity_raw_run_match": true,
+      "sources_match": true,
+      "empty": false
+    },
+    {
+      "record_id": 283,
+      "identity_raw_run_match": true,
+      "sources_match": true,
+      "empty": false
+    },
+    {
+      "record_id": 285,
+      "identity_raw_run_match": true,
+      "sources_match": true,
+      "empty": false
+    },
+    {
+      "record_id": 290,
+      "identity_raw_run_match": true,
+      "sources_match": true,
+      "empty": false
+    },
+    {
+      "record_id": 289,
+      "identity_raw_run_match": true,
+      "sources_match": true,
+      "empty": false
+    },
+    {
+      "record_id": 288,
+      "identity_raw_run_match": true,
+      "sources_match": true,
+      "empty": false
+    },
+    {
+      "record_id": 287,
+      "identity_raw_run_match": true,
+      "sources_match": true,
+      "empty": false
+    }
+  ],
+  "previous_19_checks": [
+    {
+      "record_id": 764,
+      "identity_raw_run_match": true,
+      "sources_match": true,
+      "empty": false
+    },
+    {
+      "record_id": 925,
+      "identity_raw_run_match": true,
+      "sources_match": true,
+      "empty": false
+    },
+    {
+      "record_id": 1154,
+      "identity_raw_run_match": true,
+      "sources_match": true,
+      "empty": false
+    },
+    {
+      "record_id": 1261,
+      "identity_raw_run_match": true,
+      "sources_match": true,
+      "empty": false
+    },
+    {
+      "record_id": 1674,
+      "identity_raw_run_match": true,
+      "sources_match": true,
+      "empty": false
+    },
+    {
+      "record_id": 1730,
+      "identity_raw_run_match": true,
+      "sources_match": true,
+      "empty": false
+    },
+    {
+      "record_id": 2324,
+      "identity_raw_run_match": true,
+      "sources_match": true,
+      "empty": false
+    },
+    {
+      "record_id": 2431,
+      "identity_raw_run_match": true,
+      "sources_match": true,
+      "empty": false
+    },
+    {
+      "record_id": 2432,
+      "identity_raw_run_match": true,
+      "sources_match": true,
+      "empty": false
+    },
+    {
+      "record_id": 2434,
+      "identity_raw_run_match": true,
+      "sources_match": true,
+      "empty": false
+    },
+    {
+      "record_id": 2587,
+      "identity_raw_run_match": true,
+      "sources_match": true,
+      "empty": false
+    },
+    {
+      "record_id": 5796,
+      "identity_raw_run_match": true,
+      "sources_match": true,
+      "empty": false
+    },
+    {
+      "record_id": 8176,
+      "identity_raw_run_match": true,
+      "sources_match": true,
+      "empty": false
+    },
+    {
+      "record_id": 8238,
+      "identity_raw_run_match": true,
+      "sources_match": true,
+      "empty": false
+    },
+    {
+      "record_id": 9290,
+      "identity_raw_run_match": true,
+      "sources_match": true,
+      "empty": false
+    },
+    {
+      "record_id": 10368,
+      "identity_raw_run_match": true,
+      "sources_match": true,
+      "empty": false
+    },
+    {
+      "record_id": 11455,
+      "identity_raw_run_match": true,
+      "sources_match": true,
+      "empty": false
+    },
+    {
+      "record_id": 15583,
+      "identity_raw_run_match": true,
+      "sources_match": true,
+      "empty": false
+    },
+    {
+      "record_id": 15747,
+      "identity_raw_run_match": true,
+      "sources_match": true,
+      "empty": false
+    }
+  ],
+  "rows": [
+    {
+      "record_id": 132,
+      "item_id": null,
+      "name": "奥格瑞玛议事厅",
+      "entry_type": 2,
+      "sources": [
+        {
+          "type": "vendor",
+          "price": null,
+          "zones": [
+            "创始者之角、烈风海岸"
+          ],
+          "vendor": "最后的建筑师／住宅区走私商",
+          "context": [
+            {
+              "label": "购买说明",
+              "value": "本阵营房型向最后的建筑师购买；跨阵营房型向住宅区走私商购买"
+            },
+            {
+              "label": "解锁方式",
+              "value": "购买并使用对应房间图纸后学习"
+            },
+            {
+              "label": "售价",
+              "value": "12.1.5当前商人实价待核实"
+            }
+          ],
+          "reputation": null
+        }
+      ],
+      "source_text": "",
+      "run_id": "20261102-224408"
+    },
+    {
+      "record_id": 151,
+      "item_id": null,
+      "name": "奥格瑞玛石坑室",
+      "entry_type": 2,
+      "sources": [
+        {
+          "type": "vendor",
+          "price": null,
+          "zones": [
+            "创始者之角、烈风海岸"
+          ],
+          "vendor": "最后的建筑师／住宅区走私商",
+          "context": [
+            {
+              "label": "购买说明",
+              "value": "本阵营房型向最后的建筑师购买；跨阵营房型向住宅区走私商购买"
+            },
+            {
+              "label": "解锁方式",
+              "value": "购买并使用对应房间图纸后学习"
+            },
+            {
+              "label": "售价",
+              "value": "12.1.5当前商人实价待核实"
+            }
+          ],
+          "reputation": null
+        }
+      ],
+      "source_text": "",
+      "run_id": "20261102-224408"
+    },
+    {
+      "record_id": 223,
+      "item_id": null,
+      "name": "日光圆形房间",
+      "entry_type": 2,
+      "sources": [
+        {
+          "type": "unlock",
+          "unlock": "住宅等级 3 解锁",
+          "context": [
+            {
+              "label": "说明",
+              "value": "提升住宅等级后获得对应房间"
+            }
+          ]
+        }
+      ],
+      "source_text": "",
+      "run_id": "20261102-224408"
+    },
+    {
+      "record_id": 233,
+      "item_id": null,
+      "name": "夜光圆形房间",
+      "entry_type": 2,
+      "sources": [
+        {
+          "type": "unlock",
+          "unlock": "住宅等级 5 解锁",
+          "context": [
+            {
+              "label": "说明",
+              "value": "提升住宅等级后获得对应房间"
+            }
+          ]
+        }
+      ],
+      "source_text": "",
+      "run_id": "20261102-224408"
+    },
+    {
+      "record_id": 273,
+      "item_id": null,
+      "name": "暴风城军械库",
+      "entry_type": 2,
+      "sources": [
+        {
+          "type": "vendor",
+          "price": null,
+          "zones": [
+            "创始者之角、烈风海岸"
+          ],
+          "vendor": "最后的建筑师／住宅区走私商",
+          "context": [
+            {
+              "label": "购买说明",
+              "value": "本阵营房型向最后的建筑师购买；跨阵营房型向住宅区走私商购买"
+            },
+            {
+              "label": "解锁方式",
+              "value": "购买并使用对应房间图纸后学习"
+            },
+            {
+              "label": "售价",
+              "value": "12.1.5当前商人实价待核实"
+            }
+          ],
+          "reputation": null
+        }
+      ],
+      "source_text": "",
+      "run_id": "20261102-224408"
+    },
+    {
+      "record_id": 277,
+      "item_id": null,
+      "name": "暴风城厨房",
+      "entry_type": 2,
+      "sources": [
+        {
+          "type": "vendor",
+          "price": null,
+          "zones": [
+            "创始者之角、烈风海岸"
+          ],
+          "vendor": "最后的建筑师／住宅区走私商",
+          "context": [
+            {
+              "label": "购买说明",
+              "value": "本阵营房型向最后的建筑师购买；跨阵营房型向住宅区走私商购买"
+            },
+            {
+              "label": "解锁方式",
+              "value": "购买并使用对应房间图纸后学习"
+            },
+            {
+              "label": "售价",
+              "value": "12.1.5当前商人实价待核实"
+            }
+          ],
+          "reputation": null
+        }
+      ],
+      "source_text": "",
+      "run_id": "20261102-224408"
+    },
+    {
+      "record_id": 281,
+      "item_id": null,
+      "name": "暴风城陈列室",
+      "entry_type": 2,
+      "sources": [
+        {
+          "type": "vendor",
+          "price": null,
+          "zones": [
+            "创始者之角、烈风海岸"
+          ],
+          "vendor": "最后的建筑师／住宅区走私商",
+          "context": [
+            {
+              "label": "购买说明",
+              "value": "本阵营房型向最后的建筑师购买；跨阵营房型向住宅区走私商购买"
+            },
+            {
+              "label": "解锁方式",
+              "value": "购买并使用对应房间图纸后学习"
+            },
+            {
+              "label": "售价",
+              "value": "12.1.5当前商人实价待核实"
+            }
+          ],
+          "reputation": null
+        }
+      ],
+      "source_text": "",
+      "run_id": "20261102-224408"
+    },
+    {
+      "record_id": 282,
+      "item_id": null,
+      "name": "暴风城大厅",
+      "entry_type": 2,
+      "sources": [
+        {
+          "type": "vendor",
+          "price": null,
+          "zones": [
+            "创始者之角、烈风海岸"
+          ],
+          "vendor": "最后的建筑师／住宅区走私商",
+          "context": [
+            {
+              "label": "购买说明",
+              "value": "本阵营房型向最后的建筑师购买；跨阵营房型向住宅区走私商购买"
+            },
+            {
+              "label": "解锁方式",
+              "value": "购买并使用对应房间图纸后学习"
+            },
+            {
+              "label": "售价",
+              "value": "12.1.5当前商人实价待核实"
+            }
+          ],
+          "reputation": null
+        }
+      ],
+      "source_text": "",
+      "run_id": "20261102-224408"
+    },
+    {
+      "record_id": 283,
+      "item_id": null,
+      "name": "银月城军械库",
+      "entry_type": 2,
+      "sources": [
+        {
+          "type": "vendor",
+          "price": null,
+          "zones": [
+            "创始者之角、烈风海岸"
+          ],
+          "vendor": "最后的建筑师／住宅区走私商",
+          "context": [
+            {
+              "label": "购买说明",
+              "value": "本阵营房型向最后的建筑师购买；跨阵营房型向住宅区走私商购买"
+            },
+            {
+              "label": "解锁方式",
+              "value": "购买并使用对应房间图纸后学习"
+            },
+            {
+              "label": "售价",
+              "value": "12.1.5当前商人实价待核实"
+            }
+          ],
+          "reputation": null
+        }
+      ],
+      "source_text": "",
+      "run_id": "20261102-224408"
+    },
+    {
+      "record_id": 285,
+      "item_id": null,
+      "name": "银月城高层书房",
+      "entry_type": 2,
+      "sources": [
+        {
+          "type": "vendor",
+          "price": null,
+          "zones": [
+            "创始者之角、烈风海岸"
+          ],
+          "vendor": "最后的建筑师／住宅区走私商",
+          "context": [
+            {
+              "label": "购买说明",
+              "value": "本阵营房型向最后的建筑师购买；跨阵营房型向住宅区走私商购买"
+            },
+            {
+              "label": "解锁方式",
+              "value": "购买并使用对应房间图纸后学习"
+            },
+            {
+              "label": "售价",
+              "value": "12.1.5当前商人实价待核实"
+            }
+          ],
+          "reputation": null
+        }
+      ],
+      "source_text": "",
+      "run_id": "20261102-224408"
+    },
+    {
+      "record_id": 286,
+      "item_id": null,
+      "name": "银月城陈列室",
+      "entry_type": 2,
+      "sources": [
+        {
+          "type": "vendor",
+          "price": null,
+          "zones": [
+            "创始者之角、烈风海岸"
+          ],
+          "vendor": "最后的建筑师／住宅区走私商",
+          "context": [
+            {
+              "label": "购买说明",
+              "value": "本阵营房型向最后的建筑师购买；跨阵营房型向住宅区走私商购买"
+            },
+            {
+              "label": "解锁方式",
+              "value": "购买并使用对应房间图纸后学习"
+            },
+            {
+              "label": "售价",
+              "value": "12.1.5当前商人实价待核实"
+            }
+          ],
+          "reputation": null
+        }
+      ],
+      "source_text": "",
+      "run_id": "20261102-224408"
+    },
+    {
+      "record_id": 287,
+      "item_id": null,
+      "name": "贝拉梅斯神殿室",
+      "entry_type": 2,
+      "sources": [
+        {
+          "type": "vendor",
+          "price": null,
+          "zones": [
+            "创始者之角、烈风海岸"
+          ],
+          "vendor": "最后的建筑师／住宅区走私商",
+          "context": [
+            {
+              "label": "购买说明",
+              "value": "本阵营房型向最后的建筑师购买；跨阵营房型向住宅区走私商购买"
+            },
+            {
+              "label": "解锁方式",
+              "value": "购买并使用对应房间图纸后学习"
+            },
+            {
+              "label": "售价",
+              "value": "12.1.5当前商人实价待核实"
+            }
+          ],
+          "reputation": null
+        }
+      ],
+      "source_text": "",
+      "run_id": "20261102-224408"
+    },
+    {
+      "record_id": 288,
+      "item_id": null,
+      "name": "贝拉梅斯会议室",
+      "entry_type": 2,
+      "sources": [
+        {
+          "type": "vendor",
+          "price": null,
+          "zones": [
+            "创始者之角、烈风海岸"
+          ],
+          "vendor": "最后的建筑师／住宅区走私商",
+          "context": [
+            {
+              "label": "购买说明",
+              "value": "本阵营房型向最后的建筑师购买；跨阵营房型向住宅区走私商购买"
+            },
+            {
+              "label": "解锁方式",
+              "value": "购买并使用对应房间图纸后学习"
+            },
+            {
+              "label": "售价",
+              "value": "12.1.5当前商人实价待核实"
+            }
+          ],
+          "reputation": null
+        }
+      ],
+      "source_text": "",
+      "run_id": "20261102-224408"
+    },
+    {
+      "record_id": 289,
+      "item_id": null,
+      "name": "贝拉梅斯剧院",
+      "entry_type": 2,
+      "sources": [
+        {
+          "type": "vendor",
+          "price": null,
+          "zones": [
+            "创始者之角、烈风海岸"
+          ],
+          "vendor": "最后的建筑师／住宅区走私商",
+          "context": [
+            {
+              "label": "购买说明",
+              "value": "本阵营房型向最后的建筑师购买；跨阵营房型向住宅区走私商购买"
+            },
+            {
+              "label": "解锁方式",
+              "value": "购买并使用对应房间图纸后学习"
+            },
+            {
+              "label": "售价",
+              "value": "12.1.5当前商人实价待核实"
+            }
+          ],
+          "reputation": null
+        }
+      ],
+      "source_text": "",
+      "run_id": "20261102-224408"
+    },
+    {
+      "record_id": 290,
+      "item_id": null,
+      "name": "贝拉梅斯隐秘卧室",
+      "entry_type": 2,
+      "sources": [
+        {
+          "type": "vendor",
+          "price": null,
+          "zones": [
+            "创始者之角、烈风海岸"
+          ],
+          "vendor": "最后的建筑师／住宅区走私商",
+          "context": [
+            {
+              "label": "购买说明",
+              "value": "本阵营房型向最后的建筑师购买；跨阵营房型向住宅区走私商购买"
+            },
+            {
+              "label": "解锁方式",
+              "value": "购买并使用对应房间图纸后学习"
+            },
+            {
+              "label": "售价",
+              "value": "12.1.5当前商人实价待核实"
+            }
+          ],
+          "reputation": null
+        }
+      ],
+      "source_text": "",
+      "run_id": "20261102-224408"
+    },
+    {
+      "record_id": 292,
+      "item_id": null,
+      "name": "奥格瑞玛剧院",
+      "entry_type": 2,
+      "sources": [
+        {
+          "type": "vendor",
+          "price": null,
+          "zones": [
+            "创始者之角、烈风海岸"
+          ],
+          "vendor": "最后的建筑师／住宅区走私商",
+          "context": [
+            {
+              "label": "购买说明",
+              "value": "本阵营房型向最后的建筑师购买；跨阵营房型向住宅区走私商购买"
+            },
+            {
+              "label": "解锁方式",
+              "value": "购买并使用对应房间图纸后学习"
+            },
+            {
+              "label": "售价",
+              "value": "12.1.5当前商人实价待核实"
+            }
+          ],
+          "reputation": null
+        }
+      ],
+      "source_text": "",
+      "run_id": "20261102-224408"
+    },
+    {
+      "record_id": 294,
+      "item_id": null,
+      "name": "奥格瑞玛陈列室",
+      "entry_type": 2,
+      "sources": [
+        {
+          "type": "vendor",
+          "price": null,
+          "zones": [
+            "创始者之角、烈风海岸"
+          ],
+          "vendor": "最后的建筑师／住宅区走私商",
+          "context": [
+            {
+              "label": "购买说明",
+              "value": "本阵营房型向最后的建筑师购买；跨阵营房型向住宅区走私商购买"
+            },
+            {
+              "label": "解锁方式",
+              "value": "购买并使用对应房间图纸后学习"
+            },
+            {
+              "label": "售价",
+              "value": "12.1.5当前商人实价待核实"
+            }
+          ],
+          "reputation": null
+        }
+      ],
+      "source_text": "",
+      "run_id": "20261102-224408"
+    },
+    {
+      "record_id": 307,
+      "item_id": null,
+      "name": "银月城小型书房",
+      "entry_type": 2,
+      "sources": [
+        {
+          "type": "vendor",
+          "price": null,
+          "zones": [
+            "创始者之角、烈风海岸"
+          ],
+          "vendor": "最后的建筑师／住宅区走私商",
+          "context": [
+            {
+              "label": "购买说明",
+              "value": "本阵营房型向最后的建筑师购买；跨阵营房型向住宅区走私商购买"
+            },
+            {
+              "label": "解锁方式",
+              "value": "购买并使用对应房间图纸后学习"
+            },
+            {
+              "label": "售价",
+              "value": "12.1.5当前商人实价待核实"
+            }
+          ],
+          "reputation": null
+        }
+      ],
+      "source_text": "",
+      "run_id": "20261102-224408"
+    },
+    {
+      "record_id": 400,
+      "item_id": null,
+      "name": "秋日西部荒野谷仓",
+      "entry_type": 2,
+      "sources": [
+        {
+          "type": "vendor",
+          "price": null,
+          "zones": [
+            "创始者之角、烈风海岸"
+          ],
+          "vendor": "最后的建筑师／住宅区走私商",
+          "context": [
+            {
+              "label": "购买说明",
+              "value": "本阵营房型向最后的建筑师购买；跨阵营房型向住宅区走私商购买"
+            },
+            {
+              "label": "解锁方式",
+              "value": "购买并使用对应房间图纸后学习"
+            },
+            {
+              "label": "售价",
+              "value": "12.1.5当前商人实价待核实"
+            }
+          ],
+          "reputation": null
+        }
+      ],
+      "source_text": "",
+      "run_id": "20261102-224408"
+    },
+    {
+      "record_id": 401,
+      "item_id": null,
+      "name": "春日西部荒野谷仓",
+      "entry_type": 2,
+      "sources": [
+        {
+          "type": "vendor",
+          "price": null,
+          "zones": [
+            "创始者之角、烈风海岸"
+          ],
+          "vendor": "最后的建筑师／住宅区走私商",
+          "context": [
+            {
+              "label": "购买说明",
+              "value": "本阵营房型向最后的建筑师购买；跨阵营房型向住宅区走私商购买"
+            },
+            {
+              "label": "解锁方式",
+              "value": "购买并使用对应房间图纸后学习"
+            },
+            {
+              "label": "售价",
+              "value": "12.1.5当前商人实价待核实"
+            }
+          ],
+          "reputation": null
+        }
+      ],
+      "source_text": "",
+      "run_id": "20261102-224408"
+    },
+    {
+      "record_id": 439,
+      "item_id": null,
+      "name": "魂萦幽潮门厅",
+      "entry_type": 2,
+      "sources": [
+        {
+          "tag": "商城",
+          "type": "shop",
+          "context": [
+            {
+              "label": "礼包",
+              "value": "Haunted Grimtide Estate"
+            },
+            {
+              "label": "包含内容",
+              "value": "魂萦幽潮门厅（Spirited Grimtide Foyer）"
+            }
+          ]
+        }
+      ],
+      "source_text": "",
+      "run_id": "20261102-224408"
+    },
+    {
+      "record_id": 764,
+      "item_id": 245294,
+      "name": "议会护持的珠宝高脚杯",
+      "entry_type": 1,
+      "sources": [
+        {
+          "type": "event",
+          "event": "剧场巡演",
+          "source_label": "活动"
+        },
+        {
+          "type": "treasure",
+          "zones": [
+            "多恩岛"
+          ],
+          "treasure": "业余演员的宝箱、杰出演员的宝箱"
+        }
+      ],
+      "source_text": "|cFFFFD200活动：|r剧场巡演|n|cFFFFD200宝藏：|r业余演员的宝箱、杰出演员的宝箱|n|cFFFFD200地区：|r多恩岛|n|n",
+      "run_id": "20261102-224408"
+    },
+    {
+      "record_id": 925,
+      "item_id": 241043,
+      "name": "艾洛多尔桶",
+      "entry_type": 1,
+      "sources": [
+        {
+          "type": "quest",
+          "quest": "突袭沙塔斯港口",
+          "zones": [
+            "塔拉多"
+          ],
+          "source_label": "要塞任务"
+        }
+      ],
+      "source_text": "|cFFFFD200要塞任务：|r突袭沙塔斯港口|n|cFFFFD200地区：|r塔拉多|n",
+      "run_id": "20261102-224408"
+    },
+    {
+      "record_id": 1154,
+      "item_id": 253481,
+      "name": "精湛的辛多雷墓碑",
+      "entry_type": 1,
+      "sources": [
+        {
+          "type": "quest",
+          "quest": "精选之礼",
+          "zones": [
+            "创始者之角、烈风海岸"
+          ],
+          "context": [
+            {
+              "label": "物品",
+              "value": "奥术秘藏光球"
+            }
+          ],
+          "source_label": "周常任务"
+        }
+      ],
+      "source_text": "|cFFFFD200周常任务：|r精选之礼|n|cFFFFD200物品：|r奥术秘藏光球|n|cFFFFD200地区：|r创始者之角、烈风海岸",
+      "run_id": "20261102-224408"
+    },
+    {
+      "record_id": 1261,
+      "item_id": 245320,
+      "name": "非常可靠的安德麦路灯",
+      "entry_type": 1,
+      "sources": [
+        {
+          "type": "event",
+          "event": "货运与接收",
+          "zones": [
+            "安德麦"
+          ],
+          "context": [
+            {
+              "label": "工作",
+              "value": "法定休假"
+            }
+          ],
+          "source_label": "活动"
+        }
+      ],
+      "source_text": "|cFFFFD200活动：|r货运与接收|n|cFFFFD200工作：|r法定休假|n|cFFFFD200地区：|r安德麦",
+      "run_id": "20261102-224408"
+    },
+    {
+      "record_id": 1433,
+      "item_id": 244350,
+      "name": "碎裂的阿曼尼仪式瓮",
+      "entry_type": 1,
+      "sources": [
+        {
+          "drop": "世界生物",
+          "type": "drop",
+          "zones": []
+        },
+        {
+          "type": "treasure",
+          "zones": [],
+          "context": [
+            {
+              "label": "待核实来源",
+              "value": "采集：世界错放的宝藏节点"
+            }
+          ],
+          "treasure": "世界古代储物箱掉落"
+        }
+      ],
+      "source_text": "|cFFFFD200掉落：|r世界生物|n|n|cFFFFD200宝藏：|r世界|cffA335EE古代储物箱掉落|n|n|cFFFFD200采集：|r世界错放的宝藏节点",
+      "run_id": "20261102-224408"
+    },
+    {
+      "record_id": 1674,
+      "item_id": 244852,
+      "name": "龙母的徽记",
+      "entry_type": 1,
+      "sources": [
+        {
+          "type": "achievement",
+          "context": [
+            {
+              "label": "物品",
+              "value": "货真价实、如假包换的龙母的徽记"
+            },
+            {
+              "label": "相关商人",
+              "value": "埃克斯勒（尘泥沼泽） · 250 金"
+            }
+          ],
+          "category": "巫妖王团队",
+          "achievement": "上痛！上诅咒！上钉刺！（25人）"
+        }
+      ],
+      "source_text": "|cFFFFD200成就：|r上痛！上诅咒！上钉刺！（25人）|n|cFFFFD200分类：|r巫妖王团队|n|n|cFFFFD200物品：|r货真价实、如假包换的龙母的徽记|n|cFFFFD200商人出售：|r埃克斯勒|n|cFFFFD200地区：|r尘泥沼泽|n|cFFFFD200价格：|r250|TINTERFACE\\MONEYFRAME\\UI-GOLDICON.BLP:0|t|n",
+      "run_id": "20261102-224408"
+    },
+    {
+      "record_id": 1730,
+      "item_id": 245539,
+      "name": "优雅的附魔梳妆台",
+      "entry_type": 1,
+      "sources": [
+        {
+          "type": "quest",
+          "quest": "精选之礼",
+          "zones": [
+            "创始者之角、烈风海岸"
+          ],
+          "context": [
+            {
+              "label": "物品",
+              "value": "奥术秘藏光球"
+            }
+          ],
+          "source_label": "周常任务"
+        }
+      ],
+      "source_text": "|cFFFFD200周常任务：|r精选之礼|n|cFFFFD200物品：|r奥术秘藏光球|n|cFFFFD200地区：|r创始者之角、烈风海岸",
+      "run_id": "20261102-224408"
+    },
+    {
+      "record_id": 2324,
+      "item_id": 246481,
+      "name": "退役的工业化侏儒抓取者",
+      "entry_type": 1,
+      "sources": [
+        {
+          "type": "event",
+          "event": "日常任务",
+          "zones": [
+            "麦卡贡"
+          ],
+          "context": [
+            {
+              "label": "物品",
+              "value": "自动拼装式家具包"
+            }
+          ],
+          "source_label": "活动"
+        }
+      ],
+      "source_text": "|cFFFFD200活动：|r日常任务|n|cFFFFD200物品：|r自动拼装式家具包|n|cFFFFD200地区：|r麦卡贡",
+      "run_id": "20261102-224408"
+    },
+    {
+      "record_id": 2431,
+      "item_id": 246599,
+      "name": "自行密封的高脚桶",
+      "entry_type": 1,
+      "sources": [
+        {
+          "type": "event",
+          "event": "日常任务",
+          "zones": [
+            "麦卡贡"
+          ],
+          "context": [
+            {
+              "label": "物品",
+              "value": "自动拼装式家具包"
+            }
+          ],
+          "source_label": "活动"
+        }
+      ],
+      "source_text": "|cFFFFD200活动：|r日常任务|n|cFFFFD200物品：|r自动拼装式家具包|n|cFFFFD200地区：|r麦卡贡",
+      "run_id": "20261102-224408"
+    },
+    {
+      "record_id": 2432,
+      "item_id": 246600,
+      "name": "小型机械箱子",
+      "entry_type": 1,
+      "sources": [
+        {
+          "type": "event",
+          "event": "日常任务",
+          "zones": [
+            "麦卡贡"
+          ],
+          "context": [
+            {
+              "label": "物品",
+              "value": "自动拼装式家具包"
+            }
+          ],
+          "source_label": "活动"
+        }
+      ],
+      "source_text": "|cFFFFD200活动：|r日常任务|n|cFFFFD200物品：|r自动拼装式家具包|n|cFFFFD200地区：|r麦卡贡",
+      "run_id": "20261102-224408"
+    },
+    {
+      "record_id": 2434,
+      "item_id": 246602,
+      "name": "小型家居齿轮",
+      "entry_type": 1,
+      "sources": [
+        {
+          "type": "event",
+          "event": "日常任务",
+          "zones": [
+            "麦卡贡"
+          ],
+          "context": [
+            {
+              "label": "物品",
+              "value": "自动拼装式家具包"
+            }
+          ],
+          "source_label": "活动"
+        }
+      ],
+      "source_text": "|cFFFFD200活动：|r日常任务|n|cFFFFD200物品：|r自动拼装式家具包|n|cFFFFD200地区：|r麦卡贡",
+      "run_id": "20261102-224408"
+    },
+    {
+      "record_id": 2587,
+      "item_id": 246958,
+      "name": "精工真菌排式盆栽",
+      "entry_type": 1,
+      "sources": [
+        {
+          "type": "quest",
+          "quest": "精选之礼",
+          "zones": [
+            "创始者之角、烈风海岸"
+          ],
+          "context": [
+            {
+              "label": "物品",
+              "value": "奥术秘藏光球"
+            }
+          ],
+          "source_label": "周常任务"
+        }
+      ],
+      "source_text": "|cFFFFD200周常任务：|r精选之礼|n|cFFFFD200物品：|r奥术秘藏光球|n|cFFFFD200地区：|r创始者之角、烈风海岸",
+      "run_id": "20261102-224408"
+    },
+    {
+      "record_id": 5796,
+      "item_id": 249923,
+      "name": "辛多雷黄金迎宾",
+      "entry_type": 1,
+      "sources": [
+        {
+          "type": "quest",
+          "quest": "精选之礼",
+          "zones": [
+            "创始者之角、烈风海岸"
+          ],
+          "context": [
+            {
+              "label": "物品",
+              "value": "奥术秘藏光球"
+            }
+          ],
+          "source_label": "周常任务"
+        }
+      ],
+      "source_text": "|cFFFFD200周常任务：|r精选之礼|n|cFFFFD200物品：|r奥术秘藏光球|n|cFFFFD200地区：|r创始者之角、烈风海岸",
+      "run_id": "20261102-224408"
+    },
+    {
+      "record_id": 8176,
+      "item_id": 251329,
+      "name": "影月开放式棚屋",
+      "entry_type": 1,
+      "sources": [
+        {
+          "type": "quest",
+          "quest": "突击索克雷萨高地",
+          "zones": [
+            "影月谷"
+          ],
+          "source_label": "要塞任务"
+        }
+      ],
+      "source_text": "|cFFFFD200要塞任务：|r突击索克雷萨高地|n|cFFFFD200地区：|r影月谷",
+      "run_id": "20261102-224408"
+    },
+    {
+      "record_id": 8238,
+      "item_id": 251547,
+      "name": "德莱尼农夫的篱笆",
+      "entry_type": 1,
+      "sources": [
+        {
+          "type": "quest",
+          "quest": "突袭沙塔斯市中心",
+          "zones": [
+            "塔拉多"
+          ],
+          "source_label": "要塞任务"
+        }
+      ],
+      "source_text": "|cFFFFD200要塞任务：|r突袭沙塔斯市中心|n|cFFFFD200地区：|r塔拉多|n",
+      "run_id": "20261102-224408"
+    },
+    {
+      "record_id": 8992,
+      "item_id": 252044,
+      "name": "阿曼尼兽角杯",
+      "entry_type": 1,
+      "sources": [
+        {
+          "drop": "世界生物",
+          "type": "drop",
+          "zones": []
+        },
+        {
+          "type": "treasure",
+          "zones": [],
+          "context": [
+            {
+              "label": "待核实来源",
+              "value": "采集：世界错放的宝藏节点"
+            }
+          ],
+          "treasure": "世界古代储物箱掉落"
+        }
+      ],
+      "source_text": "|cFFFFD200掉落：|r世界生物|n|n|cFFFFD200宝藏：|r世界|cffA335EE古代储物箱掉落|n|n|cFFFFD200采集：|r世界错放的宝藏节点",
+      "run_id": "20261102-224408"
+    },
+    {
+      "record_id": 9290,
+      "item_id": 253397,
+      "name": "崇敬的深石桌",
+      "entry_type": 1,
+      "sources": [
+        {
+          "type": "quest",
+          "quest": "精选之礼",
+          "zones": [
+            "创始者之角、烈风海岸"
+          ],
+          "context": [
+            {
+              "label": "物品",
+              "value": "奥术秘藏光球"
+            }
+          ],
+          "source_label": "周常任务"
+        }
+      ],
+      "source_text": "|cFFFFD200周常任务：|r精选之礼|n|cFFFFD200物品：|r奥术秘藏光球|n|cFFFFD200地区：|r创始者之角、烈风海岸",
+      "run_id": "20261102-224408"
+    },
+    {
+      "record_id": 10368,
+      "item_id": 254561,
+      "name": "食人魔勇士的珍贵颅骨",
+      "entry_type": 1,
+      "sources": [
+        {
+          "type": "quest",
+          "quest": "精选之礼",
+          "zones": [
+            "创始者之角、烈风海岸"
+          ],
+          "context": [
+            {
+              "label": "物品",
+              "value": "奥术秘藏光球"
+            }
+          ],
+          "source_label": "周常任务"
+        }
+      ],
+      "source_text": "|cFFFFD200周常任务：|r精选之礼|n|cFFFFD200物品：|r奥术秘藏光球|n|cFFFFD200地区：|r创始者之角、烈风海岸",
+      "run_id": "20261102-224408"
+    },
+    {
+      "record_id": 11455,
+      "item_id": 257353,
+      "name": "枯竭的迦拉克隆幽暗之心",
+      "entry_type": 1,
+      "sources": [
+        {
+          "type": "achievement",
+          "context": [
+            {
+              "label": "物品",
+              "value": "伪造的迦拉克隆幽暗之心"
+            }
+          ],
+          "category": "特色更新",
+          "achievement": "地心寻魂"
+        },
+        {
+          "type": "vendor",
+          "price": [
+            {
+              "amount": 15000,
+              "currency_id": 2815
+            }
+          ],
+          "zones": [
+            "安德麦"
+          ],
+          "vendor": "斯塔克斯·紧身",
+          "reputation": null
+        }
+      ],
+      "source_text": "|cFFFFD200成就：|r地心寻魂|n|cFFFFD200分类：|r特色更新|n|n|cFFFFD200物品：|r伪造的迦拉克隆幽暗之心|n|cFFFFD200商人出售：|r斯塔克斯·紧身|n|cFFFFD200地区：|r安德麦|n|cFFFFD200价格：|r15000|Hcurrency:2815|h|TInterface\\ICONS\\SPELL_AZERITE_ESSENCE14.BLP:0|t|h",
+      "run_id": "20261102-224408"
+    },
+    {
+      "record_id": 15161,
+      "item_id": 263321,
+      "name": "破旧的阿曼尼供品篮",
+      "entry_type": 1,
+      "sources": [
+        {
+          "drop": "世界生物",
+          "type": "drop",
+          "zones": []
+        },
+        {
+          "type": "treasure",
+          "zones": [],
+          "context": [
+            {
+              "label": "待核实来源",
+              "value": "采集：世界错放的宝藏节点"
+            }
+          ],
+          "treasure": "世界古代储物箱掉落"
+        }
+      ],
+      "source_text": "|cFFFFD200掉落：|r世界生物|n|n|cFFFFD200宝藏：|r世界|cffA335EE古代储物箱掉落|n|n|cFFFFD200采集：|r世界错放的宝藏节点",
+      "run_id": "20261102-224408"
+    },
+    {
+      "record_id": 15491,
+      "item_id": 264256,
+      "name": "壁挂式阿曼尼动物战利品",
+      "entry_type": 1,
+      "sources": [
+        {
+          "drop": "世界生物",
+          "type": "drop",
+          "zones": []
+        },
+        {
+          "type": "treasure",
+          "zones": [],
+          "context": [
+            {
+              "label": "待核实来源",
+              "value": "采集：世界错放的宝藏节点"
+            }
+          ],
+          "treasure": "世界古代储物箱掉落"
+        }
+      ],
+      "source_text": "|cFFFFD200掉落：|r世界生物|n|n|cFFFFD200宝藏：|r世界|cffA335EE古代储物箱掉落|n|n|cFFFFD200采集：|r世界错放的宝藏节点",
+      "run_id": "20261102-224408"
+    },
+    {
+      "record_id": 15583,
+      "item_id": 264343,
+      "name": "宇宙虚空引力宝珠",
+      "entry_type": 1,
+      "sources": [
+        {
+          "type": "event",
+          "event": "斯托玛兰突袭战",
+          "source_label": "活动"
+        },
+        {
+          "type": "treasure",
+          "zones": [
+            "虚影风暴"
+          ],
+          "treasure": "胜利的斯托玛兰巅峰之箱"
+        }
+      ],
+      "source_text": "|cFFFFD200活动：|r斯托玛兰突袭战|n|cFFFFD200宝藏：|r胜利的斯托玛兰巅峰之箱|n|cFFFFD200地区：|r虚影风暴",
+      "run_id": "20261102-224408"
+    },
+    {
+      "record_id": 15747,
+      "item_id": 264483,
+      "name": "宇宙虚空营火",
+      "entry_type": 1,
+      "sources": [
+        {
+          "type": "event",
+          "event": "斯托玛兰突袭战",
+          "source_label": "活动"
+        },
+        {
+          "type": "treasure",
+          "zones": [
+            "虚影风暴"
+          ],
+          "treasure": "胜利的斯托玛兰巅峰之箱"
+        }
+      ],
+      "source_text": "|cFFFFD200活动：|r斯托玛兰突袭战|n|cFFFFD200宝藏：|r胜利的斯托玛兰巅峰之箱|n|cFFFFD200地区：|r虚影风暴",
+      "run_id": "20261102-224408"
+    },
+    {
+      "record_id": 15748,
+      "item_id": 264484,
+      "name": "蓝色阿曼尼挂毯",
+      "entry_type": 1,
+      "sources": [
+        {
+          "drop": "世界生物",
+          "type": "drop",
+          "zones": []
+        },
+        {
+          "type": "treasure",
+          "zones": [],
+          "context": [
+            {
+              "label": "待核实来源",
+              "value": "采集：世界错放的宝藏节点"
+            }
+          ],
+          "treasure": "世界古代储物箱掉落"
+        }
+      ],
+      "source_text": "|cFFFFD200掉落：|r世界生物|n|n|cFFFFD200宝藏：|r世界|cffA335EE古代储物箱掉落|n|n|cFFFFD200采集：|r世界错放的宝藏节点",
+      "run_id": "20261102-224408"
+    },
+    {
+      "record_id": 25129,
+      "item_id": 284359,
+      "name": "锈蚀的阿曼尼灯台",
+      "entry_type": 1,
+      "sources": [
+        {
+          "drop": "世界生物",
+          "type": "drop",
+          "zones": []
+        },
+        {
+          "type": "treasure",
+          "zones": [],
+          "context": [
+            {
+              "label": "待核实来源",
+              "value": "采集：世界错放的宝藏节点"
+            }
+          ],
+          "treasure": "世界古代储物箱掉落"
+        }
+      ],
+      "source_text": "|cFFFFD200掉落：|r世界生物|n|n|cFFFFD200宝藏：|r世界|cffA335EE古代储物箱掉落|n|n|cFFFFD200采集：|r世界错放的宝藏节点",
+      "run_id": "20261102-224408"
+    }
+  ]
+}

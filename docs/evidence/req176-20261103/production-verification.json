@@ -1,0 +1,67 @@
+{
+  "executed": true,
+  "verification": {
+    "count": 2335,
+    "mismatch_ids": [],
+    "mismatch_count": 0,
+    "changed_record_ids": [
+      132,
+      151,
+      223,
+      233,
+      273,
+      277,
+      281,
+      282,
+      283,
+      285,
+      286,
+      287,
+      288,
+      289,
+      290,
+      292,
+      294,
+      307,
+      400,
+      401,
+      439,
+      1433,
+      8992,
+      15161,
+      15491,
+      15748,
+      25129
+    ],
+    "changed_count": 27,
+    "non_source_fields_changed": 0,
+    "previous_19_unchanged": true,
+    "empty_before": 62,
+    "empty_after": 35
+  },
+  "previous_unclassified_3_unchanged": true,
+  "pending_room_19_unchanged": true,
+  "source_type_counts": {
+    "quest": 339,
+    "vendor": 1753,
+    "unlock": 2,
+    "shop": 89,
+    "drop": 90,
+    "event": 9,
+    "treasure": 26,
+    "profession": 352,
+    "achievement": 186,
+    "festival_note": 29
+  },
+  "backup_hashes": {
+    "catalog-before.json": "f9a952b5d9d7fc1e0a19ad017cadafcfcc003f87f56108d0987c3660640b0c85",
+    "catalog-after.json": "8677ef493982b499da495322d9545bf79cc71fbdf1a1cc1434d94e334aff175f",
+    "expected-after.json": "3d2d7fe26956ee712e80ba8c69c81731f3d9d744b3b65812dfe45efdcdf59f10",
+    "partial-execution.log": "e6b9b00336f352a2540355ef36a0cca0b5c4dea03122534ef0b7a742c08955a6",
+    "rooms-execution.log": "b72899819343918b0097833f2ecdf3167cae28a6b3fcfe536dd72700998d9122"
+  },
+  "sql_hashes": {
+    "sql/task083_sources_partial_6.sql": "40857d9453ad1398d10ddd31707cfb3e656c1dab6d02cdea5ff0e372539c80d4",
+    "sql/req176_room_sources_21.sql": "473d7cebbe3492ba02f1423eb901fa5fdc407c0b60698375c3f9b581fe0b0d6e"
+  }
+}
