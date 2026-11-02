@@ -85,6 +85,11 @@ let browser;
         await page.locator('#dhSrcChips button').filter({hasText:new RegExp('^'+labels[type])}).click();
         assert.equal(await page.locator(`.dh-card[data-rid="${r.record_id}"]`).count(),1);
       }
+      if (r.record_id === 1674) {
+        await page.locator('#dhSrcChips button').filter({hasText:/^商人/}).click();
+        assert.equal(await page.locator('.dh-card[data-rid="1674"]').count(),0,
+          '龙母家具应归成就，相关商人只保留说明');
+      }
     }
     await page.locator('#dhSrcChips button').first().click();
     for (const r of report.pending) {

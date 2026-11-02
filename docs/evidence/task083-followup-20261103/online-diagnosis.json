@@ -1,0 +1,564 @@
+{
+  "read_only": true,
+  "frontend_versions": [
+    "20261103.107"
+  ],
+  "frontend_context_support": true,
+  "frontend_matches_local": true,
+  "catalog_total": 2335,
+  "empty_sources": 62,
+  "source_type_counts": {
+    "quest": 339,
+    "vendor": 1735,
+    "drop": 84,
+    "treasure": 20,
+    "event": 9,
+    "profession": 352,
+    "achievement": 186,
+    "shop": 88,
+    "festival_note": 29
+  },
+  "target_checks": [
+    {
+      "record_id": 764,
+      "identity_raw_run_match": true,
+      "sources_match": true,
+      "empty_sources": false
+    },
+    {
+      "record_id": 925,
+      "identity_raw_run_match": true,
+      "sources_match": true,
+      "empty_sources": false
+    },
+    {
+      "record_id": 1154,
+      "identity_raw_run_match": true,
+      "sources_match": true,
+      "empty_sources": false
+    },
+    {
+      "record_id": 1261,
+      "identity_raw_run_match": true,
+      "sources_match": true,
+      "empty_sources": false
+    },
+    {
+      "record_id": 1674,
+      "identity_raw_run_match": true,
+      "sources_match": true,
+      "empty_sources": false
+    },
+    {
+      "record_id": 1730,
+      "identity_raw_run_match": true,
+      "sources_match": true,
+      "empty_sources": false
+    },
+    {
+      "record_id": 2324,
+      "identity_raw_run_match": true,
+      "sources_match": true,
+      "empty_sources": false
+    },
+    {
+      "record_id": 2431,
+      "identity_raw_run_match": true,
+      "sources_match": true,
+      "empty_sources": false
+    },
+    {
+      "record_id": 2432,
+      "identity_raw_run_match": true,
+      "sources_match": true,
+      "empty_sources": false
+    },
+    {
+      "record_id": 2434,
+      "identity_raw_run_match": true,
+      "sources_match": true,
+      "empty_sources": false
+    },
+    {
+      "record_id": 2587,
+      "identity_raw_run_match": true,
+      "sources_match": true,
+      "empty_sources": false
+    },
+    {
+      "record_id": 5796,
+      "identity_raw_run_match": true,
+      "sources_match": true,
+      "empty_sources": false
+    },
+    {
+      "record_id": 8176,
+      "identity_raw_run_match": true,
+      "sources_match": true,
+      "empty_sources": false
+    },
+    {
+      "record_id": 8238,
+      "identity_raw_run_match": true,
+      "sources_match": true,
+      "empty_sources": false
+    },
+    {
+      "record_id": 9290,
+      "identity_raw_run_match": true,
+      "sources_match": true,
+      "empty_sources": false
+    },
+    {
+      "record_id": 10368,
+      "identity_raw_run_match": true,
+      "sources_match": true,
+      "empty_sources": false
+    },
+    {
+      "record_id": 11455,
+      "identity_raw_run_match": true,
+      "sources_match": true,
+      "empty_sources": false
+    },
+    {
+      "record_id": 15583,
+      "identity_raw_run_match": true,
+      "sources_match": true,
+      "empty_sources": false
+    },
+    {
+      "record_id": 15747,
+      "identity_raw_run_match": true,
+      "sources_match": true,
+      "empty_sources": false
+    }
+  ],
+  "rows": [
+    {
+      "record_id": 764,
+      "item_id": 245294,
+      "name": "议会护持的珠宝高脚杯",
+      "sources": [
+        {
+          "type": "event",
+          "event": "剧场巡演",
+          "source_label": "活动"
+        },
+        {
+          "type": "treasure",
+          "zones": [
+            "多恩岛"
+          ],
+          "treasure": "业余演员的宝箱、杰出演员的宝箱"
+        }
+      ],
+      "source_text": "|cFFFFD200活动：|r剧场巡演|n|cFFFFD200宝藏：|r业余演员的宝箱、杰出演员的宝箱|n|cFFFFD200地区：|r多恩岛|n|n",
+      "run_id": "20261102-224408"
+    },
+    {
+      "record_id": 925,
+      "item_id": 241043,
+      "name": "艾洛多尔桶",
+      "sources": [
+        {
+          "type": "quest",
+          "quest": "突袭沙塔斯港口",
+          "zones": [
+            "塔拉多"
+          ],
+          "source_label": "要塞任务"
+        }
+      ],
+      "source_text": "|cFFFFD200要塞任务：|r突袭沙塔斯港口|n|cFFFFD200地区：|r塔拉多|n",
+      "run_id": "20261102-224408"
+    },
+    {
+      "record_id": 1154,
+      "item_id": 253481,
+      "name": "精湛的辛多雷墓碑",
+      "sources": [
+        {
+          "type": "quest",
+          "quest": "精选之礼",
+          "zones": [
+            "创始者之角、烈风海岸"
+          ],
+          "context": [
+            {
+              "label": "物品",
+              "value": "奥术秘藏光球"
+            }
+          ],
+          "source_label": "周常任务"
+        }
+      ],
+      "source_text": "|cFFFFD200周常任务：|r精选之礼|n|cFFFFD200物品：|r奥术秘藏光球|n|cFFFFD200地区：|r创始者之角、烈风海岸",
+      "run_id": "20261102-224408"
+    },
+    {
+      "record_id": 1261,
+      "item_id": 245320,
+      "name": "非常可靠的安德麦路灯",
+      "sources": [
+        {
+          "type": "event",
+          "event": "货运与接收",
+          "zones": [
+            "安德麦"
+          ],
+          "context": [
+            {
+              "label": "工作",
+              "value": "法定休假"
+            }
+          ],
+          "source_label": "活动"
+        }
+      ],
+      "source_text": "|cFFFFD200活动：|r货运与接收|n|cFFFFD200工作：|r法定休假|n|cFFFFD200地区：|r安德麦",
+      "run_id": "20261102-224408"
+    },
+    {
+      "record_id": 1674,
+      "item_id": 244852,
+      "name": "龙母的徽记",
+      "sources": [
+        {
+          "type": "achievement",
+          "context": [
+            {
+              "label": "物品",
+              "value": "货真价实、如假包换的龙母的徽记"
+            },
+            {
+              "label": "相关商人",
+              "value": "埃克斯勒（尘泥沼泽） · 250 金"
+            }
+          ],
+          "category": "巫妖王团队",
+          "achievement": "上痛！上诅咒！上钉刺！（25人）"
+        }
+      ],
+      "source_text": "|cFFFFD200成就：|r上痛！上诅咒！上钉刺！（25人）|n|cFFFFD200分类：|r巫妖王团队|n|n|cFFFFD200物品：|r货真价实、如假包换的龙母的徽记|n|cFFFFD200商人出售：|r埃克斯勒|n|cFFFFD200地区：|r尘泥沼泽|n|cFFFFD200价格：|r250|TINTERFACE\\MONEYFRAME\\UI-GOLDICON.BLP:0|t|n",
+      "run_id": "20261102-224408"
+    },
+    {
+      "record_id": 1730,
+      "item_id": 245539,
+      "name": "优雅的附魔梳妆台",
+      "sources": [
+        {
+          "type": "quest",
+          "quest": "精选之礼",
+          "zones": [
+            "创始者之角、烈风海岸"
+          ],
+          "context": [
+            {
+              "label": "物品",
+              "value": "奥术秘藏光球"
+            }
+          ],
+          "source_label": "周常任务"
+        }
+      ],
+      "source_text": "|cFFFFD200周常任务：|r精选之礼|n|cFFFFD200物品：|r奥术秘藏光球|n|cFFFFD200地区：|r创始者之角、烈风海岸",
+      "run_id": "20261102-224408"
+    },
+    {
+      "record_id": 2324,
+      "item_id": 246481,
+      "name": "退役的工业化侏儒抓取者",
+      "sources": [
+        {
+          "type": "event",
+          "event": "日常任务",
+          "zones": [
+            "麦卡贡"
+          ],
+          "context": [
+            {
+              "label": "物品",
+              "value": "自动拼装式家具包"
+            }
+          ],
+          "source_label": "活动"
+        }
+      ],
+      "source_text": "|cFFFFD200活动：|r日常任务|n|cFFFFD200物品：|r自动拼装式家具包|n|cFFFFD200地区：|r麦卡贡",
+      "run_id": "20261102-224408"
+    },
+    {
+      "record_id": 2431,
+      "item_id": 246599,
+      "name": "自行密封的高脚桶",
+      "sources": [
+        {
+          "type": "event",
+          "event": "日常任务",
+          "zones": [
+            "麦卡贡"
+          ],
+          "context": [
+            {
+              "label": "物品",
+              "value": "自动拼装式家具包"
+            }
+          ],
+          "source_label": "活动"
+        }
+      ],
+      "source_text": "|cFFFFD200活动：|r日常任务|n|cFFFFD200物品：|r自动拼装式家具包|n|cFFFFD200地区：|r麦卡贡",
+      "run_id": "20261102-224408"
+    },
+    {
+      "record_id": 2432,
+      "item_id": 246600,
+      "name": "小型机械箱子",
+      "sources": [
+        {
+          "type": "event",
+          "event": "日常任务",
+          "zones": [
+            "麦卡贡"
+          ],
+          "context": [
+            {
+              "label": "物品",
+              "value": "自动拼装式家具包"
+            }
+          ],
+          "source_label": "活动"
+        }
+      ],
+      "source_text": "|cFFFFD200活动：|r日常任务|n|cFFFFD200物品：|r自动拼装式家具包|n|cFFFFD200地区：|r麦卡贡",
+      "run_id": "20261102-224408"
+    },
+    {
+      "record_id": 2434,
+      "item_id": 246602,
+      "name": "小型家居齿轮",
+      "sources": [
+        {
+          "type": "event",
+          "event": "日常任务",
+          "zones": [
+            "麦卡贡"
+          ],
+          "context": [
+            {
+              "label": "物品",
+              "value": "自动拼装式家具包"
+            }
+          ],
+          "source_label": "活动"
+        }
+      ],
+      "source_text": "|cFFFFD200活动：|r日常任务|n|cFFFFD200物品：|r自动拼装式家具包|n|cFFFFD200地区：|r麦卡贡",
+      "run_id": "20261102-224408"
+    },
+    {
+      "record_id": 2587,
+      "item_id": 246958,
+      "name": "精工真菌排式盆栽",
+      "sources": [
+        {
+          "type": "quest",
+          "quest": "精选之礼",
+          "zones": [
+            "创始者之角、烈风海岸"
+          ],
+          "context": [
+            {
+              "label": "物品",
+              "value": "奥术秘藏光球"
+            }
+          ],
+          "source_label": "周常任务"
+        }
+      ],
+      "source_text": "|cFFFFD200周常任务：|r精选之礼|n|cFFFFD200物品：|r奥术秘藏光球|n|cFFFFD200地区：|r创始者之角、烈风海岸",
+      "run_id": "20261102-224408"
+    },
+    {
+      "record_id": 5796,
+      "item_id": 249923,
+      "name": "辛多雷黄金迎宾",
+      "sources": [
+        {
+          "type": "quest",
+          "quest": "精选之礼",
+          "zones": [
+            "创始者之角、烈风海岸"
+          ],
+          "context": [
+            {
+              "label": "物品",
+              "value": "奥术秘藏光球"
+            }
+          ],
+          "source_label": "周常任务"
+        }
+      ],
+      "source_text": "|cFFFFD200周常任务：|r精选之礼|n|cFFFFD200物品：|r奥术秘藏光球|n|cFFFFD200地区：|r创始者之角、烈风海岸",
+      "run_id": "20261102-224408"
+    },
+    {
+      "record_id": 8176,
+      "item_id": 251329,
+      "name": "影月开放式棚屋",
+      "sources": [
+        {
+          "type": "quest",
+          "quest": "突击索克雷萨高地",
+          "zones": [
+            "影月谷"
+          ],
+          "source_label": "要塞任务"
+        }
+      ],
+      "source_text": "|cFFFFD200要塞任务：|r突击索克雷萨高地|n|cFFFFD200地区：|r影月谷",
+      "run_id": "20261102-224408"
+    },
+    {
+      "record_id": 8238,
+      "item_id": 251547,
+      "name": "德莱尼农夫的篱笆",
+      "sources": [
+        {
+          "type": "quest",
+          "quest": "突袭沙塔斯市中心",
+          "zones": [
+            "塔拉多"
+          ],
+          "source_label": "要塞任务"
+        }
+      ],
+      "source_text": "|cFFFFD200要塞任务：|r突袭沙塔斯市中心|n|cFFFFD200地区：|r塔拉多|n",
+      "run_id": "20261102-224408"
+    },
+    {
+      "record_id": 9290,
+      "item_id": 253397,
+      "name": "崇敬的深石桌",
+      "sources": [
+        {
+          "type": "quest",
+          "quest": "精选之礼",
+          "zones": [
+            "创始者之角、烈风海岸"
+          ],
+          "context": [
+            {
+              "label": "物品",
+              "value": "奥术秘藏光球"
+            }
+          ],
+          "source_label": "周常任务"
+        }
+      ],
+      "source_text": "|cFFFFD200周常任务：|r精选之礼|n|cFFFFD200物品：|r奥术秘藏光球|n|cFFFFD200地区：|r创始者之角、烈风海岸",
+      "run_id": "20261102-224408"
+    },
+    {
+      "record_id": 10368,
+      "item_id": 254561,
+      "name": "食人魔勇士的珍贵颅骨",
+      "sources": [
+        {
+          "type": "quest",
+          "quest": "精选之礼",
+          "zones": [
+            "创始者之角、烈风海岸"
+          ],
+          "context": [
+            {
+              "label": "物品",
+              "value": "奥术秘藏光球"
+            }
+          ],
+          "source_label": "周常任务"
+        }
+      ],
+      "source_text": "|cFFFFD200周常任务：|r精选之礼|n|cFFFFD200物品：|r奥术秘藏光球|n|cFFFFD200地区：|r创始者之角、烈风海岸",
+      "run_id": "20261102-224408"
+    },
+    {
+      "record_id": 11455,
+      "item_id": 257353,
+      "name": "枯竭的迦拉克隆幽暗之心",
+      "sources": [
+        {
+          "type": "achievement",
+          "context": [
+            {
+              "label": "物品",
+              "value": "伪造的迦拉克隆幽暗之心"
+            }
+          ],
+          "category": "特色更新",
+          "achievement": "地心寻魂"
+        },
+        {
+          "type": "vendor",
+          "price": [
+            {
+              "amount": 15000,
+              "currency_id": 2815
+            }
+          ],
+          "zones": [
+            "安德麦"
+          ],
+          "vendor": "斯塔克斯·紧身",
+          "reputation": null
+        }
+      ],
+      "source_text": "|cFFFFD200成就：|r地心寻魂|n|cFFFFD200分类：|r特色更新|n|n|cFFFFD200物品：|r伪造的迦拉克隆幽暗之心|n|cFFFFD200商人出售：|r斯塔克斯·紧身|n|cFFFFD200地区：|r安德麦|n|cFFFFD200价格：|r15000|Hcurrency:2815|h|TInterface\\ICONS\\SPELL_AZERITE_ESSENCE14.BLP:0|t|h",
+      "run_id": "20261102-224408"
+    },
+    {
+      "record_id": 15583,
+      "item_id": 264343,
+      "name": "宇宙虚空引力宝珠",
+      "sources": [
+        {
+          "type": "event",
+          "event": "斯托玛兰突袭战",
+          "source_label": "活动"
+        },
+        {
+          "type": "treasure",
+          "zones": [
+            "虚影风暴"
+          ],
+          "treasure": "胜利的斯托玛兰巅峰之箱"
+        }
+      ],
+      "source_text": "|cFFFFD200活动：|r斯托玛兰突袭战|n|cFFFFD200宝藏：|r胜利的斯托玛兰巅峰之箱|n|cFFFFD200地区：|r虚影风暴",
+      "run_id": "20261102-224408"
+    },
+    {
+      "record_id": 15747,
+      "item_id": 264483,
+      "name": "宇宙虚空营火",
+      "sources": [
+        {
+          "type": "event",
+          "event": "斯托玛兰突袭战",
+          "source_label": "活动"
+        },
+        {
+          "type": "treasure",
+          "zones": [
+            "虚影风暴"
+          ],
+          "treasure": "胜利的斯托玛兰巅峰之箱"
+        }
+      ],
+      "source_text": "|cFFFFD200活动：|r斯托玛兰突袭战|n|cFFFFD200宝藏：|r胜利的斯托玛兰巅峰之箱|n|cFFFFD200地区：|r虚影风暴",
+      "run_id": "20261102-224408"
+    }
+  ]
+}

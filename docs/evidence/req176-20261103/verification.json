@@ -1,0 +1,492 @@
+{
+  "source": "offline Chrome real renderer; 40 frozen room rows, 21 candidate sources",
+  "results": [
+    {
+      "width": 1366,
+      "id": 439,
+      "src": "assets/decor-icons/room-previews/439.png",
+      "text": "商城购买 · 礼包：Haunted Grimtide Estate · 包含内容：魂萦幽潮门厅（Spirited Grimtide Foyer）"
+    },
+    {
+      "width": 1366,
+      "id": 291,
+      "src": "assets/decor-icons/_placeholder.png",
+      "text": "来源未知"
+    },
+    {
+      "width": 1366,
+      "id": 7,
+      "src": "assets/decor-icons/room-previews/7.png",
+      "text": "来源未知"
+    },
+    {
+      "width": 1366,
+      "id": 1,
+      "src": "assets/decor-icons/room-previews/1.png",
+      "text": "来源未知"
+    },
+    {
+      "width": 1366,
+      "id": 11,
+      "src": "assets/decor-icons/room-previews/11.png",
+      "text": "来源未知"
+    },
+    {
+      "width": 1366,
+      "id": 12,
+      "src": "assets/decor-icons/room-previews/12.png",
+      "text": "来源未知"
+    },
+    {
+      "width": 1366,
+      "id": 3,
+      "src": "assets/decor-icons/room-previews/3.png",
+      "text": "来源未知"
+    },
+    {
+      "width": 1366,
+      "id": 2,
+      "src": "assets/decor-icons/room-previews/2.png",
+      "text": "来源未知"
+    },
+    {
+      "width": 1366,
+      "id": 14,
+      "src": "assets/decor-icons/room-previews/14.png",
+      "text": "来源未知"
+    },
+    {
+      "width": 1366,
+      "id": 9,
+      "src": "assets/decor-icons/room-previews/9.png",
+      "text": "来源未知"
+    },
+    {
+      "width": 1366,
+      "id": 15,
+      "src": "assets/decor-icons/room-previews/15.png",
+      "text": "来源未知"
+    },
+    {
+      "width": 1366,
+      "id": 8,
+      "src": "assets/decor-icons/room-previews/8.png",
+      "text": "来源未知"
+    },
+    {
+      "width": 1366,
+      "id": 6,
+      "src": "assets/decor-icons/room-previews/6.png",
+      "text": "来源未知"
+    },
+    {
+      "width": 1366,
+      "id": 13,
+      "src": "assets/decor-icons/room-previews/13.png",
+      "text": "来源未知"
+    },
+    {
+      "width": 1366,
+      "id": 50,
+      "src": "assets/decor-icons/room-previews/50.png",
+      "text": "来源未知"
+    },
+    {
+      "width": 1366,
+      "id": 10,
+      "src": "assets/decor-icons/room-previews/10.png",
+      "text": "来源未知"
+    },
+    {
+      "width": 1366,
+      "id": 48,
+      "src": "assets/decor-icons/room-previews/48.png",
+      "text": "来源未知"
+    },
+    {
+      "width": 1366,
+      "id": 223,
+      "src": "assets/decor-icons/room-previews/223.png",
+      "text": "解锁：住宅等级 3 解锁 · 说明：提升住宅等级后获得对应房间"
+    },
+    {
+      "width": 1366,
+      "id": 233,
+      "src": "assets/decor-icons/room-previews/233.png",
+      "text": "解锁：住宅等级 5 解锁 · 说明：提升住宅等级后获得对应房间"
+    },
+    {
+      "width": 1366,
+      "id": 296,
+      "src": "assets/decor-icons/_placeholder.png",
+      "text": "来源未知"
+    },
+    {
+      "width": 1366,
+      "id": 297,
+      "src": "assets/decor-icons/_placeholder.png",
+      "text": "来源未知"
+    },
+    {
+      "width": 1366,
+      "id": 400,
+      "src": "assets/decor-icons/room-previews/400.png",
+      "text": "商人：最后的建筑师／住宅区走私商（创始者之角、烈风海岸） · 购买说明：本阵营房型向最后的建筑师购买；跨阵营房型向住宅区走私商购买 · 解锁方式：购买并使用对应房间图纸后学习 · 售价：12.1.5当前商人实价待核实"
+    },
+    {
+      "width": 1366,
+      "id": 401,
+      "src": "assets/decor-icons/room-previews/401.png",
+      "text": "商人：最后的建筑师／住宅区走私商（创始者之角、烈风海岸） · 购买说明：本阵营房型向最后的建筑师购买；跨阵营房型向住宅区走私商购买 · 解锁方式：购买并使用对应房间图纸后学习 · 售价：12.1.5当前商人实价待核实"
+    },
+    {
+      "width": 1366,
+      "id": 294,
+      "src": "assets/decor-icons/room-previews/294.png",
+      "text": "商人：最后的建筑师／住宅区走私商（创始者之角、烈风海岸） · 购买说明：本阵营房型向最后的建筑师购买；跨阵营房型向住宅区走私商购买 · 解锁方式：购买并使用对应房间图纸后学习 · 售价：12.1.5当前商人实价待核实"
+    },
+    {
+      "width": 1366,
+      "id": 151,
+      "src": "assets/decor-icons/room-previews/151.png",
+      "text": "商人：最后的建筑师／住宅区走私商（创始者之角、烈风海岸） · 购买说明：本阵营房型向最后的建筑师购买；跨阵营房型向住宅区走私商购买 · 解锁方式：购买并使用对应房间图纸后学习 · 售价：12.1.5当前商人实价待核实"
+    },
+    {
+      "width": 1366,
+      "id": 292,
+      "src": "assets/decor-icons/room-previews/292.png",
+      "text": "商人：最后的建筑师／住宅区走私商（创始者之角、烈风海岸） · 购买说明：本阵营房型向最后的建筑师购买；跨阵营房型向住宅区走私商购买 · 解锁方式：购买并使用对应房间图纸后学习 · 售价：12.1.5当前商人实价待核实"
+    },
+    {
+      "width": 1366,
+      "id": 132,
+      "src": "assets/decor-icons/room-previews/132.png",
+      "text": "商人：最后的建筑师／住宅区走私商（创始者之角、烈风海岸） · 购买说明：本阵营房型向最后的建筑师购买；跨阵营房型向住宅区走私商购买 · 解锁方式：购买并使用对应房间图纸后学习 · 售价：12.1.5当前商人实价待核实"
+    },
+    {
+      "width": 1366,
+      "id": 281,
+      "src": "assets/decor-icons/room-previews/281.png",
+      "text": "商人：最后的建筑师／住宅区走私商（创始者之角、烈风海岸） · 购买说明：本阵营房型向最后的建筑师购买；跨阵营房型向住宅区走私商购买 · 解锁方式：购买并使用对应房间图纸后学习 · 售价：12.1.5当前商人实价待核实"
+    },
+    {
+      "width": 1366,
+      "id": 277,
+      "src": "assets/decor-icons/room-previews/277.png",
+      "text": "商人：最后的建筑师／住宅区走私商（创始者之角、烈风海岸） · 购买说明：本阵营房型向最后的建筑师购买；跨阵营房型向住宅区走私商购买 · 解锁方式：购买并使用对应房间图纸后学习 · 售价：12.1.5当前商人实价待核实"
+    },
+    {
+      "width": 1366,
+      "id": 273,
+      "src": "assets/decor-icons/room-previews/273.png",
+      "text": "商人：最后的建筑师／住宅区走私商（创始者之角、烈风海岸） · 购买说明：本阵营房型向最后的建筑师购买；跨阵营房型向住宅区走私商购买 · 解锁方式：购买并使用对应房间图纸后学习 · 售价：12.1.5当前商人实价待核实"
+    },
+    {
+      "width": 1366,
+      "id": 282,
+      "src": "assets/decor-icons/room-previews/282.png",
+      "text": "商人：最后的建筑师／住宅区走私商（创始者之角、烈风海岸） · 购买说明：本阵营房型向最后的建筑师购买；跨阵营房型向住宅区走私商购买 · 解锁方式：购买并使用对应房间图纸后学习 · 售价：12.1.5当前商人实价待核实"
+    },
+    {
+      "width": 1366,
+      "id": 286,
+      "src": "assets/decor-icons/room-previews/286.png",
+      "text": "商人：最后的建筑师／住宅区走私商（创始者之角、烈风海岸） · 购买说明：本阵营房型向最后的建筑师购买；跨阵营房型向住宅区走私商购买 · 解锁方式：购买并使用对应房间图纸后学习 · 售价：12.1.5当前商人实价待核实"
+    },
+    {
+      "width": 1366,
+      "id": 307,
+      "src": "assets/decor-icons/room-previews/307.png",
+      "text": "商人：最后的建筑师／住宅区走私商（创始者之角、烈风海岸） · 购买说明：本阵营房型向最后的建筑师购买；跨阵营房型向住宅区走私商购买 · 解锁方式：购买并使用对应房间图纸后学习 · 售价：12.1.5当前商人实价待核实"
+    },
+    {
+      "width": 1366,
+      "id": 283,
+      "src": "assets/decor-icons/room-previews/283.png",
+      "text": "商人：最后的建筑师／住宅区走私商（创始者之角、烈风海岸） · 购买说明：本阵营房型向最后的建筑师购买；跨阵营房型向住宅区走私商购买 · 解锁方式：购买并使用对应房间图纸后学习 · 售价：12.1.5当前商人实价待核实"
+    },
+    {
+      "width": 1366,
+      "id": 285,
+      "src": "assets/decor-icons/room-previews/285.png",
+      "text": "商人：最后的建筑师／住宅区走私商（创始者之角、烈风海岸） · 购买说明：本阵营房型向最后的建筑师购买；跨阵营房型向住宅区走私商购买 · 解锁方式：购买并使用对应房间图纸后学习 · 售价：12.1.5当前商人实价待核实"
+    },
+    {
+      "width": 1366,
+      "id": 290,
+      "src": "assets/decor-icons/room-previews/290.png",
+      "text": "商人：最后的建筑师／住宅区走私商（创始者之角、烈风海岸） · 购买说明：本阵营房型向最后的建筑师购买；跨阵营房型向住宅区走私商购买 · 解锁方式：购买并使用对应房间图纸后学习 · 售价：12.1.5当前商人实价待核实"
+    },
+    {
+      "width": 1366,
+      "id": 289,
+      "src": "assets/decor-icons/room-previews/289.png",
+      "text": "商人：最后的建筑师／住宅区走私商（创始者之角、烈风海岸） · 购买说明：本阵营房型向最后的建筑师购买；跨阵营房型向住宅区走私商购买 · 解锁方式：购买并使用对应房间图纸后学习 · 售价：12.1.5当前商人实价待核实"
+    },
+    {
+      "width": 1366,
+      "id": 288,
+      "src": "assets/decor-icons/room-previews/288.png",
+      "text": "商人：最后的建筑师／住宅区走私商（创始者之角、烈风海岸） · 购买说明：本阵营房型向最后的建筑师购买；跨阵营房型向住宅区走私商购买 · 解锁方式：购买并使用对应房间图纸后学习 · 售价：12.1.5当前商人实价待核实"
+    },
+    {
+      "width": 1366,
+      "id": 287,
+      "src": "assets/decor-icons/room-previews/287.png",
+      "text": "商人：最后的建筑师／住宅区走私商（创始者之角、烈风海岸） · 购买说明：本阵营房型向最后的建筑师购买；跨阵营房型向住宅区走私商购买 · 解锁方式：购买并使用对应房间图纸后学习 · 售价：12.1.5当前商人实价待核实"
+    },
+    {
+      "width": 1366,
+      "id": 113,
+      "src": "assets/decor-icons/_placeholder.png",
+      "text": "来源未知"
+    },
+    {
+      "width": 1920,
+      "id": 439,
+      "src": "assets/decor-icons/room-previews/439.png",
+      "text": "商城购买 · 礼包：Haunted Grimtide Estate · 包含内容：魂萦幽潮门厅（Spirited Grimtide Foyer）"
+    },
+    {
+      "width": 1920,
+      "id": 291,
+      "src": "assets/decor-icons/_placeholder.png",
+      "text": "来源未知"
+    },
+    {
+      "width": 1920,
+      "id": 7,
+      "src": "assets/decor-icons/room-previews/7.png",
+      "text": "来源未知"
+    },
+    {
+      "width": 1920,
+      "id": 1,
+      "src": "assets/decor-icons/room-previews/1.png",
+      "text": "来源未知"
+    },
+    {
+      "width": 1920,
+      "id": 11,
+      "src": "assets/decor-icons/room-previews/11.png",
+      "text": "来源未知"
+    },
+    {
+      "width": 1920,
+      "id": 12,
+      "src": "assets/decor-icons/room-previews/12.png",
+      "text": "来源未知"
+    },
+    {
+      "width": 1920,
+      "id": 3,
+      "src": "assets/decor-icons/room-previews/3.png",
+      "text": "来源未知"
+    },
+    {
+      "width": 1920,
+      "id": 2,
+      "src": "assets/decor-icons/room-previews/2.png",
+      "text": "来源未知"
+    },
+    {
+      "width": 1920,
+      "id": 14,
+      "src": "assets/decor-icons/room-previews/14.png",
+      "text": "来源未知"
+    },
+    {
+      "width": 1920,
+      "id": 9,
+      "src": "assets/decor-icons/room-previews/9.png",
+      "text": "来源未知"
+    },
+    {
+      "width": 1920,
+      "id": 15,
+      "src": "assets/decor-icons/room-previews/15.png",
+      "text": "来源未知"
+    },
+    {
+      "width": 1920,
+      "id": 8,
+      "src": "assets/decor-icons/room-previews/8.png",
+      "text": "来源未知"
+    },
+    {
+      "width": 1920,
+      "id": 6,
+      "src": "assets/decor-icons/room-previews/6.png",
+      "text": "来源未知"
+    },
+    {
+      "width": 1920,
+      "id": 13,
+      "src": "assets/decor-icons/room-previews/13.png",
+      "text": "来源未知"
+    },
+    {
+      "width": 1920,
+      "id": 50,
+      "src": "assets/decor-icons/room-previews/50.png",
+      "text": "来源未知"
+    },
+    {
+      "width": 1920,
+      "id": 10,
+      "src": "assets/decor-icons/room-previews/10.png",
+      "text": "来源未知"
+    },
+    {
+      "width": 1920,
+      "id": 48,
+      "src": "assets/decor-icons/room-previews/48.png",
+      "text": "来源未知"
+    },
+    {
+      "width": 1920,
+      "id": 223,
+      "src": "assets/decor-icons/room-previews/223.png",
+      "text": "解锁：住宅等级 3 解锁 · 说明：提升住宅等级后获得对应房间"
+    },
+    {
+      "width": 1920,
+      "id": 233,
+      "src": "assets/decor-icons/room-previews/233.png",
+      "text": "解锁：住宅等级 5 解锁 · 说明：提升住宅等级后获得对应房间"
+    },
+    {
+      "width": 1920,
+      "id": 296,
+      "src": "assets/decor-icons/_placeholder.png",
+      "text": "来源未知"
+    },
+    {
+      "width": 1920,
+      "id": 297,
+      "src": "assets/decor-icons/_placeholder.png",
+      "text": "来源未知"
+    },
+    {
+      "width": 1920,
+      "id": 400,
+      "src": "assets/decor-icons/room-previews/400.png",
+      "text": "商人：最后的建筑师／住宅区走私商（创始者之角、烈风海岸） · 购买说明：本阵营房型向最后的建筑师购买；跨阵营房型向住宅区走私商购买 · 解锁方式：购买并使用对应房间图纸后学习 · 售价：12.1.5当前商人实价待核实"
+    },
+    {
+      "width": 1920,
+      "id": 401,
+      "src": "assets/decor-icons/room-previews/401.png",
+      "text": "商人：最后的建筑师／住宅区走私商（创始者之角、烈风海岸） · 购买说明：本阵营房型向最后的建筑师购买；跨阵营房型向住宅区走私商购买 · 解锁方式：购买并使用对应房间图纸后学习 · 售价：12.1.5当前商人实价待核实"
+    },
+    {
+      "width": 1920,
+      "id": 294,
+      "src": "assets/decor-icons/room-previews/294.png",
+      "text": "商人：最后的建筑师／住宅区走私商（创始者之角、烈风海岸） · 购买说明：本阵营房型向最后的建筑师购买；跨阵营房型向住宅区走私商购买 · 解锁方式：购买并使用对应房间图纸后学习 · 售价：12.1.5当前商人实价待核实"
+    },
+    {
+      "width": 1920,
+      "id": 151,
+      "src": "assets/decor-icons/room-previews/151.png",
+      "text": "商人：最后的建筑师／住宅区走私商（创始者之角、烈风海岸） · 购买说明：本阵营房型向最后的建筑师购买；跨阵营房型向住宅区走私商购买 · 解锁方式：购买并使用对应房间图纸后学习 · 售价：12.1.5当前商人实价待核实"
+    },
+    {
+      "width": 1920,
+      "id": 292,
+      "src": "assets/decor-icons/room-previews/292.png",
+      "text": "商人：最后的建筑师／住宅区走私商（创始者之角、烈风海岸） · 购买说明：本阵营房型向最后的建筑师购买；跨阵营房型向住宅区走私商购买 · 解锁方式：购买并使用对应房间图纸后学习 · 售价：12.1.5当前商人实价待核实"
+    },
+    {
+      "width": 1920,
+      "id": 132,
+      "src": "assets/decor-icons/room-previews/132.png",
+      "text": "商人：最后的建筑师／住宅区走私商（创始者之角、烈风海岸） · 购买说明：本阵营房型向最后的建筑师购买；跨阵营房型向住宅区走私商购买 · 解锁方式：购买并使用对应房间图纸后学习 · 售价：12.1.5当前商人实价待核实"
+    },
+    {
+      "width": 1920,
+      "id": 281,
+      "src": "assets/decor-icons/room-previews/281.png",
+      "text": "商人：最后的建筑师／住宅区走私商（创始者之角、烈风海岸） · 购买说明：本阵营房型向最后的建筑师购买；跨阵营房型向住宅区走私商购买 · 解锁方式：购买并使用对应房间图纸后学习 · 售价：12.1.5当前商人实价待核实"
+    },
+    {
+      "width": 1920,
+      "id": 277,
+      "src": "assets/decor-icons/room-previews/277.png",
+      "text": "商人：最后的建筑师／住宅区走私商（创始者之角、烈风海岸） · 购买说明：本阵营房型向最后的建筑师购买；跨阵营房型向住宅区走私商购买 · 解锁方式：购买并使用对应房间图纸后学习 · 售价：12.1.5当前商人实价待核实"
+    },
+    {
+      "width": 1920,
+      "id": 273,
+      "src": "assets/decor-icons/room-previews/273.png",
+      "text": "商人：最后的建筑师／住宅区走私商（创始者之角、烈风海岸） · 购买说明：本阵营房型向最后的建筑师购买；跨阵营房型向住宅区走私商购买 · 解锁方式：购买并使用对应房间图纸后学习 · 售价：12.1.5当前商人实价待核实"
+    },
+    {
+      "width": 1920,
+      "id": 282,
+      "src": "assets/decor-icons/room-previews/282.png",
+      "text": "商人：最后的建筑师／住宅区走私商（创始者之角、烈风海岸） · 购买说明：本阵营房型向最后的建筑师购买；跨阵营房型向住宅区走私商购买 · 解锁方式：购买并使用对应房间图纸后学习 · 售价：12.1.5当前商人实价待核实"
+    },
+    {
+      "width": 1920,
+      "id": 286,
+      "src": "assets/decor-icons/room-previews/286.png",
+      "text": "商人：最后的建筑师／住宅区走私商（创始者之角、烈风海岸） · 购买说明：本阵营房型向最后的建筑师购买；跨阵营房型向住宅区走私商购买 · 解锁方式：购买并使用对应房间图纸后学习 · 售价：12.1.5当前商人实价待核实"
+    },
+    {
+      "width": 1920,
+      "id": 307,
+      "src": "assets/decor-icons/room-previews/307.png",
+      "text": "商人：最后的建筑师／住宅区走私商（创始者之角、烈风海岸） · 购买说明：本阵营房型向最后的建筑师购买；跨阵营房型向住宅区走私商购买 · 解锁方式：购买并使用对应房间图纸后学习 · 售价：12.1.5当前商人实价待核实"
+    },
+    {
+      "width": 1920,
+      "id": 283,
+      "src": "assets/decor-icons/room-previews/283.png",
+      "text": "商人：最后的建筑师／住宅区走私商（创始者之角、烈风海岸） · 购买说明：本阵营房型向最后的建筑师购买；跨阵营房型向住宅区走私商购买 · 解锁方式：购买并使用对应房间图纸后学习 · 售价：12.1.5当前商人实价待核实"
+    },
+    {
+      "width": 1920,
+      "id": 285,
+      "src": "assets/decor-icons/room-previews/285.png",
+      "text": "商人：最后的建筑师／住宅区走私商（创始者之角、烈风海岸） · 购买说明：本阵营房型向最后的建筑师购买；跨阵营房型向住宅区走私商购买 · 解锁方式：购买并使用对应房间图纸后学习 · 售价：12.1.5当前商人实价待核实"
+    },
+    {
+      "width": 1920,
+      "id": 290,
+      "src": "assets/decor-icons/room-previews/290.png",
+      "text": "商人：最后的建筑师／住宅区走私商（创始者之角、烈风海岸） · 购买说明：本阵营房型向最后的建筑师购买；跨阵营房型向住宅区走私商购买 · 解锁方式：购买并使用对应房间图纸后学习 · 售价：12.1.5当前商人实价待核实"
+    },
+    {
+      "width": 1920,
+      "id": 289,
+      "src": "assets/decor-icons/room-previews/289.png",
+      "text": "商人：最后的建筑师／住宅区走私商（创始者之角、烈风海岸） · 购买说明：本阵营房型向最后的建筑师购买；跨阵营房型向住宅区走私商购买 · 解锁方式：购买并使用对应房间图纸后学习 · 售价：12.1.5当前商人实价待核实"
+    },
+    {
+      "width": 1920,
+      "id": 288,
+      "src": "assets/decor-icons/room-previews/288.png",
+      "text": "商人：最后的建筑师／住宅区走私商（创始者之角、烈风海岸） · 购买说明：本阵营房型向最后的建筑师购买；跨阵营房型向住宅区走私商购买 · 解锁方式：购买并使用对应房间图纸后学习 · 售价：12.1.5当前商人实价待核实"
+    },
+    {
+      "width": 1920,
+      "id": 287,
+      "src": "assets/decor-icons/room-previews/287.png",
+      "text": "商人：最后的建筑师／住宅区走私商（创始者之角、烈风海岸） · 购买说明：本阵营房型向最后的建筑师购买；跨阵营房型向住宅区走私商购买 · 解锁方式：购买并使用对应房间图纸后学习 · 售价：12.1.5当前商人实价待核实"
+    },
+    {
+      "width": 1920,
+      "id": 113,
+      "src": "assets/decor-icons/_placeholder.png",
+      "text": "来源未知"
+    }
+  ],
+  "errors": [],
+  "nativeImages": 36,
+  "placeholderRooms": 4,
+  "legacyModelRegression": 26,
+  "imageFallback": true,
+  "officialPriority": true,
+  "networkRetry": true
+}

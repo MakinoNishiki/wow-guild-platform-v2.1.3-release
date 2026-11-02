@@ -1,0 +1,177 @@
+{
+  "build": "12.1.5.70688",
+  "partialDecryption": true,
+  "house_levels": [
+    {
+      "ID": 14,
+      "Level": 2,
+      "QuestID": 93901,
+      "Field_12_0_7_67808_003": 0
+    },
+    {
+      "ID": 15,
+      "Level": 4,
+      "QuestID": 93902,
+      "Field_12_0_7_67808_003": 0
+    },
+    {
+      "ID": 30,
+      "Level": 3,
+      "QuestID": 94431,
+      "Field_12_0_7_67808_003": 0
+    },
+    {
+      "ID": 34,
+      "Level": 5,
+      "QuestID": 94437,
+      "Field_12_0_7_67808_003": 0
+    },
+    {
+      "ID": 35,
+      "Level": 1,
+      "QuestID": 0,
+      "Field_12_0_7_67808_003": 0
+    },
+    {
+      "ID": 52,
+      "Level": 6,
+      "QuestID": 95043,
+      "Field_12_0_7_67808_003": 1
+    },
+    {
+      "ID": 53,
+      "Level": 8,
+      "QuestID": 0,
+      "Field_12_0_7_67808_003": 0
+    },
+    {
+      "ID": 55,
+      "Level": 7,
+      "QuestID": 0,
+      "Field_12_0_7_67808_003": 0
+    },
+    {
+      "ID": 56,
+      "Level": 9,
+      "QuestID": 0,
+      "Field_12_0_7_67808_003": 0
+    },
+    {
+      "ID": 66,
+      "Level": 10,
+      "QuestID": 0,
+      "Field_12_0_7_67808_003": 0
+    },
+    {
+      "ID": 67,
+      "Level": 11,
+      "QuestID": 0,
+      "Field_12_0_7_67808_003": 0
+    },
+    {
+      "ID": 68,
+      "Level": 12,
+      "QuestID": 0,
+      "Field_12_0_7_67808_003": 0
+    }
+  ],
+  "level_reward_text": [
+    {
+      "Name_lang": "初始房间收藏",
+      "Description_lang": "利用多种基本房间形状，开始建造你的住宅。欢迎回家！",
+      "ID": 11,
+      "HouseLevelDataID": 35,
+      "Field_12_0_0_63967_004": 0,
+      "IconFileDataID": 4217590
+    },
+    {
+      "Name_lang": "室外装饰",
+      "Description_lang": "你可以在院子里放置200点数的装饰。",
+      "ID": 12,
+      "HouseLevelDataID": 35,
+      "Field_12_0_0_63967_004": 1,
+      "IconFileDataID": 8164790
+    },
+    {
+      "Name_lang": "炉光浑天仪",
+      "Description_lang": "你将获得一台炉光浑天仪，这是一台精妙的装置，能够操控拥有者住宅内外的环境光，使其变暗或增强。|n|n你可以从住宅区的最后的建筑师处购买额外的复制品。",
+      "ID": 23,
+      "HouseLevelDataID": 52,
+      "Field_12_0_0_63967_004": 0,
+      "IconFileDataID": 7487068
+    },
+    {
+      "Name_lang": "中型住宅外观",
+      "Description_lang": "你现在可以为你的住宅使用中型住宅外观了。",
+      "ID": 24,
+      "HouseLevelDataID": 53,
+      "Field_12_0_0_63967_004": 0,
+      "IconFileDataID": 7252953
+    },
+    {
+      "Name_lang": "房间与装饰放置预算加成",
+      "Description_lang": "该等级的房间放置预算和装饰放置预算已显著提高（+10房间，+500装饰）。",
+      "ID": 26,
+      "HouseLevelDataID": 55,
+      "Field_12_0_0_63967_004": 0,
+      "IconFileDataID": 135769
+    },
+    {
+      "Name_lang": "房间与装饰放置预算加成",
+      "Description_lang": "该等级的房间放置预算和装饰放置预算已显著提高（+10房间，+500装饰）。",
+      "ID": 27,
+      "HouseLevelDataID": 56,
+      "Field_12_0_0_63967_004": 0,
+      "IconFileDataID": 135769
+    },
+    {
+      "Name_lang": "增加室外装饰",
+      "Description_lang": "你现在可以在院子里额外放置50点数的装饰，总计250点。",
+      "ID": 30,
+      "HouseLevelDataID": 30,
+      "Field_12_0_0_63967_004": 0,
+      "IconFileDataID": 8164790
+    },
+    {
+      "Name_lang": "增加室外装饰",
+      "Description_lang": "你现在可以在院子里额外放置50点数的装饰，总计300点。",
+      "ID": 38,
+      "HouseLevelDataID": 34,
+      "Field_12_0_0_63967_004": 0,
+      "IconFileDataID": 8164790
+    },
+    {
+      "Name_lang": "增加室外装饰",
+      "Description_lang": "你现在可以在院子里额外放置50点数的装饰，总计350点。",
+      "ID": 39,
+      "HouseLevelDataID": 55,
+      "Field_12_0_0_63967_004": 1,
+      "IconFileDataID": 8164790
+    },
+    {
+      "Name_lang": "天涯处的宝藏",
+      "Description_lang": "每周拜访一次你住宅区里的最后的建筑师，获取一颗奥术秘藏光球，里面包含一件从最后的建筑师精选收藏中随机挑选的装饰。",
+      "ID": 40,
+      "HouseLevelDataID": 66,
+      "Field_12_0_0_63967_004": 0,
+      "IconFileDataID": 7137527
+    },
+    {
+      "Name_lang": "房间与装饰放置预算加成",
+      "Description_lang": "该等级的房间放置预算和装饰放置预算已显著提高（+10房间，+500装饰）。",
+      "ID": 41,
+      "HouseLevelDataID": 67,
+      "Field_12_0_0_63967_004": 0,
+      "IconFileDataID": 135769
+    },
+    {
+      "Name_lang": "大型住宅外观",
+      "Description_lang": "你现在可以为你的住宅使用大型住宅外观了。",
+      "ID": 42,
+      "HouseLevelDataID": 68,
+      "Field_12_0_0_63967_004": 0,
+      "IconFileDataID": 7252953
+    }
+  ],
+  "note": "General level reward text does not provide a per-room unlock mapping. Do not infer unknown field semantics."
+}

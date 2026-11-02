@@ -131,7 +131,7 @@
       state.category = i === 0 ? 0 : D.CATEGORY_FILTER_ORDER[i - 1]; state.page = 1; refreshChips(); render(true);
     });
 
-    // 来源（十类单选）
+    // 来源（十一类单选，REQ-176新增等级解锁）
     const srcDefs = [{ key: '', label: '全部' }, ...D.SOURCE_TYPES];
     $('dhSrcChips').innerHTML = srcDefs.map(s => chip(s.label, state.source === s.key, s.key ? srcCount(s.key) : null)).join('');
     [...$('dhSrcChips').children].forEach((btn, i) => btn.onclick = () => {
@@ -225,6 +225,8 @@
     return id != null ? `assets/decor-icons/${id}.png` : PLACEHOLDER;
   }
   function iconSrc(r) {
+    const room = r.entry_type === 2 && D.ROOM_ICON_OVERRIDES && D.ROOM_ICON_OVERRIDES[r.record_id];
+    if (room && r.icon_file_id == null) return room;
     const model = D.MODEL_ICON_OVERRIDES && D.MODEL_ICON_OVERRIDES[r.record_id];
     // 官方目录新增真实图标时自动优先；网站旧物品图映射不冒充目录官方图。
     if (model && (r.icon_file_id == null || Number(r.icon_file_id) === model.fallbackIconId)) return model.src;
@@ -418,6 +420,7 @@
       case 'profession': return `制造：${s.profession}`;
       case 'treasure': return `宝藏：${s.treasure}${zones}`;
       case 'event': return `${s.source_label || '事件'}：${s.event}${zones}`;
+      case 'unlock': return `解锁：${s.unlock}`;
       case 'festival_note': return s.note || '';
       default: return '';
     }

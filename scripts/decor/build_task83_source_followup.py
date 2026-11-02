@@ -42,6 +42,22 @@ def parse_followup(text):
     return elements, anomalies
 
 
+def classify_record(rid, text):
+    sources, anomalies = parse_followup(text)
+    if rid == 1674 and not anomalies:
+        # 2026-11-03运营验收裁定：家具归成就；相关商人不是家具直售分类。
+        # 保留原文里的商人/地区/价格作为上下文，不删除客户端获取信息。
+        achievement, vendor = sources
+        if (achievement['type'] != 'achievement' or vendor['type'] != 'vendor'
+                or vendor['vendor'] != '埃克斯勒' or vendor['zones'] != ['尘泥沼泽']
+                or vendor['price'] != [{'gold': 250}]):
+            raise ValueError('1674来源结构变化，需重新核实运营分类裁定')
+        achievement.setdefault('context', []).append(
+            {'label': '相关商人', 'value': '埃克斯勒（尘泥沼泽） · 250 金'})
+        sources = [achievement]
+    return sources, anomalies
+
+
 def main():
     directory = ROOT / 'data/task083'
     rows = json.loads((directory / 'catalog-current-2335.json').read_text(encoding='utf-8'))
@@ -56,7 +72,7 @@ def main():
         if (r['source_text'] != pending[rid]['source_text']
                 or r['run_id'] != '20261102-224408' or r['client_version'] != '12.1.5'):
             raise ValueError('来源或扫描版本变化；需重新核实')
-        sources, anomalies = parse_followup(r['source_text'])
+        sources, anomalies = classify_record(rid, r['source_text'])
         if anomalies:
             raise ValueError(f'{rid}: {anomalies}')
         ready.append({k: r[k] for k in ('record_id', 'item_id', 'name', 'run_id', 'source_text')}

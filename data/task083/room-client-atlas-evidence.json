@@ -1,0 +1,1771 @@
+{
+  "build": "12.1.5.70688",
+  "partialDecryption": true,
+  "matched_rooms": 40,
+  "rows": [
+    {
+      "record_id": 439,
+      "name": "魂萦幽潮门厅",
+      "client_room": {
+        "Name_lang": "魂萦幽潮门厅",
+        "ID": 439,
+        "Field_12_0_0_63967_001": 3,
+        "Flags": 8,
+        "Field_12_0_0_63724_002": 0,
+        "RoomWmoDataID": 380,
+        "UiTextureAtlasElementID": 37454,
+        "WeightCost": 20,
+        "ItemID": 284706,
+        "SortPriority": 0
+      },
+      "atlas_element": {
+        "Name": "12PHShop_ManorPrefabHalloween_IHA01",
+        "ID": 37454
+      },
+      "atlas_members": [
+        {
+          "member": {
+            "CommittedName": "12phshop_manorprefabhalloween_iha01",
+            "ID": 42761,
+            "UiTextureAtlasID": 4268,
+            "Width": 162,
+            "Height": 162,
+            "CommittedLeft": 1,
+            "CommittedRight": 163,
+            "CommittedTop": 1,
+            "CommittedBottom": 163,
+            "UiTextureAtlasElementID": 37454,
+            "OverrideWidth": 0,
+            "OverrideHeight": 0,
+            "CommittedFlags": 0,
+            "UiCanvasID": 0
+          },
+          "texture": {
+            "ID": 4268,
+            "FileDataID": 8425294,
+            "AtlasWidth": 256,
+            "AtlasHeight": 256,
+            "UiCanvasID": 1
+          }
+        }
+      ]
+    },
+    {
+      "record_id": 291,
+      "name": "Full_Layout_Rugged_Prn",
+      "client_room": {
+        "Name_lang": "Full_Layout_Rugged_Prn",
+        "ID": 291,
+        "Field_12_0_0_63967_001": 0,
+        "Flags": 8,
+        "Field_12_0_0_63724_002": 0,
+        "RoomWmoDataID": 351,
+        "UiTextureAtlasElementID": 0,
+        "WeightCost": 100,
+        "ItemID": 274656,
+        "SortPriority": 0
+      },
+      "atlas_element": null,
+      "atlas_members": []
+    },
+    {
+      "record_id": 7,
+      "name": "方形房间（微小）",
+      "client_room": {
+        "Name_lang": "方形房间（微小）",
+        "ID": 7,
+        "Field_12_0_0_63967_001": 1,
+        "Flags": 4,
+        "Field_12_0_0_63724_002": 0,
+        "RoomWmoDataID": 3,
+        "UiTextureAtlasElementID": 31140,
+        "WeightCost": 2,
+        "ItemID": 0,
+        "SortPriority": 110
+      },
+      "atlas_element": {
+        "Name": "Layout_Square_XS_Icon",
+        "ID": 31140
+      },
+      "atlas_members": [
+        {
+          "member": {
+            "CommittedName": "layout_square_xs_icon",
+            "ID": 32714,
+            "UiTextureAtlasID": 3127,
+            "Width": 100,
+            "Height": 100,
+            "CommittedLeft": 205,
+            "CommittedRight": 305,
+            "CommittedTop": 103,
+            "CommittedBottom": 203,
+            "UiTextureAtlasElementID": 31140,
+            "OverrideWidth": 0,
+            "OverrideHeight": 0,
+            "CommittedFlags": 0,
+            "UiCanvasID": 0
+          },
+          "texture": {
+            "ID": 3127,
+            "FileDataID": 6648988,
+            "AtlasWidth": 512,
+            "AtlasHeight": 512,
+            "UiCanvasID": 1
+          }
+        }
+      ]
+    },
+    {
+      "record_id": 1,
+      "name": "方形房间（小型）",
+      "client_room": {
+        "Name_lang": "方形房间（小型）",
+        "ID": 1,
+        "Field_12_0_0_63967_001": 1,
+        "Flags": 4,
+        "Field_12_0_0_63724_002": 0,
+        "RoomWmoDataID": 5,
+        "UiTextureAtlasElementID": 31139,
+        "WeightCost": 5,
+        "ItemID": 0,
+        "SortPriority": 120
+      },
+      "atlas_element": {
+        "Name": "Layout_Square_S_Icon",
+        "ID": 31139
+      },
+      "atlas_members": [
+        {
+          "member": {
+            "CommittedName": "layout_square_s_icon",
+            "ID": 32713,
+            "UiTextureAtlasID": 3127,
+            "Width": 100,
+            "Height": 100,
+            "CommittedLeft": 103,
+            "CommittedRight": 203,
+            "CommittedTop": 103,
+            "CommittedBottom": 203,
+            "UiTextureAtlasElementID": 31139,
+            "OverrideWidth": 0,
+            "OverrideHeight": 0,
+            "CommittedFlags": 0,
+            "UiCanvasID": 0
+          },
+          "texture": {
+            "ID": 3127,
+            "FileDataID": 6648988,
+            "AtlasWidth": 512,
+            "AtlasHeight": 512,
+            "UiCanvasID": 1
+          }
+        }
+      ]
+    },
+    {
+      "record_id": 11,
+      "name": "方形房间（中型）",
+      "client_room": {
+        "Name_lang": "方形房间（中型）",
+        "ID": 11,
+        "Field_12_0_0_63967_001": 1,
+        "Flags": 0,
+        "Field_12_0_0_63724_002": 0,
+        "RoomWmoDataID": 160,
+        "UiTextureAtlasElementID": 31138,
+        "WeightCost": 12,
+        "ItemID": 0,
+        "SortPriority": 130
+      },
+      "atlas_element": {
+        "Name": "Layout_Square_M_Icon",
+        "ID": 31138
+      },
+      "atlas_members": [
+        {
+          "member": {
+            "CommittedName": "layout_square_m_icon",
+            "ID": 32712,
+            "UiTextureAtlasID": 3127,
+            "Width": 100,
+            "Height": 100,
+            "CommittedLeft": 1,
+            "CommittedRight": 101,
+            "CommittedTop": 409,
+            "CommittedBottom": 509,
+            "UiTextureAtlasElementID": 31138,
+            "OverrideWidth": 0,
+            "OverrideHeight": 0,
+            "CommittedFlags": 0,
+            "UiCanvasID": 0
+          },
+          "texture": {
+            "ID": 3127,
+            "FileDataID": 6648988,
+            "AtlasWidth": 512,
+            "AtlasHeight": 512,
+            "UiCanvasID": 1
+          }
+        }
+      ]
+    },
+    {
+      "record_id": 12,
+      "name": "方形房间（大型）",
+      "client_room": {
+        "Name_lang": "方形房间（大型）",
+        "ID": 12,
+        "Field_12_0_0_63967_001": 1,
+        "Flags": 0,
+        "Field_12_0_0_63724_002": 0,
+        "RoomWmoDataID": 6,
+        "UiTextureAtlasElementID": 31137,
+        "WeightCost": 20,
+        "ItemID": 0,
+        "SortPriority": 140
+      },
+      "atlas_element": {
+        "Name": "Layout_Square_L_Icon",
+        "ID": 31137
+      },
+      "atlas_members": [
+        {
+          "member": {
+            "CommittedName": "layout_square_l_icon",
+            "ID": 32711,
+            "UiTextureAtlasID": 3127,
+            "Width": 100,
+            "Height": 100,
+            "CommittedLeft": 1,
+            "CommittedRight": 101,
+            "CommittedTop": 307,
+            "CommittedBottom": 407,
+            "UiTextureAtlasElementID": 31137,
+            "OverrideWidth": 0,
+            "OverrideHeight": 0,
+            "CommittedFlags": 0,
+            "UiCanvasID": 0
+          },
+          "texture": {
+            "ID": 3127,
+            "FileDataID": 6648988,
+            "AtlasWidth": 512,
+            "AtlasHeight": 512,
+            "UiCanvasID": 1
+          }
+        }
+      ]
+    },
+    {
+      "record_id": 3,
+      "name": "储藏室",
+      "client_room": {
+        "Name_lang": "储藏室",
+        "ID": 3,
+        "Field_12_0_0_63967_001": 1,
+        "Flags": 4,
+        "Field_12_0_0_63724_002": 0,
+        "RoomWmoDataID": 4,
+        "UiTextureAtlasElementID": 31130,
+        "WeightCost": 1,
+        "ItemID": 0,
+        "SortPriority": 145
+      },
+      "atlas_element": {
+        "Name": "Layout_Closet_XS_Icon",
+        "ID": 31130
+      },
+      "atlas_members": [
+        {
+          "member": {
+            "CommittedName": "layout_closet_xs_icon",
+            "ID": 32704,
+            "UiTextureAtlasID": 3127,
+            "Width": 100,
+            "Height": 100,
+            "CommittedLeft": 1,
+            "CommittedRight": 101,
+            "CommittedTop": 1,
+            "CommittedBottom": 101,
+            "UiTextureAtlasElementID": 31130,
+            "OverrideWidth": 0,
+            "OverrideHeight": 0,
+            "CommittedFlags": 0,
+            "UiCanvasID": 0
+          },
+          "texture": {
+            "ID": 3127,
+            "FileDataID": 6648988,
+            "AtlasWidth": 512,
+            "AtlasHeight": 512,
+            "UiCanvasID": 1
+          }
+        }
+      ]
+    },
+    {
+      "record_id": 2,
+      "name": "走廊",
+      "client_room": {
+        "Name_lang": "走廊",
+        "ID": 2,
+        "Field_12_0_0_63967_001": 1,
+        "Flags": 4,
+        "Field_12_0_0_63724_002": 0,
+        "RoomWmoDataID": 7,
+        "UiTextureAtlasElementID": 31132,
+        "WeightCost": 3,
+        "ItemID": 0,
+        "SortPriority": 150
+      },
+      "atlas_element": {
+        "Name": "Layout_Hallway_S_Icon",
+        "ID": 31132
+      },
+      "atlas_members": [
+        {
+          "member": {
+            "CommittedName": "layout_hallway_s_icon",
+            "ID": 32706,
+            "UiTextureAtlasID": 3127,
+            "Width": 100,
+            "Height": 100,
+            "CommittedLeft": 205,
+            "CommittedRight": 305,
+            "CommittedTop": 1,
+            "CommittedBottom": 101,
+            "UiTextureAtlasElementID": 31132,
+            "OverrideWidth": 0,
+            "OverrideHeight": 0,
+            "CommittedFlags": 0,
+            "UiCanvasID": 0
+          },
+          "texture": {
+            "ID": 3127,
+            "FileDataID": 6648988,
+            "AtlasWidth": 512,
+            "AtlasHeight": 512,
+            "UiCanvasID": 1
+          }
+        }
+      ]
+    },
+    {
+      "record_id": 14,
+      "name": "八边形房间（小型）",
+      "client_room": {
+        "Name_lang": "八边形房间（小型）",
+        "ID": 14,
+        "Field_12_0_0_63967_001": 1,
+        "Flags": 4,
+        "Field_12_0_0_63724_002": 0,
+        "RoomWmoDataID": 164,
+        "UiTextureAtlasElementID": 31136,
+        "WeightCost": 4,
+        "ItemID": 0,
+        "SortPriority": 210
+      },
+      "atlas_element": {
+        "Name": "Layout_Octogon_S_Icon",
+        "ID": 31136
+      },
+      "atlas_members": [
+        {
+          "member": {
+            "CommittedName": "layout_octogon_s_icon",
+            "ID": 32710,
+            "UiTextureAtlasID": 3127,
+            "Width": 100,
+            "Height": 100,
+            "CommittedLeft": 1,
+            "CommittedRight": 101,
+            "CommittedTop": 205,
+            "CommittedBottom": 305,
+            "UiTextureAtlasElementID": 31136,
+            "OverrideWidth": 0,
+            "OverrideHeight": 0,
+            "CommittedFlags": 0,
+            "UiCanvasID": 0
+          },
+          "texture": {
+            "ID": 3127,
+            "FileDataID": 6648988,
+            "AtlasWidth": 512,
+            "AtlasHeight": 512,
+            "UiCanvasID": 1
+          }
+        }
+      ]
+    },
+    {
+      "record_id": 9,
+      "name": "八边形房间（中型）",
+      "client_room": {
+        "Name_lang": "八边形房间（中型）",
+        "ID": 9,
+        "Field_12_0_0_63967_001": 1,
+        "Flags": 4,
+        "Field_12_0_0_63724_002": 0,
+        "RoomWmoDataID": 165,
+        "UiTextureAtlasElementID": 31135,
+        "WeightCost": 8,
+        "ItemID": 0,
+        "SortPriority": 220
+      },
+      "atlas_element": {
+        "Name": "Layout_Octogon_M_Icon",
+        "ID": 31135
+      },
+      "atlas_members": [
+        {
+          "member": {
+            "CommittedName": "layout_octogon_m_icon",
+            "ID": 32709,
+            "UiTextureAtlasID": 3127,
+            "Width": 100,
+            "Height": 100,
+            "CommittedLeft": 1,
+            "CommittedRight": 101,
+            "CommittedTop": 103,
+            "CommittedBottom": 203,
+            "UiTextureAtlasElementID": 31135,
+            "OverrideWidth": 0,
+            "OverrideHeight": 0,
+            "CommittedFlags": 0,
+            "UiCanvasID": 0
+          },
+          "texture": {
+            "ID": 3127,
+            "FileDataID": 6648988,
+            "AtlasWidth": 512,
+            "AtlasHeight": 512,
+            "UiCanvasID": 1
+          }
+        }
+      ]
+    },
+    {
+      "record_id": 15,
+      "name": "八边形房间（大型）",
+      "client_room": {
+        "Name_lang": "八边形房间（大型）",
+        "ID": 15,
+        "Field_12_0_0_63967_001": 1,
+        "Flags": 0,
+        "Field_12_0_0_63724_002": 0,
+        "RoomWmoDataID": 166,
+        "UiTextureAtlasElementID": 31134,
+        "WeightCost": 16,
+        "ItemID": 0,
+        "SortPriority": 230
+      },
+      "atlas_element": {
+        "Name": "Layout_Octogon_L_Icon",
+        "ID": 31134
+      },
+      "atlas_members": [
+        {
+          "member": {
+            "CommittedName": "layout_octogon_l_icon",
+            "ID": 32708,
+            "UiTextureAtlasID": 3127,
+            "Width": 100,
+            "Height": 100,
+            "CommittedLeft": 409,
+            "CommittedRight": 509,
+            "CommittedTop": 1,
+            "CommittedBottom": 101,
+            "UiTextureAtlasElementID": 31134,
+            "OverrideWidth": 0,
+            "OverrideHeight": 0,
+            "CommittedFlags": 0,
+            "UiCanvasID": 0
+          },
+          "texture": {
+            "ID": 3127,
+            "FileDataID": 6648988,
+            "AtlasWidth": 512,
+            "AtlasHeight": 512,
+            "UiCanvasID": 1
+          }
+        }
+      ]
+    },
+    {
+      "record_id": 8,
+      "name": "L形房间",
+      "client_room": {
+        "Name_lang": "L形房间",
+        "ID": 8,
+        "Field_12_0_0_63967_001": 1,
+        "Flags": 4,
+        "Field_12_0_0_63724_002": 0,
+        "RoomWmoDataID": 163,
+        "UiTextureAtlasElementID": 31133,
+        "WeightCost": 3,
+        "ItemID": 0,
+        "SortPriority": 310
+      },
+      "atlas_element": {
+        "Name": "Layout_L-Shape_S_Icon",
+        "ID": 31133
+      },
+      "atlas_members": [
+        {
+          "member": {
+            "CommittedName": "layout_l-shape_s_icon",
+            "ID": 32707,
+            "UiTextureAtlasID": 3127,
+            "Width": 100,
+            "Height": 100,
+            "CommittedLeft": 307,
+            "CommittedRight": 407,
+            "CommittedTop": 1,
+            "CommittedBottom": 101,
+            "UiTextureAtlasElementID": 31133,
+            "OverrideWidth": 0,
+            "OverrideHeight": 0,
+            "CommittedFlags": 0,
+            "UiCanvasID": 0
+          },
+          "texture": {
+            "ID": 3127,
+            "FileDataID": 6648988,
+            "AtlasWidth": 512,
+            "AtlasHeight": 512,
+            "UiCanvasID": 1
+          }
+        }
+      ]
+    },
+    {
+      "record_id": 6,
+      "name": "T形房间",
+      "client_room": {
+        "Name_lang": "T形房间",
+        "ID": 6,
+        "Field_12_0_0_63967_001": 1,
+        "Flags": 4,
+        "Field_12_0_0_63724_002": 0,
+        "RoomWmoDataID": 162,
+        "UiTextureAtlasElementID": 31143,
+        "WeightCost": 3,
+        "ItemID": 0,
+        "SortPriority": 320
+      },
+      "atlas_element": {
+        "Name": "Layout_T-Shape_S_Icon",
+        "ID": 31143
+      },
+      "atlas_members": [
+        {
+          "member": {
+            "CommittedName": "layout_t-shape_s_icon",
+            "ID": 32717,
+            "UiTextureAtlasID": 3127,
+            "Width": 100,
+            "Height": 100,
+            "CommittedLeft": 307,
+            "CommittedRight": 407,
+            "CommittedTop": 103,
+            "CommittedBottom": 203,
+            "UiTextureAtlasElementID": 31143,
+            "OverrideWidth": 0,
+            "OverrideHeight": 0,
+            "CommittedFlags": 0,
+            "UiCanvasID": 0
+          },
+          "texture": {
+            "ID": 3127,
+            "FileDataID": 6648988,
+            "AtlasWidth": 512,
+            "AtlasHeight": 512,
+            "UiCanvasID": 1
+          }
+        }
+      ]
+    },
+    {
+      "record_id": 13,
+      "name": "十字形房间",
+      "client_room": {
+        "Name_lang": "十字形房间",
+        "ID": 13,
+        "Field_12_0_0_63967_001": 1,
+        "Flags": 4,
+        "Field_12_0_0_63724_002": 0,
+        "RoomWmoDataID": 161,
+        "UiTextureAtlasElementID": 31131,
+        "WeightCost": 4,
+        "ItemID": 0,
+        "SortPriority": 330
+      },
+      "atlas_element": {
+        "Name": "Layout_Cross_S_Icon",
+        "ID": 31131
+      },
+      "atlas_members": [
+        {
+          "member": {
+            "CommittedName": "layout_cross_s_icon",
+            "ID": 32705,
+            "UiTextureAtlasID": 3127,
+            "Width": 100,
+            "Height": 100,
+            "CommittedLeft": 103,
+            "CommittedRight": 203,
+            "CommittedTop": 1,
+            "CommittedBottom": 101,
+            "UiTextureAtlasElementID": 31131,
+            "OverrideWidth": 0,
+            "OverrideHeight": 0,
+            "CommittedFlags": 0,
+            "UiCanvasID": 0
+          },
+          "texture": {
+            "ID": 3127,
+            "FileDataID": 6648988,
+            "AtlasWidth": 512,
+            "AtlasHeight": 512,
+            "UiCanvasID": 1
+          }
+        }
+      ]
+    },
+    {
+      "record_id": 50,
+      "name": "楼梯间（右）",
+      "client_room": {
+        "Name_lang": "楼梯间（右）",
+        "ID": 50,
+        "Field_12_0_0_63967_001": 1,
+        "Flags": 6,
+        "Field_12_0_0_63724_002": 0,
+        "RoomWmoDataID": 180,
+        "UiTextureAtlasElementID": 31141,
+        "WeightCost": 7,
+        "ItemID": 0,
+        "SortPriority": 410
+      },
+      "atlas_element": {
+        "Name": "Layout_Staircase_Mirrored_S_Icon",
+        "ID": 31141
+      },
+      "atlas_members": [
+        {
+          "member": {
+            "CommittedName": "layout_staircase_mirrored_s_icon",
+            "ID": 35039,
+            "UiTextureAtlasID": 3127,
+            "Width": 100,
+            "Height": 100,
+            "CommittedLeft": 409,
+            "CommittedRight": 509,
+            "CommittedTop": 103,
+            "CommittedBottom": 203,
+            "UiTextureAtlasElementID": 31141,
+            "OverrideWidth": 0,
+            "OverrideHeight": 0,
+            "CommittedFlags": 0,
+            "UiCanvasID": 0
+          },
+          "texture": {
+            "ID": 3127,
+            "FileDataID": 6648988,
+            "AtlasWidth": 512,
+            "AtlasHeight": 512,
+            "UiCanvasID": 1
+          }
+        }
+      ]
+    },
+    {
+      "record_id": 10,
+      "name": "楼梯间（左）",
+      "client_room": {
+        "Name_lang": "楼梯间（左）",
+        "ID": 10,
+        "Field_12_0_0_63967_001": 1,
+        "Flags": 6,
+        "Field_12_0_0_63724_002": 0,
+        "RoomWmoDataID": 8,
+        "UiTextureAtlasElementID": 31142,
+        "WeightCost": 7,
+        "ItemID": 0,
+        "SortPriority": 420
+      },
+      "atlas_element": {
+        "Name": "Layout_Staircase_S_Icon",
+        "ID": 31142
+      },
+      "atlas_members": [
+        {
+          "member": {
+            "CommittedName": "layout_staircase_s_icon",
+            "ID": 35040,
+            "UiTextureAtlasID": 3127,
+            "Width": 100,
+            "Height": 100,
+            "CommittedLeft": 103,
+            "CommittedRight": 203,
+            "CommittedTop": 205,
+            "CommittedBottom": 305,
+            "UiTextureAtlasElementID": 31142,
+            "OverrideWidth": 0,
+            "OverrideHeight": 0,
+            "CommittedFlags": 0,
+            "UiCanvasID": 0
+          },
+          "texture": {
+            "ID": 3127,
+            "FileDataID": 6648988,
+            "AtlasWidth": 512,
+            "AtlasHeight": 512,
+            "UiCanvasID": 1
+          }
+        }
+      ]
+    },
+    {
+      "record_id": 48,
+      "name": "楼梯间（空）",
+      "client_room": {
+        "Name_lang": "楼梯间（空）",
+        "ID": 48,
+        "Field_12_0_0_63967_001": 1,
+        "Flags": 6,
+        "Field_12_0_0_63724_002": 0,
+        "RoomWmoDataID": 179,
+        "UiTextureAtlasElementID": 31144,
+        "WeightCost": 6,
+        "ItemID": 0,
+        "SortPriority": 430
+      },
+      "atlas_element": {
+        "Name": "Layout_TallRoom_S_Icon",
+        "ID": 31144
+      },
+      "atlas_members": [
+        {
+          "member": {
+            "CommittedName": "layout_tallroom_s_icon",
+            "ID": 35041,
+            "UiTextureAtlasID": 3127,
+            "Width": 100,
+            "Height": 100,
+            "CommittedLeft": 103,
+            "CommittedRight": 203,
+            "CommittedTop": 307,
+            "CommittedBottom": 407,
+            "UiTextureAtlasElementID": 31144,
+            "OverrideWidth": 0,
+            "OverrideHeight": 0,
+            "CommittedFlags": 0,
+            "UiCanvasID": 0
+          },
+          "texture": {
+            "ID": 3127,
+            "FileDataID": 6648988,
+            "AtlasWidth": 512,
+            "AtlasHeight": 512,
+            "UiCanvasID": 1
+          }
+        }
+      ]
+    },
+    {
+      "record_id": 223,
+      "name": "日光圆形房间",
+      "client_room": {
+        "Name_lang": "日光圆形房间",
+        "ID": 223,
+        "Field_12_0_0_63967_001": 3,
+        "Flags": 8,
+        "Field_12_0_0_63724_002": 0,
+        "RoomWmoDataID": 233,
+        "UiTextureAtlasElementID": 32639,
+        "WeightCost": 8,
+        "ItemID": 272045,
+        "SortPriority": 710
+      },
+      "atlas_element": {
+        "Name": "Full_Layout_Artisinal_Garden_Daylight",
+        "ID": 32639
+      },
+      "atlas_members": [
+        {
+          "member": {
+            "CommittedName": "full_layout_artisinal_garden_daylight",
+            "ID": 35258,
+            "UiTextureAtlasID": 3675,
+            "Width": 162,
+            "Height": 162,
+            "CommittedLeft": 657,
+            "CommittedRight": 819,
+            "CommittedTop": 1,
+            "CommittedBottom": 163,
+            "UiTextureAtlasElementID": 32639,
+            "OverrideWidth": 0,
+            "OverrideHeight": 0,
+            "CommittedFlags": 0,
+            "UiCanvasID": 0
+          },
+          "texture": {
+            "ID": 3675,
+            "FileDataID": 7525545,
+            "AtlasWidth": 1024,
+            "AtlasHeight": 1024,
+            "UiCanvasID": 1
+          }
+        }
+      ]
+    },
+    {
+      "record_id": 233,
+      "name": "夜光圆形房间",
+      "client_room": {
+        "Name_lang": "夜光圆形房间",
+        "ID": 233,
+        "Field_12_0_0_63967_001": 3,
+        "Flags": 8,
+        "Field_12_0_0_63724_002": 0,
+        "RoomWmoDataID": 255,
+        "UiTextureAtlasElementID": 32640,
+        "WeightCost": 8,
+        "ItemID": 0,
+        "SortPriority": 720
+      },
+      "atlas_element": {
+        "Name": "Full_Layout_Artisinal_Garden_Evening",
+        "ID": 32640
+      },
+      "atlas_members": [
+        {
+          "member": {
+            "CommittedName": "full_layout_artisinal_garden_evening",
+            "ID": 35259,
+            "UiTextureAtlasID": 3675,
+            "Width": 162,
+            "Height": 162,
+            "CommittedLeft": 821,
+            "CommittedRight": 983,
+            "CommittedTop": 1,
+            "CommittedBottom": 163,
+            "UiTextureAtlasElementID": 32640,
+            "OverrideWidth": 0,
+            "OverrideHeight": 0,
+            "CommittedFlags": 0,
+            "UiCanvasID": 0
+          },
+          "texture": {
+            "ID": 3675,
+            "FileDataID": 7525545,
+            "AtlasWidth": 1024,
+            "AtlasHeight": 1024,
+            "UiCanvasID": 1
+          }
+        }
+      ]
+    },
+    {
+      "record_id": 296,
+      "name": "天蓝河畔室",
+      "client_room": {
+        "Name_lang": "天蓝河畔室",
+        "ID": 296,
+        "Field_12_0_0_63967_001": 3,
+        "Flags": 8,
+        "Field_12_0_0_63724_002": 0,
+        "RoomWmoDataID": 0,
+        "UiTextureAtlasElementID": 0,
+        "WeightCost": 20,
+        "ItemID": 274677,
+        "SortPriority": 730
+      },
+      "atlas_element": null,
+      "atlas_members": []
+    },
+    {
+      "record_id": 297,
+      "name": "翠绿河畔室",
+      "client_room": {
+        "Name_lang": "翠绿河畔室",
+        "ID": 297,
+        "Field_12_0_0_63967_001": 3,
+        "Flags": 8,
+        "Field_12_0_0_63724_002": 0,
+        "RoomWmoDataID": 0,
+        "UiTextureAtlasElementID": 0,
+        "WeightCost": 20,
+        "ItemID": 274678,
+        "SortPriority": 740
+      },
+      "atlas_element": null,
+      "atlas_members": []
+    },
+    {
+      "record_id": 400,
+      "name": "秋日西部荒野谷仓",
+      "client_room": {
+        "Name_lang": "秋日西部荒野谷仓",
+        "ID": 400,
+        "Field_12_0_0_63967_001": 3,
+        "Flags": 8,
+        "Field_12_0_0_63724_002": 0,
+        "RoomWmoDataID": 378,
+        "UiTextureAtlasElementID": 36094,
+        "WeightCost": 18,
+        "ItemID": 276243,
+        "SortPriority": 750
+      },
+      "atlas_element": {
+        "Name": "Full_Layout_Fall_Prefab_L01",
+        "ID": 36094
+      },
+      "atlas_members": [
+        {
+          "member": {
+            "CommittedName": "full_layout_fall_prefab_l01",
+            "ID": 40756,
+            "UiTextureAtlasID": 3675,
+            "Width": 162,
+            "Height": 162,
+            "CommittedLeft": 165,
+            "CommittedRight": 327,
+            "CommittedTop": 657,
+            "CommittedBottom": 819,
+            "UiTextureAtlasElementID": 36094,
+            "OverrideWidth": 0,
+            "OverrideHeight": 0,
+            "CommittedFlags": 0,
+            "UiCanvasID": 0
+          },
+          "texture": {
+            "ID": 3675,
+            "FileDataID": 7525545,
+            "AtlasWidth": 1024,
+            "AtlasHeight": 1024,
+            "UiCanvasID": 1
+          }
+        }
+      ]
+    },
+    {
+      "record_id": 401,
+      "name": "春日西部荒野谷仓",
+      "client_room": {
+        "Name_lang": "春日西部荒野谷仓",
+        "ID": 401,
+        "Field_12_0_0_63967_001": 3,
+        "Flags": 8,
+        "Field_12_0_0_63724_002": 0,
+        "RoomWmoDataID": 379,
+        "UiTextureAtlasElementID": 36095,
+        "WeightCost": 18,
+        "ItemID": 276244,
+        "SortPriority": 760
+      },
+      "atlas_element": {
+        "Name": "Full_Layout_Fall_Prefab_L02",
+        "ID": 36095
+      },
+      "atlas_members": [
+        {
+          "member": {
+            "CommittedName": "full_layout_fall_prefab_l02",
+            "ID": 40757,
+            "UiTextureAtlasID": 3675,
+            "Width": 162,
+            "Height": 162,
+            "CommittedLeft": 165,
+            "CommittedRight": 327,
+            "CommittedTop": 821,
+            "CommittedBottom": 983,
+            "UiTextureAtlasElementID": 36095,
+            "OverrideWidth": 0,
+            "OverrideHeight": 0,
+            "CommittedFlags": 0,
+            "UiCanvasID": 0
+          },
+          "texture": {
+            "ID": 3675,
+            "FileDataID": 7525545,
+            "AtlasWidth": 1024,
+            "AtlasHeight": 1024,
+            "UiCanvasID": 1
+          }
+        }
+      ]
+    },
+    {
+      "record_id": 294,
+      "name": "奥格瑞玛陈列室",
+      "client_room": {
+        "Name_lang": "奥格瑞玛陈列室",
+        "ID": 294,
+        "Field_12_0_0_63967_001": 3,
+        "Flags": 8,
+        "Field_12_0_0_63724_002": 0,
+        "RoomWmoDataID": 353,
+        "UiTextureAtlasElementID": 35464,
+        "WeightCost": 5,
+        "ItemID": 274676,
+        "SortPriority": 810
+      },
+      "atlas_element": {
+        "Name": "org_displayroom",
+        "ID": 35464
+      },
+      "atlas_members": [
+        {
+          "member": {
+            "CommittedName": "org_displayroom",
+            "ID": 39802,
+            "UiTextureAtlasID": 3675,
+            "Width": 162,
+            "Height": 162,
+            "CommittedLeft": 1,
+            "CommittedRight": 163,
+            "CommittedTop": 329,
+            "CommittedBottom": 491,
+            "UiTextureAtlasElementID": 35464,
+            "OverrideWidth": 0,
+            "OverrideHeight": 0,
+            "CommittedFlags": 0,
+            "UiCanvasID": 0
+          },
+          "texture": {
+            "ID": 3675,
+            "FileDataID": 7525545,
+            "AtlasWidth": 1024,
+            "AtlasHeight": 1024,
+            "UiCanvasID": 1
+          }
+        }
+      ]
+    },
+    {
+      "record_id": 151,
+      "name": "奥格瑞玛石坑室",
+      "client_room": {
+        "Name_lang": "奥格瑞玛石坑室",
+        "ID": 151,
+        "Field_12_0_0_63967_001": 3,
+        "Flags": 8,
+        "Field_12_0_0_63724_002": 0,
+        "RoomWmoDataID": 219,
+        "UiTextureAtlasElementID": 35465,
+        "WeightCost": 5,
+        "ItemID": 274675,
+        "SortPriority": 820
+      },
+      "atlas_element": {
+        "Name": "org_stonepitRoom",
+        "ID": 35465
+      },
+      "atlas_members": [
+        {
+          "member": {
+            "CommittedName": "org_stonepitroom",
+            "ID": 39803,
+            "UiTextureAtlasID": 3675,
+            "Width": 162,
+            "Height": 162,
+            "CommittedLeft": 1,
+            "CommittedRight": 163,
+            "CommittedTop": 493,
+            "CommittedBottom": 655,
+            "UiTextureAtlasElementID": 35465,
+            "OverrideWidth": 0,
+            "OverrideHeight": 0,
+            "CommittedFlags": 0,
+            "UiCanvasID": 0
+          },
+          "texture": {
+            "ID": 3675,
+            "FileDataID": 7525545,
+            "AtlasWidth": 1024,
+            "AtlasHeight": 1024,
+            "UiCanvasID": 1
+          }
+        }
+      ]
+    },
+    {
+      "record_id": 292,
+      "name": "奥格瑞玛剧院",
+      "client_room": {
+        "Name_lang": "奥格瑞玛剧院",
+        "ID": 292,
+        "Field_12_0_0_63967_001": 3,
+        "Flags": 8,
+        "Field_12_0_0_63724_002": 0,
+        "RoomWmoDataID": 352,
+        "UiTextureAtlasElementID": 35466,
+        "WeightCost": 12,
+        "ItemID": 274674,
+        "SortPriority": 830
+      },
+      "atlas_element": {
+        "Name": "org_theaterRoom",
+        "ID": 35466
+      },
+      "atlas_members": [
+        {
+          "member": {
+            "CommittedName": "org_theaterroom",
+            "ID": 39804,
+            "UiTextureAtlasID": 3675,
+            "Width": 162,
+            "Height": 162,
+            "CommittedLeft": 1,
+            "CommittedRight": 163,
+            "CommittedTop": 657,
+            "CommittedBottom": 819,
+            "UiTextureAtlasElementID": 35466,
+            "OverrideWidth": 0,
+            "OverrideHeight": 0,
+            "CommittedFlags": 0,
+            "UiCanvasID": 0
+          },
+          "texture": {
+            "ID": 3675,
+            "FileDataID": 7525545,
+            "AtlasWidth": 1024,
+            "AtlasHeight": 1024,
+            "UiCanvasID": 1
+          }
+        }
+      ]
+    },
+    {
+      "record_id": 132,
+      "name": "奥格瑞玛议事厅",
+      "client_room": {
+        "Name_lang": "奥格瑞玛议事厅",
+        "ID": 132,
+        "Field_12_0_0_63967_001": 3,
+        "Flags": 8,
+        "Field_12_0_0_63724_002": 0,
+        "RoomWmoDataID": 202,
+        "UiTextureAtlasElementID": 35463,
+        "WeightCost": 20,
+        "ItemID": 274673,
+        "SortPriority": 840
+      },
+      "atlas_element": {
+        "Name": "org_councilroom",
+        "ID": 35463
+      },
+      "atlas_members": [
+        {
+          "member": {
+            "CommittedName": "org_councilroom",
+            "ID": 39801,
+            "UiTextureAtlasID": 3675,
+            "Width": 162,
+            "Height": 162,
+            "CommittedLeft": 1,
+            "CommittedRight": 163,
+            "CommittedTop": 165,
+            "CommittedBottom": 327,
+            "UiTextureAtlasElementID": 35463,
+            "OverrideWidth": 0,
+            "OverrideHeight": 0,
+            "CommittedFlags": 0,
+            "UiCanvasID": 0
+          },
+          "texture": {
+            "ID": 3675,
+            "FileDataID": 7525545,
+            "AtlasWidth": 1024,
+            "AtlasHeight": 1024,
+            "UiCanvasID": 1
+          }
+        }
+      ]
+    },
+    {
+      "record_id": 281,
+      "name": "暴风城陈列室",
+      "client_room": {
+        "Name_lang": "暴风城陈列室",
+        "ID": 281,
+        "Field_12_0_0_63967_001": 3,
+        "Flags": 8,
+        "Field_12_0_0_63724_002": 0,
+        "RoomWmoDataID": 328,
+        "UiTextureAtlasElementID": 35472,
+        "WeightCost": 5,
+        "ItemID": 274666,
+        "SortPriority": 910
+      },
+      "atlas_element": {
+        "Name": "stormwind_displayroom",
+        "ID": 35472
+      },
+      "atlas_members": [
+        {
+          "member": {
+            "CommittedName": "stormwind_displayroom",
+            "ID": 39810,
+            "UiTextureAtlasID": 3675,
+            "Width": 162,
+            "Height": 162,
+            "CommittedLeft": 821,
+            "CommittedRight": 983,
+            "CommittedTop": 165,
+            "CommittedBottom": 327,
+            "UiTextureAtlasElementID": 35472,
+            "OverrideWidth": 0,
+            "OverrideHeight": 0,
+            "CommittedFlags": 0,
+            "UiCanvasID": 0
+          },
+          "texture": {
+            "ID": 3675,
+            "FileDataID": 7525545,
+            "AtlasWidth": 1024,
+            "AtlasHeight": 1024,
+            "UiCanvasID": 1
+          }
+        }
+      ]
+    },
+    {
+      "record_id": 277,
+      "name": "暴风城厨房",
+      "client_room": {
+        "Name_lang": "暴风城厨房",
+        "ID": 277,
+        "Field_12_0_0_63967_001": 3,
+        "Flags": 8,
+        "Field_12_0_0_63724_002": 0,
+        "RoomWmoDataID": 326,
+        "UiTextureAtlasElementID": 35474,
+        "WeightCost": 5,
+        "ItemID": 274667,
+        "SortPriority": 920
+      },
+      "atlas_element": {
+        "Name": "stormwind_kitchen",
+        "ID": 35474
+      },
+      "atlas_members": [
+        {
+          "member": {
+            "CommittedName": "stormwind_kitchen",
+            "ID": 39812,
+            "UiTextureAtlasID": 3675,
+            "Width": 162,
+            "Height": 162,
+            "CommittedLeft": 165,
+            "CommittedRight": 327,
+            "CommittedTop": 493,
+            "CommittedBottom": 655,
+            "UiTextureAtlasElementID": 35474,
+            "OverrideWidth": 0,
+            "OverrideHeight": 0,
+            "CommittedFlags": 0,
+            "UiCanvasID": 0
+          },
+          "texture": {
+            "ID": 3675,
+            "FileDataID": 7525545,
+            "AtlasWidth": 1024,
+            "AtlasHeight": 1024,
+            "UiCanvasID": 1
+          }
+        }
+      ]
+    },
+    {
+      "record_id": 273,
+      "name": "暴风城军械库",
+      "client_room": {
+        "Name_lang": "暴风城军械库",
+        "ID": 273,
+        "Field_12_0_0_63967_001": 3,
+        "Flags": 8,
+        "Field_12_0_0_63724_002": 0,
+        "RoomWmoDataID": 305,
+        "UiTextureAtlasElementID": 35471,
+        "WeightCost": 12,
+        "ItemID": 272997,
+        "SortPriority": 930
+      },
+      "atlas_element": {
+        "Name": "stormwind_armory",
+        "ID": 35471
+      },
+      "atlas_members": [
+        {
+          "member": {
+            "CommittedName": "stormwind_armory",
+            "ID": 39809,
+            "UiTextureAtlasID": 3675,
+            "Width": 162,
+            "Height": 162,
+            "CommittedLeft": 657,
+            "CommittedRight": 819,
+            "CommittedTop": 165,
+            "CommittedBottom": 327,
+            "UiTextureAtlasElementID": 35471,
+            "OverrideWidth": 0,
+            "OverrideHeight": 0,
+            "CommittedFlags": 0,
+            "UiCanvasID": 0
+          },
+          "texture": {
+            "ID": 3675,
+            "FileDataID": 7525545,
+            "AtlasWidth": 1024,
+            "AtlasHeight": 1024,
+            "UiCanvasID": 1
+          }
+        }
+      ]
+    },
+    {
+      "record_id": 282,
+      "name": "暴风城大厅",
+      "client_room": {
+        "Name_lang": "暴风城大厅",
+        "ID": 282,
+        "Field_12_0_0_63967_001": 3,
+        "Flags": 8,
+        "Field_12_0_0_63724_002": 0,
+        "RoomWmoDataID": 336,
+        "UiTextureAtlasElementID": 35473,
+        "WeightCost": 20,
+        "ItemID": 274665,
+        "SortPriority": 940
+      },
+      "atlas_element": {
+        "Name": "stormwind_grandhall",
+        "ID": 35473
+      },
+      "atlas_members": [
+        {
+          "member": {
+            "CommittedName": "stormwind_grandhall",
+            "ID": 39811,
+            "UiTextureAtlasID": 3675,
+            "Width": 162,
+            "Height": 162,
+            "CommittedLeft": 165,
+            "CommittedRight": 327,
+            "CommittedTop": 329,
+            "CommittedBottom": 491,
+            "UiTextureAtlasElementID": 35473,
+            "OverrideWidth": 0,
+            "OverrideHeight": 0,
+            "CommittedFlags": 0,
+            "UiCanvasID": 0
+          },
+          "texture": {
+            "ID": 3675,
+            "FileDataID": 7525545,
+            "AtlasWidth": 1024,
+            "AtlasHeight": 1024,
+            "UiCanvasID": 1
+          }
+        }
+      ]
+    },
+    {
+      "record_id": 286,
+      "name": "银月城陈列室",
+      "client_room": {
+        "Name_lang": "银月城陈列室",
+        "ID": 286,
+        "Field_12_0_0_63967_001": 3,
+        "Flags": 8,
+        "Field_12_0_0_63724_002": 0,
+        "RoomWmoDataID": 346,
+        "UiTextureAtlasElementID": 35468,
+        "WeightCost": 5,
+        "ItemID": 274661,
+        "SortPriority": 1010
+      },
+      "atlas_element": {
+        "Name": "silvermoon_displayroom",
+        "ID": 35468
+      },
+      "atlas_members": [
+        {
+          "member": {
+            "CommittedName": "silvermoon_displayroom",
+            "ID": 39806,
+            "UiTextureAtlasID": 3675,
+            "Width": 162,
+            "Height": 162,
+            "CommittedLeft": 165,
+            "CommittedRight": 327,
+            "CommittedTop": 165,
+            "CommittedBottom": 327,
+            "UiTextureAtlasElementID": 35468,
+            "OverrideWidth": 0,
+            "OverrideHeight": 0,
+            "CommittedFlags": 0,
+            "UiCanvasID": 0
+          },
+          "texture": {
+            "ID": 3675,
+            "FileDataID": 7525545,
+            "AtlasWidth": 1024,
+            "AtlasHeight": 1024,
+            "UiCanvasID": 1
+          }
+        }
+      ]
+    },
+    {
+      "record_id": 307,
+      "name": "银月城小型书房",
+      "client_room": {
+        "Name_lang": "银月城小型书房",
+        "ID": 307,
+        "Field_12_0_0_63967_001": 3,
+        "Flags": 8,
+        "Field_12_0_0_63724_002": 0,
+        "RoomWmoDataID": 371,
+        "UiTextureAtlasElementID": 35470,
+        "WeightCost": 5,
+        "ItemID": 274662,
+        "SortPriority": 1020
+      },
+      "atlas_element": {
+        "Name": "silvermoon_smallstudy",
+        "ID": 35470
+      },
+      "atlas_members": [
+        {
+          "member": {
+            "CommittedName": "silvermoon_smallstudy",
+            "ID": 39808,
+            "UiTextureAtlasID": 3675,
+            "Width": 162,
+            "Height": 162,
+            "CommittedLeft": 493,
+            "CommittedRight": 655,
+            "CommittedTop": 165,
+            "CommittedBottom": 327,
+            "UiTextureAtlasElementID": 35470,
+            "OverrideWidth": 0,
+            "OverrideHeight": 0,
+            "CommittedFlags": 0,
+            "UiCanvasID": 0
+          },
+          "texture": {
+            "ID": 3675,
+            "FileDataID": 7525545,
+            "AtlasWidth": 1024,
+            "AtlasHeight": 1024,
+            "UiCanvasID": 1
+          }
+        }
+      ]
+    },
+    {
+      "record_id": 283,
+      "name": "银月城军械库",
+      "client_room": {
+        "Name_lang": "银月城军械库",
+        "ID": 283,
+        "Field_12_0_0_63967_001": 3,
+        "Flags": 8,
+        "Field_12_0_0_63724_002": 0,
+        "RoomWmoDataID": 337,
+        "UiTextureAtlasElementID": 35467,
+        "WeightCost": 12,
+        "ItemID": 274663,
+        "SortPriority": 1030
+      },
+      "atlas_element": {
+        "Name": "silvermoon_armory",
+        "ID": 35467
+      },
+      "atlas_members": [
+        {
+          "member": {
+            "CommittedName": "silvermoon_armory",
+            "ID": 39805,
+            "UiTextureAtlasID": 3675,
+            "Width": 162,
+            "Height": 162,
+            "CommittedLeft": 1,
+            "CommittedRight": 163,
+            "CommittedTop": 821,
+            "CommittedBottom": 983,
+            "UiTextureAtlasElementID": 35467,
+            "OverrideWidth": 0,
+            "OverrideHeight": 0,
+            "CommittedFlags": 0,
+            "UiCanvasID": 0
+          },
+          "texture": {
+            "ID": 3675,
+            "FileDataID": 7525545,
+            "AtlasWidth": 1024,
+            "AtlasHeight": 1024,
+            "UiCanvasID": 1
+          }
+        }
+      ]
+    },
+    {
+      "record_id": 285,
+      "name": "银月城高层书房",
+      "client_room": {
+        "Name_lang": "银月城高层书房",
+        "ID": 285,
+        "Field_12_0_0_63967_001": 3,
+        "Flags": 8,
+        "Field_12_0_0_63724_002": 0,
+        "RoomWmoDataID": 345,
+        "UiTextureAtlasElementID": 35469,
+        "WeightCost": 20,
+        "ItemID": 274664,
+        "SortPriority": 1040
+      },
+      "atlas_element": {
+        "Name": "silvermoon_loftystudy",
+        "ID": 35469
+      },
+      "atlas_members": [
+        {
+          "member": {
+            "CommittedName": "silvermoon_loftystudy",
+            "ID": 39807,
+            "UiTextureAtlasID": 3675,
+            "Width": 162,
+            "Height": 162,
+            "CommittedLeft": 329,
+            "CommittedRight": 491,
+            "CommittedTop": 165,
+            "CommittedBottom": 327,
+            "UiTextureAtlasElementID": 35469,
+            "OverrideWidth": 0,
+            "OverrideHeight": 0,
+            "CommittedFlags": 0,
+            "UiCanvasID": 0
+          },
+          "texture": {
+            "ID": 3675,
+            "FileDataID": 7525545,
+            "AtlasWidth": 1024,
+            "AtlasHeight": 1024,
+            "UiCanvasID": 1
+          }
+        }
+      ]
+    },
+    {
+      "record_id": 290,
+      "name": "贝拉梅斯隐秘卧室",
+      "client_room": {
+        "Name_lang": "贝拉梅斯隐秘卧室",
+        "ID": 290,
+        "Field_12_0_0_63967_001": 3,
+        "Flags": 8,
+        "Field_12_0_0_63724_002": 0,
+        "RoomWmoDataID": 350,
+        "UiTextureAtlasElementID": 35459,
+        "WeightCost": 5,
+        "ItemID": 274671,
+        "SortPriority": 1110
+      },
+      "atlas_element": {
+        "Name": "belameth_bedroom",
+        "ID": 35459
+      },
+      "atlas_members": [
+        {
+          "member": {
+            "CommittedName": "belameth_bedroom",
+            "ID": 39797,
+            "UiTextureAtlasID": 3675,
+            "Width": 162,
+            "Height": 162,
+            "CommittedLeft": 1,
+            "CommittedRight": 163,
+            "CommittedTop": 1,
+            "CommittedBottom": 163,
+            "UiTextureAtlasElementID": 35459,
+            "OverrideWidth": 0,
+            "OverrideHeight": 0,
+            "CommittedFlags": 0,
+            "UiCanvasID": 0
+          },
+          "texture": {
+            "ID": 3675,
+            "FileDataID": 7525545,
+            "AtlasWidth": 1024,
+            "AtlasHeight": 1024,
+            "UiCanvasID": 1
+          }
+        }
+      ]
+    },
+    {
+      "record_id": 289,
+      "name": "贝拉梅斯剧院",
+      "client_room": {
+        "Name_lang": "贝拉梅斯剧院",
+        "ID": 289,
+        "Field_12_0_0_63967_001": 3,
+        "Flags": 8,
+        "Field_12_0_0_63724_002": 0,
+        "RoomWmoDataID": 349,
+        "UiTextureAtlasElementID": 35462,
+        "WeightCost": 5,
+        "ItemID": 274669,
+        "SortPriority": 1120
+      },
+      "atlas_element": {
+        "Name": "belameth_theater",
+        "ID": 35462
+      },
+      "atlas_members": [
+        {
+          "member": {
+            "CommittedName": "belameth_theater",
+            "ID": 39800,
+            "UiTextureAtlasID": 3675,
+            "Width": 162,
+            "Height": 162,
+            "CommittedLeft": 493,
+            "CommittedRight": 655,
+            "CommittedTop": 1,
+            "CommittedBottom": 163,
+            "UiTextureAtlasElementID": 35462,
+            "OverrideWidth": 0,
+            "OverrideHeight": 0,
+            "CommittedFlags": 0,
+            "UiCanvasID": 0
+          },
+          "texture": {
+            "ID": 3675,
+            "FileDataID": 7525545,
+            "AtlasWidth": 1024,
+            "AtlasHeight": 1024,
+            "UiCanvasID": 1
+          }
+        }
+      ]
+    },
+    {
+      "record_id": 288,
+      "name": "贝拉梅斯会议室",
+      "client_room": {
+        "Name_lang": "贝拉梅斯会议室",
+        "ID": 288,
+        "Field_12_0_0_63967_001": 3,
+        "Flags": 8,
+        "Field_12_0_0_63724_002": 0,
+        "RoomWmoDataID": 348,
+        "UiTextureAtlasElementID": 35460,
+        "WeightCost": 12,
+        "ItemID": 274668,
+        "SortPriority": 1130
+      },
+      "atlas_element": {
+        "Name": "belameth_meetingroom",
+        "ID": 35460
+      },
+      "atlas_members": [
+        {
+          "member": {
+            "CommittedName": "belameth_meetingroom",
+            "ID": 39798,
+            "UiTextureAtlasID": 3675,
+            "Width": 162,
+            "Height": 162,
+            "CommittedLeft": 165,
+            "CommittedRight": 327,
+            "CommittedTop": 1,
+            "CommittedBottom": 163,
+            "UiTextureAtlasElementID": 35460,
+            "OverrideWidth": 0,
+            "OverrideHeight": 0,
+            "CommittedFlags": 0,
+            "UiCanvasID": 0
+          },
+          "texture": {
+            "ID": 3675,
+            "FileDataID": 7525545,
+            "AtlasWidth": 1024,
+            "AtlasHeight": 1024,
+            "UiCanvasID": 1
+          }
+        }
+      ]
+    },
+    {
+      "record_id": 287,
+      "name": "贝拉梅斯神殿室",
+      "client_room": {
+        "Name_lang": "贝拉梅斯神殿室",
+        "ID": 287,
+        "Field_12_0_0_63967_001": 3,
+        "Flags": 8,
+        "Field_12_0_0_63724_002": 0,
+        "RoomWmoDataID": 347,
+        "UiTextureAtlasElementID": 35461,
+        "WeightCost": 20,
+        "ItemID": 274670,
+        "SortPriority": 1140
+      },
+      "atlas_element": {
+        "Name": "belameth_templeroom",
+        "ID": 35461
+      },
+      "atlas_members": [
+        {
+          "member": {
+            "CommittedName": "belameth_templeroom",
+            "ID": 39799,
+            "UiTextureAtlasID": 3675,
+            "Width": 162,
+            "Height": 162,
+            "CommittedLeft": 329,
+            "CommittedRight": 491,
+            "CommittedTop": 1,
+            "CommittedBottom": 163,
+            "UiTextureAtlasElementID": 35461,
+            "OverrideWidth": 0,
+            "OverrideHeight": 0,
+            "CommittedFlags": 0,
+            "UiCanvasID": 0
+          },
+          "texture": {
+            "ID": 3675,
+            "FileDataID": 7525545,
+            "AtlasWidth": 1024,
+            "AtlasHeight": 1024,
+            "UiCanvasID": 1
+          }
+        }
+      ]
+    },
+    {
+      "record_id": 113,
+      "name": "Full_Layout_Prefab_S",
+      "client_room": {
+        "Name_lang": "Full_Layout_Prefab_S",
+        "ID": 113,
+        "Field_12_0_0_63967_001": 0,
+        "Flags": 8,
+        "Field_12_0_0_63724_002": 0,
+        "RoomWmoDataID": 187,
+        "UiTextureAtlasElementID": 0,
+        "WeightCost": 100,
+        "ItemID": 274672,
+        "SortPriority": 6000
+      },
+      "atlas_element": null,
+      "atlas_members": []
+    }
+  ]
+}

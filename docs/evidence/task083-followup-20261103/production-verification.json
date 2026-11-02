@@ -1,0 +1,52 @@
+{
+  "executed": true,
+  "sql_sha256": "242660e5062b2732ef3bcebf2b1a1af4e8d7385afc5d935dfcc7d7428a82a41b",
+  "changed_record_ids": [
+    764,
+    925,
+    1154,
+    1261,
+    1674,
+    1730,
+    2324,
+    2431,
+    2432,
+    2434,
+    2587,
+    5796,
+    8176,
+    8238,
+    9290,
+    10368,
+    11455,
+    15583,
+    15747
+  ],
+  "pending_unchanged": [
+    1433,
+    2523,
+    8992,
+    15161,
+    15491,
+    15748,
+    25129,
+    25546,
+    28632
+  ],
+  "backup_hashes": {
+    "catalog-before.json": "1ab4edc16606d96f1a3f647b7eb6ac99dce5d430cf93cf26489c1301ee2a92a9",
+    "catalog-after.json": "f9a952b5d9d7fc1e0a19ad017cadafcfcc003f87f56108d0987c3660640b0c85",
+    "expected-after.json": "1e434e4040cce69203fbabf28f6fa7a11a14b2cc8275f4dd8fb8e34b8e10bd2a",
+    "execution-output.log": "77949df3941ca823b1b2f5bbb75d7791150f6fd00cfd2c8bda95665fd8282899"
+  },
+  "verification": {
+    "count": 2335,
+    "target_count": 19,
+    "mismatch_count": 0,
+    "mismatch_ids": [],
+    "sources_changed": 19,
+    "non_source_fields_changed": 0,
+    "empty_sources_before": 81,
+    "empty_sources_after": 62
+  }
+}

@@ -1,0 +1,660 @@
+{
+  "build": "12.1.5.70688",
+  "source": "local client atlas",
+  "files": [
+    {
+      "record_id": 439,
+      "name": "魂萦幽潮门厅",
+      "src": "assets/decor-icons/room-previews/439.png",
+      "atlas": "12PHShop_ManorPrefabHalloween_IHA01",
+      "texture_file_id": 8425294,
+      "rect": [
+        1,
+        1,
+        163,
+        163
+      ],
+      "dimensions": [
+        162,
+        162
+      ],
+      "sha256": "a8418492c948cd78568892f18612aa01f11bfe15369c6ced4a9bd47a74acdde6"
+    },
+    {
+      "record_id": 7,
+      "name": "方形房间（微小）",
+      "src": "assets/decor-icons/room-previews/7.png",
+      "atlas": "Layout_Square_XS_Icon",
+      "texture_file_id": 6648988,
+      "rect": [
+        205,
+        103,
+        305,
+        203
+      ],
+      "dimensions": [
+        100,
+        100
+      ],
+      "sha256": "ace108451926a89c61c63f75ddc23c3fbde07784a299dd9244c80a1fac83f03c"
+    },
+    {
+      "record_id": 1,
+      "name": "方形房间（小型）",
+      "src": "assets/decor-icons/room-previews/1.png",
+      "atlas": "Layout_Square_S_Icon",
+      "texture_file_id": 6648988,
+      "rect": [
+        103,
+        103,
+        203,
+        203
+      ],
+      "dimensions": [
+        100,
+        100
+      ],
+      "sha256": "9614dcf78bee730b85515df31088cd464b6148b27237400b65facd1ec5096db8"
+    },
+    {
+      "record_id": 11,
+      "name": "方形房间（中型）",
+      "src": "assets/decor-icons/room-previews/11.png",
+      "atlas": "Layout_Square_M_Icon",
+      "texture_file_id": 6648988,
+      "rect": [
+        1,
+        409,
+        101,
+        509
+      ],
+      "dimensions": [
+        100,
+        100
+      ],
+      "sha256": "99591412e1f65809e7827a8f8071661c50110fab44ab3939d53cdac662b7a0b6"
+    },
+    {
+      "record_id": 12,
+      "name": "方形房间（大型）",
+      "src": "assets/decor-icons/room-previews/12.png",
+      "atlas": "Layout_Square_L_Icon",
+      "texture_file_id": 6648988,
+      "rect": [
+        1,
+        307,
+        101,
+        407
+      ],
+      "dimensions": [
+        100,
+        100
+      ],
+      "sha256": "7a89e177b1f42cb598a817b8d3724aa2d700dd59e0ec5f9ed2566354e9687332"
+    },
+    {
+      "record_id": 3,
+      "name": "储藏室",
+      "src": "assets/decor-icons/room-previews/3.png",
+      "atlas": "Layout_Closet_XS_Icon",
+      "texture_file_id": 6648988,
+      "rect": [
+        1,
+        1,
+        101,
+        101
+      ],
+      "dimensions": [
+        100,
+        100
+      ],
+      "sha256": "70a4cf246a94975b0b2286cd43e663e54b209e0c7e43db63cb599a7f7951781a"
+    },
+    {
+      "record_id": 2,
+      "name": "走廊",
+      "src": "assets/decor-icons/room-previews/2.png",
+      "atlas": "Layout_Hallway_S_Icon",
+      "texture_file_id": 6648988,
+      "rect": [
+        205,
+        1,
+        305,
+        101
+      ],
+      "dimensions": [
+        100,
+        100
+      ],
+      "sha256": "bed1dfc4065ab0406eca892320d36388d870e1918e59a62c738bc0ca2a80f6c2"
+    },
+    {
+      "record_id": 14,
+      "name": "八边形房间（小型）",
+      "src": "assets/decor-icons/room-previews/14.png",
+      "atlas": "Layout_Octogon_S_Icon",
+      "texture_file_id": 6648988,
+      "rect": [
+        1,
+        205,
+        101,
+        305
+      ],
+      "dimensions": [
+        100,
+        100
+      ],
+      "sha256": "9207153946d57e780d57fad2de81c1cfd71d47cb7d0a21d35d2718e170053df4"
+    },
+    {
+      "record_id": 9,
+      "name": "八边形房间（中型）",
+      "src": "assets/decor-icons/room-previews/9.png",
+      "atlas": "Layout_Octogon_M_Icon",
+      "texture_file_id": 6648988,
+      "rect": [
+        1,
+        103,
+        101,
+        203
+      ],
+      "dimensions": [
+        100,
+        100
+      ],
+      "sha256": "55870c528b59cf1fa998f889109c3ec1e6a821099a3eaf9edad36f12776e0c24"
+    },
+    {
+      "record_id": 15,
+      "name": "八边形房间（大型）",
+      "src": "assets/decor-icons/room-previews/15.png",
+      "atlas": "Layout_Octogon_L_Icon",
+      "texture_file_id": 6648988,
+      "rect": [
+        409,
+        1,
+        509,
+        101
+      ],
+      "dimensions": [
+        100,
+        100
+      ],
+      "sha256": "c4917ae5a4eabf64b64134ff9c73afb8ca31e0efe7f342c7c43d84581a2e1539"
+    },
+    {
+      "record_id": 8,
+      "name": "L形房间",
+      "src": "assets/decor-icons/room-previews/8.png",
+      "atlas": "Layout_L-Shape_S_Icon",
+      "texture_file_id": 6648988,
+      "rect": [
+        307,
+        1,
+        407,
+        101
+      ],
+      "dimensions": [
+        100,
+        100
+      ],
+      "sha256": "1fbc11c39651b2b8c66c25caff1182f6dddb77d65f68cfd74a486b4ecc35393b"
+    },
+    {
+      "record_id": 6,
+      "name": "T形房间",
+      "src": "assets/decor-icons/room-previews/6.png",
+      "atlas": "Layout_T-Shape_S_Icon",
+      "texture_file_id": 6648988,
+      "rect": [
+        307,
+        103,
+        407,
+        203
+      ],
+      "dimensions": [
+        100,
+        100
+      ],
+      "sha256": "ea54acadb799e9a5199f83baa60470189ca37cb0af11c8d743570d70a52aa143"
+    },
+    {
+      "record_id": 13,
+      "name": "十字形房间",
+      "src": "assets/decor-icons/room-previews/13.png",
+      "atlas": "Layout_Cross_S_Icon",
+      "texture_file_id": 6648988,
+      "rect": [
+        103,
+        1,
+        203,
+        101
+      ],
+      "dimensions": [
+        100,
+        100
+      ],
+      "sha256": "3b11938c4c14e12d95ab76232caa0c58302cc1adf2d321bae46ff12d7f5a6b60"
+    },
+    {
+      "record_id": 50,
+      "name": "楼梯间（右）",
+      "src": "assets/decor-icons/room-previews/50.png",
+      "atlas": "Layout_Staircase_Mirrored_S_Icon",
+      "texture_file_id": 6648988,
+      "rect": [
+        409,
+        103,
+        509,
+        203
+      ],
+      "dimensions": [
+        100,
+        100
+      ],
+      "sha256": "ce84b83f895298310c1afe1302bcf5dd84fb158505268da2d0092be226789f30"
+    },
+    {
+      "record_id": 10,
+      "name": "楼梯间（左）",
+      "src": "assets/decor-icons/room-previews/10.png",
+      "atlas": "Layout_Staircase_S_Icon",
+      "texture_file_id": 6648988,
+      "rect": [
+        103,
+        205,
+        203,
+        305
+      ],
+      "dimensions": [
+        100,
+        100
+      ],
+      "sha256": "e9af9b55536602291d67f2d7872de677c9b172654044e7abe7999b60dcd15168"
+    },
+    {
+      "record_id": 48,
+      "name": "楼梯间（空）",
+      "src": "assets/decor-icons/room-previews/48.png",
+      "atlas": "Layout_TallRoom_S_Icon",
+      "texture_file_id": 6648988,
+      "rect": [
+        103,
+        307,
+        203,
+        407
+      ],
+      "dimensions": [
+        100,
+        100
+      ],
+      "sha256": "3840ed99871add25e25b0317366c8ff61fc94367c75f6b2b07c0f9da9a482800"
+    },
+    {
+      "record_id": 223,
+      "name": "日光圆形房间",
+      "src": "assets/decor-icons/room-previews/223.png",
+      "atlas": "Full_Layout_Artisinal_Garden_Daylight",
+      "texture_file_id": 7525545,
+      "rect": [
+        657,
+        1,
+        819,
+        163
+      ],
+      "dimensions": [
+        162,
+        162
+      ],
+      "sha256": "46e6aa878df606a6de2afa37b59a79dec6db9aadaa9a808cfc949adb2af7b30a"
+    },
+    {
+      "record_id": 233,
+      "name": "夜光圆形房间",
+      "src": "assets/decor-icons/room-previews/233.png",
+      "atlas": "Full_Layout_Artisinal_Garden_Evening",
+      "texture_file_id": 7525545,
+      "rect": [
+        821,
+        1,
+        983,
+        163
+      ],
+      "dimensions": [
+        162,
+        162
+      ],
+      "sha256": "3217cd825fb1f4a503fd631cf9494af5e1cf2e680e28a36df3ae85a58608824b"
+    },
+    {
+      "record_id": 400,
+      "name": "秋日西部荒野谷仓",
+      "src": "assets/decor-icons/room-previews/400.png",
+      "atlas": "Full_Layout_Fall_Prefab_L01",
+      "texture_file_id": 7525545,
+      "rect": [
+        165,
+        657,
+        327,
+        819
+      ],
+      "dimensions": [
+        162,
+        162
+      ],
+      "sha256": "9439552df0f08a7af18d6bbd97875c8403e38eb6859f589593c24361ef4095f9"
+    },
+    {
+      "record_id": 401,
+      "name": "春日西部荒野谷仓",
+      "src": "assets/decor-icons/room-previews/401.png",
+      "atlas": "Full_Layout_Fall_Prefab_L02",
+      "texture_file_id": 7525545,
+      "rect": [
+        165,
+        821,
+        327,
+        983
+      ],
+      "dimensions": [
+        162,
+        162
+      ],
+      "sha256": "a98e5c87a167b2adc8456a0470a77e3ebd79d1895fc6d212eb4670702da7cc50"
+    },
+    {
+      "record_id": 294,
+      "name": "奥格瑞玛陈列室",
+      "src": "assets/decor-icons/room-previews/294.png",
+      "atlas": "org_displayroom",
+      "texture_file_id": 7525545,
+      "rect": [
+        1,
+        329,
+        163,
+        491
+      ],
+      "dimensions": [
+        162,
+        162
+      ],
+      "sha256": "f7be05c107285c22572c4c070cbdf413f05c361778cf3c81324b5ce5f936f572"
+    },
+    {
+      "record_id": 151,
+      "name": "奥格瑞玛石坑室",
+      "src": "assets/decor-icons/room-previews/151.png",
+      "atlas": "org_stonepitRoom",
+      "texture_file_id": 7525545,
+      "rect": [
+        1,
+        493,
+        163,
+        655
+      ],
+      "dimensions": [
+        162,
+        162
+      ],
+      "sha256": "cee32308c77793343e0e2a974790560a2bb83eba5be6265f26ecb9f4bd9845ca"
+    },
+    {
+      "record_id": 292,
+      "name": "奥格瑞玛剧院",
+      "src": "assets/decor-icons/room-previews/292.png",
+      "atlas": "org_theaterRoom",
+      "texture_file_id": 7525545,
+      "rect": [
+        1,
+        657,
+        163,
+        819
+      ],
+      "dimensions": [
+        162,
+        162
+      ],
+      "sha256": "7f60ecf2e819c1225fb519e99d760d577e2eeaffb3e0c9c017aa4d203fdd9d5f"
+    },
+    {
+      "record_id": 132,
+      "name": "奥格瑞玛议事厅",
+      "src": "assets/decor-icons/room-previews/132.png",
+      "atlas": "org_councilroom",
+      "texture_file_id": 7525545,
+      "rect": [
+        1,
+        165,
+        163,
+        327
+      ],
+      "dimensions": [
+        162,
+        162
+      ],
+      "sha256": "d3dcc695b19ce2a3346daedaa29fa863ee67147cb66915a8584e27ece670781f"
+    },
+    {
+      "record_id": 281,
+      "name": "暴风城陈列室",
+      "src": "assets/decor-icons/room-previews/281.png",
+      "atlas": "stormwind_displayroom",
+      "texture_file_id": 7525545,
+      "rect": [
+        821,
+        165,
+        983,
+        327
+      ],
+      "dimensions": [
+        162,
+        162
+      ],
+      "sha256": "aaa9d2166b831a824c8d51b22c1b47d9328fe018eed9103d12e8455a11166bdb"
+    },
+    {
+      "record_id": 277,
+      "name": "暴风城厨房",
+      "src": "assets/decor-icons/room-previews/277.png",
+      "atlas": "stormwind_kitchen",
+      "texture_file_id": 7525545,
+      "rect": [
+        165,
+        493,
+        327,
+        655
+      ],
+      "dimensions": [
+        162,
+        162
+      ],
+      "sha256": "76029dff36fbb660fe83d44cf32b2ae8e80c0cc20c59857ab89a3ca8172c642c"
+    },
+    {
+      "record_id": 273,
+      "name": "暴风城军械库",
+      "src": "assets/decor-icons/room-previews/273.png",
+      "atlas": "stormwind_armory",
+      "texture_file_id": 7525545,
+      "rect": [
+        657,
+        165,
+        819,
+        327
+      ],
+      "dimensions": [
+        162,
+        162
+      ],
+      "sha256": "cd833133e96569ae06bb597e37127f245b36f27d01a9f473bae87daaa342345b"
+    },
+    {
+      "record_id": 282,
+      "name": "暴风城大厅",
+      "src": "assets/decor-icons/room-previews/282.png",
+      "atlas": "stormwind_grandhall",
+      "texture_file_id": 7525545,
+      "rect": [
+        165,
+        329,
+        327,
+        491
+      ],
+      "dimensions": [
+        162,
+        162
+      ],
+      "sha256": "62c1db52c8ba4b36ce587a117ae5cd9af2f10ab92ab3a59720ec1eef69333248"
+    },
+    {
+      "record_id": 286,
+      "name": "银月城陈列室",
+      "src": "assets/decor-icons/room-previews/286.png",
+      "atlas": "silvermoon_displayroom",
+      "texture_file_id": 7525545,
+      "rect": [
+        165,
+        165,
+        327,
+        327
+      ],
+      "dimensions": [
+        162,
+        162
+      ],
+      "sha256": "5dd1974d283f94a7dfad911c547247938d3ea8976faf7d133ffa468b96d30bfd"
+    },
+    {
+      "record_id": 307,
+      "name": "银月城小型书房",
+      "src": "assets/decor-icons/room-previews/307.png",
+      "atlas": "silvermoon_smallstudy",
+      "texture_file_id": 7525545,
+      "rect": [
+        493,
+        165,
+        655,
+        327
+      ],
+      "dimensions": [
+        162,
+        162
+      ],
+      "sha256": "6856b150faffaebd9d687f8f661c35cdeb51c0620fec3f12b44bbf200481f0bd"
+    },
+    {
+      "record_id": 283,
+      "name": "银月城军械库",
+      "src": "assets/decor-icons/room-previews/283.png",
+      "atlas": "silvermoon_armory",
+      "texture_file_id": 7525545,
+      "rect": [
+        1,
+        821,
+        163,
+        983
+      ],
+      "dimensions": [
+        162,
+        162
+      ],
+      "sha256": "6050c6a731d2b5ec6be516f7dfe8f89c8503d4377d6faa772693e24a9e08b7ce"
+    },
+    {
+      "record_id": 285,
+      "name": "银月城高层书房",
+      "src": "assets/decor-icons/room-previews/285.png",
+      "atlas": "silvermoon_loftystudy",
+      "texture_file_id": 7525545,
+      "rect": [
+        329,
+        165,
+        491,
+        327
+      ],
+      "dimensions": [
+        162,
+        162
+      ],
+      "sha256": "53b4f7c57cd650acccf976f20aa317cd4599f955c3f50585ed9b7f0f84689a9a"
+    },
+    {
+      "record_id": 290,
+      "name": "贝拉梅斯隐秘卧室",
+      "src": "assets/decor-icons/room-previews/290.png",
+      "atlas": "belameth_bedroom",
+      "texture_file_id": 7525545,
+      "rect": [
+        1,
+        1,
+        163,
+        163
+      ],
+      "dimensions": [
+        162,
+        162
+      ],
+      "sha256": "b6704990e961aeaec02c672133d59eb4ac065a1792bc27b814a53c2fa834f45d"
+    },
+    {
+      "record_id": 289,
+      "name": "贝拉梅斯剧院",
+      "src": "assets/decor-icons/room-previews/289.png",
+      "atlas": "belameth_theater",
+      "texture_file_id": 7525545,
+      "rect": [
+        493,
+        1,
+        655,
+        163
+      ],
+      "dimensions": [
+        162,
+        162
+      ],
+      "sha256": "655a350c5453e597595f60466b10db16883ff6abd29624602b5d05046ada1c36"
+    },
+    {
+      "record_id": 288,
+      "name": "贝拉梅斯会议室",
+      "src": "assets/decor-icons/room-previews/288.png",
+      "atlas": "belameth_meetingroom",
+      "texture_file_id": 7525545,
+      "rect": [
+        165,
+        1,
+        327,
+        163
+      ],
+      "dimensions": [
+        162,
+        162
+      ],
+      "sha256": "9be5f3e00e874d3a4e5d6b7be22180b0b5cd58f05033e64d0004a24c805efb86"
+    },
+    {
+      "record_id": 287,
+      "name": "贝拉梅斯神殿室",
+      "src": "assets/decor-icons/room-previews/287.png",
+      "atlas": "belameth_templeroom",
+      "texture_file_id": 7525545,
+      "rect": [
+        329,
+        1,
+        491,
+        163
+      ],
+      "dimensions": [
+        162,
+        162
+      ],
+      "sha256": "10bdc867100ea5748673aa77f00bdf2edae5e0c31278a34ffdcf3fb83ba21190"
+    }
+  ],
+  "missing": [
+    291,
+    296,
+    297,
+    113
+  ]
+}

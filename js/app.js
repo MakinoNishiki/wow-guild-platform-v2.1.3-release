@@ -8640,6 +8640,14 @@ function lootFillAssignedTo(idOrName) {
 // ==================== 更新日志 ====================
 const changelogData = [
   {
+    id: 'v3.2.0-req176-room-previews', version: 'v3.2.0', date: '2026-11-03',
+    type: 'improve', typeLabel: '功能优化', title: '房间户型预览与获取说明补充',
+    summary: '为36种房间补充当前客户端的户型图或室内预览，补充21种房间的图纸购买、等级解锁和商城来源。',
+    details: ['基础房型展示平面轮廓，主题房间展示对应预览；新增“解锁”来源筛选。',
+      '日光／夜光圆形房间分别标注住宅等级3／5解锁；未核实的售价与来源保持待核。',
+      '6件阿曼尼家具补出已确认的掉落和宝藏途径，仍保留采集原文并明确标记待核实。']
+  },
+  {
     id: 'v3.2.0-task83-source-followup', version: 'v3.2.0', date: '2026-11-03',
     type: 'fix', typeLabel: '修复BUG', title: '家宅来源分类补齐与获取说明保留',
     summary: '补齐19件装饰的任务、活动、宝藏等来源分类，保留获取地点和相关物品、工作说明。',

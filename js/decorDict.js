@@ -94,7 +94,7 @@
   // ---- 品质名（着色走 CSS .dh-q0~q5；值域实测 0-4，5 定义保留无害） ----
   const QUALITY_NAMES = { 0: '粗糙', 1: '普通', 2: '优秀', 3: '精良', 4: '史诗', 5: '传说' };
 
-  // ---- 来源类型筛选签（十类 = 九类 sources type + 「无来源」（sources 空数组）） ----
+  // ---- 来源类型筛选签（十一类 = 十类 sources type + 「无来源」（sources 空数组）） ----
   const SOURCE_TYPES = [
     { key: 'vendor', label: '商人' },
     { key: 'quest', label: '任务' },
@@ -104,6 +104,7 @@
     { key: 'shop', label: '商城' },
     { key: 'treasure', label: '宝藏' },
     { key: 'event', label: '事件' },
+    { key: 'unlock', label: '解锁' },
     { key: 'festival_note', label: '节日' },
     { key: 'none', label: '无来源' },
   ];
@@ -179,6 +180,46 @@
   ];
 
   // #84：静态模型缩略图；新官方目录图优先，原物品图ID只作回退识别。
+  // REQ-176: current client HouseRoom -> UI atlas crops; no guessed room images.
+  const ROOM_ICON_OVERRIDES = {
+  "439": "assets/decor-icons/room-previews/439.png",
+  "7": "assets/decor-icons/room-previews/7.png",
+  "1": "assets/decor-icons/room-previews/1.png",
+  "11": "assets/decor-icons/room-previews/11.png",
+  "12": "assets/decor-icons/room-previews/12.png",
+  "3": "assets/decor-icons/room-previews/3.png",
+  "2": "assets/decor-icons/room-previews/2.png",
+  "14": "assets/decor-icons/room-previews/14.png",
+  "9": "assets/decor-icons/room-previews/9.png",
+  "15": "assets/decor-icons/room-previews/15.png",
+  "8": "assets/decor-icons/room-previews/8.png",
+  "6": "assets/decor-icons/room-previews/6.png",
+  "13": "assets/decor-icons/room-previews/13.png",
+  "50": "assets/decor-icons/room-previews/50.png",
+  "10": "assets/decor-icons/room-previews/10.png",
+  "48": "assets/decor-icons/room-previews/48.png",
+  "223": "assets/decor-icons/room-previews/223.png",
+  "233": "assets/decor-icons/room-previews/233.png",
+  "400": "assets/decor-icons/room-previews/400.png",
+  "401": "assets/decor-icons/room-previews/401.png",
+  "294": "assets/decor-icons/room-previews/294.png",
+  "151": "assets/decor-icons/room-previews/151.png",
+  "292": "assets/decor-icons/room-previews/292.png",
+  "132": "assets/decor-icons/room-previews/132.png",
+  "281": "assets/decor-icons/room-previews/281.png",
+  "277": "assets/decor-icons/room-previews/277.png",
+  "273": "assets/decor-icons/room-previews/273.png",
+  "282": "assets/decor-icons/room-previews/282.png",
+  "286": "assets/decor-icons/room-previews/286.png",
+  "307": "assets/decor-icons/room-previews/307.png",
+  "283": "assets/decor-icons/room-previews/283.png",
+  "285": "assets/decor-icons/room-previews/285.png",
+  "290": "assets/decor-icons/room-previews/290.png",
+  "289": "assets/decor-icons/room-previews/289.png",
+  "288": "assets/decor-icons/room-previews/288.png",
+  "287": "assets/decor-icons/room-previews/287.png"
+};
+
   const MODEL_ICON_OVERRIDES = {
     "28559": { "src": "assets/decor-icons/model-previews/28559.png", "fallbackIconId": 8179967 },
   "27684": {
@@ -284,7 +325,7 @@
 };
 
   window.DecorDict = {
-    MODEL_ICON_OVERRIDES,
+    MODEL_ICON_OVERRIDES, ROOM_ICON_OVERRIDES,
     CURRENCY_NAMES, ITEM_NAMES, TEXTURE_CURRENCY_NAMES,
     CATEGORY_NAMES, CATEGORY_FILTER_ORDER, SUBCATEGORY_NAMES,
     PET_SUBCATEGORY_ID, SIZE_NAMES, QUALITY_NAMES,
