@@ -8640,6 +8640,14 @@ function lootFillAssignedTo(idOrName) {
 // ==================== 更新日志 ====================
 const changelogData = [
   {
+    id: 'v3.2.0-task83-source-followup', version: 'v3.2.0', date: '2026-11-03',
+    type: 'fix', typeLabel: '修复BUG', title: '家宅来源分类补齐与获取说明保留',
+    summary: '补齐19件装饰的任务、活动、宝藏等来源分类，保留获取地点和相关物品、工作说明。',
+    details: ['周常任务和要塞任务保留游戏内原标签；活动来源显示地点。',
+      '相关物品、宝箱和工作说明随来源一并展示，避免分类后遗漏获取条件。',
+      '另9件来源或价格仍待核实，保留游戏原文，不猜测获取方式或修改价格。']
+  },
+  {
     id: 'v3.2.0-task83-decor-refresh', version: 'v3.2.0', date: '2026-11-02',
     type: 'fix', typeLabel: '修复BUG', title: '家宅装饰信息同步至12.1.5',
     summary: '同步2335条家宅目录，补入22条新记录，更新来源价格、名称、分类和标签等游戏信息。',

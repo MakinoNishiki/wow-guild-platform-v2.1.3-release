@@ -393,6 +393,15 @@
   }
 
   function sourceText(s) {
+    // #83补丁2：获取上下文不等于独立途径；与主来源一并展示，统一走调用方esc。
+    const text = sourceBaseText(s);
+    const context = Array.isArray(s.context) ? s.context
+      .filter(c => c && typeof c.label === 'string' && typeof c.value === 'string')
+      .map(c => `${c.label}：${c.value}`).join(' · ') : '';
+    return context ? `${text} · ${context}` : text;
+  }
+
+  function sourceBaseText(s) {
     const zones = Array.isArray(s.zones) && s.zones.length ? `（${s.zones.join('、')}）` : '';
     switch (s.type) {
       case 'shop': return '商城购买';
@@ -404,11 +413,11 @@
         return t;
       }
       case 'drop': return `掉落：${s.drop}${zones}`;
-      case 'quest': return `任务：${s.quest}${zones}`;
+      case 'quest': return `${s.source_label || '任务'}：${s.quest}${zones}`;
       case 'achievement': return `成就：${s.achievement}${s.category ? `（${s.category}）` : ''}`;
       case 'profession': return `制造：${s.profession}`;
       case 'treasure': return `宝藏：${s.treasure}${zones}`;
-      case 'event': return `事件：${s.event}`;
+      case 'event': return `${s.source_label || '事件'}：${s.event}${zones}`;
       case 'festival_note': return s.note || '';
       default: return '';
     }

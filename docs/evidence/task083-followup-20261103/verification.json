@@ -1,0 +1,241 @@
+{
+  "source": "offline Chrome fixture; real product renderer; no production DB",
+  "cases": [
+    {
+      "width": 1366,
+      "shell": false,
+      "record_id": 764,
+      "text": "活动：剧场巡演\n宝藏：业余演员的宝箱、杰出演员的宝箱（多恩岛）"
+    },
+    {
+      "width": 1366,
+      "shell": false,
+      "record_id": 925,
+      "text": "要塞任务：突袭沙塔斯港口（塔拉多）"
+    },
+    {
+      "width": 1366,
+      "shell": false,
+      "record_id": 1154,
+      "text": "周常任务：精选之礼（创始者之角、烈风海岸） · 物品：奥术秘藏光球"
+    },
+    {
+      "width": 1366,
+      "shell": false,
+      "record_id": 1261,
+      "text": "活动：货运与接收（安德麦） · 工作：法定休假"
+    },
+    {
+      "width": 1366,
+      "shell": false,
+      "record_id": 1674,
+      "text": "成就：上痛！上诅咒！上钉刺！（25人）（巫妖王团队） · 物品：货真价实、如假包换的龙母的徽记\n商人：埃克斯勒（尘泥沼泽） · 250 金"
+    },
+    {
+      "width": 1366,
+      "shell": false,
+      "record_id": 1730,
+      "text": "周常任务：精选之礼（创始者之角、烈风海岸） · 物品：奥术秘藏光球"
+    },
+    {
+      "width": 1366,
+      "shell": false,
+      "record_id": 2324,
+      "text": "活动：日常任务（麦卡贡） · 物品：自动拼装式家具包"
+    },
+    {
+      "width": 1366,
+      "shell": false,
+      "record_id": 2431,
+      "text": "活动：日常任务（麦卡贡） · 物品：自动拼装式家具包"
+    },
+    {
+      "width": 1366,
+      "shell": false,
+      "record_id": 2432,
+      "text": "活动：日常任务（麦卡贡） · 物品：自动拼装式家具包"
+    },
+    {
+      "width": 1366,
+      "shell": false,
+      "record_id": 2434,
+      "text": "活动：日常任务（麦卡贡） · 物品：自动拼装式家具包"
+    },
+    {
+      "width": 1366,
+      "shell": false,
+      "record_id": 2587,
+      "text": "周常任务：精选之礼（创始者之角、烈风海岸） · 物品：奥术秘藏光球"
+    },
+    {
+      "width": 1366,
+      "shell": false,
+      "record_id": 5796,
+      "text": "周常任务：精选之礼（创始者之角、烈风海岸） · 物品：奥术秘藏光球"
+    },
+    {
+      "width": 1366,
+      "shell": false,
+      "record_id": 8176,
+      "text": "要塞任务：突击索克雷萨高地（影月谷）"
+    },
+    {
+      "width": 1366,
+      "shell": false,
+      "record_id": 8238,
+      "text": "要塞任务：突袭沙塔斯市中心（塔拉多）"
+    },
+    {
+      "width": 1366,
+      "shell": false,
+      "record_id": 9290,
+      "text": "周常任务：精选之礼（创始者之角、烈风海岸） · 物品：奥术秘藏光球"
+    },
+    {
+      "width": 1366,
+      "shell": false,
+      "record_id": 10368,
+      "text": "周常任务：精选之礼（创始者之角、烈风海岸） · 物品：奥术秘藏光球"
+    },
+    {
+      "width": 1366,
+      "shell": false,
+      "record_id": 11455,
+      "text": "成就：地心寻魂（特色更新） · 物品：伪造的迦拉克隆幽暗之心\n商人：斯塔克斯·紧身（安德麦） · 15000 × 共鸣水晶"
+    },
+    {
+      "width": 1366,
+      "shell": false,
+      "record_id": 15583,
+      "text": "活动：斯托玛兰突袭战\n宝藏：胜利的斯托玛兰巅峰之箱（虚影风暴）"
+    },
+    {
+      "width": 1366,
+      "shell": false,
+      "record_id": 15747,
+      "text": "活动：斯托玛兰突袭战\n宝藏：胜利的斯托玛兰巅峰之箱（虚影风暴）"
+    },
+    {
+      "width": 1920,
+      "shell": true,
+      "record_id": 764,
+      "text": "活动：剧场巡演\n宝藏：业余演员的宝箱、杰出演员的宝箱（多恩岛）"
+    },
+    {
+      "width": 1920,
+      "shell": true,
+      "record_id": 925,
+      "text": "要塞任务：突袭沙塔斯港口（塔拉多）"
+    },
+    {
+      "width": 1920,
+      "shell": true,
+      "record_id": 1154,
+      "text": "周常任务：精选之礼（创始者之角、烈风海岸） · 物品：奥术秘藏光球"
+    },
+    {
+      "width": 1920,
+      "shell": true,
+      "record_id": 1261,
+      "text": "活动：货运与接收（安德麦） · 工作：法定休假"
+    },
+    {
+      "width": 1920,
+      "shell": true,
+      "record_id": 1674,
+      "text": "成就：上痛！上诅咒！上钉刺！（25人）（巫妖王团队） · 物品：货真价实、如假包换的龙母的徽记\n商人：埃克斯勒（尘泥沼泽） · 250 金"
+    },
+    {
+      "width": 1920,
+      "shell": true,
+      "record_id": 1730,
+      "text": "周常任务：精选之礼（创始者之角、烈风海岸） · 物品：奥术秘藏光球"
+    },
+    {
+      "width": 1920,
+      "shell": true,
+      "record_id": 2324,
+      "text": "活动：日常任务（麦卡贡） · 物品：自动拼装式家具包"
+    },
+    {
+      "width": 1920,
+      "shell": true,
+      "record_id": 2431,
+      "text": "活动：日常任务（麦卡贡） · 物品：自动拼装式家具包"
+    },
+    {
+      "width": 1920,
+      "shell": true,
+      "record_id": 2432,
+      "text": "活动：日常任务（麦卡贡） · 物品：自动拼装式家具包"
+    },
+    {
+      "width": 1920,
+      "shell": true,
+      "record_id": 2434,
+      "text": "活动：日常任务（麦卡贡） · 物品：自动拼装式家具包"
+    },
+    {
+      "width": 1920,
+      "shell": true,
+      "record_id": 2587,
+      "text": "周常任务：精选之礼（创始者之角、烈风海岸） · 物品：奥术秘藏光球"
+    },
+    {
+      "width": 1920,
+      "shell": true,
+      "record_id": 5796,
+      "text": "周常任务：精选之礼（创始者之角、烈风海岸） · 物品：奥术秘藏光球"
+    },
+    {
+      "width": 1920,
+      "shell": true,
+      "record_id": 8176,
+      "text": "要塞任务：突击索克雷萨高地（影月谷）"
+    },
+    {
+      "width": 1920,
+      "shell": true,
+      "record_id": 8238,
+      "text": "要塞任务：突袭沙塔斯市中心（塔拉多）"
+    },
+    {
+      "width": 1920,
+      "shell": true,
+      "record_id": 9290,
+      "text": "周常任务：精选之礼（创始者之角、烈风海岸） · 物品：奥术秘藏光球"
+    },
+    {
+      "width": 1920,
+      "shell": true,
+      "record_id": 10368,
+      "text": "周常任务：精选之礼（创始者之角、烈风海岸） · 物品：奥术秘藏光球"
+    },
+    {
+      "width": 1920,
+      "shell": true,
+      "record_id": 11455,
+      "text": "成就：地心寻魂（特色更新） · 物品：伪造的迦拉克隆幽暗之心\n商人：斯塔克斯·紧身（安德麦） · 15000 × 共鸣水晶"
+    },
+    {
+      "width": 1920,
+      "shell": true,
+      "record_id": 15583,
+      "text": "活动：斯托玛兰突袭战\n宝藏：胜利的斯托玛兰巅峰之箱（虚影风暴）"
+    },
+    {
+      "width": 1920,
+      "shell": true,
+      "record_id": 15747,
+      "text": "活动：斯托玛兰突袭战\n宝藏：胜利的斯托玛兰巅峰之箱（虚影风暴）"
+    }
+  ],
+  "remaining": 9,
+  "errors": [],
+  "sourceFilters": true,
+  "empty": true,
+  "longText": true,
+  "escaping": true,
+  "legacy": true,
+  "networkRetry": true
+}

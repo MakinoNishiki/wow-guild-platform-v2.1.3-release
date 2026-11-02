@@ -1,0 +1,22 @@
+{
+  "date": "2026-11-03",
+  "video_url": "https://www.bilibili.com/video/BV1k1sR64EyJ",
+  "duration_seconds": 742.566625,
+  "video_downloaded": true,
+  "audio_downloaded": false,
+  "public_subtitles": false,
+  "review_method": "one-frame-per-minute contact sheet; not full narrated viewing",
+  "credentials_used": false,
+  "source_repo": "https://github.com/Rj-pretending-afk/wow-class-picker",
+  "source_ref": "main (snapshot archive hash below; not a verified commit SHA)",
+  "files": {
+    "reference.f100023.mp4": {
+      "bytes": 8286311,
+      "sha256": "910c0a4fa23a0d0de1f4a43c620e5b55e7d4af7cef38e4f4f000c58e9d86cd62"
+    },
+    "wow-class-picker-main.zip": {
+      "bytes": 12796965,
+      "sha256": "b3de43746603fec7be1ac5b6c192fe61880e819362014593fd750069a758d4b3"
+    }
+  }
+}
