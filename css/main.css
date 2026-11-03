@@ -5063,3 +5063,44 @@ img.class-icon[src$=".png"] { border-radius: 3px; }
 }
 
 #page-home .home-entry-card, #page-home .home-entry-card:hover { text-decoration: none; }
+
+/* REQ-089: tokens are the top-level picker rows, actual gear stays selectable inside. */
+.item-db-exchange { margin-bottom: 8px; border: 1px solid var(--border-color); border-radius: 8px; background: var(--bg-card); }
+.item-db-exchange summary { display: flex; align-items: center; gap: 10px; padding: 10px 12px; cursor: pointer; }
+.item-db-exchange summary::before { content: '▸'; color: var(--gold); }
+.item-db-exchange[open] summary::before { content: '▾'; }
+.item-db-exchange summary:focus-visible { outline: 2px solid var(--gold); outline-offset: -2px; }
+.item-db-exchange-icon { border-radius: 5px; }
+.item-db-exchange-heading { display: grid; min-width: 0; gap: 2px; }
+.item-db-exchange-heading strong { color: var(--gold); }
+.item-db-exchange-heading span, .item-db-exchange-count { color: var(--text-secondary); font-size: 12px; }
+.item-db-exchange-count { margin-left: auto; flex-shrink: 0; }
+.item-db-exchange-pieces { padding: 0 10px 4px; }
+.item-db-exchange-select { display: flex; align-items: center; gap: 10px; width: 100%; padding: 10px 12px; text-align: left; color: inherit; border: 0; border-radius: 8px; background: none; cursor: pointer; }
+.item-db-exchange-select:hover, .item-db-exchange.selected { background: rgba(240, 192, 96, 0.1); }
+.item-db-exchange.selected { border-color: var(--gold); }
+.item-db-exchange-select:focus-visible { outline: 2px solid var(--gold); outline-offset: -2px; }
+.item-db-exchange-pieces { list-style: none; margin: 0; }
+.item-db-piece { display: flex; align-items: center; gap: 10px; padding: 8px 4px; border-top: 1px solid var(--border-color); font-size: 12px; }
+.item-db-piece img { border-radius: 4px; }
+
+/* REQ-179: Warcraft item quality palette, shared by all item artwork. */
+:root {
+  --item-quality-0: #9D9D9D;
+  --item-quality-1: #FFFFFF;
+  --item-quality-2: #1EFF00;
+  --item-quality-3: #0070DD;
+  --item-quality-4: #A335EE;
+  --item-quality-5: #FF8000;
+  --item-quality-6: #E6CC80;
+  --item-quality-7: #00CCFF;
+}
+[data-item-quality="0"] { --item-quality-border: var(--item-quality-0); }
+[data-item-quality="1"] { --item-quality-border: var(--item-quality-1); }
+[data-item-quality="2"] { --item-quality-border: var(--item-quality-2); }
+[data-item-quality="3"] { --item-quality-border: var(--item-quality-3); }
+[data-item-quality="4"] { --item-quality-border: var(--item-quality-4); }
+[data-item-quality="5"] { --item-quality-border: var(--item-quality-5); }
+[data-item-quality="6"] { --item-quality-border: var(--item-quality-6); }
+[data-item-quality="7"] { --item-quality-border: var(--item-quality-7); }
+[data-item-quality][data-item-quality] { border: 1px solid var(--item-quality-border); }

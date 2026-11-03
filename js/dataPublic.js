@@ -614,7 +614,7 @@
     // P1（WP6 补丁）：卡盒样式挂 .dp-item-inner——hover 时 inner 转 absolute 向下生长，
     // 外层 .dp-item 由 JS 预设折叠态 minHeight 占位（仅溢出卡），网格不塌、生长部分覆盖下方卡片
     return `<div class="dp-item"><div class="dp-item-inner">
-      ${iconUrl ? `<img class="dp-item-icon" src="${iconUrl}" loading="lazy" alt="" onerror="this.onerror=null;this.src='assets/decor-icons/_placeholder.png'">` : ''}
+      ${iconUrl ? `<img class="dp-item-icon"${LootTaxonomy.itemQualityAttr(l.quality, l.item_name)} src="${iconUrl}" loading="lazy" alt="" onerror="this.onerror=null;this.src='assets/decor-icons/_placeholder.png'">` : ''}
       <div class="dp-item-name">${esc(l.item_name)}</div>
       <div class="dp-item-meta">
         ${l.ilvl != null ? `<span class="dp-tag">物品等级 ${esc(l.ilvl)}</span>` : ''}
@@ -626,7 +626,12 @@
       ${secHtml ? `<div class="dp-item-stats">${secHtml}</div>` : ''}
       ${(l.source === 'dungeon' && l.ilvl != null) ? `<div class="dp-item-note">装等/数值=冒险手册史诗显示档；实际掉落随钥石层数与宏伟宝库提升</div>` : ''}
       ${l.effect ? `<div class="dp-item-effect-wrap"><div class="dp-item-effect-preview">${esc(l.effect)}</div></div>` : ''}
-      ${redeemable.length ? `<details class="dp-token-pieces"><summary>可兑换装备（${redeemable.length} 件）</summary><ul>${redeemable.map(piece => `<li>${esc(piece.item_name)}</li>`).join('')}</ul></details>` : ''}
+      ${redeemable.length ? `<details class="dp-token-pieces"><summary>可兑换装备（${redeemable.length} 件）</summary><ul>${redeemable.map(piece => {
+        const info = LootTaxonomy.tierPiecePresentation(piece.official_item_id);
+        const icon = LootTaxonomy.lootIconUrl(info?.iconId);
+        return `<li>${icon ? `<img${LootTaxonomy.itemQualityAttr(info ? 4 : null)} src="${icon}" width="24" height="24" loading="lazy" alt="" onerror="this.onerror=null;this.src='assets/decor-icons/_placeholder.png'">` : ''}
+          <span>${esc(piece.item_name)}${info ? ` · ${esc(info.className)}<br><small>主属性 ${esc(info.primary)} · <span class="dp-item-effect-preview">${esc(info.secondary.join(' · '))}</span></small>` : ''}</span></li>`;
+      }).join('')}</ul></details>` : ''}
       <div class="dp-item-src">${esc(srcParts.filter(Boolean).join(' · '))}</div>
     </div></div>`;
   }

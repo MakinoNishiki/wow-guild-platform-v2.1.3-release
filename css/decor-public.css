@@ -146,12 +146,14 @@
 }
 .dh-src-unknown { color: var(--text-muted); font-style: italic; white-space: nowrap; }
 /* 品质色（WoW 官方配色：0 灰 1 白 2 绿 3 蓝 4 紫 5 橙） */
-.dh-q0 { color: #9d9d9d; }
-.dh-q1 { color: #ffffff; }
-.dh-q2 { color: #1eff00; }
-.dh-q3 { color: #0070dd; }
-.dh-q4 { color: #a335ee; }
-.dh-q5 { color: #ff8000; }
+.dh-q0 { color: var(--item-quality-0); }
+.dh-q1 { color: var(--item-quality-1); }
+.dh-q2 { color: var(--item-quality-2); }
+.dh-q3 { color: var(--item-quality-3); }
+.dh-q4 { color: var(--item-quality-4); }
+.dh-q5 { color: var(--item-quality-5); }
+.dh-q6 { color: var(--item-quality-6); }
+.dh-q7 { color: var(--item-quality-7); }
 .dh-badges { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; }
 .dh-badge {
   font-size: 11px;

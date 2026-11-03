@@ -6880,7 +6880,7 @@ function lootDropsRenderTable() {
   tbody.innerHTML = rows.map(d => {
     // #79-Patch1 起：Blizzard render CDN 数字 fileDataID + onerror 占位图（不再隐藏裂图）
     const icon = d.icon_id != null
-      ? `<img class="loot-item-icon" src="https://render.worldofwarcraft.com/icons/56/${d.icon_id}.jpg" loading="lazy" alt="" onerror="this.onerror=null;this.src='assets/decor-icons/_placeholder.png'">`
+      ? `<img class="loot-item-icon"${LootTaxonomy.itemQualityAttr(d.quality, d.item_name)} src="https://render.worldofwarcraft.com/icons/56/${d.icon_id}.jpg" loading="lazy" alt="" onerror="this.onerror=null;this.src='assets/decor-icons/_placeholder.png'">`
       : '';
     return `<tr>
       <td>${fmtTs(d.timestamp)}</td>
@@ -7269,7 +7269,7 @@ function getItemIconId(name, raid, boss) {
 // 空值不渲染、lazy 保留。本地 assets/icons/items 空目录问题根治）
 function itemIconImgHtml(name, raid, boss) {
   const id = getItemIconId(name, raid, boss);
-  return id ? `<img class="loot-item-icon" src="https://render.worldofwarcraft.com/icons/56/${id}.jpg" loading="lazy" alt="" onerror="this.onerror=null;this.src='assets/decor-icons/_placeholder.png'">` : '';
+  return id ? `<img class="loot-item-icon"${LootTaxonomy.itemQualityAttr(null, name)} src="https://render.worldofwarcraft.com/icons/56/${id}.jpg" loading="lazy" alt="" onerror="this.onerror=null;this.src='assets/decor-icons/_placeholder.png'">` : '';
 }
 
 // 任务书 #65 WP3.3：装备分配列表套装标识——装备名以任一 tier_sets.set_name 开头即视为套装件。
@@ -8656,7 +8656,7 @@ const changelogData = [
   {
     id: 'v3.2.0-req089-redeemable-pieces', version: 'v3.2.0', date: '2026-11-04',
     type: 'feature', typeLabel: '新增功能', title: '副本掉落可查看兑换装备',
-    summary: '套装兑换物卡片可展开实际装备。装备分配和心愿单的装备库可搜索兑换物名称并选择对应套装件。',
+    summary: '套装兑换物卡片可展开实际装备。装备分配和心愿单可直接选兑换物，展开查看各职业成品、主属性和副属性。',
     details: ['装备库与掉落页使用统一的装备图标地址规则。']
   },
   {"id": "v3.2.0-req177-feature", "version": "v3.2.0", "date": "2026-11-04", "type": "feature", "typeLabel": "新增功能", "title": "更新日志独立入口", "summary": "更新日志移到顶部导航，打开网站即可查看。", "details": ["更新日志移到顶部导航，打开网站即可查看。"]},
@@ -14018,12 +14018,14 @@ let itemDbCallback = null;
 // 打开装备库选择器
 let itemDbPickerMode = 'wishlist';
 let itemDbTierPieces = [];
+const itemDbOpenExchangeGroups = new Set();
 let itemDbHistoryOpen = false; // REQ-149（任务书 #64）：历史赛季组手动展开态（仅本次打开内有效）
 async function openItemDbPicker(mode = 'wishlist') {
   // 任务书 #66（1.2）：渲染前等待主数据就绪（同 lootShowModal 口径）
   if (window.MasterData && !MasterData.isLoaded()) await MasterData.init();
   itemDbTierPieces = await window.MasterData?.getTierPieces?.() || [];
   itemDbPickerMode = mode;
+  itemDbOpenExchangeGroups.clear();
   itemDbHistoryOpen = false; // REQ-149：每次打开复位为「历史赛季折叠」默认态
   selectedDbItem = null;
   document.getElementById('itemDbSearch').value = '';
@@ -14094,7 +14096,7 @@ function getMasterLootItems() {
           armorType: l.item_type || '', slot: l.slot || '',
           icon: '📦', quality: 'epic', itemLevel: l.ilvl || '', // 任务书 #66（1.3）：接 boss_loot.ilvl 列
           // 任务书 #65 WP3.1：接 boss_loot.icon_name 列（sql/37，迁移前 undefined → '' 全量 📦 属预期）
-          iconName: l.icon_name || '', iconId: l.icon_id,
+          iconName: l.icon_name || '', iconId: l.icon_id, itemQuality: l.quality,
           tierToken: LootTaxonomy.tierTokenMatch(l), seasonId: raid.season_id,
           stats: { primary: (l.primary_stats || []).join('/'), secondary: l.secondary_stats || [], primaryDetail: null, secondaryDetail: null },
           equipEffect: l.effect || ''
@@ -14102,18 +14104,8 @@ function getMasterLootItems() {
       });
     });
   });
-  const pieceIds = new Set();
-  for (const token of items.filter(item => item.tierToken)) {
-    for (const piece of LootTaxonomy.redeemableTierPieces(itemDbTierPieces, token.tierToken, token.seasonId)) {
-      const id = `tier:${token.seasonId}:${piece.official_item_id}`;
-      if (pieceIds.has(id)) continue;
-      pieceIds.add(id);
-      items.push({
-        ...token, id, name: piece.item_name, slot: piece.slot, armorType: piece.armor_type,
-        iconName: piece.icon_name, iconId: null, itemLevel: piece.ilvl,
-        stats: { primary: '', secondary: [] }, equipEffect: '', exchangeName: token.name
-      });
-    }
+  for (const item of items) {
+    if (item.tierToken) item.redeemable = LootTaxonomy.redeemableTierPieces(itemDbTierPieces, item.tierToken, item.seasonId);
   }
   return items;
 }
@@ -14179,9 +14171,8 @@ function renderItemDbList() {
   const baseAll = MD_PICKER_MASTER_ONLY
     ? getMasterLootItems()
     : itemDatabase.filter(item => new Set(getGameRaidNames()).has(item.raidName));
-  // 任务书 #31 修正项①（REQ-097，D1 裁定）：恒定排除杂项（slot='杂项'）与套装兑换物，不做切换入口；
-  // 词表单一真源 = js/lootTaxonomy.js（PICKER_EXCLUDED_SLOTS）
-  const base = baseAll.filter(item => !window.LootTaxonomy.isPickerExcludedSlot(item.slot));
+  // Recognized tier tokens are selectable. Other legacy excluded rows keep their prior behavior.
+  const base = baseAll.filter(item => item.tierToken || !LootTaxonomy.isPickerExcludedSlot(item.slot));
   itemDbPickerItems = base; // selectDbItem 查找池
 
   // 左侧团本筛选同步只列有掉落的主数据团本（每次渲染重建，保留当前选择）
@@ -14195,13 +14186,13 @@ function renderItemDbList() {
   }
 
   let filtered = base.filter(item => {
-    if (search && !item.name.toLowerCase().includes(search) && !item.boss.toLowerCase().includes(search) && !(item.exchangeName || '').toLowerCase().includes(search)) return false;
+    if (search && !item.name.toLowerCase().includes(search) && !item.boss.toLowerCase().includes(search) && !item.redeemable?.some(piece => piece.item_name.toLowerCase().includes(search))) return false;
     if (raidFilter && item.raid !== raidFilter) return false;
     if (bossFilter && item.boss !== bossFilter) return false;
-    if (slotFilter && item.slot !== slotFilter) return false;
+    if (slotFilter && (item.tierToken?.slot || item.slot) !== slotFilter) return false;
     // 任务书 #31：武器 4 项判定走词表（单手/双手=item_type 白名单、远程=弓弩枪、副手=slot'副手物品'）
     if (weaponFilter && !window.LootTaxonomy.matchWeapon(weaponFilter, item.slot, item.armorType)) return false;
-    if (armorFilter && item.armorType !== armorFilter) return false;
+    if (armorFilter && (item.tierToken?.armor || item.armorType) !== armorFilter) return false;
     if (statFilter && !item.stats.secondary.includes(statFilter)) return false;
     return true;
   });
@@ -14240,13 +14231,12 @@ function renderItemDbList() {
     const qualityClass = item.quality === 'epic' ? 'quality-epic' : 'quality-rare';
     const primaryStatHtml = renderPrimaryStat(item.stats.primary, item.stats.primaryDetail);
     const secondaryStatHtml = renderSecondaryStats(item.stats.secondary, item.stats.secondaryDetail);
-    const exchange = item.exchangeName?.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
-    const sourceText = `${item.raidName} · ${item.bossIndex} ${item.boss}${exchange ? ` · 兑换物：${exchange}` : ''}`;
+    const sourceText = `${item.raidName} · ${item.bossIndex} ${item.boss}`;
     // 任务书 #66（1.3）：meta 行按非空段拼接——装等有值才渲染（与 REQ-116 公示页「非空才渲染」同口径），空段不出裸分隔符
     const metaText = [item.armorType, item.slot, item.itemLevel ? `装等${item.itemLevel}` : ''].filter(Boolean).join(' · ');
     const iconUrl = LootTaxonomy.lootIconUrl(item.iconId, item.iconName);
     const iconHtml = iconUrl
-      ? `<img src="${iconUrl}" class="item-card-icon-img" loading="lazy" alt="" onerror="this.onerror=null;this.src='assets/decor-icons/_placeholder.png'">`
+      ? `<img src="${iconUrl}" class="item-card-icon-img"${LootTaxonomy.itemQualityAttr(item.itemQuality, item.name)} loading="lazy" alt="" onerror="this.onerror=null;this.src='assets/decor-icons/_placeholder.png'">`
       : (item.icon || '📦');
     return `
       <div class="item-card ${isSelected ? 'selected' : ''}" onclick="selectDbItem('${item.id}')">
@@ -14265,12 +14255,59 @@ function renderItemDbList() {
     `;
   };
 
-  listEl.innerHTML = currentItems.map(cardHtml).join('') +
+  const escapeGroupText = value => String(value || '').replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;');
+  function groupedCards(items) {
+    return items.map(item => {
+      if (!item.tierToken) return cardHtml(item);
+      const pieces = item.redeemable || [];
+      const classes = Object.entries(LootTaxonomy.CLASS_ARMOR)
+        .filter(([, armor]) => armor === item.tierToken.armor).map(([name]) => name);
+      const icon = LootTaxonomy.lootIconUrl(item.iconId, item.iconName);
+      const selected = selectedDbItem?.id === item.id;
+      const open = itemDbOpenExchangeGroups.has(String(item.id)) ||
+        (search && !item.name.toLowerCase().includes(search));
+      const previews = pieces.map(piece => {
+        const info = LootTaxonomy.tierPiecePresentation(piece.official_item_id);
+        const icon = LootTaxonomy.lootIconUrl(info?.iconId, piece.icon_name);
+        return `<li class="item-db-piece">
+          ${icon ? `<img${LootTaxonomy.itemQualityAttr(info ? 4 : null)} src="${icon}" width="32" height="32" alt="" loading="lazy" onerror="this.onerror=null;this.src='assets/decor-icons/_placeholder.png'">` : ''}
+          <div><strong>${escapeGroupText(piece.item_name)}</strong>
+          ${info ? `<div>${info.className} · 主属性 ${info.primary}</div><div class="loot-effect-green">${info.secondary.join(' · ')}</div>` : ''}
+          </div></li>`;
+      }).join('');
+      return `<div class="item-db-exchange${selected ? ' selected' : ''}">
+        <button type="button" class="item-db-exchange-select" data-select-token="${escapeGroupText(item.id)}" aria-pressed="${selected}">
+          ${icon ? `<img class="item-db-exchange-icon"${LootTaxonomy.itemQualityAttr(item.itemQuality, item.name)} src="${icon}" width="36" height="36" alt="" loading="lazy" onerror="this.onerror=null;this.src='assets/decor-icons/_placeholder.png'">` : ''}
+          <span class="item-db-exchange-heading"><strong>${escapeGroupText(item.name)}</strong>
+          <span>适用职业 · ${classes.join('、')}</span></span>
+          <span class="item-db-exchange-count">${selected ? '已选兑换物' : '选择兑换物'}</span>
+        </button>
+        ${pieces.length ? `<details data-exchange-id="${escapeGroupText(item.id)}"${open ? ' open' : ''}>
+          <summary>可兑换装备（${pieces.length} 件）</summary><ul class="item-db-exchange-pieces">${previews}</ul>
+        </details>` : ''}
+      </div>`;
+    }).join('');
+  }
+
+  listEl.innerHTML = groupedCards(currentItems) +
     (historyItems.length ? `
       <div class="item-db-history${historyOpen ? ' open' : ''}">
         <div class="item-db-history-head" onclick="toggleItemDbHistory()"><span class="item-db-history-caret">▸</span>历史赛季团本（${historyItems.length} 件）</div>
-        <div class="item-db-history-body">${historyItems.map(cardHtml).join('')}</div>
+        <div class="item-db-history-body">${groupedCards(historyItems)}</div>
       </div>` : '');
+  listEl.querySelectorAll('[data-select-token]').forEach(button => {
+    button.onclick = () => {
+      selectDbItem(button.dataset.selectToken);
+      listEl.querySelector('[data-select-token][aria-pressed="true"]')?.focus();
+    };
+  });
+  listEl.querySelectorAll('[data-exchange-id]').forEach(group => {
+    group.addEventListener('toggle', () => {
+      if (group.open) itemDbOpenExchangeGroups.add(group.dataset.exchangeId);
+      else itemDbOpenExchangeGroups.delete(group.dataset.exchangeId);
+    });
+  });
 }
 
 // REQ-149（任务书 #64）：历史赛季组手动展开/收起（展开态仅本次打开内有效）
@@ -14349,6 +14386,7 @@ function resolveItemDbBossName(item) {
 // 旧实现只看 item_type 且部位用文本模糊匹配：item_type 为「其它」等噪声值时大类落默认「武器」、
 // 部位落首项「单手锤」（实测样本：饰品 艾林先知的凝视 slot=饰品 item_type=其它）。
 function resolvePickerCategorySlot(item) {
+  if (item?.tierToken) return { category: '防具', slot: item.tierToken.slot };
   const slot = ((item && item.slot) || '').trim();
   const type = ((item && item.armorType) || '').trim(); // 主数据路径 armorType = 库内 item_type
   // 部位 → 大类（REQ-060 口径：防具九部位 / 颈部手指=首饰 / 饰品 / 武器与副手=武器）
@@ -14405,7 +14443,7 @@ function lootFillFromItemDb(item) {
   // 主属性（取第一个）
   const primaryStat = item.stats.primary ? item.stats.primary.split('/')[0] : '';
   const primarySelect = document.getElementById('lootPrimaryStat');
-  if (primarySelect && primaryStat) {
+  if (primarySelect && (primaryStat || item.tierToken)) {
     primarySelect.value = primaryStat;
   }
   

@@ -588,3 +588,5 @@
 .dp-token-pieces { margin-top: 8px; color: var(--text-secondary); }
 .dp-token-pieces summary { cursor: pointer; color: var(--gold); }
 .dp-token-pieces ul { margin: 6px 0; padding-inline-start: 18px; }
+.dp-token-pieces li { display: flex; align-items: center; gap: 6px; margin: 4px 0; }
+.dp-token-pieces li img { border-radius: 4px; }
