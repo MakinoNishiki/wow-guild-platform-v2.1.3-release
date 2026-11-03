@@ -921,6 +921,42 @@
     return parts.join('');
   }
 
+  // Browse selection is local to this view and independent of catalog filters.
+  let bossBrowserOpen = true;
+  let browseInstance = '';
+  let browseBoss = '';
+
+  function bossBrowserHtml() {
+    const items = seasonLoot().filter(matchItem);
+    const instances = [...state.raids, ...state.dungeons]
+      .filter(instance => instance.season_id === state.seasonId &&
+        items.some(item => item.instance_id === instance.id));
+    if (!instances.length) return emptyText('该赛季掉落数据维护中');
+    const instance = instances.find(row => row.id === browseInstance) || instances[0];
+    browseInstance = instance.id;
+    const pool = items.filter(item => item.instance_id === instance.id);
+    const bosses = state.bosses.filter(boss => pool.some(item => item.boss_id === boss.id))
+      .sort((a, b) => (a.boss_order || 0) - (b.boss_order || 0));
+    if (pool.some(item => !item.boss_id)) bosses.push({ id: '', name: '整体池' });
+    const boss = bosses.find(row => row.id === browseBoss) || bosses[0];
+    if (!boss) return emptyText('该副本首领数据维护中');
+    browseBoss = boss.id;
+    const drops = pool.filter(item => (item.boss_id || '') === browseBoss);
+    return `<div class="dp-browse-layout">
+      <aside class="dp-browse-nav">
+        <label for="dpBrowseInstance">选择副本</label>
+        <select id="dpBrowseInstance" class="form-select">${instances.map(row =>
+          `<option value="${esc(row.id)}"${row.id === browseInstance ? ' selected' : ''}>${esc(row.name)}</option>`).join('')}</select>
+        <div class="dp-browse-bosses" role="group" aria-label="选择首领">${bosses.map(row =>
+          `<button type="button" class="dp-browse-boss" data-browse-boss="${esc(row.id)}" aria-pressed="${row.id === browseBoss}">${esc(row.name)}</button>`).join('')}</div>
+      </aside>
+      <section class="dp-browse-drops" aria-label="首领掉落">
+        <h3>${esc(boss.name)} <span class="dp-count" aria-live="polite">${drops.length} 件</span></h3>
+        <div class="dp-items">${sortLoot(drops).map(itemCard).join('')}</div>
+      </section>
+    </div>`;
+  }
+
   function render(enterAnim) {
     // 一级区块级折叠（团本/大秘境两大区块，默认展开，sessionStorage 记忆）
     const collapsed = getCollapsed();
@@ -965,7 +1001,11 @@
           <button class="dp-toggle${state.dungeonView === 'pool' ? ' active' : ''}" data-view="pool">整体池</button>
         </div>`;
       const mplusBody = collapsed.has('sec:dungeons') ? '' : renderDungeons();
-      main.innerHTML = `
+      const browseHeader = `<div class="dp-browse-banner">
+        <span>浏览方式</span>
+        <button type="button" id="dpBrowseToggle" class="btn btn-secondary" aria-pressed="${bossBrowserOpen}">${bossBrowserOpen ? '返回分组列表' : '按首领浏览'}</button>
+      </div>`;
+      main.innerHTML = browseHeader + (bossBrowserOpen ? bossBrowserHtml() : `
         ${showRaids ? `<section class="dp-section">
           ${secHead('sec:raids', '团本掉落池')}
           ${raidsBody}
@@ -973,8 +1013,28 @@
         ${showDungeons ? `<section class="dp-section">
           ${secHead('sec:dungeons', '大秘境掉落池', mplusToggle)}
           ${mplusBody}
-        </section>` : ''}` + tiersSection;
+        </section>` : ''}`) + tiersSection;
     }
+    const browseToggle = $('dpBrowseToggle');
+    if (browseToggle) browseToggle.onclick = () => {
+      bossBrowserOpen = !bossBrowserOpen;
+      render();
+      $('dpBrowseToggle').focus();
+    };
+    const browseSelect = $('dpBrowseInstance');
+    if (browseSelect) browseSelect.onchange = () => {
+      browseInstance = browseSelect.value;
+      browseBoss = '';
+      render();
+      $('dpBrowseInstance').focus();
+    };
+    main.querySelectorAll('[data-browse-boss]').forEach(button => {
+      button.onclick = () => {
+        browseBoss = button.dataset.browseBoss;
+        render();
+        main.querySelector('[data-browse-boss][aria-pressed="true"]')?.focus();
+      };
+    });
     // 大秘境视图切换（事件委托，渲染后重绑）
     main.querySelectorAll('.dp-toggle').forEach(btn => {
       btn.onclick = () => { state.dungeonView = btn.dataset.view; render(); };

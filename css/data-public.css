@@ -559,3 +559,27 @@
 @media (min-width: 1400px) {
   #page-lootdrop .dp-season { margin-right: 292px; }
 }
+
+/* REQ-177: desktop boss browser */
+.dp-browse-banner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 16px;
+  padding: 10px 14px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: var(--bg-secondary);
+}
+.dp-browse-banner span { color: var(--text-secondary); }
+.dp-browse-drops h3 { margin: 4px 0 12px; }
+.dp-browse-layout { display: grid; grid-template-columns: minmax(180px, 1fr) minmax(0, 3fr); gap: 16px; margin-bottom: 16px; }
+.dp-browse-nav, .dp-browse-drops { padding: 16px; background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 8px; }
+.dp-browse-nav label { display: block; margin-bottom: 8px; }
+.dp-browse-bosses { display: grid; gap: 6px; margin-top: 12px; }
+.dp-browse-boss { padding: 8px; text-align: left; color: var(--text-primary); background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 6px; cursor: pointer; }
+.dp-browse-boss:hover, .dp-browse-boss[aria-pressed="true"] { color: var(--gold); border-color: var(--gold-dark); }
+.dp-browse-boss[aria-pressed="true"] { background: #322a20; }
+.dp-browse-boss:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+@media (max-width: 767px) { .dp-browse-layout { grid-template-columns: 1fr; } }
