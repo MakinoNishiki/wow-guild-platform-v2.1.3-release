@@ -8653,6 +8653,12 @@ function lootFillAssignedTo(idOrName) {
 // ==================== 初始化 ====================
 // ==================== 更新日志 ====================
 const changelogData = [
+  {
+    id: 'v3.2.0-req089-redeemable-pieces', version: 'v3.2.0', date: '2026-11-04',
+    type: 'feature', typeLabel: '新增功能', title: '副本掉落可查看兑换装备',
+    summary: '套装兑换物卡片可展开实际装备。装备分配和心愿单的装备库可搜索兑换物名称并选择对应套装件。',
+    details: ['装备库与掉落页使用统一的装备图标地址规则。']
+  },
   {"id": "v3.2.0-req177-feature", "version": "v3.2.0", "date": "2026-11-04", "type": "feature", "typeLabel": "新增功能", "title": "更新日志独立入口", "summary": "更新日志移到顶部导航，打开网站即可查看。", "details": ["更新日志移到顶部导航，打开网站即可查看。"]},
   {"id": "v3.2.0-req177-improve", "version": "v3.2.0", "date": "2026-11-04", "type": "improve", "typeLabel": "功能优化", "title": "首页入口与家宅筛选更清楚", "summary": "首页集中展示家宅图鉴、副本掉落和方案单。家宅高级筛选收起后仍显示已选条件。", "details": ["首页集中展示家宅图鉴、副本掉落和方案单。家宅高级筛选收起后仍显示已选条件。"]},
   {"id": "v3.2.0-req177-fix", "version": "v3.2.0", "date": "2026-11-04", "type": "fix", "typeLabel": "修复BUG", "title": "家宅详情关闭后恢复键盘焦点", "summary": "按 Esc 关闭详情后，键盘焦点回到原卡片，可继续浏览。", "details": ["按 Esc 关闭详情后，键盘焦点回到原卡片，可继续浏览。"]},
@@ -14011,10 +14017,12 @@ let itemDbCallback = null;
 
 // 打开装备库选择器
 let itemDbPickerMode = 'wishlist';
+let itemDbTierPieces = [];
 let itemDbHistoryOpen = false; // REQ-149（任务书 #64）：历史赛季组手动展开态（仅本次打开内有效）
 async function openItemDbPicker(mode = 'wishlist') {
   // 任务书 #66（1.2）：渲染前等待主数据就绪（同 lootShowModal 口径）
   if (window.MasterData && !MasterData.isLoaded()) await MasterData.init();
+  itemDbTierPieces = await window.MasterData?.getTierPieces?.() || [];
   itemDbPickerMode = mode;
   itemDbHistoryOpen = false; // REQ-149：每次打开复位为「历史赛季折叠」默认态
   selectedDbItem = null;
@@ -14086,13 +14094,27 @@ function getMasterLootItems() {
           armorType: l.item_type || '', slot: l.slot || '',
           icon: '📦', quality: 'epic', itemLevel: l.ilvl || '', // 任务书 #66（1.3）：接 boss_loot.ilvl 列
           // 任务书 #65 WP3.1：接 boss_loot.icon_name 列（sql/37，迁移前 undefined → '' 全量 📦 属预期）
-          iconName: l.icon_name || '',
+          iconName: l.icon_name || '', iconId: l.icon_id,
+          tierToken: LootTaxonomy.tierTokenMatch(l), seasonId: raid.season_id,
           stats: { primary: (l.primary_stats || []).join('/'), secondary: l.secondary_stats || [], primaryDetail: null, secondaryDetail: null },
           equipEffect: l.effect || ''
         });
       });
     });
   });
+  const pieceIds = new Set();
+  for (const token of items.filter(item => item.tierToken)) {
+    for (const piece of LootTaxonomy.redeemableTierPieces(itemDbTierPieces, token.tierToken, token.seasonId)) {
+      const id = `tier:${token.seasonId}:${piece.official_item_id}`;
+      if (pieceIds.has(id)) continue;
+      pieceIds.add(id);
+      items.push({
+        ...token, id, name: piece.item_name, slot: piece.slot, armorType: piece.armor_type,
+        iconName: piece.icon_name, iconId: null, itemLevel: piece.ilvl,
+        stats: { primary: '', secondary: [] }, equipEffect: '', exchangeName: token.name
+      });
+    }
+  }
   return items;
 }
 
@@ -14173,7 +14195,7 @@ function renderItemDbList() {
   }
 
   let filtered = base.filter(item => {
-    if (search && !item.name.toLowerCase().includes(search) && !item.boss.toLowerCase().includes(search)) return false;
+    if (search && !item.name.toLowerCase().includes(search) && !item.boss.toLowerCase().includes(search) && !(item.exchangeName || '').toLowerCase().includes(search)) return false;
     if (raidFilter && item.raid !== raidFilter) return false;
     if (bossFilter && item.boss !== bossFilter) return false;
     if (slotFilter && item.slot !== slotFilter) return false;
@@ -14218,15 +14240,14 @@ function renderItemDbList() {
     const qualityClass = item.quality === 'epic' ? 'quality-epic' : 'quality-rare';
     const primaryStatHtml = renderPrimaryStat(item.stats.primary, item.stats.primaryDetail);
     const secondaryStatHtml = renderSecondaryStats(item.stats.secondary, item.stats.secondaryDetail);
-    const sourceText = `${item.raidName} · ${item.bossIndex} ${item.boss}`;
+    const exchange = item.exchangeName?.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
+    const sourceText = `${item.raidName} · ${item.bossIndex} ${item.boss}${exchange ? ` · 兑换物：${exchange}` : ''}`;
     // 任务书 #66（1.3）：meta 行按非空段拼接——装等有值才渲染（与 REQ-116 公示页「非空才渲染」同口径），空段不出裸分隔符
     const metaText = [item.armorType, item.slot, item.itemLevel ? `装等${item.itemLevel}` : ''].filter(Boolean).join(' · ');
-    // 任务书 #65 WP3.1：icon_name 合法（白名单字符防注入）→ Blizzard CDN 56px 图标；
-    // 缺失/非法 → 📦 占位；CDN 加载失败 onerror 回退 📦
-    const iconHtml = /^[A-Za-z0-9_\-]+$/.test(item.iconName || '')
-      ? `<img src="https://render.worldofwarcraft.com/icons/56/${item.iconName}.jpg" class="item-card-icon-img" loading="lazy" alt="" onerror="this.outerHTML='📦'">`
-      : item.icon;
-
+    const iconUrl = LootTaxonomy.lootIconUrl(item.iconId, item.iconName);
+    const iconHtml = iconUrl
+      ? `<img src="${iconUrl}" class="item-card-icon-img" loading="lazy" alt="" onerror="this.onerror=null;this.src='assets/decor-icons/_placeholder.png'">`
+      : (item.icon || '📦');
     return `
       <div class="item-card ${isSelected ? 'selected' : ''}" onclick="selectDbItem('${item.id}')">
         <div class="item-card-icon">${iconHtml}</div>

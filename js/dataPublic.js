@@ -174,7 +174,7 @@
   // 任务书 #39（REQ-113）：数据拉取段独立成 loadData()——boot() 首载与 activate() 脏标记重拉共用；
   // 重拉只换数据数组，筛选态（搜索/chips/来源/分类/赛季/视图）与折叠记忆（sessionStorage）全部守恒
   async function loadData() {
-    const [seasons, raids, bosses, lootAll, tierSets, dungeons, classes, specs] = await Promise.all([
+    const [seasons, raids, bosses, lootAll, tierSets, dungeons, classes, specs, tierPieces] = await Promise.all([
       restGet('/game_seasons?select=*'),
       restGet('/game_raids?select=*'),
       restGet('/game_bosses?select=*'),
@@ -183,12 +183,13 @@
       restGet('/game_dungeons?select=*'),
       restGet('/game_classes?select=*'),
       restGet('/game_specs?select=*'),
+      restGet('/tier_set_pieces?select=season_id,slot,item_name,official_item_id,armor_type').catch(() => []),
     ]);
     // 杂项防线（裁定③：RPC 服务端已排除，前端过滤仅作防线）；_src 取 RPC source 字段（来源单选判定依据）
     const lootRows = lootAll.filter(l => !isMisc(l));
     const loot = lootRows.filter(l => l.source === 'raid').map(l => ({ ...l, _src: 'raid' }));
     const dungeonLoot = lootRows.filter(l => l.source === 'dungeon').map(l => ({ ...l, _src: 'dungeon' }));
-    Object.assign(state, { seasons, raids, bosses, loot, tierSets, dungeons, dungeonLoot, classes, specs });
+    Object.assign(state, { seasons, raids, bosses, loot, tierSets, dungeons, dungeonLoot, classes, specs, tierPieces });
   }
 
   // 赛季下拉选项重渲染（选中态守恒）：原选中赛季仍在则保留，否则回落 is_current/最新（boot 首载 state.seasonId='' 自然落默认）
@@ -600,10 +601,9 @@
     // 来源行：实例 · BOSS（空=整体池）· 套装归属并入同行末尾（确认点 C）
     const srcParts = [l.instance_name, l.boss_name || '整体池'];
     if (l.slot === '套装兑换物') srcParts.push('可兑换本赛季套装');
-    // 装备图标（#79-Patch1）：icon_id 纯数字校验后走 Blizzard render CDN（数字 fileDataID 实测 17/17 = 200，
-    // 覆盖 S1/S2 团本大米样本）——根治本地 assets/icons/items/ 空目录全 404；
-    // 加载失败回退本地占位图（非裂图），空值不渲染。decor 家宅图标不改走此 CDN（实测 10/10 = 403）。
-    const iconId = (l.icon_id != null && /^\d+$/.test(String(l.icon_id))) ? String(l.icon_id) : '';
+    const iconUrl = LootTaxonomy.lootIconUrl(l.icon_id, l.icon_name);
+    const token = LootTaxonomy.tierTokenMatch(l);
+    const redeemable = LootTaxonomy.redeemableTierPieces(state.tierPieces || [], token, l.season_id);
     // REQ-116（S2-装等批次）：物品等级 meta 行首 tag——ilvl 非空才渲染（RPC 白名单透出，sql/26_s2_ilvl）。
     // 【同档绑定（运营硬性前提，钉死）】装等显示档与 effect 数值必须同档——禁止「装等取 A 档、数值取 B 档」
     // 的混搭路径。当前单值结构天然满足（effect=史诗档实测文本、ilvl=史诗档静态表值）；日后若拆档
@@ -614,7 +614,7 @@
     // P1（WP6 补丁）：卡盒样式挂 .dp-item-inner——hover 时 inner 转 absolute 向下生长，
     // 外层 .dp-item 由 JS 预设折叠态 minHeight 占位（仅溢出卡），网格不塌、生长部分覆盖下方卡片
     return `<div class="dp-item"><div class="dp-item-inner">
-      ${iconId ? `<img class="dp-item-icon" src="https://render.worldofwarcraft.com/icons/56/${iconId}.jpg" loading="lazy" alt="" onerror="this.onerror=null;this.src='assets/decor-icons/_placeholder.png'">` : ''}
+      ${iconUrl ? `<img class="dp-item-icon" src="${iconUrl}" loading="lazy" alt="" onerror="this.onerror=null;this.src='assets/decor-icons/_placeholder.png'">` : ''}
       <div class="dp-item-name">${esc(l.item_name)}</div>
       <div class="dp-item-meta">
         ${l.ilvl != null ? `<span class="dp-tag">物品等级 ${esc(l.ilvl)}</span>` : ''}
@@ -626,6 +626,7 @@
       ${secHtml ? `<div class="dp-item-stats">${secHtml}</div>` : ''}
       ${(l.source === 'dungeon' && l.ilvl != null) ? `<div class="dp-item-note">装等/数值=冒险手册史诗显示档；实际掉落随钥石层数与宏伟宝库提升</div>` : ''}
       ${l.effect ? `<div class="dp-item-effect-wrap"><div class="dp-item-effect-preview">${esc(l.effect)}</div></div>` : ''}
+      ${redeemable.length ? `<details class="dp-token-pieces"><summary>可兑换装备（${redeemable.length} 件）</summary><ul>${redeemable.map(piece => `<li>${esc(piece.item_name)}</li>`).join('')}</ul></details>` : ''}
       <div class="dp-item-src">${esc(srcParts.filter(Boolean).join(' · '))}</div>
     </div></div>`;
   }
@@ -769,7 +770,6 @@
   // js/lootTaxonomy.js CLASS_ARMOR / ARMOR_TOKEN_FAMILY（单一真源）。真实套装件名待 REQ-089 展开落地后
   // 切换数据源（规则表送审中，禁止编造件名）。赛季归属链路：兑换物 boss_id → game_bosses → raid_id →
   // game_raids.season_id，与套装卡 season_id 对齐；赛季无对应族代币（如 S1 仅珍玩）→ 返回空，卡面不渲染标识。
-  const TIER_TOKEN_SLOT_WORDS = [['套装头盔', '头部'], ['套装护肩', '肩部'], ['套装胸甲', '胸部'], ['套装护手', '手部'], ['套装护腿', '腿部']];
   function tierTokenPieces(t, cls) {
     if (!window.LootTaxonomy) return [];
     const armor = LootTaxonomy.CLASS_ARMOR[(cls && cls.name_zh) || ''];
@@ -780,9 +780,9 @@
       const boss = state.bosses.find(b => b.id === l.boss_id);
       const raid = boss && state.raids.find(r => r.id === boss.raid_id);
       if (!raid || raid.season_id !== t.season_id) return;
-      const hit = TIER_TOKEN_SLOT_WORDS.find(([w]) => (l.effect || '').includes(w));
-      if (!hit) return;
-      out.push({ slot: hit[1], name: l.item_name });
+      const match = LootTaxonomy.tierTokenMatch(l);
+      if (!match) return;
+      out.push({ slot: match.slot, name: l.item_name });
     });
     const order = LootTaxonomy.SLOT_OPTIONS;
     return out.sort((a, b) => order.indexOf(a.slot) - order.indexOf(b.slot));

@@ -91,12 +91,33 @@ window.LootTaxonomy = (function () {
   };
   const ARMOR_TOKEN_FAMILY = { '布甲': '毒织', '皮甲': '毒咒', '锁甲': '毒锻', '板甲': '毒铸' };
 
+  const TIER_TOKEN_SLOTS = [['套装头盔', '头部'], ['套装护肩', '肩部'], ['套装胸甲', '胸部'], ['套装护手', '手部'], ['套装护腿', '腿部']];
+  function tierTokenMatch(row) {
+    if (row.slot !== '套装兑换物') return null;
+    const armor = Object.keys(ARMOR_TOKEN_FAMILY).find(key => (row.item_name || '').startsWith(ARMOR_TOKEN_FAMILY[key]));
+    const slot = TIER_TOKEN_SLOTS.find(([word]) => (row.effect || '').includes(word))?.[1];
+    return armor && slot ? { armor, slot } : null;
+  }
+  function redeemableTierPieces(pieces, token, seasonId) {
+    if (!token) return [];
+    return [...new Map(pieces
+      .filter(piece => piece.season_id === seasonId && piece.slot === token.slot &&
+        piece.armor_type === token.armor && piece.official_item_id)
+      .map(piece => [piece.official_item_id, piece])).values()];
+  }
+  function lootIconUrl(iconId, iconName) {
+    const id = String(iconId ?? '');
+    const asset = /^[1-9][0-9]*$/.test(id) ? id : /^[a-z0-9_]+$/i.test(iconName || '') ? iconName : '';
+    return asset ? 'https://render.worldofwarcraft.com/icons/56/' + asset + '.jpg' : '';
+  }
+
   return {
     SLOT_OPTIONS, WEAPON_GROUPS, WEAPON_MAIN_HAND, ARMOR_TYPES,
     PICKER_EXCLUDED_SLOTS, isMiscSlot, isPickerExcludedSlot,
     slotCategoryOf, matchWeapon, matchArmor, matchSlot,
     DC_EXTRA_SLOTS, MISC_ITEM_TYPES, DC_SLOT_OPTIONS, DC_ITEM_TYPE_OPTIONS, // 任务书 #40：数据中心表单下拉词表
     VENOMCURSE_LABEL, // 任务书 #43
+    lootIconUrl, tierTokenMatch, redeemableTierPieces,
     CLASS_ARMOR, ARMOR_TOKEN_FAMILY // 任务书 #64（REQ-148）
   };
 })();

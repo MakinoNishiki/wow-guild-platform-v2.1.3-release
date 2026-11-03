@@ -583,3 +583,8 @@
 .dp-browse-boss[aria-pressed="true"] { background: #322a20; }
 .dp-browse-boss:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
 @media (max-width: 767px) { .dp-browse-layout { grid-template-columns: 1fr; } }
+
+/* REQ-089: redeemable pieces stay within the original drop card. */
+.dp-token-pieces { margin-top: 8px; color: var(--text-secondary); }
+.dp-token-pieces summary { cursor: pointer; color: var(--gold); }
+.dp-token-pieces ul { margin: 6px 0; padding-inline-start: 18px; }

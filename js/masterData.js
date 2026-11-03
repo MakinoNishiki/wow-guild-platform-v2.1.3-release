@@ -49,6 +49,17 @@
     ]);
   }
 
+  async function getTierPieces() {
+    const c = client();
+    if (!c) return [];
+    try {
+      return await withTimeout(fetchTable(c, 'tier_set_pieces'), LOAD_TIMEOUT_MS);
+    } catch (error) {
+      console.warn('套装件暂不可用', error.message);
+      return [];
+    }
+  }
+
   // 初始化：并行拉 9 表；任一失败 → 快照兜底 + toast（禁止白屏）
   async function init() {
     if (state.loaded) return state;
@@ -141,7 +152,7 @@
   // 掉落页消费表（侦察 2026-08-12，dataPublic.js boot 拉取清单）：game_seasons/game_raids/game_bosses/
   // boss_loot/dungeon_loot（公开 RPC 合并两表）/tier_sets/game_dungeons/game_classes/game_specs——9 张全消费；
   // 仅 game_patches 不被掉落页消费，不置脏。
-  const DP_LOOT_TABLES = new Set(['game_seasons', 'game_raids', 'game_bosses', 'boss_loot', 'dungeon_loot', 'tier_sets', 'game_dungeons', 'game_classes', 'game_specs']);
+  const DP_LOOT_TABLES = new Set(['game_seasons', 'game_raids', 'game_bosses', 'boss_loot', 'dungeon_loot', 'tier_sets', 'tier_set_pieces', 'game_dungeons', 'game_classes', 'game_specs']);
   function markDpLootDirty(table) { if (DP_LOOT_TABLES.has(table)) window.__dpLootDirty = true; }
 
   // ---- 写助手：server.js 代理（仅超管，server.js 主数据分支校验） ----
@@ -199,7 +210,7 @@
   window.MasterData = {
     init, refresh,
     getPatches, getSeasons, getCurrentSeason,
-    getRaids, getRaidByName, getBosses, getDungeonBosses, getLoot, getDungeonLoot, getTierSets, getDungeons,
+    getRaids, getRaidByName, getBosses, getDungeonBosses, getLoot, getDungeonLoot, getTierSets, getTierPieces, getDungeons,
     getClasses, getSpecs, getSpecsByClassName,
     isLoaded, isSnapshotMode, isSuperadmin,
     mdInsert, mdUpdate, mdDelete, mdUpsert
