@@ -1,0 +1,21 @@
+{
+  "url": "https://wow.ddctl.com/index.html#/house/decor",
+  "image_count": 0,
+  "image_ids": [],
+  "source_count": 3,
+  "results": [
+    {
+      "record_id": 11,
+      "text": "解锁：住宅等级 2 解锁 · 说明：提升住宅等级后获得对应房间"
+    },
+    {
+      "record_id": 12,
+      "text": "解锁：住宅等级 5 解锁 · 说明：提升住宅等级后获得对应房间"
+    },
+    {
+      "record_id": 15,
+      "text": "解锁：住宅等级 4 解锁 · 说明：提升住宅等级后获得对应房间"
+    }
+  ],
+  "errors": []
+}

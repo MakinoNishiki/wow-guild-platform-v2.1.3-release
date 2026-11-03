@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="zh-CN">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>魔兽管家 · 整站美术方向稿</title>
+<style>
+:root{color-scheme:dark;--ink:#121719;--panel:#1b2222;--well:#151b1c;--line:#3c4540;--gold:#e9bf77;--text:#f4ead7;--muted:#b8b9ab;--green:#93c7a5}
+*{box-sizing:border-box}body{margin:0;background:var(--ink);color:var(--text);font:15px/1.55 "Microsoft YaHei",sans-serif}a{color:inherit;text-decoration:none}button,input{font:inherit;color:inherit}button,a,summary{cursor:pointer}a:focus-visible,button:focus-visible,input:focus-visible,summary:focus-visible{outline:2px solid var(--gold);outline-offset:4px}
+.shell{max-width:1280px;margin:auto;padding:0 30px}.mast{border-bottom:1px solid var(--line);background:#181e1e}.mast .shell{display:flex;gap:32px;align-items:center;min-height:68px;flex-wrap:wrap}.brand{font-size:20px;font-weight:750;color:var(--gold)}.brand span{font:12px Georgia;color:var(--muted);margin-left:10px;letter-spacing:.1em}nav{display:flex;gap:6px}nav a{padding:20px 15px;border-bottom:2px solid transparent}nav a[aria-current=page]{color:var(--gold);border-color:var(--gold)}.flag{margin-left:auto;color:var(--muted);font-size:12px}
+main{padding-top:30px!important;padding-bottom:40px!important}h1,h2,h3,p{margin:0}h1,h2{font-family:Georgia,"Songti SC","SimSun",serif}h1{font-size:clamp(32px,5vw,60px);line-height:1.13}h2{font-size:27px}.eyebrow{display:block;color:var(--gold);font-size:12px;font-weight:700;letter-spacing:.18em;margin-bottom:10px}.muted,small{color:var(--muted)}.intro{margin-bottom:22px}.intro p{margin-top:8px}
+.hero{position:relative;isolation:isolate;overflow:hidden;min-height:315px;padding:50px 38px;border:1px solid #64563e;border-radius:8px;background:#202a27}.hero svg{position:absolute;inset:0;width:100%;height:100%;z-index:-1}.hero p{margin:14px 0 25px;max-width:32ch;color:#e2d7be}.primary,.secondary{display:inline-block;padding:9px 15px;border:1px solid var(--line);border-radius:6px;background:var(--well);color:var(--text)}.primary{background:var(--gold);color:#241b10;border-color:var(--gold);font-weight:750}.secondary:hover{border-color:var(--gold)}.hero .secondary{margin-left:8px}.section-title{margin:24px 0 12px}.grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}.surface{background:var(--panel);border:1px solid var(--line);border-radius:8px}.link-card{display:block;padding:20px}.link-card:hover{border-color:var(--gold)}.link-card h3{margin-bottom:6px}.link-card p{color:var(--muted)}
+.filter{padding:16px;margin-bottom:18px}.toolbar{display:flex;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:12px}.toolbar input{min-width:0;flex:1;padding:9px 11px;background:var(--well);border:1px solid var(--line);border-radius:6px}.chips{display:flex;flex-wrap:wrap;gap:7px}.chips button{padding:5px 11px;border-radius:5px;border:1px solid var(--line);background:var(--well)}.chips button[aria-pressed=true]{color:var(--gold);border-color:#896e45;background:#322b21}.decor-grid{grid-template-columns:repeat(4,minmax(0,1fr))}.decor{padding:13px;display:grid;gap:7px}.image{display:grid;place-items:center;background:var(--well);min-height:105px;border-radius:6px}.image img{width:78px;height:78px;object-fit:contain}.decor h3{font-size:15px}.decor .secondary{width:100%;text-align:center;color:var(--gold)}.decor small{min-height:2.8em}
+.table-wrap{overflow:auto}table{width:100%;border-collapse:collapse;text-align:left;min-width:540px}th,td{padding:13px 16px;border-bottom:1px solid var(--line)}th{color:var(--muted);font-weight:500;background:var(--well)}tr:last-child td{border-bottom:0}.status{color:var(--green)}.table-bar{padding:14px}.footer{margin-top:20px;color:var(--muted);font-size:12px}
+dialog{width:min(450px,92vw);padding:24px;color:var(--text)}dialog::backdrop{background:#000a}dialog p{margin:10px 0 18px}
+@media(max-width:780px){.shell{padding-left:16px;padding-right:16px}.mast .shell{gap:8px}.flag{display:none}.grid,.decor-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.hero{padding:30px 20px}.hero svg{opacity:.65}}
+button:active:not(:disabled){transform:translateY(1px);filter:brightness(1.15)}
+button:disabled{opacity:.72;cursor:wait}
+.feedback{margin:8px 0;color:var(--muted)}
+.feedback[data-state="success"]{color:var(--green)}
+.feedback[data-state="error"]{color:#ffb4a6}
+#edit-name{display:block;width:100%;margin:8px 0 12px;padding:8px;background:var(--well);border:1px solid var(--line);border-radius:6px}
+</style>
+<header class="mast"><div class="shell"><a class="brand" href="#home">魔兽管家 <span>WOW BUTLER</span></a><nav aria-label="样板导航"><a href="#home">首页</a><a href="#housing">家宅图鉴</a><a href="#members">成员管理</a></nav><span class="flag">整站美术 · 方向稿</span></div></header>
+<main class="shell">
+<section id="home">
+<div class="hero">
+<svg viewBox="0 0 1200 340" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><defs><radialGradient id="sky"><stop stop-color="#b19b62"/><stop offset=".46" stop-color="#536151"/><stop offset="1" stop-color="#182120"/></radialGradient><linearGradient id="shade"><stop stop-color="#151b1b"/><stop offset=".8" stop-color="#151b1b" stop-opacity="0"/></linearGradient></defs><path fill="url(#sky)" d="M0 0h1200v340H0z"/><circle cx="904" cy="100" r="56" fill="#e7cc86" opacity=".43"/><path fill="#344339" d="m340 276 133-118 58 36 91-111 112 112 103-96 93 87 94-61 176 111v104H340z"/><path fill="#26342d" d="m550 340 86-109 106 17 102-66 88 34 110-52 158 61v115z"/><path fill="#1c2623" d="M785 280v-78h19v-33h17v-32h21v31h17v36h24v-64h15v-35h17v35h15v75h35v-44h19v-28h21v28h17v109z"/><path fill="#ebc581" opacity=".7" d="M899 157h6v16h-6zm-74 32h6v15h-6zm160 1h6v14h-6z"/><path fill="#111a18" d="m610 340 45-42 78 5 98-44 83 12 86-13 107 35 93-4v51z"/><path fill="url(#shade)" d="M0 0h950v340H0z"/></svg>
+<span class="eyebrow">公会事务与游戏图鉴</span><h1>魔兽管家</h1><p>安排团本、管理成员，查找你想带回家宅的那件装饰。</p><a class="primary" href="#members">查看公会成员</a><a class="secondary" href="#housing">浏览家宅图鉴</a>
+</div>
+<h2 class="section-title">常用入口</h2>
+<div class="grid"><a class="surface link-card" href="#members"><h3>成员管理 →</h3><p>查找角色，查看职责和在队状态。</p></a><a class="surface link-card" href="#housing"><h3>家宅图鉴 →</h3><p>按分类和来源查看装饰与房型。</p></a><div class="surface link-card"><h3>团本考勤</h3><p>查看活动与出勤记录。</p></div></div>
+</section>
+<section id="housing" hidden>
+<div class="intro"><span class="eyebrow">游戏图鉴</span><h1>家宅图鉴</h1><p class="muted">按房型名称查找预览与解锁条件。</p></div>
+<div class="surface filter"><div class="toolbar"><input id="search" aria-label="搜索房型" placeholder="搜索房型…"><button class="secondary" id="reset">重置</button><span id="count" aria-live="polite"></span></div><div class="chips"><button type="button" data-filter="all" aria-pressed="true">全部房型</button><button type="button" data-filter="initial" aria-pressed="false">初始房间</button><button type="button" data-filter="level" aria-pressed="false">升级奖励</button></div></div>
+<p class="feedback" id="filter-feedback"></p><div class="grid decor-grid" id="cards"></div>
+</section>
+<section id="members" hidden>
+<div class="intro"><span class="eyebrow">公会工作区</span><h1>成员管理</h1><p class="muted">按角色名查找公会成员，查看职业、职责和状态。</p></div>
+<div class="surface table-wrap"><div class="toolbar table-bar"><input id="member-search" aria-label="搜索成员" placeholder="搜索角色名…"><small>演示名单</small></div><p class="feedback table-bar" id="member-feedback" role="status"></p>
+<table><thead><tr><th>角色</th><th>职业</th><th>专精</th><th>职责</th><th>状态</th><th>操作</th></tr></thead><tbody>
+<tr><td>暮谷守卫</td><td>战士</td><td>防护</td><td>坦克</td><td class="status">在队</td></tr>
+<tr><td>林间月影</td><td>德鲁伊</td><td>恢复</td><td>治疗</td><td class="status">在队</td></tr>
+<tr><td>星火旅人</td><td>法师</td><td>火焰</td><td>输出</td><td class="status">在队</td></tr>
+<tr><td>霜枝</td><td>猎人</td><td>射击</td><td>输出</td><td class="muted">离队</td></tr>
+</tbody></table></div><p id="member-empty" hidden>没有符合条件的成员。</p>
+</section>
+<p class="footer">方向稿 · 本地预览</p>
+</main>
+<dialog class="surface" id="detail"><h2 id="detail-name"></h2><p id="detail-source"></p><form method="dialog"><button class="secondary">关闭</button></form></dialog>
+<dialog class="surface" id="edit-member" aria-labelledby="edit-title">
+<h2 id="edit-title">编辑成员</h2>
+<form id="edit-form">
+<label for="edit-name">角色名</label><input id="edit-name" required maxlength="32">
+<label><input type="checkbox" id="simulate-failure"> 模拟保存失败</label>
+<p class="feedback" id="edit-feedback" role="status"></p>
+<button class="primary" id="save-member">保存修改</button>
+<button class="secondary" type="button" id="cancel-edit">取消</button>
+</form>
+</dialog>
+<script>
+const pages=['home','housing','members'];
+function route(){
+ const page=pages.includes(location.hash.slice(1))?location.hash.slice(1):'home';
+ for(const id of pages) document.getElementById(id).hidden=id!==page;
+ for(const link of document.querySelectorAll('nav a')) {
+  if(link.hash==='#'+page)link.setAttribute('aria-current','page');
+  else link.removeAttribute('aria-current');
+ }
+}
+addEventListener('hashchange',route);route();
+const rooms=[
+ [1,'方形房间（小型）',1],[2,'走廊',1],[3,'储藏室',1],[8,'L形房间',1],
+ [11,'方形房间（中型）',2],[15,'八边形房间（大型）',4],[12,'方形房间（大型）',5],[233,'夜光圆形房间',5]
+];
+let filter='all';
+const search=document.querySelector('#search');
+const cards=document.querySelector('#cards');
+const detail=document.querySelector('#detail');
+function renderRooms(){
+ const rows=rooms.filter(([,name,level])=>name.toLowerCase().includes(search.value.trim().toLowerCase())&&(filter==='all'||(filter==='initial'?level===1:level>1)));
+ document.querySelector('#count').textContent=rows.length+' 项';
+ document.querySelector('#filter-feedback').textContent={
+  all:'全部房型', initial:'已选：初始房间', level:'已选：升级奖励'
+ }[filter]+(search.value.trim()?' · 搜索「'+search.value.trim()+'」':'');
+ cards.innerHTML=rows.length?rows.map(([id,name,level])=>`<article class="surface decor"><div class="image"><img src="../../assets/decor-icons/room-previews/${id}.png" alt="" width="78" height="78"></div><h3>${name}</h3><small>住宅等级 ${level} 解锁</small><button class="secondary" data-room="${id}">查看详情</button></article>`).join(''):'<p>没有符合条件的房型。</p>';
+ for(const button of document.querySelectorAll('[data-filter]'))button.setAttribute('aria-pressed',button.dataset.filter===filter);
+}
+document.querySelector('.chips').onclick=event=>{if(event.target.dataset.filter){filter=event.target.dataset.filter;renderRooms();}};
+search.oninput=renderRooms;
+document.querySelector('#reset').onclick=()=>{filter='all';search.value='';renderRooms();};
+let detailTrigger;
+detail.addEventListener('close',()=>detailTrigger?.focus({preventScroll:true}));
+cards.onclick=event=>{
+ const room=rooms.find(([id])=>String(id)===event.target.dataset.room);
+ if(room){detailTrigger=event.target;document.querySelector('#detail-name').textContent=room[1];document.querySelector('#detail-source').textContent='住宅等级 '+room[2]+' 解锁';detail.showModal();}
+};
+renderRooms();
+document.querySelector('#member-search').oninput=event=>{
+ const rows=Array.from(document.querySelectorAll('tbody tr'));
+ for(const row of rows)row.hidden=!row.cells[0].textContent.includes(event.target.value.trim());
+ document.querySelector('#member-empty').hidden=rows.some(row=>!row.hidden);
+};
+
+const edit = document.querySelector('#edit-member');
+const editForm = document.querySelector('#edit-form');
+const editName = document.querySelector('#edit-name');
+const editFeedback = document.querySelector('#edit-feedback');
+const save = document.querySelector('#save-member');
+const cancel = document.querySelector('#cancel-edit');
+const simulateFailure = document.querySelector('#simulate-failure');
+let editingRow;
+for (const row of document.querySelectorAll('tbody tr')) {
+ const button = document.createElement('button');
+ button.type = 'button';
+ button.className = 'secondary';
+ button.textContent = '编辑';
+ row.insertCell().append(button);
+ button.onclick = () => {
+  editingRow = row;
+  editName.value = row.cells[0].textContent;
+  simulateFailure.checked = false;
+  editFeedback.textContent = '';
+  edit.showModal();
+ };
+}
+cancel.onclick = () => edit.close();
+edit.addEventListener('cancel',event=>{if(save.disabled)event.preventDefault();});
+editForm.onsubmit = async event => {
+ event.preventDefault();
+ const name = editName.value.trim();
+ if (!name) { editFeedback.dataset.state='error';editFeedback.textContent='请输入角色名。';editName.focus();return; }
+ const fail = simulateFailure.checked;
+ save.disabled = cancel.disabled = editName.disabled = simulateFailure.disabled = true;
+ save.textContent = '保存中…';
+ editFeedback.dataset.state = 'pending';
+ editFeedback.textContent = '正在保存成员资料。';
+ await new Promise(resolve=>setTimeout(resolve,850));
+ save.disabled = cancel.disabled = editName.disabled = simulateFailure.disabled = false;
+ save.textContent = '保存修改';
+ if (fail) {
+  simulateFailure.checked = false;
+  editFeedback.dataset.state = 'error';
+  editFeedback.textContent = '保存失败，输入已保留。请重试。';
+  save.focus();
+  return;
+ }
+ editingRow.cells[0].textContent = name;
+ const memberSearch=document.querySelector('#member-search');
+ memberSearch.dispatchEvent(new Event('input'));
+ const feedback = document.querySelector('#member-feedback');
+ feedback.dataset.state = 'success';
+ feedback.textContent = '已保存「'+name+'」的修改。';
+ edit.close();
+};
+</script>
+</html>

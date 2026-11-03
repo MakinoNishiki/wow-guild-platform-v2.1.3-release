@@ -4,13 +4,13 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>魔兽管家</title>
-<!-- 静态资源版本号：20261103.108（任务书 #22 WP3-②：凡改动 js/css 的 commit 必须同步递增此处与所有 ?v= 查询串，见 docs/开发规范.md 第五章） -->
+<!-- 静态资源版本号：20261104.114（任务书 #22 WP3-②：凡改动 js/css 的 commit 必须同步递增此处与所有 ?v= 查询串，见 docs/开发规范.md 第五章） -->
 <link rel="icon" type="image/png" sizes="32x32" href="assets/brand/favicon-32.png">
 <link rel="icon" type="image/png" sizes="16x16" href="assets/brand/favicon-16.png">
-<link rel="stylesheet" href="css/main.css?v=20261103.108">
-<link rel="stylesheet" href="css/data-public.css?v=20261103.108"><!-- 任务书 #28 WP5：副本掉落 tab（选择器全 .dp- 前缀 + #page-lootdrop 作用域，零泄漏） -->
-<link rel="stylesheet" href="css/decor-public.css?v=20261103.108"><!-- 任务书 #51：家宅图鉴（选择器全 .dh- 前缀，零泄漏，双壳共用） -->
-<script src="assets/vendor/supabase-js-2.js?v=20261103.108"></script>
+<link rel="stylesheet" href="css/main.css?v=20261104.114">
+<link rel="stylesheet" href="css/data-public.css?v=20261104.114"><!-- 任务书 #28 WP5：副本掉落 tab（选择器全 .dp- 前缀 + #page-lootdrop 作用域，零泄漏） -->
+<link rel="stylesheet" href="css/decor-public.css?v=20261104.114"><!-- 任务书 #51：家宅图鉴（选择器全 .dh- 前缀，零泄漏，双壳共用） -->
+<script src="assets/vendor/supabase-js-2.js?v=20261104.114"></script>
 </head>
 <body>
 
@@ -198,13 +198,14 @@
         <button type="button" class="ia-tab" data-ia-tab="home" onclick="iaSwitchTab('home')">首页</button>
         <button type="button" class="ia-tab" data-ia-tab="team" onclick="iaSwitchTab('team')">团队管理</button>
         <button type="button" class="ia-tab" data-ia-tab="house" onclick="iaSwitchTab('house')">家宅房屋</button>
+      <button type="button" class="ia-tab" data-ia-tab="changelog" onclick="iaSwitchTab('changelog')">更新日志</button>
       </nav>
       <div class="ia-top-right">
         <button type="button" class="btn btn-primary ia-login-btn" id="iaLoginBtn" style="display:none" onclick="iaOpenAuth()">登录 / 注册</button>
       </div>
     </div>
     <!-- 团队管理二级导航（任务书 #59 WP1：原侧栏纵向导航 pill 化，数据中心显隐与 #navDatacenter 同步） -->
-    <div class="ia-subnav" id="iaSubnavTeam" style="display:none">
+    <div class="ia-subnav" role="navigation" aria-label="团队管理" id="iaSubnavTeam" style="display:none">
       <button type="button" class="ia-pill" data-ia-key="dashboard" onclick="iaGoKey('dashboard')">📊 仪表盘</button>
       <button type="button" class="ia-pill" data-ia-key="members" onclick="iaGoKey('members')">👥 成员管理</button>
       <button type="button" class="ia-pill" data-ia-key="attendance" onclick="iaGoKey('attendance')">📅 考勤记录</button>
@@ -214,10 +215,9 @@
       <button type="button" class="ia-pill" data-ia-key="data" onclick="iaGoKey('data')">💾 数据管理</button>
       <button type="button" class="ia-pill" data-ia-key="datacenter" id="iaPillDatacenter" style="display:none" onclick="iaGoKey('datacenter')">🗄 数据中心</button>
       <button type="button" class="ia-pill" data-ia-key="lootdrop" onclick="iaGoKey('lootdrop')">📖 副本掉落</button>
-      <button type="button" class="ia-pill" data-ia-key="changelog" onclick="iaGoKey('changelog')">📝 更新日志</button>
     </div>
     <!-- 家宅房屋二级导航（任务书 #59 WP1；#dhNavPlanBadge 徽标自侧栏 nav-item 整节点迁入，id 唯一、decorData.js 绑定不变） -->
-    <div class="ia-subnav" id="iaSubnavHouse" style="display:none">
+    <div class="ia-subnav" role="navigation" aria-label="家宅房屋" id="iaSubnavHouse" style="display:none">
       <button type="button" class="ia-pill" data-ia-key="decor" onclick="iaGoKey('decor')">🏠 家宅图鉴</button>
       <button type="button" class="ia-pill" data-ia-key="decor-plan" onclick="iaGoKey('decor-plan')">🧺 方案单 <span class="dh-nav-plan-badge" id="dhNavPlanBadge" style="display:none">0</span></button>
       <button type="button" class="ia-pill" data-ia-key="community" onclick="iaGoKey('community')">💬 社区</button>
@@ -321,10 +321,10 @@
           </div>
           <!-- 任务书 #21 WP2：认领审核区块（approval 模式 + owner/editor + 有待审申请时由 renderClaimReviewBlock 显示） -->
           <div id="claimReviewBlock" class="claim-review-card" style="display:none"></div>
-          <div class="toolbar">
+          <div class="toolbar member-workbar">
             <div class="toolbar-left">
-              <input type="text" class="search-input" placeholder="搜索角色名、职业..." id="memberSearch" oninput="renderMembers()">
-              <select class="form-select" style="width:140px;font-size:13px" id="classFilter" onchange="renderMembers()">
+              <input type="text" class="search-input" placeholder="搜索角色名、职业…" aria-label="搜索角色名或职业" id="memberSearch" oninput="renderMembers()">
+              <select class="form-select" style="width:140px;font-size:13px" id="classFilter" aria-label="筛选职业" onchange="renderMembers()">
                 <option value="">全部职业</option>
                 <option value="战士">战士</option>
                 <option value="法师">法师</option>
@@ -880,19 +880,23 @@
            文案逐字以任务书为准；字体/装饰线/光晕等纯视觉项随 WP4 不落地 -->
       <div class="page" id="page-home">
         <div class="home-hero">
-          <div class="home-kicker">一个随时会噶的魔兽站点，想到什么做什么</div>
+          <div class="home-kicker">公会事务与游戏图鉴</div>
           <div class="home-hero-title"><span class="home-hero-light">魔兽</span><span class="home-hero-gold">管家</span></div>
-          <div class="home-hero-sub">团队行政 · 装备管理 · 家宅宠物 —— 社区？招募？依旧在探索、在尝试……</div>
+          <div class="home-hero-sub">管理公会成员、考勤与装备，也可以直接浏览副本掉落和家宅装饰。</div>
         </div>
         <div class="home-entry-grid">
-          <div class="home-entry-card" onclick="iaGoKey('decor')">
+          <a class="home-entry-card" href="#/house/decor" onclick="if (!event.ctrlKey &amp;&amp; !event.metaKey &amp;&amp; !event.shiftKey &amp;&amp; !event.altKey) { event.preventDefault(); iaGoKey('decor'); }">
             <div class="home-entry-title">🏠 家宅图鉴 <span class="home-chip-free">免登录</span><span class="home-entry-arrow">→</span></div>
             <div class="home-entry-desc">浏览全部家宅物品与获取来源，无需登录，点开即看</div>
-          </div>
-          <div class="home-entry-card" onclick="iaGoKey('lootdrop')">
+          </a>
+          <a class="home-entry-card" href="#/team/lootdrop" onclick="if (!event.ctrlKey &amp;&amp; !event.metaKey &amp;&amp; !event.shiftKey &amp;&amp; !event.altKey) { event.preventDefault(); iaGoKey('lootdrop'); }">
             <div class="home-entry-title">📖 副本掉落 <span class="home-chip-free">免登录</span><span class="home-entry-arrow">→</span></div>
             <div class="home-entry-desc">各副本装备掉落与分配公示页，游客直读，数据实时同源</div>
-          </div>
+          </a>
+          <a class="home-entry-card" href="#/house/plan" onclick="if (!event.ctrlKey &amp;&amp; !event.metaKey &amp;&amp; !event.shiftKey &amp;&amp; !event.altKey) { event.preventDefault(); iaGoKey('decor-plan'); }">
+            <div class="home-entry-title">🧺 方案单 <span class="home-entry-arrow">→</span></div>
+            <div class="home-entry-desc">整理想收集的装饰和房型，查看你的家宅方案。</div>
+          </a>
         </div>
         <div class="home-locked-strip">
           <div class="home-locked-label">🔒 登录并加入公会后可用</div>
@@ -904,9 +908,6 @@
             <span class="home-locked-pill">🔒 数据中心</span>
             <span class="home-locked-pill">🔒 更新日志</span>
           </div>
-        </div>
-        <div class="home-quick">
-          无需登录：<button type="button" class="home-quick-link" onclick="iaGoKey('decor')">家宅图鉴</button> · <button type="button" class="home-quick-link" onclick="iaGoKey('lootdrop')">副本掉落</button> · <button type="button" class="home-quick-link" onclick="iaGoKey('decor-plan')">方案单</button>
         </div>
       </div>
 
@@ -2074,26 +2075,6 @@
     </div>
   </nav>
 
-  <!-- 任务书 #59 WP1 需求 6：首页 QQ 用户群悬浮钮——仅 #/home 路由显示（显隐 iaApplyRoute 控制）；
-       纯 CSS hover/focus-within 出码，无埋点无跳转；二维码素材沿用现有静态目录 assets/brand/ -->
-  <div class="home-qq-float" id="homeQqFloat" style="display:none">
-    <button type="button" class="home-qq-btn" aria-label="QQ 用户群">
-      <svg viewBox="0 0 48 48" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-        <ellipse cx="24" cy="26" rx="13" ry="16"/>
-        <ellipse cx="24" cy="30" rx="7.5" ry="10"/>
-        <circle cx="19" cy="18" r="1.6" fill="currentColor" stroke="none"/>
-        <circle cx="29" cy="18" r="1.6" fill="currentColor" stroke="none"/>
-        <path d="M21 23 L24 26.5 L27 23"/>
-        <path d="M16 43 L21 40.5 M32 43 L27 40.5"/>
-      </svg>
-    </button>
-    <div class="home-qq-pop">
-      <div class="home-qq-qr"><img src="assets/brand/qq-group-qr.png" alt="魔兽管家用户群 QQ 群二维码"></div>
-      <div class="home-qq-name">魔兽管家用户群</div>
-      <div class="home-qq-num">群号：1104273954</div>
-    </div>
-  </div>
-
   <!-- 用户中心模态框 -->
   <div class="modal-overlay" id="userCenterModal">
     <div class="modal-content user-center-modal">
@@ -2333,21 +2314,21 @@
   </div>
 </div>
 
-<script src="js/cloud.js?v=20261103.108"></script>
+<script src="js/cloud.js?v=20261104.114"></script>
 <!-- 任务书 #14：主数据层（快照兜底 + 加载层），须在 app.js 之前 -->
-<script src="js/masterDataSnapshot.js?v=20261103.108"></script>
-<script src="js/masterData.js?v=20261103.108"></script>
+<script src="js/masterDataSnapshot.js?v=20261104.114"></script>
+<script src="js/masterData.js?v=20261104.114"></script>
 <!-- 任务书 #22 WP2：职业/专精/职责图标集中映射（全站唯一取图处） -->
-<script src="js/iconMap.js?v=20261103.108"></script>
+<script src="js/iconMap.js?v=20261104.114"></script>
 <!-- 任务书 #31（REQ-097）：装备分类词表单一真源（公示页 chips / picker 过滤 / BUG-057 回填三处消费，须在 dataPublic.js 与 app.js 之前） -->
-<script src="js/lootTaxonomy.js?v=20261103.108"></script>
+<script src="js/lootTaxonomy.js?v=20261104.114"></script>
 <!-- 任务书 #28 WP5：副本掉落渲染层（双壳同源；无 data-public-body 不自动启动，由 app.js 懒挂载，须在 app.js 之前） -->
-<script src="js/dataPublic.js?v=20261103.108"></script>
+<script src="js/dataPublic.js?v=20261104.114"></script>
 <!-- 任务书 #51（REQ-137 一期）：家宅图鉴词表单一真源（价格/分类/尺寸/来源词表，须在 decorData.js 之前） -->
-<script src="js/decorDict.js?v=20261103.108"></script>
+<script src="js/decorDict.js?v=20261104.114"></script>
 <!-- 任务书 #51：家宅图鉴数据层+渲染层（双壳同源；无 data-decor-body 不自动启动，由 app.js 懒挂载，须在 app.js 之前） -->
-<script src="js/decorData.js?v=20261103.108"></script>
-<script src="js/app.js?v=20261103.108"></script>
-<script src="js/track.js?v=20261103.108"></script><!-- 任务书 #54 WP1：全站埋点采集层（REQ-141，零依赖静默兜底） -->
+<script src="js/decorData.js?v=20261104.114"></script>
+<script src="js/app.js?v=20261104.114"></script>
+<script src="js/track.js?v=20261104.114"></script><!-- 任务书 #54 WP1：全站埋点采集层（REQ-141，零依赖静默兜底） -->
 </body>
 </html>

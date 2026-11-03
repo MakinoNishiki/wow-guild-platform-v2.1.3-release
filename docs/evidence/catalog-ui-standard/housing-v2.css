@@ -1,0 +1,39 @@
+.catalog-v2 {
+  --catalog-panel: #1b1b21;
+  --catalog-well: #141419;
+  --catalog-line: #393641;
+  --catalog-copy: #f4ecde;
+  --catalog-muted: #bdb4b5;
+  --catalog-gold: #f0c060;
+}
+.catalog-v2 #page-decor { color: var(--catalog-copy); }
+.catalog-v2 .dh-filterbar, .catalog-v2 .dh-card, .catalog-v2 .dh-modal {
+  background: var(--catalog-panel);
+  border: 1px solid var(--catalog-line);
+  border-radius: 8px;
+}
+.catalog-v2 .dh-filterbar { padding: 16px; margin-bottom: 16px; }
+.catalog-v2 .dh-group { padding: 8px 0; border-bottom: 0; }
+.catalog-v2 .dh-group-head { color: var(--catalog-copy); font-size: 13px; font-weight: 700; }
+.catalog-v2 .dh-count, .catalog-v2 .dh-group-note, .catalog-v2 .dh-cat, .catalog-v2 .dh-src, .catalog-v2 .dh-modal-sub { color: var(--catalog-muted); }
+.catalog-v2 :is(.dh-chip,.dh-filterbar .btn,.dh-filterbar input,.dh-icon-wrap,.dh-modal-icon,.dh-meta-rows) {
+  background: var(--catalog-well); border-color: var(--catalog-line); color: var(--catalog-copy);
+}
+.catalog-v2 .dh-chip .dh-chip-n { color: var(--catalog-muted); }
+.catalog-v2 .dh-chip.on, .catalog-v2 .dh-card-add.added {
+  color: #ffe0a2; background: #392c1f; border-color: #a07b45;
+}
+.catalog-v2 .dh-card { padding: 14px; gap: 7px; }
+.catalog-v2 .dh-card:hover { transform: none; border-color: #a07b45; }
+.catalog-v2 .dh-name { font-size: 15px; }
+.catalog-v2 .dh-src { font-size: 12px; }
+.catalog-v2 .dh-card-add { color: var(--catalog-gold); border-color: #6e5536; background: #28221d; }
+.catalog-v2 .dh-detail-add { color: #241a10; background: var(--catalog-gold); border-color: var(--catalog-gold); }
+.catalog-v2 .dh-modal-head { padding-bottom: 16px; border-bottom: 1px solid var(--catalog-line); }
+.catalog-v2 .dh-meta-rows { padding: 12px; border-radius: 6px; }
+.catalog-v2 .dh-sec-title { color: var(--catalog-copy); }
+.catalog-v2 .dh-src-list { padding: 12px; background: var(--catalog-well); border: 1px solid var(--catalog-line); border-radius: 6px; }
+.catalog-v2 :is(.dh-card,button,input,summary):focus-visible { outline: 2px solid var(--catalog-gold); outline-offset: 2px; }
+.catalog-v2 .catalog-advanced { padding-top: 8px; border-top: 1px solid var(--catalog-line); }
+.catalog-v2 .catalog-advanced summary { cursor: pointer; color: var(--catalog-muted); padding: 5px 0; }
+.catalog-v2 .catalog-advanced[open] summary { color: var(--catalog-gold); }

@@ -2642,7 +2642,7 @@ async function saveDecorPlan(items, name) {
 // 路由表：#/home 导航页（游客与登录均可见）；#/house/decor|plan|community 家宅系（全免登录可读，组单保存登录墙维持 #58 现状）；
 // #/team/<key> 团队系——lootdrop 全员放行，其余 9 页需登录+公会（游客/无公会落 team-guide 引导卡，hash 不改写）。
 // 埋点 tab_click 仅此两处挂点（iaSwitchTab level:1 / iaGoKey level:2），WBTrack.event 直调不 await（track.js 自带静默兜底）。
-const IA_TEAM_KEYS = ['dashboard', 'members', 'attendance', 'loot', 'wishlist', 'reports', 'data', 'datacenter', 'lootdrop', 'changelog'];
+const IA_TEAM_KEYS = ['dashboard', 'members', 'attendance', 'loot', 'wishlist', 'reports', 'data', 'datacenter', 'lootdrop'];
 let iaLastHash = ''; // 防环锚点：本模块写过的最后一个 hash（hashchange 回火时比对跳过）
 
 function iaSetHash(h) {
@@ -2651,7 +2651,7 @@ function iaSetHash(h) {
 }
 
 function iaKeyToHash(key) {
-  if (key === 'home') return '#/home';
+  if (key === 'home' || key === 'changelog') return '#/' + key;
   if (key === 'decor') return '#/house/decor';
   if (key === 'decor-plan') return '#/house/plan';
   if (key === 'community') return '#/house/community';
@@ -2662,6 +2662,7 @@ function iaKeyToHash(key) {
 function iaTabOfPage(page) {
   if (page === 'decor' || page === 'decor-plan' || page === 'community') return 'house';
   if (page === 'home') return null;
+  if (page === 'changelog') return 'changelog';
   return 'team'; // 团队系 + team-guide
 }
 
@@ -2703,16 +2704,25 @@ function iaRenderTeamGuide() {
 function iaPaintRoute(page, tab, activeKey) {
   // 任务书 #62 §1（BUG-109）：# 首页门户态（tab=null）高亮「首页」tab；无公会态 tab=null 其余逻辑不变
   const effTab = page === 'home' ? 'home' : tab;
-  document.querySelectorAll('.ia-tab').forEach(t => t.classList.toggle('active', t.dataset.iaTab === effTab));
+  document.getElementById('mainContent').dataset.workspace = tab || '';
+  document.querySelectorAll('.ia-tab').forEach(button => {
+    const active = button.dataset.iaTab === effTab;
+    button.classList.toggle('active', active);
+    if (active) button.setAttribute('aria-current', 'true');
+    else button.removeAttribute('aria-current');
+  });
   const subTeam = document.getElementById('iaSubnavTeam');
   const subHouse = document.getElementById('iaSubnavHouse');
   if (subTeam) subTeam.style.display = tab === 'team' ? '' : 'none';
   if (subHouse) subHouse.style.display = tab === 'house' ? '' : 'none';
   const pillKey = activeKey || page;
-  document.querySelectorAll('.ia-pill').forEach(p => p.classList.toggle('active', p.dataset.iaKey === pillKey));
+  document.querySelectorAll('.ia-pill').forEach(button => {
+    const active = button.dataset.iaKey === pillKey;
+    button.classList.toggle('active', active);
+    if (active) button.setAttribute('aria-current', 'page');
+    else button.removeAttribute('aria-current');
+  });
   if (page === 'team-guide') iaRenderTeamGuide();
-  const qq = document.getElementById('homeQqFloat');
-  if (qq) qq.style.display = page === 'home' ? '' : 'none';
 }
 
 // 旧格式兼容：'#page-xxx' → 新 hash（location.replace 改写，避免历史栈污染）
@@ -2722,7 +2732,7 @@ function iaLegacyRedirect(hash) {
   const key = m[1];
   if (key === 'decor') return '#/house/decor';
   if (key === 'decor-plan') return '#/house/plan';
-  if (key === 'home') return '#/home';
+  if (key === 'home' || key === 'changelog') return '#/' + key;
   if (key === 'community') return '#/house/community';
   if (IA_TEAM_KEYS.includes(key)) return '#/team/' + key;
   return null;
@@ -2732,7 +2742,7 @@ function iaLegacyRedirect(hash) {
 function iaApplyRoute() {
   let h = location.hash || '';
   iaLastHash = h;
-  const legacy = iaLegacyRedirect(h);
+  const legacy = h === '#/team/changelog' ? '#/changelog' : iaLegacyRedirect(h);
   if (legacy) {
     iaLastHash = legacy;
     location.replace(legacy);
@@ -2749,6 +2759,8 @@ function iaApplyRoute() {
   let page = null, tab = null, activeKey = null;
   if (h === '#/home') {
     page = 'home'; tab = null;
+  } else if (h === '#/changelog') {
+    page = 'changelog'; tab = 'changelog';
   } else if (h === '#/house' || h === '#/house/') {
     iaLastHash = '#/house/decor'; location.replace('#/house/decor');
     page = 'decor'; tab = 'house';
@@ -2799,6 +2811,8 @@ function iaSwitchTab(tab) {
   if (window.WBTrack) WBTrack.event('tab_click', { level: 1, key: tab });
   if (tab === 'home') {
     iaSetHash('#/home'); // 任务书 #62 §1（BUG-109）：首页 tab / 品牌区回门户
+  } else if (tab === 'changelog') {
+    iaSetHash('#/changelog');
   } else if (tab === 'house') {
     iaSetHash('#/house/decor');
   } else if (iaHasGuild()) {
@@ -8639,6 +8653,10 @@ function lootFillAssignedTo(idOrName) {
 // ==================== 初始化 ====================
 // ==================== 更新日志 ====================
 const changelogData = [
+  {"id": "v3.2.0-req177-feature", "version": "v3.2.0", "date": "2026-11-04", "type": "feature", "typeLabel": "新增功能", "title": "更新日志独立入口", "summary": "更新日志移到顶部导航，打开网站即可查看。", "details": ["更新日志移到顶部导航，打开网站即可查看。"]},
+  {"id": "v3.2.0-req177-improve", "version": "v3.2.0", "date": "2026-11-04", "type": "improve", "typeLabel": "功能优化", "title": "首页入口与家宅筛选更清楚", "summary": "首页集中展示家宅图鉴、副本掉落和方案单。家宅高级筛选收起后仍显示已选条件。", "details": ["首页集中展示家宅图鉴、副本掉落和方案单。家宅高级筛选收起后仍显示已选条件。"]},
+  {"id": "v3.2.0-req177-fix", "version": "v3.2.0", "date": "2026-11-04", "type": "fix", "typeLabel": "修复BUG", "title": "家宅详情关闭后恢复键盘焦点", "summary": "按 Esc 关闭详情后，键盘焦点回到原卡片，可继续浏览。", "details": ["按 Esc 关闭详情后，键盘焦点回到原卡片，可继续浏览。"]},
+  {"id": "v3.2.0-req177-refactor", "version": "v3.2.0", "date": "2026-11-04", "type": "refactor", "typeLabel": "模块调整", "title": "团队与家宅采用统一桌面布局", "summary": "桌面端的模块导航移到左侧，页头保留一个问题反馈入口。", "details": ["桌面端的模块导航移到左侧，页头保留一个问题反馈入口。"]},
   {
     id: 'v3.2.0-req176-room-previews', version: 'v3.2.0', date: '2026-11-03',
     type: 'improve', typeLabel: '功能优化', title: '房间户型预览与获取说明补充',

@@ -111,17 +111,19 @@
       <div class="dh-top-row">
         <div class="uc-input-wrap dh-search-wrap"><input type="text" id="dhSearch" class="search-input" placeholder="搜索装饰名…"><button type="button" id="dhSearchClear" class="uc-clear-btn" aria-label="清除搜索" title="清空" style="display:none">&times;</button></div>
         <button type="button" id="dhResetFilters" class="btn btn-secondary">重置筛选</button>
-        <div class="dh-count" id="dhCount"></div>
-        <button type="button" id="dhFilterToggle" class="btn btn-secondary dh-filter-toggle">筛选 ▾</button>
+        <div class="dh-count" id="dhCount" role="status"></div>
+        <button type="button" id="dhFilterToggle" aria-controls="dhFilterRows" aria-expanded="false" class="btn btn-secondary dh-filter-toggle">筛选 ▾</button>
       </div>
       <div class="dh-filter-rows" id="dhFilterRows">
         <div class="dh-group"><div class="dh-group-head">分类<span class="dh-chip-n">（单选）</span></div><div class="dh-chips" id="dhCatChips"></div></div>
         <div class="dh-group"><div class="dh-group-head">来源<span class="dh-chip-n">（单选）</span></div><div class="dh-chips" id="dhSrcChips"></div></div>
+        <details class="dh-advanced"><summary>更多筛选<span id="dhAdvancedSummary"></span></summary>
         <div class="dh-group"><div class="dh-group-head">资料片分类<span class="dh-chip-n">（单选）</span></div><div class="dh-group-note">按装饰的主题风格归类，非物品加入版本</div><div class="dh-chips" id="dhExpChips"></div></div>
         <div class="dh-group"><div class="dh-group-head">种族<span class="dh-chip-n">（单选）</span></div><div class="dh-group-note">按装饰的种族风格筛选</div><div class="dh-chips" id="dhRaceChips"></div></div>
         <div class="dh-group"><div class="dh-group-head">容量<span class="dh-chip-n">（单选）</span></div><div class="dh-chips" id="dhCostChips"></div></div>
         <div class="dh-group"><div class="dh-group-head">摆放环境<span class="dh-chip-n">（单选）</span></div><div class="dh-chips" id="dhEnvChips"></div></div>
         <div class="dh-group"><div class="dh-group-head">特性</div><div class="dh-chips" id="dhFeatChips"></div></div>
+        </details>
       </div>`;
 
     // 分类（主类单选，计数全量数据驱动）
@@ -190,6 +192,7 @@
     $('dhResetFilters').onclick = () => { resetFilters(); refreshChips(); render(true); };
     $('dhFilterToggle').onclick = () => {
       const open = filterBar.classList.toggle('filters-open');
+      $('dhFilterToggle').setAttribute('aria-expanded', open);
       $('dhFilterToggle').textContent = open ? '筛选 ▴' : '筛选 ▾';
     };
     refreshCount();
@@ -210,6 +213,12 @@
 
   function refreshCount() {
     const n = activeFilterCount();
+    filterBar.querySelectorAll('.dh-chip').forEach(button =>
+      button.setAttribute('aria-pressed', button.classList.contains('on')));
+    const selected = [...filterBar.querySelectorAll('.dh-advanced .dh-chip.on')]
+      .filter(button => button.parentElement.id === 'dhFeatChips' || button !== button.parentElement.firstElementChild)
+      .map(button => button.firstChild.textContent.trim());
+    $('dhAdvancedSummary').textContent = selected.length ? ' · ' + selected.join('、') : '';
     $('dhCount').textContent = n ? `命中 ${filteredRows().length} 件 · ${n} 项生效` : `共 ${state.rows.length} 件`;
   }
 
@@ -363,7 +372,7 @@
       <div class="dh-pager" id="dhPager">${pagerHtml(rows.length, state.page, pages)}</div>`;
 
     [...main.querySelectorAll('.dh-card')].forEach(card => {
-      const open = () => openDetail(state.rows.find(r => r.record_id === +card.dataset.rid));
+      const open = () => openDetail(state.rows.find(r => r.record_id === +card.dataset.rid), card);
       card.onclick = open;
       card.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); } };
     });
@@ -469,6 +478,7 @@
 
   // ---- 详情弹窗（只读不涉 modalDirtyChecks；document.body 单例，双壳自足） ----
   let modalEl = null;
+  let detailTrigger = null;
   function closeDetail() {
     if (!modalEl) return;
     modalEl.classList.remove('show');
@@ -476,11 +486,14 @@
     modalEl = null;
     setTimeout(() => el.remove(), 200);
     document.removeEventListener('keydown', onModalKey);
+    detailTrigger?.focus({ preventScroll: true });
+    detailTrigger = null;
   }
   function onModalKey(e) { if (e.key === 'Escape') closeDetail(); }
 
-  function openDetail(r) {
+  function openDetail(r, trigger) {
     if (!r || modalEl) return;
+    detailTrigger = trigger;
     const q = r.quality != null ? r.quality : 1;
     const envText = r.indoors && r.outdoors ? '均可' : r.indoors ? '室内' : r.outdoors ? '室外' : '—';
     const catText = Array.isArray(r.category_ids) && r.category_ids.length
@@ -518,6 +531,7 @@
     // 任务书 #58-补丁：详情弹窗底部加单主按钮（行为同卡片：加入/已加入 ×N 双态，点击 qty+1）
     modalEl.querySelector('.dh-detail-add').onclick = () => planAdd(r.record_id, 'detail');
     document.body.appendChild(modalEl);
+    modalEl.querySelector('.dh-modal-close').focus({ preventScroll: true });
     document.addEventListener('keydown', onModalKey);
     requestAnimationFrame(() => modalEl && modalEl.classList.add('show'));
   }

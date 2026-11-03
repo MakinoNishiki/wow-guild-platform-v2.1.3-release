@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#101218">
+<title>魔兽管家 · 副本掉落设计样板</title>
+<style>
+:root{color-scheme:dark;--ground:#101218;--panel:#191d26;--line:#353c49;--gold:#f0c060;--muted:#aab3c4}
+*{box-sizing:border-box}body{margin:0;background:var(--ground);color:#f4ecdb;font:15px/1.6 "Microsoft YaHei",sans-serif}
+header,main{max-width:1260px;margin:auto;padding:24px 32px}header{display:flex;justify-content:space-between;border-bottom:1px solid var(--line);color:var(--muted)}
+header strong{color:var(--gold)}h1,h2,p{margin:0}h1{font-size:clamp(36px,6vw,65px);line-height:1.2;letter-spacing:.05em}h2{font-size:23px}
+.hero{position:relative;isolation:isolate;overflow:hidden;padding:50px 36px;border:1px solid #64543a;border-radius:8px;background:radial-gradient(ellipse at 80% 80%,#755835,#252536 48%,#161820 75%)}
+.hero svg{position:absolute;inset:0 0 0 auto;width:67%;height:100%;z-index:-1}.hero p{max-width:34ch;margin-top:12px;color:#ddd6c8}.eyebrow{display:block;color:var(--gold);font-weight:700;letter-spacing:.17em;margin-bottom:10px}
+.layout{display:grid;grid-template-columns:minmax(210px,1fr) minmax(0,3fr);gap:16px;margin-top:20px}section,aside{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:22px}
+label{display:block;color:var(--muted);margin:0 0 8px}select,button{font:inherit;color:inherit;background:#131720;border:1px solid var(--line);border-radius:6px;padding:10px 12px}select{width:100%}button{cursor:pointer;width:100%;text-align:left;margin-top:7px}button:hover{border-color:#ac945b}button[aria-pressed=true]{background:#322a20;border-color:#99753b;color:#ffd882} :focus-visible{outline:2px solid #f0c060;outline-offset:3px}
+.head{display:flex;justify-content:space-between;align-items:center;gap:12px;border-bottom:1px solid var(--line);padding-bottom:14px}.head span,small{color:var(--muted)}ul{margin:0;padding:0;list-style:none}li{display:grid;grid-template-columns:38px 1fr auto;gap:12px;align-items:center;padding:14px 0;border-bottom:1px solid var(--line)}li:last-child{border-bottom:0}li strong{color:#ba9aff}li small{display:block}.rune{display:grid;place-items:center;background:#272338;border:1px solid #554969;border-radius:6px;color:#c9a9ff;font-size:21px;width:38px;height:38px}
+@media(max-width:700px){main,header{padding:16px}.layout{grid-template-columns:1fr}.hero{padding:32px 20px}}
+</style>
+<header><strong>魔兽管家</strong><span>副本掉落 · 设计样板</span></header>
+<main>
+<div class="hero">
+<svg viewBox="0 0 680 300" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><defs><linearGradient id="stone"><stop stop-color="#302d39"/><stop offset=".52" stop-color="#837054"/><stop offset="1" stop-color="#302d39"/></linearGradient><radialGradient id="glow"><stop stop-color="#e4b46d" stop-opacity=".53"/><stop offset="1" stop-color="#e4b46d" stop-opacity="0"/></radialGradient></defs><ellipse cx="430" cy="235" rx="225" ry="175" fill="url(#glow)"/><g fill="none" stroke="url(#stone)" opacity=".8"><path d="M220 310V153Q220 67 420 0Q620 67 620 153V310" stroke-width="23"/><path d="M265 310V158Q265 85 420 31Q575 85 575 158V310" stroke-width="9"/><path d="M319 310V174Q319 123 420 76Q521 123 521 174V310" stroke-width="5"/></g><g fill="none" stroke="#efd49f" opacity=".35"><path d="M420 97l34 39-34 39-34-39z"/><path d="M420 109l24 27-24 27-24-27z"/><path d="M420 90v92m-42-46h84"/></g></svg>
+<span class="eyebrow">团队副本 · 掉落图鉴</span><h1>副本掉落</h1><p>先选副本，再按首领查看装备。左侧保留当前位置，右侧专心看掉落。</p>
+</div>
+<div class="layout">
+<aside><label for="raid">选择副本</label><select id="raid"><option>虚影尖塔</option><option>梦境裂隙</option></select><p style="margin-top:20px;color:var(--muted)">首领</p><div id="bosses"></div></aside>
+<section aria-label="装备列表"><div class="head"><h2 id="boss"></h2><span id="count" aria-live="polite"></span></div><ul id="items"></ul><small>布局演示 · 首领和装备使用示例数据</small></section>
+</div>
+</main>
+<script>
+const catalog = [
+  [['尖塔守卫', ['暮色守卫的长刃', '碎星护腕', '无光印记']], ['暗影织者', ['暗影织者的披风', '夜幕之戒']]],
+  [['裂隙看守', ['裂隙看守的战锤', '梦尘护符']], ['织梦者', ['织梦者的法杖', '沉梦长袍']]]
+];
+const raid = document.querySelector('#raid');
+const bosses = document.querySelector('#bosses');
+function selectBoss(index) {
+  const [name, items] = catalog[raid.selectedIndex][index];
+  document.querySelector('#boss').textContent = name;
+  document.querySelector('#count').textContent = items.length + ' 件掉落';
+  document.querySelector('#items').innerHTML = items.map(item => '<li><span class="rune" aria-hidden="true">◇</span><div><strong>' + item + '</strong><small>团队副本装备</small></div><small>史诗</small></li>').join('');
+  Array.from(bosses.children).forEach((button, position) => button.setAttribute('aria-pressed', position === index));
+}
+function selectRaid() {
+  bosses.replaceChildren(...catalog[raid.selectedIndex].map(([name], index) => {
+    const button = document.createElement('button');
+    button.textContent = name;
+    button.onclick = () => selectBoss(index);
+    return button;
+  }));
+  selectBoss(0);
+}
+raid.addEventListener('change', selectRaid);
+selectRaid();
+</script>
+</html>

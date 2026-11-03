@@ -4859,62 +4859,7 @@ img.class-icon[src$=".png"] { border-radius: 3px; }
    44px 圆角 8px（§9 圆角上限）金线描边；纯 CSS hover/focus-within 出码，无埋点无跳转） */
 /* bottom 84px 让位：方案单抽屉钮 .dh-plan-toggle（decor-public.css，fixed right:20 bottom:20 z-index:1150）
    挂载后常驻右下角，24px 会被完全压住（WP1 验证 BUG-1 实证）——抬高避让，不碰 #58 抽屉链 */
-.home-qq-float { position: fixed; right: 24px; bottom: 84px; z-index: 55; }
-.home-qq-btn {
-  width: 44px;
-  height: 44px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 8px;
-  border: 1px solid var(--gold);
-  background: var(--bg-secondary);
-  color: var(--gold);
-  cursor: pointer;
-  box-shadow: var(--shadow);
-}
-.home-qq-btn:hover { background: var(--bg-tertiary); }
-.home-qq-pop {
-  position: absolute;
-  right: 0;
-  bottom: calc(100% + 12px);
-  width: 200px;
-  background: var(--bg-secondary);
-  border: 1px solid var(--gold);
-  border-radius: 8px;
-  padding: 12px;
-  box-shadow: var(--shadow);
-  text-align: center;
-  opacity: 0;
-  visibility: hidden;
-  transform: translateY(6px);
-  transition: opacity 0.2s ease-out, transform 0.2s ease-out, visibility 0.2s;
-}
-/* 指向按钮的小三角（金线描边同色系） */
-.home-qq-pop::after {
-  content: '';
-  position: absolute;
-  bottom: -6px;
-  right: 16px;
-  width: 10px;
-  height: 10px;
-  background: var(--bg-secondary);
-  border-right: 1px solid var(--gold);
-  border-bottom: 1px solid var(--gold);
-  transform: rotate(45deg);
-}
-.home-qq-float:hover .home-qq-pop, .home-qq-float:focus-within .home-qq-pop {
-  opacity: 1;
-  visibility: visible;
-  transform: translateY(0);
-}
-/* 浅色卡托：白底圆角 padding，深色主题下保扫码识别率（同 .fb-qr-wrap 口径） */
-.home-qq-qr { background: #ffffff; border-radius: 6px; padding: 8px; }
-.home-qq-qr img { display: block; width: 100%; }
-.home-qq-name { margin-top: 8px; font-size: 13px; font-weight: 600; color: var(--text-primary); }
-.home-qq-num { margin-top: 2px; font-size: 12px; color: var(--gold); }
 @media (prefers-reduced-motion: reduce) {
-  .home-qq-pop { transition: none; }
   .home-entry-card { transition: none; }
 }
 
@@ -4923,7 +4868,6 @@ img.class-icon[src$=".png"] { border-radius: 3px; }
   .ia-topbar { gap: 10px; padding: 0 12px; }
   .ia-brand-sub { display: none; }
   .ia-subnav { padding: 8px 12px; }
-  .home-qq-float { right: 16px; bottom: 76px; }
 }
 
 /* ==================== 任务书 #59 WP2：团队管理引导卡正式版（REQ-138 主卡权重 ≥2:1） ==================== */
@@ -5050,3 +4994,72 @@ img.class-icon[src$=".png"] { border-radius: 3px; }
 .tier-slot-cap:hover { border-color: var(--gold); color: var(--text-primary); background: rgba(240, 192, 96, 0.05); }
 .tier-slot-cap.active { background: linear-gradient(135deg, var(--gold-dark), var(--gold)); color: var(--bg-primary); border-color: var(--gold); font-weight: 600; box-shadow: 0 0 10px rgba(240, 192, 96, 0.3); }
 .tier-slot-cap.disabled { opacity: 0.45; cursor: not-allowed; }
+
+/* #85 WP2: layout and action feedback on the existing palette. */
+.home-entry-card:focus-visible,
+#page-members .member-workbar :is(button,input,select):focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 3px;
+}
+.home-entry-card:active { transform: translateY(1px); }
+#page-members .member-workbar {
+  padding: 12px;
+  margin-bottom: 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: var(--bg-secondary);
+}
+#page-members .member-workbar .toolbar-left { flex-wrap: wrap; }
+#page-members .member-workbar button:active:not(:disabled) { transform: translateY(1px); }
+@media (prefers-reduced-motion: reduce) {
+  .home-entry-card:active,
+  #page-members .member-workbar button:active:not(:disabled) { transform: none; }
+}
+
+/* #85 WP3: shared desktop workspace shell. Existing narrow layout remains available. */
+#mainContent {
+  --workspace-gutter: 24px;
+}
+#mainContent :is(.ia-tab,.ia-pill):focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: -3px;
+}
+#mainContent :is(.ia-tab,.ia-pill):active {
+  background-color: rgba(240, 192, 96, 0.12);
+}
+@media (min-width: 1200px) {
+  #mainContent:is([data-workspace="team"],[data-workspace="house"]) {
+    display: grid;
+    grid-template-columns: 176px minmax(0, 1fr);
+    grid-template-rows: auto auto 1fr;
+    grid-template-areas: "mast mast" "rail heading" "rail content";
+    align-items: start;
+  }
+  #mainContent > .ia-topbar { grid-area: mast; padding-inline: var(--workspace-gutter); }
+  #mainContent > .topbar { grid-area: heading; padding-inline: var(--workspace-gutter); }
+  #mainContent > .content-area { grid-area: content; padding-inline: var(--workspace-gutter); }
+  #mainContent > .ia-subnav {
+    grid-area: rail;
+    position: sticky;
+    top: 0;
+    align-self: start;
+    flex-direction: column;
+    flex-wrap: nowrap;
+    padding: 16px 12px;
+    background: var(--bg-secondary);
+    border-bottom: 0;
+    border-right: 1px solid var(--border-color);
+    min-height: calc(100vh - 40px);
+  }
+  #mainContent > .ia-subnav .ia-pill {
+    width: 100%;
+    justify-content: flex-start;
+    border-color: transparent;
+    text-align: left;
+  }
+  #mainContent > .ia-subnav .ia-pill:hover,
+  #mainContent > .ia-subnav .ia-pill.active { border-color: var(--gold-dark); }
+  #mainContent > .topbar .page-title { font-size: 20px; }
+}
+
+#page-home .home-entry-card, #page-home .home-entry-card:hover { text-decoration: none; }
