@@ -1,0 +1,622 @@
+{
+  "build": "12.1.5.70688",
+  "season": "S2",
+  "source": [
+    "ItemSet",
+    "Item",
+    "ItemSparse"
+  ],
+  "sets": [
+    {
+      "item_set_id": 2055,
+      "name": "灾厄墓骑的熔炉",
+      "pieces": [
+        {
+          "item_id": 271477,
+          "name": "灾厄墓骑胸甲",
+          "slot": "胸部",
+          "class_mask": 32,
+          "armor_subclass": 4,
+          "icon_file_data_id": 0
+        },
+        {
+          "item_id": 271475,
+          "name": "灾厄墓骑死握护手",
+          "slot": "手部",
+          "class_mask": 32,
+          "armor_subclass": 4,
+          "icon_file_data_id": 0
+        },
+        {
+          "item_id": 271474,
+          "name": "灾厄墓骑面甲",
+          "slot": "头部",
+          "class_mask": 32,
+          "armor_subclass": 4,
+          "icon_file_data_id": 0
+        },
+        {
+          "item_id": 271473,
+          "name": "灾厄墓骑护腿",
+          "slot": "腿部",
+          "class_mask": 32,
+          "armor_subclass": 4,
+          "icon_file_data_id": 0
+        },
+        {
+          "item_id": 271472,
+          "name": "灾厄墓骑绞架肩铠",
+          "slot": "肩部",
+          "class_mask": 32,
+          "armor_subclass": 4,
+          "icon_file_data_id": 0
+        }
+      ],
+      "exact_site_spec_count": 3
+    },
+    {
+      "item_set_id": 2056,
+      "name": "深渊末日猎犬的追击",
+      "pieces": [
+        {
+          "item_id": 271540,
+          "name": "深渊末日猎犬核心护甲",
+          "slot": "胸部",
+          "class_mask": 2048,
+          "armor_subclass": 2,
+          "icon_file_data_id": 0
+        },
+        {
+          "item_id": 271538,
+          "name": "深渊末日猎犬的镶钉护手",
+          "slot": "手部",
+          "class_mask": 2048,
+          "armor_subclass": 2,
+          "icon_file_data_id": 0
+        },
+        {
+          "item_id": 271537,
+          "name": "深渊末日猎犬的无情凝视",
+          "slot": "头部",
+          "class_mask": 2048,
+          "armor_subclass": 2,
+          "icon_file_data_id": 0
+        },
+        {
+          "item_id": 271536,
+          "name": "深渊末日猎犬腿甲",
+          "slot": "腿部",
+          "class_mask": 2048,
+          "armor_subclass": 2,
+          "icon_file_data_id": 0
+        },
+        {
+          "item_id": 271535,
+          "name": "深渊末日猎犬之颚",
+          "slot": "肩部",
+          "class_mask": 2048,
+          "armor_subclass": 2,
+          "icon_file_data_id": 0
+        }
+      ],
+      "exact_site_spec_count": 3
+    },
+    {
+      "item_set_id": 2057,
+      "name": "神秘梦境守望者的树皮",
+      "pieces": [
+        {
+          "item_id": 271531,
+          "name": "神秘梦境守望者的月光法服",
+          "slot": "胸部",
+          "class_mask": 1024,
+          "armor_subclass": 2,
+          "icon_file_data_id": 0
+        },
+        {
+          "item_id": 271529,
+          "name": "神秘梦境守望者护手",
+          "slot": "手部",
+          "class_mask": 1024,
+          "armor_subclass": 2,
+          "icon_file_data_id": 0
+        },
+        {
+          "item_id": 271528,
+          "name": "神秘梦境守望者的酣眠凝视",
+          "slot": "头部",
+          "class_mask": 1024,
+          "armor_subclass": 2,
+          "icon_file_data_id": 0
+        },
+        {
+          "item_id": 271527,
+          "name": "神秘梦境守望者护腿",
+          "slot": "腿部",
+          "class_mask": 1024,
+          "armor_subclass": 2,
+          "icon_file_data_id": 0
+        },
+        {
+          "item_id": 271526,
+          "name": "神秘梦境守望者翎羽",
+          "slot": "肩部",
+          "class_mask": 1024,
+          "armor_subclass": 2,
+          "icon_file_data_id": 0
+        }
+      ],
+      "exact_site_spec_count": 4
+    },
+    {
+      "item_set_id": 2058,
+      "name": "灾厄回响",
+      "pieces": [
+        {
+          "item_id": 271504,
+          "name": "灾厄灼热火山口胸甲",
+          "slot": "胸部",
+          "class_mask": 4096,
+          "armor_subclass": 3,
+          "icon_file_data_id": 0
+        },
+        {
+          "item_id": 271502,
+          "name": "灾厄回响的黑檀巨角护手",
+          "slot": "手部",
+          "class_mask": 4096,
+          "armor_subclass": 3,
+          "icon_file_data_id": 0
+        },
+        {
+          "item_id": 271501,
+          "name": "灾厄回响的熔岩塑形头盔",
+          "slot": "头部",
+          "class_mask": 4096,
+          "armor_subclass": 3,
+          "icon_file_data_id": 0
+        },
+        {
+          "item_id": 271500,
+          "name": "灾厄大地之柱护腿",
+          "slot": "腿部",
+          "class_mask": 4096,
+          "armor_subclass": 3,
+          "icon_file_data_id": 0
+        },
+        {
+          "item_id": 271499,
+          "name": "灾厄回响的裂峰护肩",
+          "slot": "肩部",
+          "class_mask": 4096,
+          "armor_subclass": 3,
+          "icon_file_data_id": 0
+        }
+      ],
+      "exact_site_spec_count": 3
+    },
+    {
+      "item_set_id": 2059,
+      "name": "潜伏蝰蛇的伏击",
+      "pieces": [
+        {
+          "item_id": 271495,
+          "name": "潜伏蝰蛇的鳞板胸甲",
+          "slot": "胸部",
+          "class_mask": 4,
+          "armor_subclass": 3,
+          "icon_file_data_id": 0
+        },
+        {
+          "item_id": 271493,
+          "name": "潜伏蝰蛇的穿皮护手",
+          "slot": "手部",
+          "class_mask": 4,
+          "armor_subclass": 3,
+          "icon_file_data_id": 0
+        },
+        {
+          "item_id": 271492,
+          "name": "潜伏蝰蛇的渗液之牙",
+          "slot": "头部",
+          "class_mask": 4,
+          "armor_subclass": 3,
+          "icon_file_data_id": 0
+        },
+        {
+          "item_id": 271491,
+          "name": "潜伏蝰蛇的盘绕腿甲",
+          "slot": "腿部",
+          "class_mask": 4,
+          "armor_subclass": 3,
+          "icon_file_data_id": 0
+        },
+        {
+          "item_id": 271490,
+          "name": "潜伏蝰蛇之颚",
+          "slot": "肩部",
+          "class_mask": 4,
+          "armor_subclass": 3,
+          "icon_file_data_id": 0
+        }
+      ],
+      "exact_site_spec_count": 3
+    },
+    {
+      "item_set_id": 2060,
+      "name": "始源魔网守卫的装束",
+      "pieces": [
+        {
+          "item_id": 271567,
+          "name": "始源魔网守卫护胸",
+          "slot": "胸部",
+          "class_mask": 128,
+          "armor_subclass": 1,
+          "icon_file_data_id": 0
+        },
+        {
+          "item_id": 271565,
+          "name": "始源魔网守卫的法力塑形手套",
+          "slot": "手部",
+          "class_mask": 128,
+          "armor_subclass": 1,
+          "icon_file_data_id": 0
+        },
+        {
+          "item_id": 271564,
+          "name": "始源魔网守卫之冠",
+          "slot": "头部",
+          "class_mask": 128,
+          "armor_subclass": 1,
+          "icon_file_data_id": 0
+        },
+        {
+          "item_id": 271563,
+          "name": "始源魔网守卫的精裁裹腿",
+          "slot": "腿部",
+          "class_mask": 128,
+          "armor_subclass": 1,
+          "icon_file_data_id": 0
+        },
+        {
+          "item_id": 271562,
+          "name": "始源魔网守卫的法力涌流",
+          "slot": "肩部",
+          "class_mask": 128,
+          "armor_subclass": 1,
+          "icon_file_data_id": 0
+        }
+      ],
+      "exact_site_spec_count": 3
+    },
+    {
+      "item_set_id": 2061,
+      "name": "美猴王的诡计",
+      "pieces": [
+        {
+          "item_id": 271522,
+          "name": "美猴王战衣",
+          "slot": "胸部",
+          "class_mask": 512,
+          "armor_subclass": 2,
+          "icon_file_data_id": 0
+        },
+        {
+          "item_id": 271520,
+          "name": "美猴王的斗拳",
+          "slot": "手部",
+          "class_mask": 512,
+          "armor_subclass": 2,
+          "icon_file_data_id": 0
+        },
+        {
+          "item_id": 271519,
+          "name": "美猴王的不屈面容",
+          "slot": "头部",
+          "class_mask": 512,
+          "armor_subclass": 2,
+          "icon_file_data_id": 0
+        },
+        {
+          "item_id": 271518,
+          "name": "美猴王长裤",
+          "slot": "腿部",
+          "class_mask": 512,
+          "armor_subclass": 2,
+          "icon_file_data_id": 0
+        },
+        {
+          "item_id": 271517,
+          "name": "美猴王流苏护肩",
+          "slot": "肩部",
+          "class_mask": 512,
+          "armor_subclass": 2,
+          "icon_file_data_id": 0
+        }
+      ],
+      "exact_site_spec_count": 3
+    },
+    {
+      "item_set_id": 2062,
+      "name": "祝圣烈焰之耀",
+      "pieces": [
+        {
+          "item_id": 271468,
+          "name": "祝圣烈焰壁垒",
+          "slot": "胸部",
+          "class_mask": 2,
+          "armor_subclass": 4,
+          "icon_file_data_id": 0
+        },
+        {
+          "item_id": 271466,
+          "name": "祝圣烈焰护手",
+          "slot": "手部",
+          "class_mask": 2,
+          "armor_subclass": 4,
+          "icon_file_data_id": 0
+        },
+        {
+          "item_id": 271465,
+          "name": "祝圣烈焰战盔",
+          "slot": "头部",
+          "class_mask": 2,
+          "armor_subclass": 4,
+          "icon_file_data_id": 0
+        },
+        {
+          "item_id": 271464,
+          "name": "祝圣烈焰护腿",
+          "slot": "腿部",
+          "class_mask": 2,
+          "armor_subclass": 4,
+          "icon_file_data_id": 0
+        },
+        {
+          "item_id": 271463,
+          "name": "祝圣烈焰肩铠",
+          "slot": "肩部",
+          "class_mask": 2,
+          "armor_subclass": 4,
+          "icon_file_data_id": 0
+        }
+      ],
+      "exact_site_spec_count": 3
+    },
+    {
+      "item_set_id": 2063,
+      "name": "宇宙忏悔者的法服",
+      "pieces": [
+        {
+          "item_id": 271556,
+          "name": "宇宙忏悔者的天界之握",
+          "slot": "手部",
+          "class_mask": 16,
+          "armor_subclass": 1,
+          "icon_file_data_id": 0
+        },
+        {
+          "item_id": 271555,
+          "name": "宇宙忏悔者的真视头饰",
+          "slot": "头部",
+          "class_mask": 16,
+          "armor_subclass": 1,
+          "icon_file_data_id": 0
+        },
+        {
+          "item_id": 271554,
+          "name": "宇宙忏悔者的包覆裹腿",
+          "slot": "腿部",
+          "class_mask": 16,
+          "armor_subclass": 1,
+          "icon_file_data_id": 0
+        },
+        {
+          "item_id": 271558,
+          "name": "宇宙忏悔者的星蚀法袍",
+          "slot": "胸部",
+          "class_mask": 16,
+          "armor_subclass": 1,
+          "icon_file_data_id": 0
+        },
+        {
+          "item_id": 271553,
+          "name": "宇宙忏悔者的回响尖啸",
+          "slot": "肩部",
+          "class_mask": 16,
+          "armor_subclass": 1,
+          "icon_file_data_id": 0
+        }
+      ],
+      "exact_site_spec_count": 3
+    },
+    {
+      "item_set_id": 2064,
+      "name": "天选屠血者的妖纹",
+      "pieces": [
+        {
+          "item_id": 271513,
+          "name": "天选屠血者绑带罩衫",
+          "slot": "胸部",
+          "class_mask": 8,
+          "armor_subclass": 2,
+          "icon_file_data_id": 0
+        },
+        {
+          "item_id": 271511,
+          "name": "天选屠血者尖牙护手",
+          "slot": "手部",
+          "class_mask": 8,
+          "armor_subclass": 2,
+          "icon_file_data_id": 0
+        },
+        {
+          "item_id": 271510,
+          "name": "天选屠血者精魂兜帽",
+          "slot": "头部",
+          "class_mask": 8,
+          "armor_subclass": 2,
+          "icon_file_data_id": 0
+        },
+        {
+          "item_id": 271509,
+          "name": "天选屠血者加固长裤",
+          "slot": "腿部",
+          "class_mask": 8,
+          "armor_subclass": 2,
+          "icon_file_data_id": 0
+        },
+        {
+          "item_id": 271508,
+          "name": "天选屠血者巫毒护肩",
+          "slot": "肩部",
+          "class_mask": 8,
+          "armor_subclass": 2,
+          "icon_file_data_id": 0
+        }
+      ],
+      "exact_site_spec_count": 3
+    },
+    {
+      "item_set_id": 2065,
+      "name": "蛇裔神谕者的预言",
+      "pieces": [
+        {
+          "item_id": 271486,
+          "name": "蛇裔神谕者尖牙法服",
+          "slot": "胸部",
+          "class_mask": 64,
+          "armor_subclass": 3,
+          "icon_file_data_id": 0
+        },
+        {
+          "item_id": 271484,
+          "name": "蛇裔神谕者妖术之握",
+          "slot": "手部",
+          "class_mask": 64,
+          "armor_subclass": 3,
+          "icon_file_data_id": 0
+        },
+        {
+          "item_id": 271483,
+          "name": "蛇裔神谕者蛇冠",
+          "slot": "头部",
+          "class_mask": 64,
+          "armor_subclass": 3,
+          "icon_file_data_id": 0
+        },
+        {
+          "item_id": 271482,
+          "name": "蛇裔神谕者护腿",
+          "slot": "腿部",
+          "class_mask": 64,
+          "armor_subclass": 3,
+          "icon_file_data_id": 0
+        },
+        {
+          "item_id": 271481,
+          "name": "蛇裔神谕者嘶鸣披肩",
+          "slot": "肩部",
+          "class_mask": 64,
+          "armor_subclass": 3,
+          "icon_file_data_id": 0
+        }
+      ],
+      "exact_site_spec_count": 3
+    },
+    {
+      "item_set_id": 2066,
+      "name": "受诅通灵师碎裂束缚",
+      "pieces": [
+        {
+          "item_id": 271547,
+          "name": "受诅通灵师焦黑之握",
+          "slot": "手部",
+          "class_mask": 256,
+          "armor_subclass": 1,
+          "icon_file_data_id": 0
+        },
+        {
+          "item_id": 271546,
+          "name": "受诅通灵师颅骨",
+          "slot": "头部",
+          "class_mask": 256,
+          "armor_subclass": 1,
+          "icon_file_data_id": 0
+        },
+        {
+          "item_id": 271545,
+          "name": "受诅通灵师绑腿",
+          "slot": "腿部",
+          "class_mask": 256,
+          "armor_subclass": 1,
+          "icon_file_data_id": 0
+        },
+        {
+          "item_id": 271549,
+          "name": "受诅通灵师嘎响法袍",
+          "slot": "胸部",
+          "class_mask": 256,
+          "armor_subclass": 1,
+          "icon_file_data_id": 0
+        },
+        {
+          "item_id": 271544,
+          "name": "受诅通灵师尖塔肩甲",
+          "slot": "肩部",
+          "class_mask": 256,
+          "armor_subclass": 1,
+          "icon_file_data_id": 0
+        }
+      ],
+      "exact_site_spec_count": 3
+    },
+    {
+      "item_set_id": 2067,
+      "name": "翡翠督军的统御",
+      "pieces": [
+        {
+          "item_id": 271459,
+          "name": "翡翠督军胸铠",
+          "slot": "胸部",
+          "class_mask": 1,
+          "armor_subclass": 4,
+          "icon_file_data_id": 0
+        },
+        {
+          "item_id": 271457,
+          "name": "翡翠督军的镶玉护手",
+          "slot": "手部",
+          "class_mask": 1,
+          "armor_subclass": 4,
+          "icon_file_data_id": 0
+        },
+        {
+          "item_id": 271456,
+          "name": "翡翠督军的淬火战角",
+          "slot": "头部",
+          "class_mask": 1,
+          "armor_subclass": 4,
+          "icon_file_data_id": 0
+        },
+        {
+          "item_id": 271455,
+          "name": "翡翠督军腿铠",
+          "slot": "腿部",
+          "class_mask": 1,
+          "armor_subclass": 4,
+          "icon_file_data_id": 0
+        },
+        {
+          "item_id": 271454,
+          "name": "翡翠督军的狂怒肩铠",
+          "slot": "肩部",
+          "class_mask": 1,
+          "armor_subclass": 4,
+          "icon_file_data_id": 0
+        }
+      ],
+      "exact_site_spec_count": 3
+    }
+  ]
+}
