@@ -1359,7 +1359,7 @@ async function syncAllToCloud() {
 // Supabase 是唯一主数据源；localStorage 仅作缓存；JSON 仅作备份/迁移。
 // 流程：写入 DB -> 重新读取 DB -> 更新 appData -> 渲染
 async function cloudCrud(dataType, operation, payload, options = {}) {
-  const { renderFn, onSuccess, onError, reloadTypes } = options;
+  const { renderFn, onSuccess, onError, reloadTypes, silentError = false } = options;
   const perfT0 = performance.now(); // 任务书 #10：写路径前端计时
 
   try {
@@ -1397,7 +1397,7 @@ async function cloudCrud(dataType, operation, payload, options = {}) {
     return { success: true };
   } catch (e) {
     console.error(`cloudCrud 失败 [${dataType}/${operation}]:`, e);
-    showToast('保存失败: ' + (e.message || '未知错误'), 'error');
+    if (!silentError) showToast('保存失败: ' + (e.message || '未知错误'), 'error');
     if (typeof onError === 'function') onError(e);
     throw e;
   }
@@ -4220,7 +4220,7 @@ async function importParseWcl() {
       // 未识别职业按现有 bad 状态处理（预览页可人工修正）
       const dup = cls ? !!matchMemberByNameServer(activeMembers, p.name, p.server || '') : false;
       const status = !cls ? 'bad' : (dup ? 'dup' : 'ok');
-      return { name: p.name, cls, server: p.server || '', include: status === 'ok', status };
+      return { name: p.name, cls, server: p.server || '', ...wclImportSpecs(cls, p), include: status === 'ok', status };
     });
     showImportPreviewStep();
   } catch (e) {
@@ -4255,6 +4255,34 @@ function importBackToPaste() {
   switchImportTab(importSource);
 }
 
+// REQ-182: report observations become editable main/off specs for new members only.
+function wclImportSpecs(cls, player) {
+  const valid = getGameSpecs(cls);
+  const specs = [...new Set((player.specs || []).map(entry => {
+    const mapped = window.IconMap?.specNameFromKey(cls, entry.name);
+    if (!mapped) return '';
+    return valid.find(name => name === mapped ||
+      window.IconMap.specIcon(cls, name) === window.IconMap.specIcon(cls, mapped)) || '';
+  }).filter(Boolean))];
+  return { mainSpec: specs[0] || '', reportSpecs: specs };
+}
+
+function importSpecFields(row) {
+  const valid = getGameSpecs(row.cls);
+  const main = valid.includes(row.mainSpec) ? row.mainSpec : '待补充';
+  const off = (row.reportSpecs || []).filter(name => valid.includes(name) && name !== main);
+  const fields = { main_spec: main, spec: main, off_spec: off[0] || '', off_specs: off };
+  return { ...fields, role: deriveMemberRoles(fields) };
+}
+
+function importSpecCell(row, index) {
+  const valid = getGameSpecs(row.cls);
+  const off = (row.reportSpecs || []).filter(name => valid.includes(name) && name !== row.mainSpec);
+  return `${specIconHtml(row.cls, row.mainSpec)}<select class="form-select" aria-label="主专精" style="height:28px;padding:2px 6px" onchange="importUpdateRow(${index},'mainSpec',this.value)">
+    <option value="">待补充</option>${valid.map(name => `<option value="${name}" ${row.mainSpec === name ? 'selected' : ''}>${name}</option>`).join('')}</select>
+    ${off.length ? `<div style="font-size:12px;color:var(--text-secondary)">副：${off.join('、')}</div>` : ''}`;
+}
+
 function renderImportPreview() {
   const classOptions = sel => '<option value="">（选职业）</option>' +
     Object.keys(classMap).map(c => `<option value="${c}" ${sel === c ? 'selected' : ''}>${c}</option>`).join('');
@@ -4277,9 +4305,9 @@ function renderImportPreview() {
     return `<tr${color ? ` style="color:${color}"` : ''}>
       <td class="center"><input type="checkbox" ${r.include ? 'checked' : ''} onchange="importUpdateRow(${i},'include',this.checked)"></td>
       <td>${nameCell}</td>
-      <td style="white-space:nowrap">${classMap[r.cls] ? `<img class="class-icon" id="importClsIcon${i}" src="assets/icons/${classMap[r.cls]}.svg" alt="" onerror="this.style.display='none'">` : `<span id="importClsIcon${i}"></span>`}<select class="form-select" style="height:28px;padding:2px 6px" onchange="importUpdateRow(${i},'cls',this.value)">${classOptions(r.cls)}</select></td>
+      <td style="white-space:nowrap"><span id="importClsIcon${i}">${classIconHtml(r.cls)}</span><select class="form-select" style="height:28px;padding:2px 6px" onchange="importUpdateRow(${i},'cls',this.value)">${classOptions(r.cls)}</select></td>
       <td style="font-size:12px;white-space:nowrap">${r.server || '—'}</td>
-      <td style="white-space:nowrap">待补充</td>
+      <td id="importSpecCell${i}" style="white-space:nowrap">${importSpecCell(r, i)}</td>
       <td class="center" style="white-space:nowrap">${statusText[r.status]}</td>
       <td class="center"><button type="button" class="btn btn-sm btn-danger" onclick="importRemoveRow(${i})">剔除</button></td>
     </tr>`;
@@ -4290,17 +4318,14 @@ function importUpdateRow(i, field, value) {
   const r = importPreviewRows[i];
   if (!r) return;
   r[field] = value;
-  // 任务书 #13 §6：职业变更时同步更新行内图标
   if (field === 'cls') {
+    r.mainSpec = ''; r.reportSpecs = [];
     const icon = document.getElementById(`importClsIcon${i}`);
-    if (icon) {
-      const key = classMap[value];
-      if (key) {
-        icon.outerHTML = `<img class="class-icon" id="importClsIcon${i}" src="assets/icons/${key}.svg" alt="" onerror="this.style.display='none'">`;
-      } else {
-        icon.outerHTML = `<span id="importClsIcon${i}"></span>`;
-      }
-    }
+    if (icon) icon.innerHTML = classIconHtml(value);
+  }
+  if (field === 'cls' || field === 'mainSpec') {
+    const cell = document.getElementById(`importSpecCell${i}`);
+    if (cell) cell.innerHTML = importSpecCell(r, i);
   }
   // 不整表重绘（避免输入框失焦），状态在确认导入时最终校验
 }
@@ -4396,11 +4421,7 @@ async function importExecute(toAdd, toRestore, skipped) {
           name: r.name.trim(),
           server: r.server || '', // REQ-095：服务器随导入写库（此前解析出但丢弃）
           class: r.cls,
-          main_spec: '待补充',
-          spec: '待补充', // 向后兼容
-          off_spec: '',
-          off_specs: [],
-          role: [],
+          ...importSpecFields(r),
           status: '正式',
           join_date: formatDate(new Date()),
           notes: ''
@@ -4447,7 +4468,7 @@ async function importExecute(toAdd, toRestore, skipped) {
       if (!failedRows.length) closeModal('importMembersModal');
       else renderImportPreview();
       const restoredMsg = restoredOk ? `，恢复 ${restoredOk} 个已离队成员` : '';
-      showToast(`成功导入 ${addedOk} 个成员（专精待补充）${restoredMsg}${failedMsg}`, failedRows.length ? 'warning' : 'success');
+      showToast(`成功导入 ${addedOk} 个成员${restoredMsg}${failedMsg}`, failedRows.length ? 'warning' : 'success');
     }
     // BUG-026（任务书 #12 补丁）：从 WCL 同步预览跳转过来的"添加为成员"，
     // 导入成功后回到同步预览弹窗，不阻塞后续考勤写入
@@ -4880,6 +4901,9 @@ function editAttendanceReport() {
 }
 
 function showActivityModal(activity = null) {
+  if (activitySaving) return;
+  activityModalEpoch++;
+  activityCreateId = activity ? null : crypto.randomUUID();
   editingActivityId = activity ? activity.id : null;
   document.getElementById('activityModalTitle').textContent = activity ? '编辑活动' : '创建活动';
   document.getElementById('activityDate').value = activity ? activity.date : formatDate(new Date());
@@ -4918,6 +4942,15 @@ function updateActivityDuration() {
 
 // 防重复提交标志
 let activitySaving = false;
+let activityCreateId = null;
+let activityModalEpoch = 0;
+
+// REQ-183: compare independently reloaded data, never cached state after a failed read.
+function activitySaveMatches(row, payload) {
+  return ['date', 'raid_name', 'notes', 'wcl_url', 'wcl_report_code', 'team_label'].every(key =>
+    (row[key] || '') === (payload[key] || '')) &&
+    ['start_time', 'end_time'].every(key => (row[key] || '').slice(0,5) === (payload[key] || '').slice(0,5));
+}
 
 // REQ-014：校验 WCL 链接并解析报告编号
 // 返回 { url, code }；空输入返回 { url:'', code:'' }；非 warcraftlogs.com 域名返回 null
@@ -4944,6 +4977,12 @@ async function saveActivity() {
     showToast('请先恢复活动再编辑', 'warning'); return;
   }
   activitySaving = true;
+  const saveGuildId = window.CloudSync.getCurrentGuild()?.id;
+  const saveEpoch = activityModalEpoch;
+  let attemptedPayload = null;
+  const isNewActivity = !editingActivityId;
+  const stillCurrent = () => window.CloudSync.getCurrentGuild()?.id === saveGuildId &&
+    activityModalEpoch === saveEpoch && document.getElementById('activityModal').classList.contains('show');
   const saveBtn = document.getElementById('activitySaveBtn');
   if (saveBtn) { saveBtn.dataset.originalText = saveBtn.textContent; saveBtn.disabled = true; saveBtn.textContent = '保存中...'; }
 
@@ -4973,7 +5012,7 @@ async function saveActivity() {
     // REQ-062：团号（trim；空串不显示徽章）。REQ-064：旧 team_tag 已并入本字段，不再读写
     team_label: document.getElementById('activityTeamLabel').value.trim()
   };
-  if (wclParsed.code && appData.activities.some(row => row.id !== editingActivityId &&
+  if (wclParsed.code && appData.activities.some(row => row.id !== (editingActivityId || activityCreateId) &&
       (row.wcl_report_code || parseWclUrl(row.wcl_url)?.code) === wclParsed.code)) {
     showToast('这份 WCL 报告已关联其他活动，请先核对。', 'error');
     activitySaving = false;
@@ -5006,7 +5045,9 @@ async function saveActivity() {
       }
       // Editing activity metadata must not rewrite existing attendance rows.
       const payload = { ...activityData, boss: activity.boss, id: editingActivityId };
-      await cloudCrud('activities', 'update', payload, { renderFn: renderAttendance });
+      attemptedPayload = payload;
+      await cloudCrud('activities', 'update', payload, { renderFn: renderAttendance, silentError: true });
+      if (!stillCurrent()) return;
       wclBoardCache.clear();
       if (currentActivityId === payload.id && document.getElementById('attendanceDetailModal').classList.contains('show')) {
         const refreshed = appData.activities.find(row => row.id === payload.id);
@@ -5020,11 +5061,24 @@ async function saveActivity() {
       if (window.WBTrack) WBTrack.event('attendance_save', { marked: appData.members.filter(m => m.status !== '离队').length });
       showToast('活动已更新', 'success');
     } else {
+      // Fresh read before a new linked activity; a previous window may have saved it.
+      if (activityData.wcl_report_code) {
+        await window.CloudSync.reloadData('activities');
+        if (!stillCurrent()) return;
+        if (appData.activities.some(a => a.id !== activityCreateId &&
+            (a.wcl_report_code || parseWclUrl(a.wcl_url)?.code) === activityData.wcl_report_code)) {
+          renderAttendance();
+          showToast('这份报告已有关联活动，请打开已有活动继续处理，无需重新创建。', 'warning');
+          return;
+        }
+      }
       const attendees = appData.members.filter(m => m.status !== '离队').map(m => ({
         member_id: m.id, status: '缺席', notes: ''
       }));
-      const payload = { ...activityData, status: 'normal', attendees };
-      await cloudCrud('activities', 'add', payload, { renderFn: renderAttendance });
+      const payload = { ...activityData, id: activityCreateId, status: 'normal', attendees };
+      attemptedPayload = payload;
+      await cloudCrud('activities', 'add', payload, { renderFn: renderAttendance, silentError: true });
+      if (!stillCurrent()) return;
       rememberRecentRaidName(raidName); // REQ-029
       // 任务书 #56：REQ-141 WP3 埋点（事件名见 docs/开发规范.md 埋点纪律章）
       if (window.WBTrack) WBTrack.event('attendance_save', { marked: attendees.length });
@@ -5033,7 +5087,41 @@ async function saveActivity() {
     closeModal('activityModal'); // BUG-080 同族（任务书 #47 WP2-#3）：成功才关弹窗——失败保弹窗留输入便于重试（与 saveMember 口径对齐）
   } catch (e) {
     console.error('活动保存失败:', e);
-    showToast(e.message || '活动保存失败，请重试', 'error');
+    if (!stillCurrent()) return;
+    if (attemptedPayload?.id) {
+      if (saveBtn) saveBtn.textContent = '正在核对保存结果...';
+      try {
+        await window.CloudSync.reloadData('activities');
+        if (!stillCurrent()) return;
+        const saved = appData.activities.find(a => a.id === attemptedPayload.id);
+        saveData();
+        renderAttendance();
+        if (saved) {
+          // Future manual saves edit this row; never restart creation or rewrite attendance.
+          editingActivityId = saved.id;
+          document.getElementById('activityModalTitle').textContent = '编辑活动';
+          if (!activitySaveMatches(saved, attemptedPayload)) {
+            showToast('已找到活动，但资料与此次输入不同。输入已保留，请核对后保存；不会重复创建。', 'warning');
+            return;
+          }
+          const missing = (attemptedPayload.attendees || []).filter(a =>
+            !(saved.attendees || []).some(existing => existing.member_id === a.member_id));
+          closeModal('activityModal');
+          if (isNewActivity && missing.length) {
+            openAttendanceDetail(saved.id);
+            showToast(`已核实活动已创建，${missing.length} 人的初始考勤尚未保存。请在此活动同步或保存考勤，无需重建。`, 'warning');
+          } else {
+            showToast('已核实活动保存成功，无需重复操作。', 'success');
+          }
+          return;
+        }
+        showToast('暂未查到保存记录，输入已保留。可重试保存，本次重试不会重复创建活动。', 'warning');
+      } catch (readError) {
+        if (stillCurrent()) showToast('网络异常，暂时无法确认保存结果。请保留此窗口稍后重试，不要另建同一活动。', 'warning');
+      }
+    } else {
+      showToast(e.message || '读取活动失败，尚未提交保存，请稍后重试', 'error');
+    }
   } finally {
     activitySaving = false;
     if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = saveBtn.dataset.originalText || '保存'; }
@@ -5616,9 +5704,9 @@ function wclCheckSummaryHtml(data) {
   const unmatched = players.filter(p => !wclMatchRosterMember(members, p));
   const uncertain = matched.filter(p => !p.server || !wclMatchRosterMember(members, p).server);
   const names = list => list.map(p => wcl70Esc(p.name + (p.server ? ' · ' + p.server : ' · 服务器未知'))).join('、') || '无';
-  return `<p>首领战 ${Number(data.bossFightTotal) || 0} 场 · 参战 ${players.length} 人 · 名单匹配 ${matched.length} 人 · 待核对 ${unmatched.length} 人</p>` +
+  return `<p>首领战 ${Number(data.bossFightTotal) || 0} 场 · 参战 ${players.length} 人 · 名单匹配 ${matched.length} 人 · 未匹配团队名单 ${unmatched.length} 人（默认不计入考勤）</p>` +
     (!data.bossFightTotal || !players.length ? '<p>未发现可用于考勤的首领参战记录，请勿据此判断出勤。</p>' : '') +
-    `<details><summary>查看名单对照</summary><p>匹配：${names(matched)}</p><p>待核对：${names(unmatched)}</p>` +
+    `<details><summary>查看名单对照</summary><p>匹配：${names(matched)}</p><p>未匹配团队名单（默认不计入考勤，无需逐个忽略）：${names(unmatched)}</p>` +
     (uncertain.length ? `<p>服务器资料不全，仅按唯一同名匹配：${names(uncertain)}</p>` : '') +
     '</details><p>匹配数仅供核对，不代表这一定是本团队活动；请结合日期、副本与团号确认。</p>';
 }
@@ -5910,7 +5998,7 @@ function buildWclSyncPreview(activity, reportCode, data, replacement = null) {
   wclSyncRows = (data.players || []).filter(p => p.bossFights > 0).map(p => {
     const cls = wowClassEnToCn[(p.subType || '').toUpperCase()] || '';
     const base = {
-      name: p.name, server: p.server || '', subType: p.subType || '', cls,
+      name: p.name, server: p.server || '', subType: p.subType || '', cls, specs: p.specs || [],
       bossFights: p.bossFights || 0, memberId: null, status: '出席', ignored: false
     };
     // 按角色名逐一匹配（REQ-095 统一口径：单候选宽松、多候选须 (name,server) 精确相等），
@@ -5988,7 +6076,7 @@ function renderWclSyncPreview() {
   }
   // ③ 未匹配（红）：log 有、成员管理没有，不写入考勤；可添加为成员 / 忽略
   if (unmatched.length) {
-    html += `<div class="wcl-sync-zone"><div class="wcl-sync-zone-title" style="color:var(--danger)">③ 未匹配（${unmatched.length}）</div>`;
+    html += `<div class="wcl-sync-zone"><div class="wcl-sync-zone-title" style="color:var(--danger)">③ 未匹配团队名单（${unmatched.length}，默认不计入考勤）</div><p style="color:var(--text-secondary)">这些角色不会自动加入成员或写入考勤，无需逐个忽略；确认确属团队成员时再手动添加。</p>`;
     html += unmatched.map(r => {
       const i = wclSyncRows.indexOf(r);
       // BUG-026：已成功添加为成员的行标「已添加」灰显，不再可操作
@@ -6063,7 +6151,7 @@ function wclSyncAddAsMember(i) {
     const activeMembers = appData.members.filter(m => !isDepartedStatus(m.status));
     const dup = r.cls ? !!matchMemberByNameServer(activeMembers, r.name, r.server) : false;
     const status = !r.cls ? 'bad' : (dup ? 'dup' : 'ok');
-    importPreviewRows = [{ name: r.name, cls: r.cls, server: r.server, include: status === 'ok', status }];
+    importPreviewRows = [{ name: r.name, cls: r.cls, server: r.server, ...wclImportSpecs(r.cls, r), include: status === 'ok', status }];
     importSource = 'wcl';
     importWclTitle = wclSyncMeta ? wclSyncMeta.title : '';
     document.getElementById('importTabPaste').classList.remove('active');
@@ -8771,6 +8859,14 @@ function lootFillAssignedTo(idOrName) {
 // ==================== 初始化 ====================
 // ==================== 更新日志 ====================
 const changelogData = [
+  { id: 'v3.2.0-req183-feature', version: 'v3.2.0', date: '2026-11-05', type: 'feature', typeLabel: '新增功能', title: '活动保存异常后自动核对结果', summary: '网络报错后会重新读取活动，区分已保存、部分保存和结果未知。', details: ['已核实保存成功时无需再次创建活动。'] },
+  { id: 'v3.2.0-req183-improve', version: 'v3.2.0', date: '2026-11-05', type: 'improve', typeLabel: '功能优化', title: '名单核对说明更清楚', summary: '未匹配团队名单的角色默认不计入考勤，无需逐人忽略。', details: ['确认属于团队成员时仍可手动添加。'] },
+  { id: 'v3.2.0-req183-fix', version: 'v3.2.0', date: '2026-11-05', type: 'fix', typeLabel: '修复BUG', title: '减少保存报错后的误操作', summary: '同一次创建重试复用活动编号，避免成功响应丢失后重复建活动；保存错误不再重复弹出。', details: ['初始考勤未齐时进入已创建的活动继续处理，不覆盖已有考勤。'] },
+  { id: 'v3.2.0-req183-refactor', version: 'v3.2.0', date: '2026-11-05', type: 'refactor', typeLabel: '模块调整', title: '沿用已有活动继续处理', summary: '保存核对与重试仍在原活动流程内完成，不新增独立管理入口。', details: ['网络仍不可用时保留输入并提示结果未知，不假报成功。'] },
+  { id: 'v3.2.0-req182-feature', version: 'v3.2.0', date: '2026-11-05', type: 'feature', typeLabel: '新增功能', title: 'WCL 导入自动带入专精', summary: '读取报告中的首领参战专精，新成员导入时保存主副专精与职责。', details: ['多专精按参战次数最多设为主专精，相同时取最近使用；确认前可调整。'] },
+  { id: 'v3.2.0-req182-improve', version: 'v3.2.0', date: '2026-11-05', type: 'improve', typeLabel: '功能优化', title: '导入预览可核对专精', summary: '主副专精直接展示，缺失时可手动补充。', details: ['已有成员默认跳过，不自动覆盖原资料。'] },
+  { id: 'v3.2.0-req182-fix', version: 'v3.2.0', date: '2026-11-05', type: 'fix', typeLabel: '修复BUG', title: '导入职业图标与全站统一', summary: '修正导入预览仍显示旧单色图标的问题，使用魔兽职业与专精素材。', details: ['修改职业后同步更换图标，并清除原职业专精。'] },
+  { id: 'v3.2.0-req182-refactor', version: 'v3.2.0', date: '2026-11-05', type: 'refactor', typeLabel: '模块调整', title: '共用报告专精与图标规则', summary: '成员导入与考勤中的添加成员入口使用同一套专精规则。', details: ['不改变原有考勤数据与角色认领关系。'] },
   { id: 'v3.2.0-req180-feature', version: 'v3.2.0', date: '2026-11-04', type: 'feature', typeLabel: '新增功能', title: '活动可补充日志并预览更换差异', summary: '创建活动后仍可添加 WCL 链接，更换已同步报告时先核对名单变化。', details: ['更换报告保留已有考勤状态，不因新报告少了某个人就自动改成缺席。'] },
   { id: 'v3.2.0-req180-improve', version: 'v3.2.0', date: '2026-11-04', type: 'improve', typeLabel: '功能优化', title: '团队管理操作顺序更清楚', summary: '成员、考勤、装备三页增加简明指引；复盘与同步统一放在活动的「战斗日志」中。', details: ['发现报告后可查看参战名单对照，再关联已有活动或创建活动。'] },
   { id: 'v3.2.0-req180-fix', version: 'v3.2.0', date: '2026-11-04', type: 'fix', typeLabel: '修复BUG', title: '减少日志误关联和考勤误改', summary: 'WCL 核对不再把已知不同服务器的同名角色算成同一人。', details: ['活动信息编辑不重写考勤，保存失败保留输入；未保存的考勤修改会提示先保存。查找报告每次给出完成反馈，日志菜单展开不再撑高操作栏。', '更换报告保存失败后，重试按钮仍明确提示保留已有考勤。'] },

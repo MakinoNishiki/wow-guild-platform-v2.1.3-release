@@ -132,5 +132,14 @@ window.IconMap = (() => {
     return CLASS_COLORS[cnClass] || CLASS_COLORS[CLASS_ALIAS[cnClass]] || null;
   }
 
-  return { classIcon, specIcon, roleIcon, classColor, CLASS_COLORS };
+  // REQ-182: resolve WCL English keys against the existing asset dictionary.
+  // No second translation table; aliases are resolved by the caller's valid spec list.
+  function specNameFromKey(cnClass, key) {
+    if (typeof key !== 'string') return null;
+    const normalized = key.replace(/[^a-z]/gi, '').toLowerCase();
+    return Object.entries(SPEC_ICONS[canonClass(cnClass)] || {}).find(([, path]) =>
+      path.split('_').pop().replace('.png', '').toLowerCase() === normalized)?.[0] || null;
+  }
+
+  return { classIcon, specIcon, roleIcon, classColor, specNameFromKey, CLASS_COLORS };
 })();

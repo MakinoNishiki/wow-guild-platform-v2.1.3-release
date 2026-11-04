@@ -56,7 +56,8 @@ const root = path.resolve(__dirname, '..');
   const server = require(path.join(temp, 'server.js')).startServer();
   try {
     await new Promise(resolve => server.listening ? resolve() : server.once('listening', resolve));
-    await require('./verify-req180-real.cjs')(config);
+    const suite = {req182:'./verify-req182-real.cjs', req183:'./verify-req183-real.cjs'}[process.argv[2]] || './verify-req180-real.cjs';
+    await require(suite)(config);
   } finally {
     await new Promise(resolve => server.close(resolve));
     await new Promise(resolve => bridge.close(resolve));

@@ -4,13 +4,13 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>魔兽管家</title>
-<!-- 静态资源版本号：20261105.127（任务书 #22 WP3-②：凡改动 js/css 的 commit 必须同步递增此处与所有 ?v= 查询串，见 docs/开发规范.md 第五章） -->
+<!-- 静态资源版本号：20261105.129（任务书 #22 WP3-②：凡改动 js/css 的 commit 必须同步递增此处与所有 ?v= 查询串，见 docs/开发规范.md 第五章） -->
 <link rel="icon" type="image/png" sizes="32x32" href="assets/brand/favicon-32.png">
 <link rel="icon" type="image/png" sizes="16x16" href="assets/brand/favicon-16.png">
-<link rel="stylesheet" href="css/main.css?v=20261105.127">
-<link rel="stylesheet" href="css/data-public.css?v=20261105.127"><!-- 任务书 #28 WP5：副本掉落 tab（选择器全 .dp- 前缀 + #page-lootdrop 作用域，零泄漏） -->
-<link rel="stylesheet" href="css/decor-public.css?v=20261105.127"><!-- 任务书 #51：家宅图鉴（选择器全 .dh- 前缀，零泄漏，双壳共用） -->
-<script src="assets/vendor/supabase-js-2.js?v=20261105.127"></script>
+<link rel="stylesheet" href="css/main.css?v=20261105.129">
+<link rel="stylesheet" href="css/data-public.css?v=20261105.129"><!-- 任务书 #28 WP5：副本掉落 tab（选择器全 .dp- 前缀 + #page-lootdrop 作用域，零泄漏） -->
+<link rel="stylesheet" href="css/decor-public.css?v=20261105.129"><!-- 任务书 #51：家宅图鉴（选择器全 .dh- 前缀，零泄漏，双壳共用） -->
+<script src="assets/vendor/supabase-js-2.js?v=20261105.129"></script>
 </head>
 <body>
 
@@ -1083,7 +1083,7 @@
 
 <!-- ===== 弹窗：智能导入成员 ===== -->
 <div class="modal-overlay" id="importMembersModal">
-  <div class="modal" style="max-width:640px">
+  <div class="modal" style="max-width:900px">
     <div class="modal-header">
       <div class="modal-title">智能导入成员</div>
       <div class="modal-close" onclick="closeModal('importMembersModal')">×</div>
@@ -1100,7 +1100,7 @@
       <!-- REQ-032：从 WCL 链接导入（解析后进入下方现有预览确认页） -->
       <div id="importWclStep" style="display:none">
         <p style="font-size:13px;color:var(--text-muted);margin-bottom:8px">
-          粘贴本团队的一份 WCL 战斗报告，我们会自动读取角色名、职业和服务器。下一步核对后才导入成员；不会自动认领角色或记入考勤。
+          粘贴本团队的一份 WCL 战斗报告，我们会自动读取角色名、职业、专精和服务器。下一步核对后才导入成员；不会自动认领角色或记入考勤。
         </p>
         <div class="form-group">
           <label class="form-label">WCL 报告链接</label>
@@ -1113,19 +1113,19 @@
         <!-- REQ-032：WCL 来源时显示报告标题 -->
         <div id="importPreviewSource" style="display:none;font-size:12px;color:var(--info);margin-bottom:8px"></div>
         <p style="font-size:13px;color:var(--text-muted);margin-bottom:8px">
-          确认导入内容：<span style="color:var(--danger)">红色 = 无法识别（可修正或剔除）</span>，<span style="color:var(--warning)">黄色 = 已存在（默认跳过，可勾选保留）</span>。专精统一为"待补充"，入库后请逐个补录。
+          确认导入内容：<span style="color:var(--danger)">红色 = 无法识别（可修正或剔除）</span>，<span style="color:var(--warning)">黄色 = 已存在（默认跳过，不覆盖资料）</span>。WCL 专精自动带入；多专精按首领参战次数最多设为主专精（相同时取最近使用），其余记为副专精，可在下方调整。未识别时可手动补充。
         </p>
         <div class="table-container" style="max-height:320px;overflow-y:auto">
           <table class="data-table">
             <thead>
               <tr>
                 <th style="width:40px" class="center">导入</th>
-                <th>名字</th>
-                <th style="width:110px">职业</th>
-                <th style="width:90px">服务器</th>
-                <th style="width:70px">专精</th>
+                <th style="width:160px">名字</th>
+                <th style="width:135px">职业</th>
+                <th style="width:115px">服务器</th>
+                <th style="width:175px">专精</th>
                 <th style="width:70px" class="center">状态</th>
-                <th style="width:50px" class="center">操作</th>
+                <th style="width:75px" class="center">操作</th>
               </tr>
             </thead>
             <tbody id="importPreviewBody"></tbody>
@@ -2268,22 +2268,22 @@
   </div>
 </div>
 
-<script src="js/cloud.js?v=20261105.127"></script>
+<script src="js/cloud.js?v=20261105.129"></script>
 <!-- 任务书 #14：主数据层（快照兜底 + 加载层），须在 app.js 之前 -->
-<script src="js/masterDataSnapshot.js?v=20261105.127"></script>
-<script src="js/masterData.js?v=20261105.127"></script>
+<script src="js/masterDataSnapshot.js?v=20261105.129"></script>
+<script src="js/masterData.js?v=20261105.129"></script>
 <!-- 任务书 #22 WP2：职业/专精/职责图标集中映射（全站唯一取图处） -->
-<script src="js/iconMap.js?v=20261105.127"></script>
+<script src="js/iconMap.js?v=20261105.129"></script>
 <!-- 任务书 #31（REQ-097）：装备分类词表单一真源（公示页 chips / picker 过滤 / BUG-057 回填三处消费，须在 dataPublic.js 与 app.js 之前） -->
-<script src="js/itemQualityData.js?v=20261105.127"></script>
-<script src="js/lootTaxonomy.js?v=20261105.127"></script>
+<script src="js/itemQualityData.js?v=20261105.129"></script>
+<script src="js/lootTaxonomy.js?v=20261105.129"></script>
 <!-- 任务书 #28 WP5：副本掉落渲染层（双壳同源；无 data-public-body 不自动启动，由 app.js 懒挂载，须在 app.js 之前） -->
-<script src="js/dataPublic.js?v=20261105.127"></script>
+<script src="js/dataPublic.js?v=20261105.129"></script>
 <!-- 任务书 #51（REQ-137 一期）：家宅图鉴词表单一真源（价格/分类/尺寸/来源词表，须在 decorData.js 之前） -->
-<script src="js/decorDict.js?v=20261105.127"></script>
+<script src="js/decorDict.js?v=20261105.129"></script>
 <!-- 任务书 #51：家宅图鉴数据层+渲染层（双壳同源；无 data-decor-body 不自动启动，由 app.js 懒挂载，须在 app.js 之前） -->
-<script src="js/decorData.js?v=20261105.127"></script>
-<script src="js/app.js?v=20261105.127"></script>
-<script src="js/track.js?v=20261105.127"></script><!-- 任务书 #54 WP1：全站埋点采集层（REQ-141，零依赖静默兜底） -->
+<script src="js/decorData.js?v=20261105.129"></script>
+<script src="js/app.js?v=20261105.129"></script>
+<script src="js/track.js?v=20261105.129"></script><!-- 任务书 #54 WP1：全站埋点采集层（REQ-141，零依赖静默兜底） -->
 </body>
 </html>

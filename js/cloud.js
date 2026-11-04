@@ -1125,7 +1125,9 @@
         if (operation === 'update' && item.id) {
           await dbUpdate('activities', row, { id: item.id });
         } else {
-          const data = await dbInsert('activities', row);
+          // REQ-183: reuse this create attempt's UUID on retry; the existing PK
+          // rejects a delayed duplicate POST before any attendance rewrite occurs.
+          const data = await dbInsert('activities', item.id ? { ...row, id: item.id } : row);
           if (data && data.id) item.id = data.id;
         }
 

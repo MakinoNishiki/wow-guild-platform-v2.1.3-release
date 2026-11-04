@@ -2,7 +2,7 @@
 const { chromium } = require('playwright');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
-const out = 'docs/evidence/req180-20261104';
+const out = process.env.REQ180_EVIDENCE_DIR || 'docs/evidence/req180-20261104';
 fs.mkdirSync(out, { recursive: true });
 (async () => {
   const browser = await chromium.launch({ channel: 'chrome', headless: true });
@@ -26,7 +26,7 @@ fs.mkdirSync(out, { recursive: true });
     check('后台自动建活动调度与写入端点已退役', !/wclAutoCreateSweep|startWclAutoCreateSweep|set-auto-create/.test(serverSource));
     // HEAD 已有 17 处（旧 #47 脚本的 16 是历史基线）；本批没有新增底层写点。
     check('写入门禁与本批 HEAD 基线一致 17/1/0', (appSource.match(/window\.CloudSync\.saveCloudData\(/g) || []).length - 1 === 17 && (appSource.match(/fetch\('\/api\/db/g) || []).length === 1 && (appSource.match(/[^.]db(?:Insert|Update|Delete)\(/g) || []).length === 0);
-    check('资源版本全部一致', [...fs.readFileSync('index.html','utf8').matchAll(/(?:src|href)="(?:js|css)\/[^"?]+\?v=([^"]+)"/g)].every(m => m[1] === '20261105.127'));
+    check('资源版本全部一致', [...fs.readFileSync('index.html','utf8').matchAll(/(?:src|href)="(?:js|css)\/[^"?]+\?v=([^"]+)"/g)].every(m => m[1] === '20261105.129'));
     const screenshot = async name => {
       await page.evaluate(async () => {
         document.getElementById('toastContainer').replaceChildren();

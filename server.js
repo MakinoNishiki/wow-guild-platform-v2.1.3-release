@@ -990,7 +990,7 @@ query ($code: String!) {
       startTime
       endTime
       masterData { actors(type: "Player") { id name server subType } }
-      fights { id encounterID name startTime endTime friendlyPlayers }
+      fights { id encounterID name startTime endTime friendlyPlayers friendlySpecs }
     }
   }
   rateLimitData { limitPerHour pointsSpentThisHour pointsResetIn }
@@ -1052,6 +1052,7 @@ async function fetchWclReportSummary(code) {
     name: a.name,
     server: a.server || "",
     subType: a.subType || "",
+    specs: wclActorSpecs(bossFights, a.id),
     bossFights: bossFights.filter(
       (f) => Array.isArray(f.friendlyPlayers) && f.friendlyPlayers.includes(a.id)
     ).length,
@@ -1063,6 +1064,25 @@ async function fetchWclReportSummary(code) {
     bossFightTotal: bossFights.length,
     players,
   };
+}
+
+// REQ-182: WCL schema guarantees friendlySpecs matches friendlyPlayers exactly.
+// Only boss fights count; reject malformed pairs instead of guessing by class/name.
+function wclActorSpecs(bossFights, actorId) {
+  const counts = new Map();
+  for (const fight of bossFights) {
+    if (!Array.isArray(fight.friendlyPlayers) || !Array.isArray(fight.friendlySpecs) ||
+        fight.friendlyPlayers.length !== fight.friendlySpecs.length) continue;
+    const index = fight.friendlyPlayers.indexOf(actorId);
+    const spec = fight.friendlySpecs[index];
+    if (typeof spec !== 'string' || !/^[A-Za-z]+$/.test(spec)) continue;
+    const entry = counts.get(spec) || { name: spec, bossFights: 0, lastSeen: 0 };
+    entry.bossFights++;
+    entry.lastSeen = Math.max(entry.lastSeen, Number(fight.startTime) || 0);
+    counts.set(spec, entry);
+  }
+  return [...counts.values()].sort((a, b) => b.bossFights - a.bossFights ||
+    b.lastSeen - a.lastSeen || a.name.localeCompare(b.name));
 }
 
 // 两个 WCL 端点的共用处理器；withSnapshot=true 时附带活动已有快照供前端比对
