@@ -1,0 +1,17 @@
+{
+  "testCountsAfterCleanup": {
+    "auth.users": 0,
+    "guilds": 0,
+    "guild_members": 0,
+    "raid_members": 0,
+    "activities": 0,
+    "activity_attendance": 0,
+    "user_profiles": 0,
+    "claim_requests": 0,
+    "loot_records": 0,
+    "wishlists": 0,
+    "notifications": 0,
+    "analytics_events": 0
+  },
+  "productionContainersUnchanged": true
+}

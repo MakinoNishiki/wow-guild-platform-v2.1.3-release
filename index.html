@@ -4,13 +4,13 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>魔兽管家</title>
-<!-- 静态资源版本号：20261104.122（任务书 #22 WP3-②：凡改动 js/css 的 commit 必须同步递增此处与所有 ?v= 查询串，见 docs/开发规范.md 第五章） -->
+<!-- 静态资源版本号：20261105.127（任务书 #22 WP3-②：凡改动 js/css 的 commit 必须同步递增此处与所有 ?v= 查询串，见 docs/开发规范.md 第五章） -->
 <link rel="icon" type="image/png" sizes="32x32" href="assets/brand/favicon-32.png">
 <link rel="icon" type="image/png" sizes="16x16" href="assets/brand/favicon-16.png">
-<link rel="stylesheet" href="css/main.css?v=20261104.122">
-<link rel="stylesheet" href="css/data-public.css?v=20261104.122"><!-- 任务书 #28 WP5：副本掉落 tab（选择器全 .dp- 前缀 + #page-lootdrop 作用域，零泄漏） -->
-<link rel="stylesheet" href="css/decor-public.css?v=20261104.122"><!-- 任务书 #51：家宅图鉴（选择器全 .dh- 前缀，零泄漏，双壳共用） -->
-<script src="assets/vendor/supabase-js-2.js?v=20261104.122"></script>
+<link rel="stylesheet" href="css/main.css?v=20261105.127">
+<link rel="stylesheet" href="css/data-public.css?v=20261105.127"><!-- 任务书 #28 WP5：副本掉落 tab（选择器全 .dp- 前缀 + #page-lootdrop 作用域，零泄漏） -->
+<link rel="stylesheet" href="css/decor-public.css?v=20261105.127"><!-- 任务书 #51：家宅图鉴（选择器全 .dh- 前缀，零泄漏，双壳共用） -->
+<script src="assets/vendor/supabase-js-2.js?v=20261105.127"></script>
 </head>
 <body>
 
@@ -312,6 +312,10 @@
 
       <!-- 成员管理 -->
       <div class="page" id="page-members">
+        <details class="team-flow-guide">
+          <summary>① 建立名单与认领角色 · 团队管理怎么用</summary>
+          <ol><li>团长用「智能导入」粘贴本团队 WCL 报告，核对名单后确认导入；没有报告时可使用手动名单。</li><li>团员在成员列表认领自己的角色；是否需审核或管理者分配，按公会设置执行。一个账号可以认领多个角色。</li><li>名单齐了，到 <a href="#/team/attendance">考勤记录</a> 核对本场活动，再到 <a href="#/team/loot">装备分配</a> 记录最终接收人。</li></ol>
+        </details>
         <div class="card">
           <div class="card-header">
             <div>
@@ -394,6 +398,10 @@
 
       <!-- 考勤记录 -->
       <div class="page" id="page-attendance">
+        <details class="team-flow-guide">
+          <summary>② 核对本场活动与考勤 · 团队管理怎么用</summary>
+          <ol><li>先在 <a href="#/team/members">成员管理</a> 建好名单；没有日志也能先创建活动。</li><li>绑定 WCL 公会后可「查找新报告」，核对参战名单、日期与团号，再关联已有活动或创建活动。野团误传请忽略。</li><li>打开活动的「战斗日志」，可以补链接、预览同步或查看复盘。更换已同步报告会先显示名单差异，已有考勤保留；迟到、请假等仍在详情中修改并保存。</li><li>考勤核对后，前往 <a href="#/team/loot">装备分配</a> 确认物品的最终接收人。</li></ol>
+        </details>
         <div class="card">
           <div class="card-header">
             <div>
@@ -408,15 +416,14 @@
             </div>
             <div style="display:flex;gap:8px">
               <!-- 任务书 #70：已绑定 WCL 公会的同步入口（显隐由 syncAttendanceViewUI 控制） -->
-              <button class="btn edit-only" id="wclReportsSyncBtn" style="display:none" onclick="wclSyncReports()">🔄 同步 WCL 报告</button>
-              <button class="btn edit-only" onclick="showWCLImportModal()">🔗 WCL 导入</button>
+              <button class="btn edit-only" id="wclReportsSyncBtn" style="display:none" onclick="wclSyncReports()">查找新报告</button>
               <button class="btn btn-primary edit-only" onclick="showActivityModal()">+ 创建活动</button>
             </div>
           </div>
 
           <!-- 任务书 #70：WCL 新报告关联提示 banner（默认隐藏，同步后有新报告才显示） -->
           <div id="wclNewReportsBanner" class="attendance-wcl-banner" style="display:none;flex-direction:column;gap:8px;margin-bottom:12px"></div>
-          <div id="wclSyncStatusLine" style="display:none;font-size:12px;color:var(--text-muted);margin-bottom:8px"></div>
+          <div id="wclSyncStatusLine" role="status" aria-live="polite" style="display:none"></div>
 
           <!-- 日历视图（REQ-011：默认列表视图，日历为用户自选） -->
           <div id="calendarView" style="display:none">
@@ -490,6 +497,10 @@
 
       <!-- 装备分配 -->
       <div class="page" id="page-loot">
+        <details class="team-flow-guide">
+          <summary>③ 确认装备最终去向 · 团队管理怎么用</summary>
+          <ol><li>先在 <a href="#/team/attendance">考勤记录</a> 核对活动与名单，拾取采集可以在打团时提前进行。</li><li>已有 Collector 导出的数据，在本页「拾取记录」中导入并检查；没有插件也可以直接添加分配记录。</li><li>拾取者可能只是代拿。请在「分配记录」中选择装备与最终接收人，确认后保存。当前导入拾取不会自动生成分配记录。</li></ol>
+        </details>
         <div class="card">
           <div class="card-header">
             <div>
@@ -1078,47 +1089,24 @@
       <div class="modal-close" onclick="closeModal('importMembersModal')">×</div>
     </div>
     <div class="modal-body">
-      <!-- REQ-032：标签页（粘贴名单 / 从 WCL 链接导入） -->
       <div class="view-tabs" id="importTabs" style="margin-bottom:12px">
-        <div class="view-tab active" id="importTabPaste" onclick="switchImportTab('paste')">粘贴名单</div>
-        <div class="view-tab" id="importTabWcl" onclick="switchImportTab('wcl')">从 WCL 链接导入</div>
+        <button type="button" class="view-tab active" id="importTabWcl" onclick="switchImportTab('wcl')">从 WCL 导入</button>
+        <button type="button" class="view-tab" id="importTabPaste" onclick="switchImportTab('paste')">手动名单（备用）</button>
       </div>
-      <!-- 第一步：粘贴名单 -->
-      <div id="importPasteStep">
-        <details style="margin-bottom:12px;font-size:13px" open>
-          <summary style="cursor:pointer;color:var(--info)">📖 游戏内一键导出教程（点击展开）</summary>
-          <div style="margin-top:8px;padding:10px;background:var(--bg-tertiary);border-radius:6px;color:var(--text-secondary)">
-            <div style="margin-bottom:6px"><strong style="color:var(--text-primary)">团队宏（推荐）</strong>：先组好团队/小队再执行，只导出当前实际打团的人：</div>
-            <div style="display:flex;gap:8px;align-items:flex-start">
-              <code id="importMacroTeam" style="flex:1;font-size:11px;word-break:break-all;color:var(--gold)">/run for i=1,GetNumGroupMembers() do local n,_,_,_,_,c=GetRaidRosterInfo(i) if n then print(n..","..c) end end</code>
-              <button type="button" class="btn btn-sm" onclick="copyImportMacro('importMacroTeam')">复制</button>
-            </div>
-            <details style="margin-top:10px">
-              <summary style="cursor:pointer">公会宏（兜底：导出整个公会花名册，适合整会导入）</summary>
-              <div style="display:flex;gap:8px;align-items:flex-start;margin-top:6px">
-                <code id="importMacroGuild" style="flex:1;font-size:11px;word-break:break-all;color:var(--gold)">/run for i=1,GetNumGuildMembers() do local n,_,_,_,_,_,_,_,_,_,c=GetGuildRosterInfo(i) if n then print(n..","..c) end end</code>
-                <button type="button" class="btn btn-sm" onclick="copyImportMacro('importMacroGuild')">复制</button>
-              </div>
-            </details>
-            <div style="margin-top:8px;font-size:12px;color:var(--text-muted)">提示：魔兽原生聊天框不支持复制，需安装聊天增强插件（如自带复制功能的插件）后才能复制名单。</div>
-          </div>
-        </details>
-        <p style="font-size:13px;color:var(--text-muted);margin-bottom:8px">
-          粘贴任意来源的名单，自动识别格式：<br>
-          · 游戏宏输出 <code style="color:var(--gold)">名字-服务器,WARRIOR</code>　· <code style="color:var(--gold)">名字,职业</code> / <code style="color:var(--gold)">名字-职业</code> / <code style="color:var(--gold)">名字 职业</code>　· 纯名字（每行一个）
-        </p>
-        <textarea class="form-textarea" id="importMembersText" style="height:180px" placeholder="战神阿瑞斯-死亡之翼,WARRIOR&#10;烈焰法师,法师&#10;圣光牧师-牧师&#10;暗影盗贼 盗贼&#10;兽王猎人"></textarea>
+      <div id="importPasteStep" style="display:none">
+        <p style="font-size:13px;color:var(--text-secondary);margin-bottom:8px">没有 WCL 报告时使用。每行填写一个角色和职业，例如「小明,战士」。下一步可补充服务器并核对重名角色。</p>
+        <textarea class="form-textarea" id="importMembersText" aria-label="手动名单，每行角色名和职业" style="height:180px" placeholder="小明,战士&#10;小雨,法师"></textarea>
       </div>
       <!-- REQ-032：从 WCL 链接导入（解析后进入下方现有预览确认页） -->
       <div id="importWclStep" style="display:none">
         <p style="font-size:13px;color:var(--text-muted);margin-bottom:8px">
-          粘贴 WCL (Warcraft Logs) 报告链接，自动提取参战玩家（角色名 + 职业 + 服务器）并进入预览确认页。
+          粘贴本团队的一份 WCL 战斗报告，我们会自动读取角色名、职业和服务器。下一步核对后才导入成员；不会自动认领角色或记入考勤。
         </p>
         <div class="form-group">
           <label class="form-label">WCL 报告链接</label>
           <input type="text" class="form-input" id="importWclUrl" placeholder="https://www.warcraftlogs.com/reports/...">
         </div>
-        <button class="btn btn-primary" id="importWclParseBtn" onclick="importParseWcl()">解析</button>
+        <button class="btn btn-primary" id="importWclParseBtn" onclick="importParseWcl()">读取名单并预览</button>
       </div>
       <!-- 第二步：预览确认 -->
       <div id="importPreviewStep" style="display:none">
@@ -1275,10 +1263,14 @@
       <button class="btn btn-danger btn-sm edit-only" id="activityDeleteBtn" onclick="deleteCurrentActivity()" style="margin-right:auto">删除活动</button>
       <!-- REQ-020：取消/恢复活动（owner/editor 可见），按当前状态显示其一 -->
       <button class="btn btn-sm edit-only" id="activityCancelBtn" onclick="toggleActivityCancelled()">取消活动</button>
-      <!-- REQ-014：已挂 WCL 链接的活动显示复盘入口（全体成员可见），新标签页打开 -->
-      <a id="attendanceWclBtn" class="btn btn-sm" href="#" target="_blank" rel="noopener noreferrer" style="display:none">📊 WCL 复盘</a>
-      <!-- REQ-033：已挂 WCL 链接的活动显示同步考勤入口（owner/editor 可见） -->
-      <button id="attendanceWclSyncBtn" class="btn btn-sm btn-primary edit-only" style="display:none" onclick="syncAttendanceFromWcl()">🔄 从 WCL 同步考勤</button>
+      <details id="attendanceWclActions">
+        <summary class="btn btn-sm" aria-label="展开或收起战斗日志操作">战斗日志 <span class="wcl-actions-caret" aria-hidden="true">▾</span></summary>
+        <div class="attendance-wcl-actions">
+          <a id="attendanceWclBtn" class="btn btn-sm" href="#" target="_blank" rel="noopener noreferrer" hidden>打开 WCL 复盘</a>
+          <button id="attendanceWclSyncBtn" class="btn btn-sm edit-only" hidden onclick="syncAttendanceFromWcl()">预览并同步考勤</button>
+          <button id="attendanceWclEditBtn" class="btn btn-sm edit-only" onclick="editAttendanceReport()">添加或更换链接</button>
+        </div>
+      </details>
       <button class="btn" onclick="closeModal('attendanceDetailModal')">关闭</button>
       <button id="attendanceSaveBtn" class="btn btn-primary edit-only" onclick="saveAttendance()">保存考勤</button>
     </div>
@@ -1297,6 +1289,7 @@
     </div>
     <div class="modal-body">
       <div id="wclSyncStats" style="font-size:12px;color:var(--text-muted);margin-bottom:12px"></div>
+      <div id="wclSyncChanges" class="wcl-report-check" hidden></div>
       <div id="wclSyncPreviewList" style="max-height:380px;overflow-y:auto"></div>
     </div>
     <div class="modal-footer">
@@ -1380,50 +1373,6 @@
     </div>
   </div>
 </div>
-
-<!-- ===== 弹窗：WCL 导入 ===== -->
-<div class="modal-overlay" id="wclImportModal">
-  <div class="modal">
-    <div class="modal-header">
-      <div class="modal-title">WCL 导入</div>
-      <div class="modal-close" onclick="closeModal('wclImportModal')">×</div>
-    </div>
-    <div class="modal-body">
-      <p style="font-size:13px;color:var(--text-muted);margin-bottom:12px">
-        粘贴 WCL (Warcraft Logs) 报告链接，自动提取参与玩家并匹配团队成员。
-      </p>
-      <div class="form-group">
-        <label class="form-label">WCL 链接</label>
-        <input type="text" class="form-input" id="wclUrl" placeholder="https://www.warcraftlogs.com/reports/...">
-      </div>
-      <div class="form-row">
-        <div class="form-group">
-          <label class="form-label">活动日期</label>
-          <input type="date" class="form-input" id="wclDate">
-        </div>
-        <div class="form-group">
-          <label class="form-label">团本名称</label>
-          <input type="text" class="form-input" id="wclRaidName" placeholder="尼鲁巴尔王宫">
-        </div>
-      </div>
-      <div style="padding:12px;background:var(--bg-primary);border-radius:6px;font-size:12px;color:var(--text-muted);border:1px solid var(--border-color)">
-        <strong style="color:var(--warning)">说明：</strong>由于浏览器安全限制，无法直接跨域请求 WCL API。
-        请在下方直接粘贴玩家名单（每行一个角色名），或使用角色名列表快速导入：
-      </div>
-      <div class="form-group" style="margin-top:12px">
-        <label class="form-label">玩家名单（每行一个角色名）</label>
-        <textarea class="form-textarea" id="wclPlayerList" style="height:120px" placeholder="角色名1
-角色名2
-角色名3"></textarea>
-      </div>
-    </div>
-    <div class="modal-footer">
-      <button class="btn" onclick="closeModal('wclImportModal')">取消</button>
-      <button class="btn btn-primary" onclick="importFromWCL()">导入</button>
-    </div>
-  </div>
-</div>
-
 
 <!-- ===== 弹窗：添加/编辑装备 ===== -->
 <div class="modal-overlay" id="lootModal">
@@ -1987,7 +1936,7 @@
         </div>
       </div>
 
-      <!-- 任务书 #70：WCL 公会绑定（可选；绑定/解绑/开关仅 owner/editor，viewer 只读状态） -->
+      <!-- WCL 公会绑定（可选；绑定/解绑仅 owner/editor，viewer 只读状态） -->
       <div class="card" style="margin-bottom:16px">
         <div class="card-header">
           <div class="card-title">🔗 WCL 公会绑定（可选）</div>
@@ -1996,8 +1945,7 @@
           <!-- 已绑定状态 -->
           <div id="wclBindBound" style="display:none">
             <div style="font-size:14px;color:var(--text-primary)">已绑定：<b id="wclBoundName"></b> <span id="wclBoundMeta" style="font-size:12px;color:var(--text-muted)"></span></div>
-            <label class="att-filter-toggle edit-only" style="margin-top:10px;display:block"><input type="checkbox" id="wclAutoCreateEvent" onchange="wclToggleAutoCreate()"> 自动创建活动（检测到新报告时自动创建并关联）</label>
-            <div style="font-size:12px;color:var(--text-muted);margin-top:4px">⚠️ 开启后 WCL 有新公开报告时管家每小时自动创建活动（自然日+副本去重），活动时间以 WCL 报告为准，可能需手动调整。</div>
+            <div style="font-size:12px;color:var(--text-muted);margin-top:4px">在考勤记录中点击「查找新报告」，核对参战名单后关联或创建活动。绑定公会不会自动记入考勤。</div>
             <button class="btn btn-sm edit-only" id="wclUnbindBtn" style="margin-top:10px" onclick="wclUnbind()">解绑</button>
           </div>
           <!-- 未绑定状态 -->
@@ -2320,22 +2268,22 @@
   </div>
 </div>
 
-<script src="js/cloud.js?v=20261104.122"></script>
+<script src="js/cloud.js?v=20261105.127"></script>
 <!-- 任务书 #14：主数据层（快照兜底 + 加载层），须在 app.js 之前 -->
-<script src="js/masterDataSnapshot.js?v=20261104.122"></script>
-<script src="js/masterData.js?v=20261104.122"></script>
+<script src="js/masterDataSnapshot.js?v=20261105.127"></script>
+<script src="js/masterData.js?v=20261105.127"></script>
 <!-- 任务书 #22 WP2：职业/专精/职责图标集中映射（全站唯一取图处） -->
-<script src="js/iconMap.js?v=20261104.122"></script>
+<script src="js/iconMap.js?v=20261105.127"></script>
 <!-- 任务书 #31（REQ-097）：装备分类词表单一真源（公示页 chips / picker 过滤 / BUG-057 回填三处消费，须在 dataPublic.js 与 app.js 之前） -->
-<script src="js/itemQualityData.js?v=20261104.122"></script>
-<script src="js/lootTaxonomy.js?v=20261104.122"></script>
+<script src="js/itemQualityData.js?v=20261105.127"></script>
+<script src="js/lootTaxonomy.js?v=20261105.127"></script>
 <!-- 任务书 #28 WP5：副本掉落渲染层（双壳同源；无 data-public-body 不自动启动，由 app.js 懒挂载，须在 app.js 之前） -->
-<script src="js/dataPublic.js?v=20261104.122"></script>
+<script src="js/dataPublic.js?v=20261105.127"></script>
 <!-- 任务书 #51（REQ-137 一期）：家宅图鉴词表单一真源（价格/分类/尺寸/来源词表，须在 decorData.js 之前） -->
-<script src="js/decorDict.js?v=20261104.122"></script>
+<script src="js/decorDict.js?v=20261105.127"></script>
 <!-- 任务书 #51：家宅图鉴数据层+渲染层（双壳同源；无 data-decor-body 不自动启动，由 app.js 懒挂载，须在 app.js 之前） -->
-<script src="js/decorData.js?v=20261104.122"></script>
-<script src="js/app.js?v=20261104.122"></script>
-<script src="js/track.js?v=20261104.122"></script><!-- 任务书 #54 WP1：全站埋点采集层（REQ-141，零依赖静默兜底） -->
+<script src="js/decorData.js?v=20261105.127"></script>
+<script src="js/app.js?v=20261105.127"></script>
+<script src="js/track.js?v=20261105.127"></script><!-- 任务书 #54 WP1：全站埋点采集层（REQ-141，零依赖静默兜底） -->
 </body>
 </html>

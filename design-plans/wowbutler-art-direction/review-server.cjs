@@ -2,6 +2,7 @@ const http = require('node:http');
 const fs = require('node:fs/promises');
 const path = require('node:path');
 const root = path.resolve(__dirname, '../..');
+const installAttendanceFixture = require('../req180-preview.cjs');
 const preview = String.raw`<script>
 (() => {
   const fetchRead = window.fetch.bind(window);
@@ -17,6 +18,17 @@ const preview = String.raw`<script>
     button.className = 'btn btn-secondary';
     button.textContent = '验收：成员演示';
     document.querySelector('.ia-top-right').prepend(button);
+    const attendanceButton = document.createElement('button');
+    attendanceButton.className = 'btn btn-secondary';
+    attendanceButton.textContent = '验收：考勤流程';
+    document.querySelector('.ia-top-right').prepend(attendanceButton);
+    attendanceButton.onclick = () => {
+      fixtureReady = false;
+      (${installAttendanceFixture.toString()})();
+      iaPaintRoute('attendance','team');
+      document.getElementById('pageTitle').textContent = '考勤记录 · 隔离演示（刷新重置）';
+      syncAttendanceViewUI();
+    };
     const login = document.querySelector('#iaLoginBtn');
     login.disabled = true;
     login.title = '本地验收使用隔离名单';

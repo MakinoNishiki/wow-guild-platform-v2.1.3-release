@@ -5104,3 +5104,36 @@ img.class-icon[src$=".png"] { border-radius: 3px; }
 [data-item-quality="6"] { --item-quality-border: var(--item-quality-6); }
 [data-item-quality="7"] { --item-quality-border: var(--item-quality-7); }
 [data-item-quality][data-item-quality] { border: 1px solid var(--item-quality-border); }
+
+/* REQ-180: the activity owns its report actions. */
+.attendance-wcl-actions { position: absolute; bottom: calc(100% + 8px); left: 0; width: 220px; display: flex; flex-direction: column; gap: 6px; padding: 10px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 6px; box-shadow: 0 8px 24px rgba(0,0,0,.35); }
+#attendanceDetailModal .modal-footer { align-items: center; }
+#attendanceWclActions { position: relative; }
+#attendanceWclActions [hidden] { display: none; }
+#attendanceWclActions summary { cursor: pointer; display: inline-flex; gap: 10px; align-items: center; list-style: none; }
+#attendanceWclActions summary::-webkit-details-marker { display: none; }
+#attendanceWclActions[open] summary { color: var(--gold); border-color: var(--gold); background: var(--bg-tertiary); }
+#attendanceWclActions .wcl-actions-caret { display: inline-block; }
+#attendanceWclActions[open] .wcl-actions-caret { transform: rotate(180deg); }
+.attendance-wcl-actions .btn { justify-content: flex-start; text-decoration: none; }
+#importTabs button.view-tab { border: 0; background: transparent; font-family: inherit; }
+#importTabs button.view-tab.active { background: var(--gold); color: var(--bg-primary); }
+#importTabs button.view-tab:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+#wclSyncStatusLine { margin-bottom: 12px; padding: 8px 12px; border-left: 3px solid currentColor; background: var(--bg-secondary); font-size: 13px; font-weight: 600; line-height: 1.6; color: var(--blue-highlight); }
+#wclSyncStatusLine[data-state="success"] { color: var(--success); }
+#wclSyncStatusLine[data-state="error"] { color: var(--danger); }
+/* REQ-180：现有团队页面的折叠指引与报告对照，复用站内变量及按钮状态。 */
+.team-flow-guide { margin-bottom: 1rem; padding: .75rem 1rem; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-secondary); color: var(--text-secondary); font-size: 13px; line-height: 1.6; }
+.team-flow-guide summary { cursor: pointer; color: var(--text-primary); font-weight: 600; }
+.team-flow-guide summary:hover, .team-flow-guide summary:focus-visible { color: var(--gold); }
+.team-flow-guide a { color: var(--blue-highlight); text-underline-offset: .2em; }
+.team-flow-guide ol { margin: .75rem 0 0; padding-left: 1.5rem; }
+.team-flow-guide li + li { margin-top: .5rem; }
+.wcl-report-candidate { border-top: 1px solid var(--border-color); padding-top: .75rem; }
+#wclNewReportsBanner { text-align: left; color: var(--text-primary); background: var(--bg-secondary); border-color: var(--border-color); }
+.wcl-report-actions { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; }
+.wcl-report-actions .form-select { width: auto; max-width: 100%; }
+.wcl-report-check { font-size: 13px; line-height: 1.6; color: var(--text-secondary); overflow-wrap: anywhere; }
+.wcl-report-check p { margin: .5rem 0; }
+.wcl-report-check summary { cursor: pointer; color: var(--text-primary); }
+.wcl-report-check[hidden] { display: none; }

@@ -1,0 +1,119 @@
+{
+  "checkedAtUtc": "2026-11-04T16:57:26Z",
+  "checks": [
+    {
+      "name": "Explicit isolated target",
+      "passed": true
+    },
+    {
+      "name": "All test containers running",
+      "passed": true
+    },
+    {
+      "name": "All containers belong to test project",
+      "passed": true
+    },
+    {
+      "name": "No production network attached",
+      "passed": true
+    },
+    {
+      "name": "No production data mounts",
+      "passed": true
+    },
+    {
+      "name": "Resource limits and manual start",
+      "passed": true
+    },
+    {
+      "name": "Only loopback API published",
+      "passed": true
+    },
+    {
+      "name": "Auth health",
+      "passed": true
+    },
+    {
+      "name": "Public game dictionary",
+      "passed": true
+    },
+    {
+      "name": "No copied users or business data",
+      "passed": true
+    },
+    {
+      "name": "Public tables, RLS policy and constraint counts match production",
+      "passed": true
+    },
+    {
+      "name": "owner real signup",
+      "passed": true
+    },
+    {
+      "name": "outsider real signup",
+      "passed": true
+    },
+    {
+      "name": "Test guild create",
+      "passed": true
+    },
+    {
+      "name": "Membership query",
+      "passed": true
+    },
+    {
+      "name": "Create owner membership",
+      "passed": true
+    },
+    {
+      "name": "Owner can read own guild",
+      "passed": true
+    },
+    {
+      "name": "Outsider cannot read guild",
+      "passed": true
+    },
+    {
+      "name": "Outsider cannot update guild",
+      "passed": true
+    },
+    {
+      "name": "Service update",
+      "passed": true
+    },
+    {
+      "name": "Independent read after update",
+      "passed": true
+    },
+    {
+      "name": "Delete synthetic guild",
+      "passed": true
+    },
+    {
+      "name": "Delete synthetic account",
+      "passed": true
+    },
+    {
+      "name": "Delete synthetic account",
+      "passed": true
+    },
+    {
+      "name": "Test data cleanup",
+      "passed": true
+    },
+    {
+      "name": "Production containers not recreated or restarted",
+      "passed": true
+    }
+  ],
+  "stats": "wowbutler-test-db-1|64.39MiB / 512MiB\nwowbutler-test-auth-1|23.99MiB / 128MiB\nwowbutler-test-rest-1|12.06MiB / 192MiB\nwowbutler-test-gateway-1|73.8MiB / 256MiB",
+  "memory": "               total        used        free      shared  buff/cache   available\nMem:            3723        1974         141          78        1975        1748\nSwap:           1987         747        1240\n",
+  "limits": "1088 MiB total, swap disabled per container; restart=no",
+  "scope": "Infrastructure API/RLS smoke only; not REQ-180 browser end-to-end acceptance",
+  "lifecycle": {
+    "stopPassed": true,
+    "restartPassed": true,
+    "dictionaryPersisted": true,
+    "testUsersAfterRestart": 0
+  }
+}
