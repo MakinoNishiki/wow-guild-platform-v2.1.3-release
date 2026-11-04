@@ -6,14 +6,14 @@
 <title>副本掉落 · 魔兽管家</title>
 <!-- 静态资源版本号：20261015.102（开发规范第五章第 6 条规约对象=index.html 及被其引用的 js/css；本壳引用资源变更时才随批递增，不随 index.html 联动——任务书 #61-WP1 注释统一） -->
 <!-- 任务书 #59 WP3（D3 拍板：不保留独立公示页）：本文件保留为重定向壳不删——
-     内容能力并入主站免登录页 index.html#/team/lootdrop（双壳本就同源 window.DPLootDrop 单一真源）。
+     内容能力并入主站免登录页 index.html#/lootdrop（双壳本就同源 window.DPLootDrop 单一真源）。
      JS location.replace 即跳（location.search 来源参数透传不丢）；meta refresh 3s 静态兜底
      （仅 JS 失效时触发，静态 URL 不透参，透传以 JS 路径为准）。
      track.js 保留：page_view page='data' 旧口径继续入库（外链传播源 PV 不断）——
      重定向脚本注册在 track.js 之后的 DOMContentLoaded，保证 boot PV 先入队再跳（sendBeacon 跨导航存活）。
      渲染层脚本引用保留（单一真源不拆第二份），body 已摘除 data-public-body 自动挂载类——
      渲染层加载但惰性（零数据请求零渲染），跳转优先。 -->
-<meta http-equiv="refresh" content="3;url=index.html#/team/lootdrop">
+<meta http-equiv="refresh" content="3;url=index.html#/lootdrop">
 <link rel="icon" type="image/png" sizes="32x32" href="assets/brand/favicon-32.png">
 <link rel="icon" type="image/png" sizes="16x16" href="assets/brand/favicon-16.png">
 <link rel="stylesheet" href="css/main.css?v=20261015.102">
@@ -24,7 +24,7 @@
 <body>
   <div class="card" style="max-width:420px;margin:120px auto;text-align:center">
     副本掉落已并入主站，正在跳转…<br>
-    <a href="index.html#/team/lootdrop" style="color:var(--blue-highlight)">点击手动打开</a>
+    <a href="index.html#/lootdrop" style="color:var(--blue-highlight)">点击手动打开</a>
   </div>
   <!-- 任务书 #31（REQ-097）：装备分类词表单一真源（须在 dataPublic.js 之前） -->
   <script src="js/lootTaxonomy.js?v=20261015.102"></script>
@@ -33,7 +33,7 @@
   <script>
   // 任务书 #59 WP3：JS 重定向（query 透传）；监听器注册晚于 track.js，PV 先发出
   document.addEventListener('DOMContentLoaded', function () {
-    var t = 'index.html' + location.search + '#/team/lootdrop';
+    var t = 'index.html' + location.search + '#/lootdrop';
     try { location.replace(t); } catch (e) { location.href = t; }
   });
   </script>

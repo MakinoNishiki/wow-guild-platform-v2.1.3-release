@@ -103,6 +103,8 @@
 @media (max-width: 1399px) {
   .dp-filter-toggle { display: inline-flex; align-items: center; }
   .dp-filterbar:not(.filters-open) .dp-filter-rows { display: none; }
+  /* Expanded filters scroll with the page to keep result cards unobscured. */
+  .dp-filterbar.filters-open { position: static; }
   /* 筛选规范 v2.0 §7：展开收起动画 150–250ms ease-out，只动 transform/opacity */
   .dp-filterbar.filters-open .dp-filter-rows { animation: dpRowsIn 0.2s ease-out; }
   .dp-filter-rows.closing { opacity: 0; transform: translateY(-6px); transition: opacity 0.2s ease-out, transform 0.2s ease-out; }

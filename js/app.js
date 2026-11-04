@@ -2640,9 +2640,9 @@ async function saveDecorPlan(items, name) {
 
 // ==================== 任务书 #59 WP1：门户化 IA——hash 路由 + 一级 tab + 二级导航 ====================
 // 路由表：#/home 导航页（游客与登录均可见）；#/house/decor|plan|community 家宅系（全免登录可读，组单保存登录墙维持 #58 现状）；
-// #/team/<key> 团队系——lootdrop 全员放行，其余 9 页需登录+公会（游客/无公会落 team-guide 引导卡，hash 不改写）。
+// #/team/<key> 团队系——需登录+公会（游客/无公会落 team-guide 引导卡，hash 不改写）。
 // 埋点 tab_click 仅此两处挂点（iaSwitchTab level:1 / iaGoKey level:2），WBTrack.event 直调不 await（track.js 自带静默兜底）。
-const IA_TEAM_KEYS = ['dashboard', 'members', 'attendance', 'loot', 'wishlist', 'reports', 'data', 'datacenter', 'lootdrop'];
+const IA_TEAM_KEYS = ['dashboard', 'members', 'attendance', 'loot', 'wishlist', 'reports', 'data', 'datacenter'];
 let iaLastHash = ''; // 防环锚点：本模块写过的最后一个 hash（hashchange 回火时比对跳过）
 
 function iaSetHash(h) {
@@ -2651,7 +2651,7 @@ function iaSetHash(h) {
 }
 
 function iaKeyToHash(key) {
-  if (key === 'home' || key === 'changelog') return '#/' + key;
+  if (key === 'home' || key === 'changelog' || key === 'lootdrop') return '#/' + key;
   if (key === 'decor') return '#/house/decor';
   if (key === 'decor-plan') return '#/house/plan';
   if (key === 'community') return '#/house/community';
@@ -2662,7 +2662,7 @@ function iaKeyToHash(key) {
 function iaTabOfPage(page) {
   if (page === 'decor' || page === 'decor-plan' || page === 'community') return 'house';
   if (page === 'home') return null;
-  if (page === 'changelog') return 'changelog';
+  if (page === 'changelog' || page === 'lootdrop') return page;
   return 'team'; // 团队系 + team-guide
 }
 
@@ -2732,7 +2732,7 @@ function iaLegacyRedirect(hash) {
   const key = m[1];
   if (key === 'decor') return '#/house/decor';
   if (key === 'decor-plan') return '#/house/plan';
-  if (key === 'home' || key === 'changelog') return '#/' + key;
+  if (key === 'home' || key === 'changelog' || key === 'lootdrop') return '#/' + key;
   if (key === 'community') return '#/house/community';
   if (IA_TEAM_KEYS.includes(key)) return '#/team/' + key;
   return null;
@@ -2742,7 +2742,7 @@ function iaLegacyRedirect(hash) {
 function iaApplyRoute() {
   let h = location.hash || '';
   iaLastHash = h;
-  const legacy = h === '#/team/changelog' ? '#/changelog' : iaLegacyRedirect(h);
+  const legacy = ['#/team/changelog', '#/team/lootdrop'].includes(h) ? h.replace('/team/', '/') : iaLegacyRedirect(h);
   if (legacy) {
     iaLastHash = legacy;
     location.replace(legacy);
@@ -2759,8 +2759,8 @@ function iaApplyRoute() {
   let page = null, tab = null, activeKey = null;
   if (h === '#/home') {
     page = 'home'; tab = null;
-  } else if (h === '#/changelog') {
-    page = 'changelog'; tab = 'changelog';
+  } else if (h === '#/changelog' || h === '#/lootdrop') {
+    page = h.slice(2); tab = page;
   } else if (h === '#/house' || h === '#/house/') {
     iaLastHash = '#/house/decor'; location.replace('#/house/decor');
     page = 'decor'; tab = 'house';
@@ -2782,8 +2782,8 @@ function iaApplyRoute() {
     tab = 'team';
     if (IA_TEAM_KEYS.includes(key)) {
       activeKey = key;
-      if (key === 'lootdrop' || hasGuild) {
-        page = key; // 副本掉落全员放行；公会成员原样进功能页
+      if (hasGuild) {
+        page = key;
       } else {
         page = 'team-guide'; // 守卫：落引导卡，hash 保持不变不强行改写（pill 高亮目标 key）
       }
@@ -2811,8 +2811,8 @@ function iaSwitchTab(tab) {
   if (window.WBTrack) WBTrack.event('tab_click', { level: 1, key: tab });
   if (tab === 'home') {
     iaSetHash('#/home'); // 任务书 #62 §1（BUG-109）：首页 tab / 品牌区回门户
-  } else if (tab === 'changelog') {
-    iaSetHash('#/changelog');
+  } else if (tab === 'changelog' || tab === 'lootdrop') {
+    iaSetHash('#/' + tab);
   } else if (tab === 'house') {
     iaSetHash('#/house/decor');
   } else if (iaHasGuild()) {

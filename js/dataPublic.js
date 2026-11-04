@@ -208,6 +208,7 @@
   async function reloadData() {
     await loadData();
     renderSeasonOptions();
+    renderFitFilters();
     renderCategory();
     renderSourceChips();
     render();
@@ -238,6 +239,7 @@
 
     // 赛季下拉：默认 is_current，无 is_current 取最新
     renderSeasonOptions();
+    renderFitFilters();
     $('dpSeasonSelect').onchange = e => { state.seasonId = e.target.value; resetFilters(); renderSourceChips(); render(); };
 
     // 筛选条（结构 = 筛选规范 v2.0 §2 布局 + 任务书 #43 两态一套 DOM：首行搜索+重置+命中计数+折叠钮 →
@@ -437,6 +439,8 @@
 
   // 全部筛选重置为默认（赛季切换 / 「重置筛选」按钮共用；筛选规范 v2.0 §5：每组回「全部」、来源回「全部」、搜索清空）
   function resetFilters() {
+    fitClassId = fitSpecId = '';
+    renderFitFilters();
     state.search = '';
     state.primaryStats.clear(); state.secondaryStats.clear();
     state.source = ''; state.sourceInstance = '';
@@ -478,15 +482,77 @@
   // 任务书 #43：生效条件计数（「N 项生效」）——搜索/来源/实例/毒咒各计 1，分类三级/主/副属性按已选 chip 逐个计
   const activeFilterCount = () => (state.search ? 1 : 0) + state.catSel.size
     + state.primaryStats.size + state.secondaryStats.size
-    + (state.source ? 1 : 0) + (state.sourceInstance ? 1 : 0) + (state.venomOnly ? 1 : 0);
+    + (state.source ? 1 : 0) + (state.sourceInstance ? 1 : 0) + (state.venomOnly ? 1 : 0) + (fitClassId ? 1 : 0) + (fitSpecId ? 1 : 0);
 
   // WP6 F3：筛选态平铺——内容类条件（搜索/分类三级/主属性/副属性/毒咒）任一激活即平铺；
   // 仅选来源（含实例级）保持浏览态；分类仅打开二级 tab 未选 chip 不算激活
-  const isFlatMode = () => !!(state.search || state.primaryStats.size || state.secondaryStats.size || state.catSel.size || state.venomOnly);
+  const isFlatMode = () => !!(fitClassId || state.search || state.primaryStats.size || state.secondaryStats.size || state.catSel.size || state.venomOnly);
 
   // ---- 筛选（搜索 AND；分类三级 OR（组内）AND（跨组）；主/副属性标签 AND；来源单选+实例级等值） ----
   // P4（WP6 补丁）：matchExcept(l, skip) 供联动置灰计算「除本组外」的命中数；skip=null 即全条件
+  let fitClassId = '';
+  let fitSpecId = '';
+  // REQ-091: only apply narrow weapon rules with explicit evidence.
+  const FIT_WEAPONS = {
+    '战士/武器': ['双手剑', '双手斧', '双手锤', '长柄武器', '法杖'],
+    '猎人/野兽控制': ['弓', '弩', '枪械'], '猎人/射击': ['弓', '弩', '枪械'], '盗贼/刺杀': ['匕首'], '潜行者/刺杀': ['匕首']
+  };
+  const FIT_SHIELD_SPECS = new Set(['圣骑士/神圣', '圣骑士/防护', '战士/防护', '萨满/元素', '萨满/恢复', '萨满祭司/元素', '萨满祭司/恢复']);
+
+  function renderFitFilters() {
+    const classSelect = $('dpFitClass'), specSelect = $('dpFitSpec');
+    if (!classSelect || !specSelect) return;
+    if (!state.classes.some(row => row.id === fitClassId)) fitClassId = '';
+    const specs = state.specs.filter(row => row.class_id === fitClassId);
+    if (!specs.some(row => row.id === fitSpecId)) fitSpecId = '';
+    classSelect.replaceChildren(new Option('全部职业', ''), ...state.classes.map(row => new Option(row.name_zh, row.id)));
+    specSelect.replaceChildren(new Option('全部专精', ''), ...specs.map(row => new Option(row.name_zh, row.id)));
+    classSelect.value = fitClassId;
+    specSelect.value = fitSpecId;
+    specSelect.disabled = !fitClassId;
+    const spec = specs.find(row => row.id === fitSpecId);
+    const cls = state.classes.find(row => row.id === fitClassId);
+    $('dpFitNote').textContent = fitClassId && (!spec || !FIT_WEAPONS[cls.name_zh + '/' + spec.name_zh]) ?
+      '武器类型尚未完整核实，保留可能适配的掉落' : '';
+    classSelect.onchange = () => {
+      fitClassId = classSelect.value;
+      fitSpecId = '';
+      renderFitFilters();
+      render(true);
+    };
+    specSelect.onchange = () => {
+      fitSpecId = specSelect.value;
+      renderFitFilters();
+      render(true);
+    };
+  }
+
+  function matchesFit(item) {
+    if (!fitClassId) return true;
+    const cls = state.classes.find(row => row.id === fitClassId);
+    const specs = state.specs.filter(row => row.class_id === fitClassId && (!fitSpecId || row.id === fitSpecId));
+    if (!cls) return true;
+    const className = { '潜行者': '盗贼', '萨满祭司': '萨满' }[cls.name_zh] || cls.name_zh;
+    const armor = LootTaxonomy.CLASS_ARMOR[className];
+    const token = LootTaxonomy.tierTokenMatch(item);
+    if (token) return !armor || token.armor === armor;
+    if (['颈部', '手指', '背部', '饰品'].includes(item.slot)) return true;
+    if (item.item_type === '盾牌') return specs.some(row => FIT_SHIELD_SPECS.has(cls.name_zh + '/' + row.name_zh));
+    if (['板甲', '锁甲', '皮甲', '布甲'].includes(item.item_type) && armor && item.item_type !== armor) return false;
+    const weapon = LootTaxonomy.slotCategoryOf(item.slot) === '武器' && item.slot !== '副手物品';
+    const primary = item.primary_stats || [];
+    return !specs.length || specs.some(spec => {
+      const allowed = FIT_WEAPONS[cls.name_zh + '/' + spec.name_zh];
+      if (weapon && allowed &&
+          LootTaxonomy.WEAPON_GROUPS.some(group => group.types?.includes(item.item_type)) &&
+          !allowed.includes(item.item_type)) return false;
+      const stat = typeof getPrimaryStat === 'function' ? getPrimaryStat(cls.name_zh === '盗贼' ? '潜行者' : cls.name_zh, spec.name_zh) : '';
+      return !primary.length || !stat || primary.includes(stat);
+    });
+  }
+
   function matchExcept(l, skip) {
+    if (!matchesFit(l)) return false;
     if (skip !== 'source') {
       if (state.source && l._src !== state.source) return false; // quest/profession 无行带此 _src，选中即空结果（当前值域不含这两值）
       if (state.sourceInstance && l.instance_id !== state.sourceInstance) return false; // WP6 F2
