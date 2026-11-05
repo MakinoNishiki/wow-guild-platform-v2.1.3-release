@@ -5137,3 +5137,20 @@ img.class-icon[src$=".png"] { border-radius: 3px; }
 .wcl-report-check p { margin: .5rem 0; }
 .wcl-report-check summary { cursor: pointer; color: var(--text-primary); }
 .wcl-report-check[hidden] { display: none; }
+/* REQ-185 spacing: scoped to My Claims WCL panel. */
+#wclAccountPanel { margin: 8px 0 24px; padding: 20px; border: 1px solid var(--border-color); border-radius: 8px; background: var(--bg-secondary); display: flex; flex-direction: column; gap: 16px; }
+#wclAccountPanel .wcl-account-heading { display: flex; flex-direction: column; gap: 8px; }
+#wclAccountPanel h3, #wclAccountPanel p { margin: 0; }
+#wclAccountPanel p { line-height: 1.65; }
+#wclAccountPanel .wcl-account-actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+#wclAccountPanel .wcl-account-note { color: var(--text-secondary); font-size: 13px; }
+#wclAccountPanel #wclCandidateList { display: flex; flex-direction: column; gap: 14px; padding-top: 16px; border-top: 1px solid var(--border-color); }
+#wclAccountPanel .wcl-candidates { display: flex; flex-direction: column; }
+#wclAccountPanel .wcl-candidate-row { display: grid; grid-template-columns: 18px 24px minmax(0,1fr) minmax(100px, .65fr); gap: 12px; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--border-color); cursor: pointer; }
+#wclAccountPanel .wcl-candidate-row:last-child { border-bottom: 0; }
+#wclAccountPanel .wcl-candidate-row input { margin: 0; width: 16px; height: 16px; }
+#wclAccountPanel .wcl-candidate-icon { display: flex; align-items: center; justify-content: center; }
+#wclAccountPanel .wcl-candidate-identity { display: flex; flex-direction: column; gap: 4px; min-width: 0; overflow-wrap: anywhere; line-height: 1.5; }
+#wclAccountPanel .wcl-candidate-identity > span { color: var(--text-secondary); font-size: 12px; }
+#wclAccountPanel .wcl-candidate-status { color: var(--text-secondary); font-size: 12px; line-height: 1.5; overflow-wrap: anywhere; }
+#wclAccountPanel .wcl-account-footer { padding-top: 4px; display: flex; justify-content: flex-end; }

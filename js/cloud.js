@@ -1960,6 +1960,16 @@
     // 任务书 #14：主数据层直连读取（RLS select 放行 authenticated；写仍走代理超管校验）
     getClient: () => supabaseClient,
     // REQ-032/033（任务书 #11）：前端调 /api/wcl/* 端点需复用同一途径取用户 JWT
+    // REQ-185: dedicated authenticated account API; server owns authorization and writes.
+    wclAccount: async function(action, body) {
+      const token = await getAccessToken();
+      if (!token) throw new Error('请先登录');
+      const read = action === 'status' || action.startsWith('result?');
+      const response = await fetch('/api/wcl/user/' + action, {method:read?'GET':'POST', headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'}, ...(read?{}:{body:JSON.stringify(body||{})})});
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || data.message || 'WCL 操作失败');
+      return data;
+    },
     getAccessToken: getAccessToken,
     // 用户中心
     getUserProfile: getUserProfile,

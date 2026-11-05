@@ -1486,6 +1486,25 @@ function serveFile(res, filePath, req) {
   });
 }
 
+const handleWclUser = require('./lib/wclUserRoutes.cjs')({
+  auth: verifyTokenCached, role: getGuildRoleCached, get: supabaseRestGet,
+  write: supabaseRestWrite, body: readBody,
+  exchange: async (code, redirectUri) => {
+    loadEnv();
+    const tokenResult = await wclHttpsRequest({hostname:'www.warcraftlogs.com',path:'/oauth/token',method:'POST',headers:{
+      Authorization:'Basic '+Buffer.from(process.env.WCL_CLIENT_ID+':'+process.env.WCL_CLIENT_SECRET).toString('base64'),
+      'Content-Type':'application/x-www-form-urlencoded'
+    }},new URLSearchParams({grant_type:'authorization_code',code,redirect_uri:redirectUri}).toString());
+    if(tokenResult.status!==200)throw Error('WCL授权失败，请重新开始');
+    let token;try{token=JSON.parse(tokenResult.body).access_token;}catch{}
+    if(!token)throw Error('WCL授权返回无效');
+    const result=await wclHttpsRequest({hostname:'www.warcraftlogs.com',path:'/api/v2/user',method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'}},JSON.stringify({query:'{ userData { currentUser { id name characters { id canonicalID name claimed classID server { name slug region { slug } } } } } }'}));
+    if(result.status!==200)throw Error('WCL角色读取失败，请重新授权');
+    let json;try{json=JSON.parse(result.body);}catch{}
+    if(!json||json.errors||!json.data?.userData?.currentUser)throw Error('WCL角色读取失败，请重新授权');
+    return json.data.userData.currentUser;
+  }
+});
 const server = http.createServer(async (req, res) => {
   let urlPath = req.url.split("?")[0];
   res.setHeader("X-Content-Type-Options", "nosniff");
@@ -1528,6 +1547,9 @@ const server = http.createServer(async (req, res) => {
     res.end(JSON.stringify({ message: "请求必须使用 application/json" }));
     return;
   }
+
+  // REQ-185: authenticated account linking and confirmed batch claims.
+  if (await handleWclUser(req, res)) return;
 
   // API: Supabase config
   if (urlPath === "/api/supabase-config" && req.method === "GET") {

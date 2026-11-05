@@ -50,19 +50,24 @@ const root = path.resolve(__dirname, '..');
   process.env.DEPLOY_RUN_PORT = '18779';
   process.env.DEPLOY_RUN_HOST = '127.0.0.1';
   process.env.CORS_ALLOWED_ORIGINS = 'http://127.0.0.1:18779';
+  if(process.argv[2]==='req185') {
+    process.env.WCL_USER_REDIRECT_URI='http://127.0.0.1:18779/api/wcl/user/callback';
+    process.env.WCL_CLIENT_ID='isolated-fixture';process.env.WCL_CLIENT_SECRET='isolated-fixture';
+    require('./req185-wcl-fixture.cjs').install();
+  }
   const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'wb-req180-'));
   for (const name of ['server.js', 'index.html', 'data.html', 'decor.html']) fs.copyFileSync(path.join(root, name), path.join(temp, name));
-  for (const name of ['js', 'css', 'assets']) fs.symlinkSync(path.join(root, name), path.join(temp, name), 'junction');
+  for (const name of ['js', 'css', 'assets', 'lib']) fs.symlinkSync(path.join(root, name), path.join(temp, name), 'junction');
   const server = require(path.join(temp, 'server.js')).startServer();
   try {
     await new Promise(resolve => server.listening ? resolve() : server.once('listening', resolve));
-    const suite = {req182:'./verify-req182-real.cjs', req183:'./verify-req183-real.cjs'}[process.argv[2]] || './verify-req180-real.cjs';
+    const suite = {req182:'./verify-req182-real.cjs', req183:'./verify-req183-real.cjs',req185:'./verify-req185-real.cjs'}[process.argv[2]] || './verify-req180-real.cjs';
     await require(suite)(config);
   } finally {
     await new Promise(resolve => server.close(resolve));
     await new Promise(resolve => bridge.close(resolve));
     // Remove only explicit temporary entries; never recursively traverse junctions.
-    for (const name of ['js', 'css', 'assets']) fs.rmdirSync(path.join(temp, name));
+    for (const name of ['js', 'css', 'assets','lib']) fs.rmdirSync(path.join(temp, name));
     for (const name of ['server.js', 'index.html', 'data.html', 'decor.html']) fs.unlinkSync(path.join(temp, name));
     fs.rmdirSync(temp);
   }

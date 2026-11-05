@@ -602,6 +602,7 @@ function switchUserTab(tabName) {
 // 任务书 #18 WP2 R2/R3：用户中心「我的认领」——跨公会列出我认领的 raid_members，
 // 逐条展示角色名/职业专精/公会/区服/在队状态并提供解绑；本公会部分附 R2 聚合行。
 async function loadMyClaims() {
+  loadWclAccount();
   const listEl = document.getElementById('myClaimsList');
   const sumEl = document.getElementById('myClaimsSummary');
   if (!listEl) return;
@@ -2131,6 +2132,7 @@ async function handleSignOut() {
 
 // 显示应用视图（登录后）
 function showAppView() {
+  if (typeof wclResultCode !== 'undefined' && wclResultCode) setTimeout(async () => { await openUserCenter(); switchUserTab('claims'); }, 0);
   // REQ-141（任务书 #54 WP1）授权行①：会话建立（登录/注册/会话恢复共同落点）写埋点 uid
   window.__wbUid = (window.CloudSync && window.CloudSync.getCachedUser()?.id) || null;
   const authOverlay = document.getElementById('authOverlay');
@@ -8859,6 +8861,10 @@ function lootFillAssignedTo(idOrName) {
 // ==================== 初始化 ====================
 // ==================== 更新日志 ====================
 const changelogData = [
+  {id:'req185-feature',version:'v3.2.0',date:'2026-11-06',type:'feature',typeLabel:'新增功能',title:'关联 WCL 并批量认领角色',summary:'授权后匹配当前公会名单，勾选确认自己的角色。',details:['不会自动添加公会成员。']},
+  {id:'req185-improve',version:'v3.2.0',date:'2026-11-06',type:'improve',typeLabel:'功能优化',title:'认领结果逐项展示',summary:'区分可认领、已有归属和资料待核对，失败项可重试。',details:['保留现有职业图标与认领列表。']},
+  {id:'req185-fix',version:'v3.2.0',date:'2026-11-06',type:'fix',typeLabel:'修复BUG',title:'认领写入增加冲突保护',summary:'提交时再次核对角色归属，避免覆盖他人的认领。',details:['实际行为由服务端校验。']},
+  {id:'req185-refactor',version:'v3.2.0',date:'2026-11-06',type:'refactor',typeLabel:'模块调整',title:'沿用公会认领规则',summary:'自由认领、审核和管理者分配继续生效。',details:['解除 WCL 关联不会删除已认领角色或历史记录。']},
   { id: 'v3.2.0-req183-feature', version: 'v3.2.0', date: '2026-11-05', type: 'feature', typeLabel: '新增功能', title: '活动保存异常后自动核对结果', summary: '网络报错后会重新读取活动，区分已保存、部分保存和结果未知。', details: ['已核实保存成功时无需再次创建活动。'] },
   { id: 'v3.2.0-req183-improve', version: 'v3.2.0', date: '2026-11-05', type: 'improve', typeLabel: '功能优化', title: '名单核对说明更清楚', summary: '未匹配团队名单的角色默认不计入考勤，无需逐人忽略。', details: ['确认属于团队成员时仍可手动添加。'] },
   { id: 'v3.2.0-req183-fix', version: 'v3.2.0', date: '2026-11-05', type: 'fix', typeLabel: '修复BUG', title: '减少保存报错后的误操作', summary: '同一次创建重试复用活动编号，避免成功响应丢失后重复建活动；保存错误不再重复弹出。', details: ['初始考勤未齐时进入已创建的活动继续处理，不覆盖已有考勤。'] },
@@ -16208,3 +16214,77 @@ paintCalendarDensity(getCalendarDensity());
     }
   });
 })();
+// REQ-185: existing My Claims surface; all evidence remains server-side.
+let wclClaimPreview = null;
+let wclAccountBusy = false;
+let wclAccountEpoch = 0;
+let wclResultCode = new URLSearchParams(location.search).get('wclResult');
+if (wclResultCode) {
+  const cleanUrl = new URL(location.href); cleanUrl.searchParams.delete('wclResult');
+  history.replaceState(null, '', cleanUrl.pathname + cleanUrl.search + cleanUrl.hash);
+}
+function wclEscapeHtml(value) {
+  return String(value == null ? '' : value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+async function loadWclAccount() {
+  const el=document.getElementById('wclAccountPanel'); if(!el || wclAccountBusy)return;
+  const epoch=++wclAccountEpoch, uid=CloudSync.getCachedUser()?.id, gid=CloudSync.getCurrentGuild()?.id;
+  const current=()=>epoch===wclAccountEpoch && uid===CloudSync.getCachedUser()?.id && gid===CloudSync.getCurrentGuild()?.id;
+  if(wclClaimPreview && (wclClaimPreview.userId!==uid || wclClaimPreview.guildId!==gid))wclClaimPreview=null;
+  el.textContent='正在读取 WCL 关联状态…';
+  try {
+    const status=await CloudSync.wclAccount('status');
+    if(!current())return;
+    el.innerHTML='<div class="wcl-account-heading"><h3>WCL 账号关联</h3><p>'+ (status.link?'已关联：'+wclEscapeHtml(status.link.wcl_user_name):'授权后，可一次匹配当前公会中属于你的角色。')+'</p></div>';
+    if(wclResultCode) {
+      const result=await CloudSync.wclAccount('result?result='+encodeURIComponent(wclResultCode));
+      if(!current())return;
+      el.innerHTML+='<p class="wcl-account-note">即将关联 '+wclEscapeHtml(result.name)+'，读取到 '+Number(result.characterCount)+' 个角色。确认关联不会自动认领。</p><div class="wcl-account-actions"><button class="btn btn-primary" onclick="wclAccountAction(\'finish\')">确认关联并查看角色</button></div>';
+    } else el.innerHTML+='<div class="wcl-account-actions"><button class="btn btn-primary" onclick="wclAccountAction(\'start\')" '+(!status.configured?'disabled':'')+'>'+(status.link?'重新授权并匹配角色':'关联 WCL')+'</button></div>';
+    if(status.link)el.querySelector('.wcl-account-actions').insertAdjacentHTML('beforeend','<button class="btn btn-secondary" onclick="wclAccountAction(\'unlink\')">解除 WCL 关联</button>');
+    if(!status.configured)el.innerHTML+='<p class="wcl-account-note">账号授权尚未配置，请稍后再试。</p>';
+    if(!CloudSync.getCurrentGuild())el.innerHTML+='<p class="wcl-account-note">加入或选择公会后，才能匹配团队角色。</p>';
+    if(wclClaimPreview)renderWclCandidates();
+  } catch(e) {if(!current())return;el.textContent=e.message;const b=document.createElement('button');b.className='btn btn-secondary';b.textContent='重新加载';b.onclick=loadWclAccount;el.appendChild(b);
+    if(wclResultCode){const retry=document.createElement('button');retry.className='btn btn-secondary';retry.textContent='重新授权';retry.onclick=()=>{wclResultCode=null;wclAccountAction('start');};el.appendChild(retry);}
+  }
+}
+function renderWclCandidates() {
+  const el=document.getElementById('wclAccountPanel');if(!el||!wclClaimPreview)return;
+  const old=document.getElementById('wclCandidateList');if(old)old.remove();
+  const labels={available:'可认领',owned:'已由你认领',conflict:'已被他人认领',ambiguous:'同名待核对',incomplete:'服务器信息不全',unmatched:'不在当前公会名单',unverified:'归属未验证',duplicate:'重复角色'};
+  const rows=wclClaimPreview.candidates||[];
+  const action=wclClaimPreview.action;
+  el.insertAdjacentHTML('beforeend','<div id="wclCandidateList"><p class="wcl-account-note">仅匹配当前公会；不会自动添加成员。'+(action==='forbidden'?'本公会由管理者统一分配认领。':'请勾选需要认领的角色。')+'</p><div class="wcl-candidates">'+rows.map((r,i)=>'<label class="wcl-candidate-row"><input type="checkbox" data-wcl-index="'+i+'" '+(r.status==='available'&&action!=='forbidden'?'':'disabled')+'><span class="wcl-candidate-icon">'+(r.className?classIconHtml(r.className):'')+'</span><span class="wcl-candidate-identity"><strong>'+wclEscapeHtml(r.name)+'</strong><span>'+wclEscapeHtml(r.server)+'</span></span><span class="wcl-candidate-status">'+wclEscapeHtml(r.message||labels[r.status]||r.status)+'</span></label>').join('')+'</div>'+(!rows.length?'<p class="wcl-account-note">没有可匹配的角色。</p>':'')+(action!=='forbidden'&&rows.some(r=>r.status==='available')?'<div class="wcl-account-footer"><button class="btn btn-primary" onclick="wclAccountAction(\'claim\')">'+(action==='request'?'提交所选认领申请':'确认认领所选角色')+'</button></div>':'')+'</div>');
+}
+async function wclAccountAction(action) {
+  if(wclAccountBusy)return;
+  const me=CloudSync.getCachedUser()?.id, guildId=CloudSync.getCurrentGuild()?.id;
+  if(action==='unlink'&&!confirm('解除 WCL 关联？已认领角色和历史记录将保留。'))return;
+  let memberIds=[];
+  if(action==='claim') {
+    if(guildId!==wclClaimPreview?.guildId){showToast('公会已切换，请重新授权匹配','error');return;}
+    memberIds=Array.from(document.querySelectorAll('[data-wcl-index]:checked')).map(e=>wclClaimPreview.candidates[Number(e.dataset.wclIndex)].memberId);
+    if(!memberIds.length){showToast('请先选择角色','warning');return;}
+  }
+  wclAccountBusy=true;
+  document.querySelectorAll('#wclAccountPanel button').forEach(b=>b.disabled=true);
+  try {
+    // Development rules 1.2.2: one server-validated batch, then one reload; no local optimistic claims.
+    const data=await CloudSync.wclAccount(action,action==='finish'?{result:wclResultCode,guildId}:action==='claim'?{guildId,evidence:wclClaimPreview.evidence,memberIds}:{});
+    if(CloudSync.getCachedUser()?.id!==me || CloudSync.getCurrentGuild()?.id!==guildId)return;
+    if(action==='start'){location.assign(data.url);return;}
+    if(action==='finish'){wclResultCode=null;wclClaimPreview={...data,guildId,userId:me};}
+    if(action==='unlink'){wclClaimPreview=null;wclResultCode=null;}
+    if(action==='claim') {
+      for(const result of data.results||[]){const row=wclClaimPreview.candidates.find(r=>r.memberId===result.id);if(row){row.status=['claimed','owned'].includes(result.status)?'owned':result.status==='requested'?'requested':'available';row.message=result.message||(result.status==='requested'?'已提交审核':result.status==='claimed'?'认领成功':result.status==='failed'?'失败，可重试':'已由你认领');}}
+      await CloudSync.reloadData('members'); saveData();renderMembers();
+      const failed=(data.results||[]).filter(r=>r.status==='failed').length;
+      showToast(failed?'部分角色未完成，请查看原因并重试':'处理完成，请查看逐项结果',failed?'warning':'success');
+    }
+  }catch(e){if(CloudSync.getCachedUser()?.id===me && CloudSync.getCurrentGuild()?.id===guildId)showToast(e.message,'error');}
+  finally{wclAccountBusy=false;if(CloudSync.getCachedUser()?.id===me)loadMyClaims();}
+}
+// Claims checkboxes live inside the existing user-center modal.
+const wclOriginalUserDirty = modalDirtyChecks.userCenterModal;
+modalDirtyChecks.userCenterModal=()=>wclAccountBusy||!!document.querySelector('[data-wcl-index]:checked')||wclOriginalUserDirty();
