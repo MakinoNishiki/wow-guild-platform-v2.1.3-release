@@ -50,7 +50,7 @@ const root = path.resolve(__dirname, '..');
   process.env.DEPLOY_RUN_PORT = '18779';
   process.env.DEPLOY_RUN_HOST = '127.0.0.1';
   process.env.CORS_ALLOWED_ORIGINS = 'http://127.0.0.1:18779';
-  if(['req185','req186'].includes(process.argv[2])) {
+  if(['req185','req186','req187'].includes(process.argv[2])) {
     process.env.WCL_USER_REDIRECT_URI='http://127.0.0.1:18779/api/wcl/user/callback';
     process.env.WCL_CLIENT_ID='isolated-fixture';process.env.WCL_CLIENT_SECRET='isolated-fixture';
     require('./req185-wcl-fixture.cjs').install();
@@ -61,7 +61,7 @@ const root = path.resolve(__dirname, '..');
   const server = require(path.join(temp, 'server.js')).startServer();
   try {
     await new Promise(resolve => server.listening ? resolve() : server.once('listening', resolve));
-    const suite = {req182:'./verify-req182-real.cjs', req183:'./verify-req183-real.cjs',req185:'./verify-req185-real.cjs',req186:'./verify-req186-real.cjs'}[process.argv[2]] || './verify-req180-real.cjs';
+    const suite = {req182:'./verify-req182-real.cjs', req183:'./verify-req183-real.cjs',req185:'./verify-req185-real.cjs',req186:'./verify-req186-real.cjs',req187:'./verify-req187-real.cjs'}[process.argv[2]] || './verify-req180-real.cjs';
     await require(suite)(config);
   } finally {
     await new Promise(resolve => server.close(resolve));

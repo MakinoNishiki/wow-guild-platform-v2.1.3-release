@@ -400,6 +400,7 @@
   // ---- 用户登出后 ----
   function onUserSignedOut() {
     isCloudMode = false;
+    if (window.appData) { window.appData.decorPlans = []; window.appData.decorPlan = null; }
     // BUG-078（任务书 #44 WP1）：登出清偏好内存态与本地数据缓存——否则同浏览器换号后，
     // 新账号在自身偏好加载完成前沿用上一账号的 nav_order/calendar_density（导航串号病灶）。
     userPreferences = {};
@@ -637,10 +638,11 @@
     // BUG-029（任务书 #12 补丁）：原来是静默 return——会话/公会上下文在写流程中途
     // 丢失（auth 事件竞态）时 reload 变 no-op，调用方照常 toast 成功但界面是旧数据
     // （假成功）。改为明确抛错，让调用方走失败提示（规范：禁止静默失败）。
-    if (!supabaseClient || !currentGuild) {
+    // REQ-187：个人方案只依赖账号，团队数据仍必须具备公会上下文。
+    if (!supabaseClient || !currentUser || (dataType !== 'decorPlan' && !currentGuild)) {
       throw new Error('云端连接未就绪（会话或公会上下文丢失），请刷新页面重试');
     }
-    const guildId = currentGuild.id;
+    const guildId = currentGuild?.id;
     const perfT0 = performance.now(); // 任务书 #10：分表计时
 
     try {
@@ -848,11 +850,12 @@
   // ---- 保存数据到云端 ----
   async function saveCloudData(dataType, operation, item, extra) {
     // BUG-029（任务书 #12 补丁）：同 reloadData，静默 return 会造成假成功，改为明确抛错
-    if (!supabaseClient || !currentGuild) {
+    // REQ-187：个人方案沿用本人 RLS，不能被团队前置条件拦截。
+    if (!supabaseClient || !currentUser || (dataType !== 'decorPlan' && !currentGuild)) {
       throw new Error('云端连接未就绪（会话或公会上下文丢失），请刷新页面重试');
     }
 
-    const guildId = currentGuild.id;
+    const guildId = currentGuild?.id;
 
     try {
       switch (dataType) {
@@ -917,14 +920,15 @@
   // WP2-1 口径 = 「当前选定方案」：选定 id 存 localStorage wb_decor_plan_current；无选定值或
   // 选定 id 已不存在 → 回退 updated_at 最新。appData.decorPlans = 全量方案（updated_at 倒序），
   // appData.decorPlan = 当前方案（WP1 单方案消费方零改动）。
-  const DECOR_PLAN_CURRENT_KEY = 'wb_decor_plan_current';
+  const decorPlanStorageKey = () => 'wb_decor_plan_current:' + (currentUser?.id || 'anonymous');
   function decorPlanResolveCurrentId(planIds) {
     let cid = null;
-    try { cid = localStorage.getItem(DECOR_PLAN_CURRENT_KEY); } catch { cid = null; }
+    try { cid = localStorage.getItem(decorPlanStorageKey()); } catch { cid = null; }
     if (cid && planIds.some(id => String(id) === cid)) return cid;
     return planIds.length ? String(planIds[0]) : null; // 调用方保证 updated_at 倒序
   }
   async function reloadDecorPlan() {
+    const ownerId = currentUser?.id;
     if (!currentUser) {
       if (typeof window.appData !== 'undefined') { window.appData.decorPlans = []; window.appData.decorPlan = null; }
       return;
@@ -932,8 +936,9 @@
     const { data, error } = await supabaseClient
       .from('decor_plans')
       .select('*, decor_plan_items(*)')
-      .eq('user_id', currentUser.id)
+      .eq('user_id', ownerId)
       .order('updated_at', { ascending: false });
+    if (ownerId !== currentUser?.id) return;
     if (error) throw error;
     const plans = (data || []).map(row => ({
       id: row.id,
@@ -954,7 +959,7 @@
 
     // switch：仅切 localStorage，不写库（reload 由 cloudCrud 统一触发）
     if (operation === 'switch') {
-      try { localStorage.setItem(DECOR_PLAN_CURRENT_KEY, String(item && item.id)); } catch { /* localStorage 不可用静默 */ }
+      try { localStorage.setItem(decorPlanStorageKey(), String(item && item.id)); } catch { /* localStorage 不可用静默 */ }
       return;
     }
     // create：INSERT 头 + 空明细，并设为当前选定
@@ -962,7 +967,7 @@
       const { data: ins, error: iErr } = await supabaseClient
         .from('decor_plans').insert({ user_id: currentUser.id, name: (item && item.name) || '我的方案单' }).select('id').single();
       if (iErr) throw iErr;
-      try { localStorage.setItem(DECOR_PLAN_CURRENT_KEY, String(ins.id)); } catch { /* 静默 */ }
+      try { localStorage.setItem(decorPlanStorageKey(), String(ins.id)); } catch { /* 静默 */ }
       return;
     }
     // rename：仅改头名（不 bump updated_at——当前选定由 id 锚定，排序语义不动）
@@ -983,7 +988,7 @@
       const { error: dErr } = await supabaseClient.from('decor_plans').delete().eq('id', item.id);
       if (dErr) throw dErr;
       try {
-        if (localStorage.getItem(DECOR_PLAN_CURRENT_KEY) === String(item.id)) localStorage.removeItem(DECOR_PLAN_CURRENT_KEY);
+        if (localStorage.getItem(decorPlanStorageKey()) === String(item.id)) localStorage.removeItem(decorPlanStorageKey());
       } catch { /* 静默 */ }
       return;
     }

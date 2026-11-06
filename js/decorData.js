@@ -551,6 +551,8 @@
     cloudName: '我的方案单',
     notice: '',         // 一次性提示（草稿还原）
     saving: false,
+    loadFailed: false,
+    loading: false,
     built: false,
   };
 
@@ -564,9 +566,13 @@
   }
   // 任务书 #58-WP2-1：草稿按方案分键（{plans:{[planId|'anon']:{items,updatedAt}}}）——切方案不串单；
   // 兼容 WP1 旧形态 {items,updatedAt} → 视作 'anon' 单槽（未登录/无云端方案行为不变）
+  function planOwner() { return window.CloudSync?.getCachedUser?.()?.id || 'guest'; }
+  function planDraftStorageKey() { return PLAN_DRAFT_KEY + ':' + planOwner(); }
+  let planOwnerId = null;
+  let planLoadEpoch = 0;
   function planDraftReadAll() {
     try {
-      const raw = localStorage.getItem(PLAN_DRAFT_KEY);
+      const raw = localStorage.getItem(planDraftStorageKey());
       if (!raw) return { plans: {} };
       const d = JSON.parse(raw);
       if (d && d.plans && typeof d.plans === 'object') return d;
@@ -576,12 +582,13 @@
   }
   function planDraftKey() { return plan.currentId != null ? String(plan.currentId) : 'anon'; }
   function planDraftSave() {
+    if (planOwnerId !== planOwner()) return; // late UI work cannot write a different account's draft
     try {
       const all = planDraftReadAll();
       if (plan.items.length) all.plans[planDraftKey()] = { items: plan.items, updatedAt: Date.now() };
       else delete all.plans[planDraftKey()];
-      if (Object.keys(all.plans).length) localStorage.setItem(PLAN_DRAFT_KEY, JSON.stringify(all));
-      else localStorage.removeItem(PLAN_DRAFT_KEY);
+      if (Object.keys(all.plans).length) localStorage.setItem(planDraftStorageKey(), JSON.stringify(all));
+      else localStorage.removeItem(planDraftStorageKey());
     } catch { /* localStorage 不可用（隐私模式等）静默 */ }
   }
   function planDraftLoad() {
@@ -592,11 +599,32 @@
   function planDraftAdoptAnon() {
     if (planDraftKey() === 'anon') return;
     const all = planDraftReadAll();
+    try {
+      const old = JSON.parse(localStorage.getItem(PLAN_DRAFT_KEY) || '{"plans":{}}');
+      if (!all.plans[planDraftKey()] && plan.plans.some(p => String(p.id) === planDraftKey()) && old.plans?.[planDraftKey()]) {
+        all.plans[planDraftKey()] = old.plans[planDraftKey()];
+        localStorage.setItem(planDraftStorageKey(), JSON.stringify(all));
+        delete old.plans[planDraftKey()]; localStorage.setItem(PLAN_DRAFT_KEY, JSON.stringify(old));
+      }
+    } catch {}
+    // Only the explicitly guest-scoped draft may cross the login boundary.
+    // Legacy global drafts have no proven owner and are left untouched.
+    if (planOwner() !== 'guest' && !all.plans.anon) {
+      try {
+        const guest = JSON.parse(localStorage.getItem(PLAN_DRAFT_KEY + ':guest') || '{"plans":{}}');
+        if (guest.plans?.anon && !all.plans[planDraftKey()]) {
+          all.plans.anon = guest.plans.anon;
+          delete guest.plans.anon;
+          localStorage.setItem(planDraftStorageKey(), JSON.stringify(all));
+          localStorage.setItem(PLAN_DRAFT_KEY + ':guest', JSON.stringify(guest));
+        }
+      } catch { /* leave unavailable draft storage untouched */ }
+    }
     const legacy = all.plans.anon;
     if (!all.plans[planDraftKey()] && legacy && Array.isArray(legacy.items) && legacy.items.length) {
       all.plans[planDraftKey()] = legacy;
       delete all.plans.anon;
-      try { localStorage.setItem(PLAN_DRAFT_KEY, JSON.stringify(all)); } catch { /* 静默 */ }
+      try { localStorage.setItem(planDraftStorageKey(), JSON.stringify(all)); } catch { /* 静默 */ }
     }
   }
 
@@ -609,8 +637,17 @@
   // 任务书 #58-WP2-1：登录态云端对齐——拉全量方案 → plans/currentId/cloudName；
   // 当前方案 items 合并三分支（草稿空→云端；云端空→草稿；皆非空→草稿优先+一次性提示）
   async function planPullCloud() {
-    let list = [];
-    try { list = await planBridge().listPlans(); } catch { list = []; }
+    const owner = planOwner(), epoch = ++planLoadEpoch;
+    plan.loading = true; planRender();
+    let list;
+    try { list = await planBridge().listPlans(); }
+    catch (e) {
+      // Obsolete failures must not replace a newer successful load or another account's state.
+      if (owner !== planOwner() || epoch !== planLoadEpoch) return;
+      throw e;
+    } finally { if (owner === planOwner() && epoch === planLoadEpoch) plan.loading = false; }
+    if (owner !== planOwner() || epoch !== planLoadEpoch) return;
+    plan.loadFailed = false;
     plan.plans = Array.isArray(list) ? list : [];
     const bid = planBridge().currentPlanId && planBridge().currentPlanId();
     plan.currentId = bid != null ? bid : (plan.plans[0] && plan.plans[0].id) || null;
@@ -630,13 +667,25 @@
 
   // 初始化（boot 数据拉齐后调用）
   async function planInit() {
+    const owner = planOwner();
+    if (planOwnerId !== owner) {
+      planOwnerId = owner; ++planLoadEpoch; plan.loadFailed = planLoggedIn(); plan.loading = false;
+      plan.items = []; plan.plans = []; plan.currentId = null; plan.notice = ''; plan.cloudName = '我的方案单';
+      planRender();
+    }
     if (planLoggedIn()) {
-      await planPullCloud();
+      try { await planPullCloud(); } catch (e) {
+        if (owner !== planOwner()) return;
+        plan.loadFailed = true;
+        plan.notice = '方案读取失败，请重新进入页面重试；未覆盖已有方案。';
+        planRender(); return;
+      }
+      if (owner !== planOwner()) return;
     } else {
       plan.plans = [];
       plan.currentId = null;
       const draft = planDraftLoad();
-      if (draft) plan.items = draft.items.map(it => ({ record_id: it.record_id | 0, qty: Math.max(1, it.qty | 0) }));
+      plan.items = draft ? draft.items.map(it => ({ record_id: it.record_id | 0, qty: Math.max(1, it.qty | 0) })) : [];
     }
     // 目录外 record_id（数据下线等）静默剔除
     plan.items = plan.items.filter(it => state.rows.some(r => r.record_id === it.record_id));
@@ -701,6 +750,7 @@
 
   // ---- 任务书 #58-WP2-1：多方案动作（登录壳专用；写全部走 bridge→cloudCrud，完成后云端对齐重渲染） ----
   async function planActionSwitch(id) {
+    if (plan.loading || plan.loadFailed) { planToast('请先重新进入方案页，成功加载后再操作', true); return; }
     if (!planLoggedIn() || String(id) === String(plan.currentId)) return;
     planDraftSave(); // 当前方案未保存编辑先入草稿（切方案不丢不串）
     try {
@@ -712,6 +762,7 @@
     } catch (e) { planToast('切换方案失败：' + ((e && e.message) || '未知错误'), true); }
   }
   async function planActionCreate() {
+    if (plan.loading || plan.loadFailed) { planToast('请先重新进入方案页，成功加载后再操作', true); return; }
     if (!planLoggedIn()) { planToast('新建方案需要登录，登录后组单内容不丢'); setTimeout(() => { location.href = 'index.html?auth=login'; }, 900); return; }
     planDraftSave();
     // 默认名「我的方案 N」：取未被占用的最小序号
@@ -728,6 +779,7 @@
     } catch (e) { planToast('新建方案失败：' + ((e && e.message) || '未知错误'), true); }
   }
   async function planActionRename() {
+    if (plan.loading || plan.loadFailed) { planToast('请先重新进入方案页，成功加载后再操作', true); return; }
     if (!planLoggedIn() || plan.currentId == null) return;
     const name = window.prompt('方案名称', plan.cloudName || '我的方案单');
     if (name == null) return; // 取消
@@ -741,6 +793,7 @@
     } catch (e) { planToast('重命名失败：' + ((e && e.message) || '未知错误'), true); }
   }
   async function planActionDelete() {
+    if (plan.loading || plan.loadFailed) { planToast('请先重新进入方案页，成功加载后再操作', true); return; }
     if (!planLoggedIn() || plan.currentId == null) return;
     if (plan.plans.length <= 1) { planToast('仅剩一个方案，禁止删除', true); return; } // 前端拦截与服务端同口径
     if (!window.confirm(`确定删除方案「${plan.cloudName}」吗？明细一并删除，不可恢复。`)) return;
@@ -793,6 +846,8 @@
 
   function planRender() {
     planBuildDom();
+    const save = $doc('dhPlanSave');
+    if (save) { save.disabled = plan.loading || plan.loadFailed || plan.saving; save.textContent = plan.loading ? '读取中…' : '保存'; }
     planRefreshEntries(); // 任务书 #58-补丁：加单入口双态同步（须在空清单早退前执行）
     const n = planCount();
     $doc('dhPlanToggleN').textContent = n;
@@ -859,6 +914,7 @@
 
   // ---- 保存（D2：公示壳恒视为未登录 → 提示+跳主站登录页；登录壳走 bridge cloudCrud 链路） ----
   async function planSave() {
+    if (plan.loading || plan.loadFailed) { planToast('方案尚未成功加载，请重新进入页面重试', true); return; }
     if (!planLoggedIn()) {
       planToast('保存方案单需要登录，登录后组单内容不丢');
       setTimeout(() => { location.href = 'index.html?auth=login'; }, 900);
@@ -1179,7 +1235,7 @@
     planPageEl = el;
     planPageRender();
   }
-  function activatePlanPage() { planPageRender(); } // 重切页签刷新（方案可能在抽屉/卡片侧改过）
+  function activatePlanPage() { planDraftSave(); planInit().then(planPageRender); } // 重切页签刷新（方案可能在抽屉/卡片侧改过）
 
   function planPageRowHtml(it) {
     const row = state.rows.find(r => r.record_id === it.record_id);
@@ -1246,7 +1302,7 @@
         </div>` : ''}
         <button type="button" class="dh-pp-back" id="dhPpBack">← 返回图鉴</button>
       </div>
-      ${plan.notice ? `<div class="dh-pp-notice">${esc(plan.notice)}</div>` : ''}
+      ${plan.loading ? '<div class="dh-pp-notice">正在读取个人方案…</div>' : plan.loadFailed ? '<div class="dh-pp-notice">方案读取失败，已有内容已保留。<button class="btn btn-sm" id="dhPpRetryPersonal">重新加载</button></div>' : plan.notice ? `<div class="dh-pp-notice">${esc(plan.notice)}</div>` : ''}
       <div class="dh-pp-body">
         <div class="dh-pp-main">
           <div class="dh-pp-batch">
@@ -1273,7 +1329,7 @@
             ${cap > DECOR_PLAN_CAPACITY_REF ? '<div class="dh-pp-over-hint">已超参考上限（游戏内预算随住宅等级变化，仅提示不阻断）</div>' : ''}
             <button type="button" class="btn btn-primary dh-pp-export" id="dhPpExport">导出</button>
             <button type="button" class="btn dh-pp-share" id="dhPpShare" disabled title="三期社区开放">分享方案</button>
-            <div class="dh-pp-sync">${logged ? '云端已同步 · 跨设备可用' : '未登录 · 草稿本地暂存，保存时跳登录'}</div>
+            <div class="dh-pp-sync">${logged ? (plan.loading ? '正在读取云端方案' : plan.loadFailed ? '读取失败 · 未更新云端' : plan.notice ? '有本地草稿 · 保存后同步' : '云端已读取 · 跨设备可用') : '未登录 · 草稿本地暂存，保存时跳登录'}</div>
           </div>
         </aside>
       </div>
@@ -1288,6 +1344,9 @@
       const selEl = $p('dhPpPlanSel');
       selEl.dataset.current = String(plan.currentId); // 异步切换落地标记（verify/测试可观测）
       selEl.onchange = e => planActionSwitch(e.target.value);
+      const retryPersonal = $p('dhPpRetryPersonal');
+      if (retryPersonal) retryPersonal.onclick = () => planInit();
+      ['dhPpCreate','dhPpRename','dhPpDelete','dhPpPlanSel','dhPpSave'].forEach(id => { const el = $p(id); if (el) el.disabled = el.disabled || plan.loading || plan.loadFailed; });
       $p('dhPpCreate').onclick = planActionCreate;
       $p('dhPpRename').onclick = planActionRename;
       $p('dhPpDelete').onclick = planActionDelete;
@@ -1367,7 +1426,8 @@
       root = el || document;
       boot();
     },
-    activate() { /* 只读目录：无脏标记、无重测需求，刻意零动作 */ },
+    activate() { planDraftSave(); planInit(); },
+    syncPersonalContext() { if (started && planOwnerId !== planOwner()) planInit(); },
     // 任务书 #58-WP2-1：方案单独立页（应用壳专用；公示壳不调用，惰性不触发）
     mountPlanPage(el) { mountPlanPage(el); },
     activatePlanPage() { activatePlanPage(); },

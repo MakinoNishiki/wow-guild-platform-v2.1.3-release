@@ -1,0 +1,42 @@
+const assert=require('node:assert/strict'),crypto=require('node:crypto'),fs=require('node:fs');
+const {chromium}=require('playwright');
+module.exports=async config=>{
+ const checks=[],out='docs/evidence/req187-20261107';fs.mkdirSync(out,{recursive:true});
+ const headers={apikey:config.SUPABASE_SERVICE_ROLE_KEY,Authorization:'Bearer '+config.SUPABASE_SERVICE_ROLE_KEY,'Content-Type':'application/json'};
+ const call=async(path,method='GET',body)=>{const r=await fetch(config.SUPABASE_URL+path,{method,headers,body:body===undefined?undefined:JSON.stringify(body)});assert.ok(r.ok,path+' '+r.status);const text=await r.text();return text?JSON.parse(text):null;};
+ const email='req187-'+crypto.randomBytes(5).toString('hex')+'@example.com',password=crypto.randomBytes(24).toString('base64url');
+ let user,userB,guildId,browser;
+ const check=(s,v)=>{assert.ok(v,s);checks.push(s);console.log('PASS '+s);};
+ try{
+ user=await call('/auth/v1/admin/users','POST',{email,password,email_confirm:true});
+ browser=await chromium.launch({channel:'chrome',headless:true});const context=await browser.newContext({ignoreHTTPSErrors:true,viewport:{width:1366,height:900}}),page=await context.newPage();
+ await page.route('**/*',r=>new URL(r.request().url()).hostname==='127.0.0.1'?r.continue():r.abort());
+ await page.route('**/rest/v1/decor_catalog?*',r=>r.fulfill({json:[{record_id:1,name_zh:'隔离目录样本',category_id:1,entry_type:1,tags:[],sources:[]}]}));
+ await page.goto('http://127.0.0.1:18779/#/home');await page.getByRole('button',{name:'登录 / 注册',exact:true}).first().click();await page.locator('#authEmail').fill(email);await page.locator('#authPassword').fill(password);await page.locator('#authLoginBtn').click();await page.waitForFunction(()=>CloudSync.getCachedUser()&&!document.getElementById('authOverlay').offsetHeight);
+ check('无公会登录进入主站',await page.evaluate(()=>!CloudSync.getCurrentGuild()));
+ await page.evaluate(async()=>{await openUserCenter();switchUserTab('characters');});await page.getByRole('button',{name:'+ 添加角色',exact:false}).click().catch(()=>page.evaluate(()=>openAddCharacterModal()));
+ await page.locator('#charName').fill('独立角色');await page.locator('#charServer').fill('金色平原');await page.getByRole('button',{name:'保存角色',exact:true}).click();await page.waitForFunction(()=>document.getElementById('characterList').textContent.includes('独立角色'));
+ const chars=await call('/rest/v1/user_characters?user_id=eq.'+user.id);check('无公会手动角色保存',chars.length===1);
+ await page.locator('#personalDisplayCharacter').selectOption(chars[0].id);await page.waitForFunction(()=>!personalDisplayBusy);check('展示选择落库',(await call('/rest/v1/user_characters?user_id=eq.'+user.id))[0].is_displayed);
+ await page.waitForFunction(()=>document.getElementById('characterList').textContent.includes('当前展示：独立角色'));
+ await page.screenshot({path:out+'/personal.png',fullPage:true});await page.evaluate(()=>closeModal('userCenterModal'));
+ await page.goto('http://127.0.0.1:18779/#/house/plan');await page.locator('#dhPpCreate').click();await page.waitForFunction(()=>appData.decorPlans?.length===1);
+ check('无公会新建方案写库',(await call('/rest/v1/decor_plans?user_id=eq.'+user.id)).length===1);
+ page.once('dialog',d=>d.accept('个人方案改名'));await page.locator('#dhPpRename').click();await page.waitForFunction(()=>appData.decorPlan?.name==='个人方案改名');
+ await page.reload();await page.waitForFunction(()=>document.getElementById('dhPpPlanSel')?.textContent.includes('个人方案改名'));check('刷新后方案恢复',true);
+ await page.screenshot({path:out+'/plan.png',fullPage:true});await page.locator('#dhPpCreate').click();await page.waitForFunction(()=>appData.decorPlans?.length===2 && document.getElementById('dhPpPlanSel')?.options.length===2 && !document.getElementById('dhPpDelete')?.disabled);console.log('PASS 第二方案界面就绪');page.once('dialog',d=>d.accept());await page.locator('#dhPpDelete').click();await page.waitForFunction(()=>appData.decorPlans?.length===1);check('无公会删除方案',(await call('/rest/v1/decor_plans?user_id=eq.'+user.id)).length===1);
+ userB=await call('/auth/v1/admin/users','POST',{email:'b-'+email,password,email_confirm:true});
+ await page.evaluate(()=>handleSignOut());
+ await page.getByRole('button',{name:'登录 / 注册',exact:true}).first().click();await page.locator('#authEmail').fill('b-'+email);await page.locator('#authPassword').fill(password);await page.locator('#authLoginBtn').click();await page.waitForFunction(id=>CloudSync.getCachedUser()?.id===id,userB.id);
+ await page.evaluate(()=>{location.hash='#/house/plan';});await page.waitForFunction(()=>document.getElementById('dhPpPlanSel')?.options.length===0);
+ check('同浏览器换号方案不泄漏',!(await page.locator('#page-decor-plan').innerText().catch(()=>page.locator('body').innerText())).includes('个人方案改名'));
+ await page.evaluate(async()=>{await openUserCenter();switchUserTab('characters');});await page.waitForFunction(()=>document.getElementById('characterList').textContent.includes('暂无角色'));check('换号个人角色不泄漏',true);
+ check('原账号个人资产保留',(await call('/rest/v1/decor_plans?user_id=eq.'+user.id)).length===1&&(await call('/rest/v1/user_characters?user_id=eq.'+user.id)).length===1);
+ await page.evaluate(()=>closeModal('userCenterModal'));await page.evaluate(()=>{location.hash='#/house/plan';});await page.locator('#dhPpCreate').click();await page.waitForFunction(()=>appData.decorPlans?.length===1);check('B可独立新建方案',(await call('/rest/v1/decor_plans?user_id=eq.'+userB.id)).length===1);
+ await page.evaluate(()=>handleSignOut());await page.getByRole('button',{name:'登录 / 注册',exact:true}).first().click();await page.locator('#authEmail').fill(email);await page.locator('#authPassword').fill(password);await page.locator('#authLoginBtn').click();await page.waitForFunction(id=>CloudSync.getCachedUser()?.id===id,user.id);await page.evaluate(()=>{location.hash='#/house/plan';});await page.waitForFunction(()=>document.getElementById('dhPpPlanSel')?.textContent.includes('个人方案改名'));check('切回A恢复原方案',true);
+ guildId=crypto.randomUUID();await call('/rest/v1/guilds','POST',{id:guildId,name:'个人边界测试',owner_id:userB.id,invite_code:crypto.randomBytes(4).toString('hex')});await call('/rest/v1/guild_members','POST',[{guild_id:guildId,user_id:user.id,role:'editor'},{guild_id:guildId,user_id:userB.id,role:'owner'}]);
+ await page.evaluate(async id=>{await CloudSync.loadUserGuilds();await CloudSync.selectGuild(id);},guildId);page.on('dialog',d=>d.accept());await page.evaluate(()=>handleLeaveGuild());
+ check('退出最后公会成员关系移除',(await call('/rest/v1/guild_members?user_id=eq.'+user.id)).length===0);check('退出公会个人资产保持',(await call('/rest/v1/decor_plans?user_id=eq.'+user.id)).length===1&&(await call('/rest/v1/user_characters?user_id=eq.'+user.id)).length===1);
+ fs.writeFileSync(out+'/verification.json',JSON.stringify({checks,environment:'real Chrome + isolated Supabase; synthetic public decor catalog'},null,2));
+ }finally{if(browser)await browser.close();if(guildId)await call('/rest/v1/guilds?id=eq.'+guildId,'DELETE');if(user)await call('/auth/v1/admin/users/'+user.id,'DELETE');if(userB)await call('/auth/v1/admin/users/'+userB.id,'DELETE');}
+};

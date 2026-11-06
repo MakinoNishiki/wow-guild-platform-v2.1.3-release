@@ -1,0 +1,11 @@
+{
+  "environment": "real Chrome; full decorData.js and real DOM; synthetic account and network bridge; no database writes",
+  "checks": [
+    "加载时新建和保存禁用",
+    "读取中登出清除加载状态且旧结果不回填",
+    "读取失败保留原两件家具并提供重试",
+    "点击重新加载成功后恢复操作",
+    "旧失败不覆盖较新成功结果"
+  ],
+  "pageErrors": []
+}
