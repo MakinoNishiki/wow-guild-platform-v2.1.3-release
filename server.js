@@ -767,6 +767,9 @@ async function authorizeProxyRequest(user, table, method, queryString, rawBody) 
 
   // ---- user_profiles / user_characters：仅限本人 ----
   if (table === "user_profiles" || table === "user_characters") {
+    // REQ186: manual character edits use RLS + DB trigger; WCL identities only dedicated routes.
+    // Generic service-role proxy must never bypass verified-field protection.
+    if (table === 'user_characters' && ['POST','PATCH','PUT'].includes(method)) return deny('个人角色请使用专用入口保存');
     if ((method === "PATCH" || method === "DELETE") && !filters.user_id && !filters.id) {
       return badRequest("修改或删除用户数据必须提供记录 ID 或用户 ID");
     }

@@ -594,6 +594,7 @@ function switchUserTab(tabName) {
   if (tabName === 'notifications') {
     loadNotifications();
   }
+  if (tabName === 'characters') { loadWclAccount(); loadUserCharacters(); }
   if (tabName === 'claims') {
     loadMyClaims();
   }
@@ -602,7 +603,7 @@ function switchUserTab(tabName) {
 // 任务书 #18 WP2 R2/R3：用户中心「我的认领」——跨公会列出我认领的 raid_members，
 // 逐条展示角色名/职业专精/公会/区服/在队状态并提供解绑；本公会部分附 R2 聚合行。
 async function loadMyClaims() {
-  loadWclAccount();
+  loadWclGuildPanel();
   const listEl = document.getElementById('myClaimsList');
   const sumEl = document.getElementById('myClaimsSummary');
   if (!listEl) return;
@@ -869,49 +870,37 @@ async function saveUserProfile() {
 }
 
 // 加载用户角色列表
+let personalCharacterEpoch=0;
+let personalDisplayBusy=false;
 async function loadUserCharacters() {
-  const container = document.getElementById('characterList');
-  if (!container) return;
-  
+  const container=document.getElementById('characterList');if(!container)return;
+  const uid=CloudSync.getCachedUser()?.id,epoch=++personalCharacterEpoch;
+  const current=()=>uid===CloudSync.getCachedUser()?.id&&epoch===personalCharacterEpoch;
+  container.textContent='正在读取个人角色…';
   try {
-    const characters = await window.CloudSync.getUserCharacters();
-    
-    if (characters.length === 0) {
-      container.innerHTML = '<p class="uc-empty">暂无角色，点击上方按钮添加</p>';
-      return;
-    }
-    
-    const regionLabels = { 'CN': '国服', 'Asia': '亚服', 'US-EU': '欧美服' };
-    const factionLabels = { 'Alliance': '联盟', 'Horde': '部落' };
-    
-    container.innerHTML = characters.map(c => `
-      <div class="uc-character-card">
-        <div class="uc-character-header">
-          <div>
-            <span class="uc-character-name">${c.character_name}</span>
-            <span class="uc-character-server">${c.server_name}</span>
-            <span class="uc-character-region">${regionLabels[c.server_region] || c.server_region}</span>
-          </div>
-        </div>
-        <div class="uc-character-details">
-          ${c.class ? `<div class="uc-character-detail">职业：<span>${c.class}</span></div>` : ''}
-          ${c.spec ? `<div class="uc-character-detail">专精：<span>${c.spec}</span></div>` : ''}
-          ${c.race ? `<div class="uc-character-detail">种族：<span>${c.race}</span></div>` : ''}
-          ${c.faction ? `<div class="uc-character-detail">阵营：<span>${factionLabels[c.faction] || c.faction}</span></div>` : ''}
-          ${c.level ? `<div class="uc-character-detail">等级：<span>${c.level}</span></div>` : ''}
-          ${c.item_level ? `<div class="uc-character-detail">装等：<span>${c.item_level}</span></div>` : ''}
-          ${c.guild_name ? `<div class="uc-character-detail">公会：<span>${c.guild_name}</span></div>` : ''}
-        </div>
-        ${c.armory_url ? `<div class="uc-character-armory"><a href="${c.armory_url}" target="_blank" rel="noopener">查看英雄榜 →</a></div>` : ''}
-        <div class="uc-character-actions">
-          <button class="uc-btn uc-btn-danger" onclick="deleteCharacter('${c.id}')">删除</button>
-        </div>
-      </div>
-    `).join('');
-  } catch (e) {
-    console.error('加载角色列表失败:', e);
-    container.innerHTML = '<p class="uc-empty">加载失败</p>';
-  }
+    const data=await CloudSync.wclAccount('characters');if(!current())return;
+    const characters=data.characters||[],selected=data.displayCharacterId;
+    const labels={verified:'WCL 已验证',review:'待重新验证',revoked:'WCL 已解绑'};
+    container.innerHTML='<div class="personal-display-setting"><label for="personalDisplayCharacter">对外展示角色</label><select class="uc-select" id="personalDisplayCharacter" onchange="savePersonalDisplay(this.value)"><option value="">不展示任何角色（默认）</option>'+characters.map(c=>'<option value="'+wclEscapeHtml(c.id)+'" '+(c.id===selected?'selected':'')+'>'+wclEscapeHtml(c.character_name+' · '+c.server_name)+'</option>').join('')+'</select><p>仅展示所选角色的名称、服务器、地区和职业；其余角色仅自己可见。不影响公会认领。</p></div>'+
+      (characters.length?characters.map(c=>'<div class="uc-character-card"><div class="uc-character-header"><div class="personal-character-title">'+(c.class?classIconHtml(c.class):'')+'<strong>'+wclEscapeHtml(c.character_name)+'</strong><span>'+wclEscapeHtml(c.server_name)+' · '+wclEscapeHtml(c.server_region)+'</span></div></div><div class="uc-character-details"><span>'+wclEscapeHtml(c.class||'职业未填写')+(c.spec?' · '+wclEscapeHtml(c.spec):'')+'</span><span>'+wclEscapeHtml(c.source==='wcl'?(labels[c.wcl_verification]||'待验证'):'手动添加 · 未验证归属')+'</span></div>'+personalCharacterDetails(c)+'<div class="uc-character-actions"><button class="uc-btn uc-btn-danger" onclick="deleteCharacter(\''+wclEscapeHtml(c.id)+'\')">删除</button></div></div>').join(''):'<p class="uc-empty">暂无角色。可关联 WCL 同步，或手动添加。</p>');
+  } catch(e){if(current()){container.textContent='加载个人角色失败：'+e.message;const b=document.createElement('button');b.className='btn btn-secondary';b.textContent='重新加载';b.onclick=loadUserCharacters;container.appendChild(b);}}
+}
+function personalCharacterDetails(c) {
+  const labels={race:'种族',faction:'阵营',level:'等级',item_level:'装等',guild_name:'公会'};
+  let html='<div class="uc-character-details">'+Object.keys(labels).filter(k=>c[k]).map(k=>'<span>'+labels[k]+'：'+wclEscapeHtml(c[k])+'</span>').join('')+'</div>';
+  if(c.armory_url && /^https?:\/\//i.test(c.armory_url))html+='<div class="uc-character-armory"><a href="'+wclEscapeHtml(c.armory_url)+'" target="_blank" rel="noopener">查看英雄榜 →</a></div>';
+  return html;
+}
+async function savePersonalDisplay(characterId) {
+  if(personalDisplayBusy)return;
+  const uid=CloudSync.getCachedUser()?.id;personalDisplayBusy=true;
+  const select=document.getElementById('personalDisplayCharacter');if(select)select.disabled=true;
+  try {
+    // 开发规范1.2.2：服务端验证本人角色后写展示选择，重新读取DB再渲染。
+    await CloudSync.wclAccount('display',{characterId:characterId||null});
+    if(uid===CloudSync.getCachedUser()?.id)showToast(characterId?'展示角色已保存':'已关闭角色展示','success');
+  }catch(e){if(uid===CloudSync.getCachedUser()?.id)showToast(e.message,'error');}
+  finally{personalDisplayBusy=false;if(uid===CloudSync.getCachedUser()?.id)await loadUserCharacters();}
 }
 
 // 打开添加角色模态框
@@ -2132,7 +2121,7 @@ async function handleSignOut() {
 
 // 显示应用视图（登录后）
 function showAppView() {
-  if (typeof wclResultCode !== 'undefined' && wclResultCode) setTimeout(async () => { await openUserCenter(); switchUserTab('claims'); }, 0);
+  if (typeof wclResultCode !== 'undefined' && wclResultCode) setTimeout(async () => { await openUserCenter(); switchUserTab('characters'); }, 0);
   // REQ-141（任务书 #54 WP1）授权行①：会话建立（登录/注册/会话恢复共同落点）写埋点 uid
   window.__wbUid = (window.CloudSync && window.CloudSync.getCachedUser()?.id) || null;
   const authOverlay = document.getElementById('authOverlay');
@@ -8861,6 +8850,10 @@ function lootFillAssignedTo(idOrName) {
 // ==================== 初始化 ====================
 // ==================== 更新日志 ====================
 const changelogData = [
+  {id:'req186-feature',version:'v3.2.0',date:'2026-11-06',type:'feature',typeLabel:'新增功能',title:'同步个人 WCL 角色',summary:'在我的角色关联 WCL，无需加入公会即可保存本人角色。',details:['授权同步与公会认领分开进行。']},
+  {id:'req186-improve',version:'v3.2.0',date:'2026-11-06',type:'improve',typeLabel:'功能优化',title:'自主选择展示角色',summary:'默认不展示角色，可选择一个角色对外展示，也可随时关闭。',details:['其他个人角色仅自己可见。']},
+  {id:'req186-fix',version:'v3.2.0',date:'2026-11-06',type:'fix',typeLabel:'修复BUG',title:'明确角色资料缺失来源',summary:'区分 WCL 资料不完整与公会名单未填写服务器，避免误解。',details:['资料未核对前不会仅凭同名自动认领。']},
+  {id:'req186-refactor',version:'v3.2.0',date:'2026-11-06',type:'refactor',typeLabel:'模块调整',title:'个人角色与团队认领分开管理',summary:'我的认领仅匹配当前公会相关角色，保留原认领规则与历史。',details:['解除 WCL 关联保留个人角色及公会历史，撤销当前验证状态。']},
   {id:'req185-feature',version:'v3.2.0',date:'2026-11-06',type:'feature',typeLabel:'新增功能',title:'关联 WCL 并批量认领角色',summary:'授权后匹配当前公会名单，勾选确认自己的角色。',details:['不会自动添加公会成员。']},
   {id:'req185-improve',version:'v3.2.0',date:'2026-11-06',type:'improve',typeLabel:'功能优化',title:'认领结果逐项展示',summary:'区分可认领、已有归属和资料待核对，失败项可重试。',details:['保留现有职业图标与认领列表。']},
   {id:'req185-fix',version:'v3.2.0',date:'2026-11-06',type:'fix',typeLabel:'修复BUG',title:'认领写入增加冲突保护',summary:'提交时再次核对角色归属，避免覆盖他人的认领。',details:['实际行为由服务端校验。']},
@@ -16235,24 +16228,30 @@ async function loadWclAccount() {
   try {
     const status=await CloudSync.wclAccount('status');
     if(!current())return;
-    el.innerHTML='<div class="wcl-account-heading"><h3>WCL 账号关联</h3><p>'+ (status.link?'已关联：'+wclEscapeHtml(status.link.wcl_user_name):'授权后，可一次匹配当前公会中属于你的角色。')+'</p></div>';
+    el.innerHTML='<div class="wcl-account-heading"><h3>WCL 账号关联</h3><p>'+ (status.link?'已关联：'+wclEscapeHtml(status.link.wcl_user_name):'授权后同步你的个人角色，无需加入公会。角色默认仅自己可见。')+'</p></div>';
     if(wclResultCode) {
       const result=await CloudSync.wclAccount('result?result='+encodeURIComponent(wclResultCode));
       if(!current())return;
       el.innerHTML+='<p class="wcl-account-note">即将关联 '+wclEscapeHtml(result.name)+'，读取到 '+Number(result.characterCount)+' 个角色。确认关联不会自动认领。</p><div class="wcl-account-actions"><button class="btn btn-primary" onclick="wclAccountAction(\'finish\')">确认关联并查看角色</button></div>';
-    } else el.innerHTML+='<div class="wcl-account-actions"><button class="btn btn-primary" onclick="wclAccountAction(\'start\')" '+(!status.configured?'disabled':'')+'>'+(status.link?'重新授权并匹配角色':'关联 WCL')+'</button></div>';
+    } else el.innerHTML+='<div class="wcl-account-actions"><button class="btn btn-primary" onclick="wclAccountAction(\'start\')" '+(!status.configured?'disabled':'')+'>'+(status.link?'重新授权并同步角色':'关联 WCL')+'</button></div>';
     if(status.link)el.querySelector('.wcl-account-actions').insertAdjacentHTML('beforeend','<button class="btn btn-secondary" onclick="wclAccountAction(\'unlink\')">解除 WCL 关联</button>');
     if(!status.configured)el.innerHTML+='<p class="wcl-account-note">账号授权尚未配置，请稍后再试。</p>';
-    if(!CloudSync.getCurrentGuild())el.innerHTML+='<p class="wcl-account-note">加入或选择公会后，才能匹配团队角色。</p>';
-    if(wclClaimPreview)renderWclCandidates();
+    el.innerHTML+='<p class="wcl-account-note">个人角色与公会认领独立。同步不会加入公会，也不会自动认领团队成员。</p>';
   } catch(e) {if(!current())return;el.textContent=e.message;const b=document.createElement('button');b.className='btn btn-secondary';b.textContent='重新加载';b.onclick=loadWclAccount;el.appendChild(b);
     if(wclResultCode){const retry=document.createElement('button');retry.className='btn btn-secondary';retry.textContent='重新授权';retry.onclick=()=>{wclResultCode=null;wclAccountAction('start');};el.appendChild(retry);}
   }
 }
+function loadWclGuildPanel() {
+  const el=document.getElementById('wclGuildPanel');if(!el)return;
+  const uid=CloudSync.getCachedUser()?.id,gid=CloudSync.getCurrentGuild()?.id;
+  if(wclClaimPreview && (wclClaimPreview.userId!==uid || wclClaimPreview.guildId!==gid))wclClaimPreview=null;
+  el.innerHTML='<div class="wcl-account-heading"><h3>匹配当前公会角色</h3><p>仅核对当前公会名单中的角色，其他个人角色不会展示给公会。</p></div>'+(gid?'<div class="wcl-account-actions"><button class="btn btn-primary" onclick="wclAccountAction(\'match\')">匹配我的角色</button><button class="btn btn-secondary" onclick="switchUserTab(\'characters\')">管理个人角色与 WCL</button></div>':'<p class="wcl-account-note">加入或选择公会后，可以匹配团队角色。个人角色仍可在“我的角色”管理。</p>');
+  if(wclClaimPreview)renderWclCandidates();
+}
 function renderWclCandidates() {
-  const el=document.getElementById('wclAccountPanel');if(!el||!wclClaimPreview)return;
+  const el=document.getElementById('wclGuildPanel');if(!el||!wclClaimPreview)return;
   const old=document.getElementById('wclCandidateList');if(old)old.remove();
-  const labels={available:'可认领',owned:'已由你认领',conflict:'已被他人认领',ambiguous:'同名待核对',incomplete:'服务器信息不全',unmatched:'不在当前公会名单',unverified:'归属未验证',duplicate:'重复角色'};
+  const labels={available:'可认领',owned:'已由你认领',conflict:'已被他人认领',ambiguous:'同名待核对',incomplete:'资料待核对',wcl_incomplete:'WCL角色资料不完整',guild_incomplete:'公会名单未填写服务器',unmatched:'不在当前公会名单',unverified:'归属未验证',duplicate:'重复角色'};
   const rows=wclClaimPreview.candidates||[];
   const action=wclClaimPreview.action;
   el.insertAdjacentHTML('beforeend','<div id="wclCandidateList"><p class="wcl-account-note">仅匹配当前公会；不会自动添加成员。'+(action==='forbidden'?'本公会由管理者统一分配认领。':'请勾选需要认领的角色。')+'</p><div class="wcl-candidates">'+rows.map((r,i)=>'<label class="wcl-candidate-row"><input type="checkbox" data-wcl-index="'+i+'" '+(r.status==='available'&&action!=='forbidden'?'':'disabled')+'><span class="wcl-candidate-icon">'+(r.className?classIconHtml(r.className):'')+'</span><span class="wcl-candidate-identity"><strong>'+wclEscapeHtml(r.name)+'</strong><span>'+wclEscapeHtml(r.server)+'</span></span><span class="wcl-candidate-status">'+wclEscapeHtml(r.message||labels[r.status]||r.status)+'</span></label>').join('')+'</div>'+(!rows.length?'<p class="wcl-account-note">没有可匹配的角色。</p>':'')+(action!=='forbidden'&&rows.some(r=>r.status==='available')?'<div class="wcl-account-footer"><button class="btn btn-primary" onclick="wclAccountAction(\'claim\')">'+(action==='request'?'提交所选认领申请':'确认认领所选角色')+'</button></div>':'')+'</div>');
@@ -16263,18 +16262,19 @@ async function wclAccountAction(action) {
   if(action==='unlink'&&!confirm('解除 WCL 关联？已认领角色和历史记录将保留。'))return;
   let memberIds=[];
   if(action==='claim') {
-    if(guildId!==wclClaimPreview?.guildId){showToast('公会已切换，请重新授权匹配','error');return;}
+    if(guildId!==wclClaimPreview?.guildId){showToast('公会已切换，请重新匹配','error');return;}
     memberIds=Array.from(document.querySelectorAll('[data-wcl-index]:checked')).map(e=>wclClaimPreview.candidates[Number(e.dataset.wclIndex)].memberId);
     if(!memberIds.length){showToast('请先选择角色','warning');return;}
   }
   wclAccountBusy=true;
-  document.querySelectorAll('#wclAccountPanel button').forEach(b=>b.disabled=true);
+  document.querySelectorAll('#wclAccountPanel button, #wclGuildPanel button').forEach(b=>b.disabled=true);
   try {
     // Development rules 1.2.2: one server-validated batch, then one reload; no local optimistic claims.
-    const data=await CloudSync.wclAccount(action,action==='finish'?{result:wclResultCode,guildId}:action==='claim'?{guildId,evidence:wclClaimPreview.evidence,memberIds}:{});
-    if(CloudSync.getCachedUser()?.id!==me || CloudSync.getCurrentGuild()?.id!==guildId)return;
+    const data=await CloudSync.wclAccount(action,action==='finish'?{result:wclResultCode}:action==='match'?{guildId}:action==='claim'?{guildId,evidence:wclClaimPreview.evidence,memberIds}:{});
+    if(CloudSync.getCachedUser()?.id!==me || (['match','claim'].includes(action)&&CloudSync.getCurrentGuild()?.id!==guildId))return;
     if(action==='start'){location.assign(data.url);return;}
-    if(action==='finish'){wclResultCode=null;wclClaimPreview={...data,guildId,userId:me};}
+    if(action==='finish'){wclResultCode=null;wclClaimPreview=null;showToast('已关联 WCL 并同步个人角色','success');}
+    if(action==='match')wclClaimPreview={...data,guildId,userId:me};
     if(action==='unlink'){wclClaimPreview=null;wclResultCode=null;}
     if(action==='claim') {
       for(const result of data.results||[]){const row=wclClaimPreview.candidates.find(r=>r.memberId===result.id);if(row){row.status=['claimed','owned'].includes(result.status)?'owned':result.status==='requested'?'requested':'available';row.message=result.message||(result.status==='requested'?'已提交审核':result.status==='claimed'?'认领成功':result.status==='failed'?'失败，可重试':'已由你认领');}}
@@ -16283,8 +16283,8 @@ async function wclAccountAction(action) {
       showToast(failed?'部分角色未完成，请查看原因并重试':'处理完成，请查看逐项结果',failed?'warning':'success');
     }
   }catch(e){if(CloudSync.getCachedUser()?.id===me && CloudSync.getCurrentGuild()?.id===guildId)showToast(e.message,'error');}
-  finally{wclAccountBusy=false;if(CloudSync.getCachedUser()?.id===me)loadMyClaims();}
+  finally{wclAccountBusy=false;if(CloudSync.getCachedUser()?.id===me){loadWclAccount();loadUserCharacters();loadMyClaims();}}
 }
 // Claims checkboxes live inside the existing user-center modal.
 const wclOriginalUserDirty = modalDirtyChecks.userCenterModal;
-modalDirtyChecks.userCenterModal=()=>wclAccountBusy||!!document.querySelector('[data-wcl-index]:checked')||wclOriginalUserDirty();
+modalDirtyChecks.userCenterModal=()=>wclAccountBusy||personalDisplayBusy||!!document.querySelector('[data-wcl-index]:checked')||wclOriginalUserDirty();

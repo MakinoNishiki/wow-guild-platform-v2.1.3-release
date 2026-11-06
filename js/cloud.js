@@ -1964,7 +1964,7 @@
     wclAccount: async function(action, body) {
       const token = await getAccessToken();
       if (!token) throw new Error('请先登录');
-      const read = action === 'status' || action.startsWith('result?');
+      const read = action === 'status' || action === 'characters' || action.startsWith('result?');
       const response = await fetch('/api/wcl/user/' + action, {method:read?'GET':'POST', headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'}, ...(read?{}:{body:JSON.stringify(body||{})})});
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || data.message || 'WCL 操作失败');
