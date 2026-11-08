@@ -1,0 +1,16 @@
+{
+  "checks": [
+    "无公会登录进入主站",
+    "保存失败表单保留",
+    "保存失败输入保留",
+    "保存失败未入库",
+    "重试保存单行且防重复",
+    "手动角色标未验证",
+    "同服同名不再写入",
+    "删除说明明确个人与团队边界",
+    "删除失败角色仍在",
+    "删除失败界面仍在",
+    "删除重试成功且防重复"
+  ],
+  "environment": "real Chrome + isolated Supabase; deliberate POST/DELETE failure injection"
+}

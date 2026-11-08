@@ -1152,7 +1152,18 @@ function parseArmoryUrl(url) {
 }
 
 // 保存角色
+let personalCharacterSaving = false;
+let personalCharacterSaveOwner = null;
+const personalCharacterDeleting = new Set();
 async function saveCharacter() {
+  const ownerId = CloudSync.getCachedUser()?.id;
+  if (personalCharacterSaving && personalCharacterSaveOwner === ownerId) return;
+  if (!ownerId) { showToast('请先登录后管理个人角色', 'warning'); return; }
+  const current = () => CloudSync.getCachedUser()?.id === ownerId;
+  personalCharacterSaving = true; personalCharacterSaveOwner = ownerId;
+  const button = document.querySelector('#addCharacterModal [onclick="saveCharacter()"]');
+  if (button) { button.disabled = true; button.textContent = '保存中…'; }
+  try {
   const characterData = {
     character_name: document.getElementById('charName').value.trim(),
     server_name: document.getElementById('charServer').value.trim(),
@@ -1188,24 +1199,34 @@ async function saveCharacter() {
   }
 
   try {
+    if (!current()) return;
     await window.CloudSync.saveUserCharacter(characterData);
+    if (!current()) return;
     closeModal('addCharacterModal');
     await loadUserCharacters();
   } catch (e) {
-    alert('保存失败：' + e.message);
+    if (current()) showToast('保存失败：' + e.message, 'error');
+  }
+  } finally {
+    if (personalCharacterSaveOwner === ownerId) { personalCharacterSaving = false; personalCharacterSaveOwner = null; }
+    if (current() && button) { button.disabled = false; button.textContent = '保存角色'; }
   }
 }
 
 // 删除角色
 async function deleteCharacter(characterId) {
-  if (!confirm('确定要删除这个角色吗？')) return;
-  
+  const ownerId = CloudSync.getCachedUser()?.id;
+  if (!ownerId) { showToast('请先登录后管理个人角色', 'warning'); return; }
+  const key = ownerId + ':' + characterId;
+  if (personalCharacterDeleting.has(key)) return;
+  if (!confirm('仅从你的个人角色列表移除该角色，不会解除公会认领，也不会删除团队考勤或装备记录。确定移除吗？')) return;
+  personalCharacterDeleting.add(key);
   try {
     await window.CloudSync.deleteUserCharacter(characterId);
-    await loadUserCharacters();
+    if (CloudSync.getCachedUser()?.id === ownerId) await loadUserCharacters();
   } catch (e) {
-    alert('删除失败：' + e.message);
-  }
+    if (CloudSync.getCachedUser()?.id === ownerId) showToast('删除失败：' + e.message, 'error');
+  } finally { personalCharacterDeleting.delete(key); }
 }
 
 // 加载通知列表
@@ -8859,6 +8880,11 @@ function lootFillAssignedTo(idOrName) {
 // ==================== 初始化 ====================
 // ==================== 更新日志 ====================
 const changelogData = [
+  {id:'req188-feature',version:'v3.2.0',date:'2026-11-09',type:'feature',typeLabel:'新增功能',title:'个人角色管理范围说明',summary:'删除角色前明确个人列表与团队记录的区别。',details:['仅移除个人角色，不解除公会认领。']},
+  {id:'req188-improve',version:'v3.2.0',date:'2026-11-09',type:'improve',typeLabel:'功能优化',title:'角色操作反馈更清楚',summary:'保存中显示进度并防止重复操作，失败可保留输入重试。',details:[]},
+  {id:'req188-fix',version:'v3.2.0',date:'2026-11-09',type:'fix',typeLabel:'修复BUG',title:'修复角色保存和删除失败提示',summary:'云端失败不再被当作正常完成，使用站内提示说明错误。',details:[]},
+  {id:'req188-refactor',version:'v3.2.0',date:'2026-11-09',type:'refactor',typeLabel:'模块调整',title:'个人角色操作账号隔离',summary:'账号切换后旧操作结果不会关闭新账号的角色弹窗。',details:[]},
+
   {id:'req187-feature',version:'v3.2.0',date:'2026-11-07',type:'feature',typeLabel:'新增功能',title:'个人角色展示预览',summary:'选择展示角色后可直接核对当前展示内容。',details:['个人主页尚未开放，其他角色仍仅自己可见。']},
   {id:'req187-improve',version:'v3.2.0',date:'2026-11-07',type:'improve',typeLabel:'功能优化',title:'明确角色同步状态',summary:'区分账号已关联与角色已保存，空列表提供重新授权指引。',details:['同步反馈显示已验证角色数量。']},
   {id:'req187-fix',version:'v3.2.0',date:'2026-11-07',type:'fix',typeLabel:'修复BUG',title:'个人方案不再依赖公会',summary:'未加入公会也能保存和读取家宅方案，当前方案按个人账号分别记忆。',details:['隔离换号时迟到的方案读取结果。']},

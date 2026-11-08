@@ -1732,7 +1732,8 @@
 
   // 保存用户角色
   async function saveUserCharacter(characterData) {
-    if (!isCloudMode || !currentUser) return null;
+    if (!supabaseClient || !currentUser) throw new Error('请先登录后管理个人角色');
+    const ownerId = currentUser.id;
     try {
       // BUG-011 修复：upsert 不带 id 时主键永远新生成，会产生重复行。
       // 未指定 id 时先按 (user_id, server_name, character_name) 查已有行，复用其 id 做真正的更新。
@@ -1741,17 +1742,18 @@
         const { data: existing, error: queryError } = await supabaseClient
           .from('user_characters')
           .select('id')
-          .eq('user_id', currentUser.id)
+          .eq('user_id', ownerId)
           .eq('server_name', characterData.server_name || '')
           .eq('character_name', characterData.character_name || '')
           .maybeSingle();
         if (queryError) throw queryError;
         if (existing) rowId = existing.id;
       }
+      if (currentUser?.id !== ownerId) throw new Error('账号已切换，请重新操作');
       const { data, error } = await supabaseClient
         .from('user_characters')
         .upsert({
-          user_id: currentUser.id,
+          user_id: ownerId,
           ...characterData,
           id: rowId || undefined,
           updated_at: new Date().toISOString()
@@ -1762,24 +1764,25 @@
       return data;
     } catch (e) {
       console.error('保存用户角色失败:', e);
-      return null;
+      throw e;
     }
   }
 
   // 删除用户角色
   async function deleteUserCharacter(characterId) {
-    if (!isCloudMode || !currentUser) return false;
+    if (!supabaseClient || !currentUser) throw new Error('请先登录后管理个人角色');
+    const ownerId = currentUser.id;
     try {
       const { error } = await supabaseClient
         .from('user_characters')
         .delete()
         .eq('id', characterId)
-        .eq('user_id', currentUser.id);
+        .eq('user_id', ownerId);
       if (error) throw error;
       return true;
     } catch (e) {
       console.error('删除用户角色失败:', e);
-      return false;
+      throw e;
     }
   }
 
