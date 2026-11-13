@@ -1,0 +1,62 @@
+[
+  {
+    "name": "modern API records actual linked item level",
+    "ok": true
+  },
+  {
+    "name": "legacy API fallback",
+    "ok": true
+  },
+  {
+    "name": "cold cache retries with original context",
+    "ok": true
+  },
+  {
+    "name": "cold cache timeout is visible and bounded",
+    "ok": true
+  },
+  {
+    "name": "no item API warns without crashing",
+    "ok": true
+  },
+  {
+    "name": "outside raid and uncommon items excluded",
+    "ok": true
+  },
+  {
+    "name": "dead target is not a boss evidence",
+    "ok": true
+  },
+  {
+    "name": "zone change clears boss context",
+    "ok": true
+  },
+  {
+    "name": "duplicate loot callback suppressed",
+    "ok": true
+  },
+  {
+    "name": "cold duplicate suppressed",
+    "ok": true
+  },
+  {
+    "name": "clear cancels pending retry",
+    "ok": true
+  },
+  {
+    "name": "export waits for pending item data",
+    "ok": true
+  },
+  {
+    "name": "expired boss window is empty",
+    "ok": true
+  },
+  {
+    "name": "consumables excluded",
+    "ok": true
+  },
+  {
+    "name": "saved historical rows retained",
+    "ok": true
+  }
+]

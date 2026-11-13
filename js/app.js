@@ -1434,7 +1434,8 @@ function cloudCrudSentinelCheck(dataType, operation, payload) {
   const coll = dataType === 'members' ? appData.members
     : dataType === 'loots' ? appData.loots
     : (dataType === 'wishlist' || dataType === 'wishlists') ? appData.wishlist
-    : dataType === 'activities' ? appData.activities : null;
+    : dataType === 'activities' ? appData.activities
+    : dataType === 'lootDrops' ? appData.lootDrops : null;
   if (!Array.isArray(coll)) return true;
   const id = payload && payload.id;
   if (!id) return true;
@@ -7020,6 +7021,33 @@ function tierSetReset(scope) {
 let lootViewMode = 'assign';      // 'assign' 分配记录 | 'drops' 拾取记录（会话内记忆，不落盘）
 let lootDropsLoadedFor = null;    // 懒加载锚：已加载的公会 id（切公会/导入成功后重置）
 let lootDropsLoadError = '';      // 加载失败原因（门禁/网络），渲染层据此给中文提示
+const lootDropDeleting = new Set(); // BUG-119：每条删除在回读完成前不重复提交
+
+async function lootDropDelete(id) {
+  const cloud = window.CloudSync;
+  const guildId = cloud.getCurrentGuild()?.id;
+  const userId = cloud.getCachedUser()?.id;
+  if (!guildId || !cloud.canEdit()) { showToast('仅公会管理者可删除拾取记录', 'error'); return; }
+  if (lootDropDeleting.has(id)) return;
+  const row = (appData.lootDrops || []).find(r => r.id === id && r.guild_id === guildId);
+  if (!row) { showToast('记录不存在或已更新，请刷新列表', 'warning'); return; }
+  if (!confirm(`删除这条拾取记录？\n装备：${row.item_name}\n拾取人：${row.player_name}\n时间：${new Date(row.timestamp).toLocaleString('zh-CN')}\n\n仅删除这条拾取流水，不会删除分配记录、考勤或游戏内装备。原导出文本再次导入仍可能恢复该记录。`)) return;
+  const sameContext = () => cloud.getCurrentGuild()?.id === guildId && cloud.getCachedUser()?.id === userId;
+  if (!sameContext() || !cloud.canEdit()) return;
+  lootDropDeleting.add(id);
+  lootDropsRenderTable();
+  try {
+    await cloudCrud('lootDrops', 'delete', { id }, { silentError: true });
+    if (!sameContext()) return;
+    if ((appData.lootDrops || []).some(r => r.id === id)) throw new Error('回读仍存在该记录，请刷新核对后重试');
+    showToast('拾取记录已删除', 'success');
+  } catch (e) {
+    if (sameContext()) showToast('删除结果未确认：' + (e.message || '请刷新核对后重试'), 'error');
+  } finally {
+    lootDropDeleting.delete(id);
+    if (sameContext()) lootDropsRenderTable();
+  }
+}
 
 // 本区块局部转义器（拾取记录字段来自插件/外部 JSON，不走 app.js 历史裸插口径）
 const dropEsc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -7058,7 +7086,7 @@ function lootDropsRender() {
   const tbody = document.getElementById('lootDropsTableBody');
   if (!tbody) return;
   if (lootDropsLoadedFor !== ((window.CloudSync.getCurrentGuild() || {}).id) && !lootDropsLoadError) {
-    tbody.innerHTML = '<tr><td colspan="8"><div class="empty-state"><div class="empty-text">拾取记录加载中...</div></div></td></tr>';
+    tbody.innerHTML = '<tr><td colspan="9"><div class="empty-state"><div class="empty-text">拾取记录加载中...</div></div></td></tr>';
     lootDropsEnsureLoaded().then(() => lootDropsRenderTable());
     return;
   }
@@ -7070,7 +7098,7 @@ function lootDropsRenderTable() {
   if (!tbody) return;
   if (lootDropsLoadError) {
     // 迁移门禁/加载失败：中文提示 + 重试入口，不白屏
-    tbody.innerHTML = `<tr><td colspan="8"><div class="empty-state"><div class="empty-icon">⚠️</div><div class="empty-text">${dropEsc(lootDropsLoadError)}</div><button class="btn btn-secondary" onclick="lootDropsRender()">重试</button></div></td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="9"><div class="empty-state"><div class="empty-icon">⚠️</div><div class="empty-text">${dropEsc(lootDropsLoadError)}</div><button class="btn btn-secondary" onclick="lootDropsRender()">重试</button></div></td></tr>`;
     return;
   }
   // 副本筛选项动态构建（数据驱动，保留当前选择）
@@ -7092,11 +7120,11 @@ function lootDropsRenderTable() {
 
   if (!(appData.lootDrops || []).length) {
     // §4.9 空态：文案 + 引导动作（导入钮 viewer 由 edit-only 门控）
-    tbody.innerHTML = `<tr><td colspan="8"><div class="empty-state"><div class="empty-icon">🎁</div><div class="empty-text">暂无拾取记录，用插件 WoWButlerCollector 采集后点击「导入拾取」入库</div><button class="btn btn-primary edit-only" onclick="lootDropImportOpen()">📥 导入拾取</button></div></td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="9"><div class="empty-state"><div class="empty-icon">🎁</div><div class="empty-text">暂无拾取记录，用插件 WoWButlerCollector 采集后点击「导入拾取」入库</div><button class="btn btn-primary edit-only" onclick="lootDropImportOpen()">📥 导入拾取</button></div></td></tr>`;
     return;
   }
   if (!rows.length) {
-    tbody.innerHTML = '<tr><td colspan="8"><div class="empty-state"><div class="empty-text">当前筛选无匹配的拾取记录</div></div></td></tr>';
+    tbody.innerHTML = '<tr><td colspan="9"><div class="empty-state"><div class="empty-text">当前筛选无匹配的拾取记录</div></div></td></tr>';
     return;
   }
   const fmtTs = ts => {
@@ -7118,8 +7146,12 @@ function lootDropsRenderTable() {
       <td class="center">${dropEsc(d.difficulty || '—')}</td>
       <td>${dropEsc(d.boss_name || '—')}</td>
       <td>${dropEsc(d.instance_name || '—')}</td>
+      <td class="center edit-only"><button type="button" class="btn btn-danger btn-sm" data-drop-delete="${dropEsc(d.id)}" ${lootDropDeleting.has(d.id) ? 'disabled' : ''}>${lootDropDeleting.has(d.id) ? '删除中…' : '删除'}</button></td>
     </tr>`;
   }).join('');
+  tbody.querySelectorAll('[data-drop-delete]').forEach(button => {
+    button.addEventListener('click', () => lootDropDelete(button.dataset.dropDelete));
+  });
 }
 
 // ---- 导入弹窗 ----
@@ -8880,6 +8912,10 @@ function lootFillAssignedTo(idOrName) {
 // ==================== 初始化 ====================
 // ==================== 更新日志 ====================
 const changelogData = [
+  {id:'req189-delete-feature',version:'v3.2.0',date:'2026-11-13',type:'feature',typeLabel:'新增功能',title:'删除误录的拾取记录',summary:'管理者可在拾取记录中删除单条误录，操作前确认装备和拾取人。',details:[]},
+  {id:'req189-delete-improve',version:'v3.2.0',date:'2026-11-13',type:'improve',typeLabel:'功能优化',title:'明确拾取删除状态',summary:'删除中禁用重复操作，失败提示核对后重试。',details:[]},
+  {id:'req189-delete-fix',version:'v3.2.0',date:'2026-11-13',type:'fix',typeLabel:'修复BUG',title:'补齐拾取误录撤回入口',summary:'修复拾取记录导入后无法从页面删除的问题。',details:[]},
+  {id:'req189-delete-refactor',version:'v3.2.0',date:'2026-11-13',type:'refactor',typeLabel:'模块调整',title:'拾取流水独立维护',summary:'删除拾取流水不影响装备分配、考勤或游戏内装备；自动转分配仍在后续计划中。',details:[]},
   {id:'req188-feature',version:'v3.2.0',date:'2026-11-09',type:'feature',typeLabel:'新增功能',title:'个人角色管理范围说明',summary:'删除角色前明确个人列表与团队记录的区别。',details:['仅移除个人角色，不解除公会认领。']},
   {id:'req188-improve',version:'v3.2.0',date:'2026-11-09',type:'improve',typeLabel:'功能优化',title:'角色操作反馈更清楚',summary:'保存中显示进度并防止重复操作，失败可保留输入重试。',details:[]},
   {id:'req188-fix',version:'v3.2.0',date:'2026-11-09',type:'fix',typeLabel:'修复BUG',title:'修复角色保存和删除失败提示',summary:'云端失败不再被当作正常完成，使用站内提示说明错误。',details:[]},

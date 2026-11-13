@@ -1,0 +1,6 @@
+{
+  "source": "https://raw.githubusercontent.com/Gethe/wow-ui-source/live/Interface/AddOns/Blizzard_FrameXMLUtil/Mainline/DifficultyUtil_Base.lua",
+  "sha256": "f4f328cb638d0e44bab091d269d30c2dc38031c00256b7ee6c4b629ac11b2bb5",
+  "note": "Blizzard UI source mirror live branch, does not replace installed client verification",
+  "idsExcerpt": "DifficultyUtil = {};\n\nDifficultyUtil.ID = {\n\tDungeonNormal = 1,\n\tDungeonHeroic = 2,\n\tRaid10Normal = 3,\n\tRaid25Normal = 4,\n\tRaid10Heroic = 5,\n\tRaid25Heroic = 6,\n\tRaidLFR = 7,\n\tDungeonChallenge = 8,\n\tRaid40 = 9,\n\tPrimaryRaidNormal = 14,\n\tPrimaryRaidHeroic = 15,\n\tPrimaryRaidMythic = 16,\n\tPrimaryRaidLFR = 17,\n\tDungeonMythic = 23,\n\tDungeonTimewalker = 24,\n\tRaidTimewalker = 33,\n\tRaidStory = 220,\n\tRaidMythicFlexible = 233,\n\tRaidWorld = 250,\n};"
+}

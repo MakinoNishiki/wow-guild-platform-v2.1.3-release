@@ -1,0 +1,56 @@
+{
+  "environment": "Lua5.1 actual core; synthetic API/chat fixtures, not live game",
+  "fixtureNote": "Not original chat event; screenshots lack original itemLink. API values318/305 used only as test values.",
+  "results": [
+    {
+      "name": "named color preserves full link and actual level",
+      "ok": false,
+      "error": "[string \"<python>\"]:1: assertion failed!\nstack traceback:\n\t[string \"<python>\"]:1: in main chunk\n\t[C]: in function 'assert'"
+    },
+    {
+      "name": "warbound until equipped excluded",
+      "ok": false,
+      "error": "[string \"<python>\"]:1: assertion failed!\nstack traceback:\n\t[string \"<python>\"]:1: in main chunk\n\t[C]: in function 'assert'"
+    },
+    {
+      "name": "account bound excluded",
+      "ok": false,
+      "error": "[string \"<python>\"]:1: assertion failed!\nstack traceback:\n\t[string \"<python>\"]:1: in main chunk\n\t[C]: in function 'assert'"
+    },
+    {
+      "name": "tooltip actual level wins over base API value",
+      "ok": false,
+      "error": "[string \"<python>\"]:1: assertion failed!\nstack traceback:\n\t[string \"<python>\"]:1: in main chunk\n\t[C]: in function 'assert'"
+    },
+    {
+      "name": "no actual level must not export base level",
+      "ok": false,
+      "error": "[string \"<python>\"]:1: assertion failed!\nstack traceback:\n\t[string \"<python>\"]:1: in main chunk\n\t[C]: in function 'assert'"
+    },
+    {
+      "name": "API exceptions retain review record without crashing",
+      "ok": false,
+      "error": "[string \"<python>\"]:1: unavailable\nstack traceback:\n\t[string \"<python>\"]:1: in main chunk\n\t[string \"<python>\"]:29: in function 'loot'\n\t[string \"<python>\"]:237: in function 'handler'\n\t[string \"<python>\"]:179: in function 'recordLoot'\n\t[string \"<python>\"]:159: in function 'attempt'\n\t[string \"<python>\"]:1: in function 'getLevel'\n\t[C]: in function 'error'"
+    },
+    {
+      "name": "unknown binding held for review",
+      "ok": false,
+      "error": "[string \"<python>\"]:1: assertion failed!\nstack traceback:\n\t[string \"<python>\"]:1: in main chunk\n\t[C]: in function 'assert'"
+    },
+    {
+      "name": "tooltip warbound excludes even when API says false",
+      "ok": false,
+      "error": "[string \"<python>\"]:1: assertion failed!\nstack traceback:\n\t[string \"<python>\"]:1: in main chunk\n\t[C]: in function 'assert'"
+    },
+    {
+      "name": "same ID ordinary drop retained while warbound variant excluded",
+      "ok": false,
+      "error": "[string \"<python>\"]:1: assertion failed!\nstack traceback:\n\t[string \"<python>\"]:1: in main chunk\n\t[C]: in function 'assert'"
+    },
+    {
+      "name": "cold tooltip retries then reads actual level",
+      "ok": false,
+      "error": "[string \"<python>\"]:1: assertion failed!\nstack traceback:\n\t[string \"<python>\"]:1: in main chunk\n\t[C]: in function 'assert'"
+    }
+  ]
+}

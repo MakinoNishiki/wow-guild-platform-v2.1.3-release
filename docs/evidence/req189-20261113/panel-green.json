@@ -1,0 +1,102 @@
+{
+  "environment": "Lua 5.1; simulated game controls/events, no visual or live game validation",
+  "version": "1.0.4",
+  "results": [
+    {
+      "name": "login registers one settings panel and default-enabled launcher",
+      "ok": true
+    },
+    {
+      "name": "minimap and slash open the same registered page",
+      "ok": true
+    },
+    {
+      "name": "empty state blocks button and legacy export",
+      "ok": true
+    },
+    {
+      "name": "pause blocks new events and resume captures again",
+      "ok": true
+    },
+    {
+      "name": "saved paused/hidden settings and history survive initialization",
+      "ok": true
+    },
+    {
+      "name": "pending visible; disabling capture does not discard accepted event",
+      "ok": true
+    },
+    {
+      "name": "failed item leaves persistent panel diagnostic",
+      "ok": true
+    },
+    {
+      "name": "zone status refreshes without re-opening",
+      "ok": true
+    },
+    {
+      "name": "LFR and unsupported status are not shown as ready",
+      "ok": true
+    },
+    {
+      "name": "normal heroic mythic status and recent record have correct labels",
+      "ok": true
+    },
+    {
+      "name": "export real JSON handles control characters",
+      "ok": true
+    },
+    {
+      "name": "five variant events export four ordinary drops with linked levels",
+      "ok": true
+    },
+    {
+      "name": "export reuses frame and supports reselect/escape",
+      "ok": true
+    },
+    {
+      "name": "clear is confirmation-only and preserves configuration",
+      "ok": true
+    },
+    {
+      "name": "clear cancels queued item and refreshes disabled states",
+      "ok": true
+    },
+    {
+      "name": "hidden launcher retains settings entry and can be restored",
+      "ok": true
+    },
+    {
+      "name": "combat blocks settings opening but not capture",
+      "ok": true
+    },
+    {
+      "name": "missing settings API degrades to legacy commands",
+      "ok": true
+    },
+    {
+      "name": "legacy checkbutton label global works",
+      "ok": true
+    },
+    {
+      "name": "launcher drag retains bounded placement",
+      "ok": true
+    },
+    {
+      "name": "legacy rows remain visible but cannot be exported",
+      "ok": true
+    },
+    {
+      "name": "mixed old and new exports verified rows only",
+      "ok": true
+    },
+    {
+      "name": "missing actual level is visible and blocks export",
+      "ok": true
+    },
+    {
+      "name": "export includes capacity-sized dataset without truncating JSON",
+      "ok": true
+    }
+  ]
+}

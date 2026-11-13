@@ -61,7 +61,7 @@ const root = path.resolve(__dirname, '..');
   const server = require(path.join(temp, 'server.js')).startServer();
   try {
     await new Promise(resolve => server.listening ? resolve() : server.once('listening', resolve));
-    const suite = {req188:'./verify-req188-real.cjs',personalEntry:'./verify-personal-entry-real.cjs',req182:'./verify-req182-real.cjs', req183:'./verify-req183-real.cjs',req185:'./verify-req185-real.cjs',req186:'./verify-req186-real.cjs',req187:'./verify-req187-real.cjs'}[process.argv[2]] || './verify-req180-real.cjs';
+    const suite = {req189:'./verify-req189-delete-real.cjs',req188:'./verify-req188-real.cjs',personalEntry:'./verify-personal-entry-real.cjs',req182:'./verify-req182-real.cjs', req183:'./verify-req183-real.cjs',req185:'./verify-req185-real.cjs',req186:'./verify-req186-real.cjs',req187:'./verify-req187-real.cjs'}[process.argv[2]] || './verify-req180-real.cjs';
     await require(suite)(config);
   } finally {
     await new Promise(resolve => server.close(resolve));

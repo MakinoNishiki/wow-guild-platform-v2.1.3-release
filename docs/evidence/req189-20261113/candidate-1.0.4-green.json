@@ -1,0 +1,46 @@
+{
+  "environment": "Lua5.1 actual core; synthetic API/chat fixtures, not live game",
+  "fixtureNote": "Not original chat event; screenshots lack original itemLink. API values318/305 used only as test values.",
+  "results": [
+    {
+      "name": "named color preserves full link and actual level",
+      "ok": true
+    },
+    {
+      "name": "warbound until equipped excluded",
+      "ok": true
+    },
+    {
+      "name": "account bound excluded",
+      "ok": true
+    },
+    {
+      "name": "tooltip actual level wins over base API value",
+      "ok": true
+    },
+    {
+      "name": "no actual level must not export base level",
+      "ok": true
+    },
+    {
+      "name": "API exceptions retain review record without crashing",
+      "ok": true
+    },
+    {
+      "name": "unknown binding held for review",
+      "ok": true
+    },
+    {
+      "name": "tooltip warbound excludes even when API says false",
+      "ok": true
+    },
+    {
+      "name": "same ID ordinary drop retained while warbound variant excluded",
+      "ok": true
+    },
+    {
+      "name": "cold tooltip retries then reads actual level",
+      "ok": true
+    }
+  ]
+}

@@ -40,14 +40,14 @@ check('A3a 事件监听：CHAT_MSG_LOOT + ENCOUNTER_END + PLAYER_LOGIN 三注册
 check('A3b locale-safe 聊天解析：用客户端全局串 LOOT_ITEM_SELF/LOOT_ITEM（不硬编码中文句式）',
   /LOOT_ITEM_SELF/.test(core) && /LOOT_ITEM_MULTIPLE/.test(core) && /fmtToPattern/.test(core), '');
 check('A3c 过滤：品质 ≥4 + classID 数字排除表（0/5/7/12，客户端语言无关）',
-  /quality < 4 then return/.test(core) && /EXCLUDE_CLASS = \{ \[0\] = true, \[5\] = true, \[7\] = true, \[12\] = true \}/.test(core), '');
+  /quality < 4 or EXCLUDE_CLASS\[classID\] then/.test(core) && /EXCLUDE_CLASS = \{ \[0\] = true, \[5\] = true, \[7\] = true, \[12\] = true \}/.test(core), '');
 check('A3d iconID 数字口径（GetItemInfo 第 10 返回值，与 Exporter REQ-092 同口径；无字符串 icon_name 伪字段）',
   /iconID = iconID/.test(core) && !/iconName/.test(core), '');
 check('A3e 首领归属 180s 窗 + 容量护栏 2000 + 去重防抖 2s',
   /BOSS_WINDOW_SEC = 180/.test(core) && /MAX_ENTRIES = 2000/.test(core) &&
   /lastLoot\.itemID == itemID and lastLoot\.looter == looter/.test(core), '');
 check('A3f 斜杠命令 /wbc（export 弹窗直出 + clear StaticPopup 二次确认）',
-  /SLASH_WBC1 = "\/wbc"/.test(core) && /showExportFrame\(JSONEncode\(WoWButlerCollectorDB\)\)/.test(core) &&
+  /SLASH_WBC1 = "\/wbc"/.test(core) && /showExportFrame\(JSONEncode\(rows\)\)/.test(core) &&
   /StaticPopup_Show\("WBC_CLEAR_CONFIRM"\)/.test(core) && /wipe\(WoWButlerCollectorDB\)/.test(core), '');
 
 // A4 #75-补丁1 锚点
@@ -56,8 +56,10 @@ check('A4a 插件内零依赖 JSON 编码器（字符串转义 + 数字直出 + 
   /if val then/.test(core), '');
 check('A4b 团本过滤：instanceType ~= "raid" 即弃（party=大秘境/地下城、none=世界BOSS/野外全排除）',
   /instanceType ~= "raid" then return/.test(core), '');
-check('A4c 难度中文名：GetDifficultyInfo 优先 + GetInstanceInfo 难度名回退 + 「未知」兜底',
-  /GetDifficultyInfo\(difficultyID\)\) or difficultyName or "未知"/.test(core) &&
+// REQ-189 运营更新范围：只允许普通/英雄/史诗；未知与随机难度不再走名称回退。
+check('A4c 难度ID白名单 + 中文难度与原始ID保留（行为另由Lua测试覆盖）',
+  /local difficulty = RAID_DIFFICULTY\[difficultyID\]/.test(core) &&
+  /if not RAID_DIFFICULTY\[difficultyID\] then return end/.test(core) && /difficultyID = difficultyID,/.test(core) &&
   /difficulty = difficulty,/.test(core), '');
 check('A4d 导出弹窗：BasicFrameTemplateWithInset + 多行 EditBox + 先聚焦再高亮 + ESC 关闭 + 框架复用',
   /BasicFrameTemplateWithInset/.test(core) && /SetMultiLine\(true\)/.test(core) &&

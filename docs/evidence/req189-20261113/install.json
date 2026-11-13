@@ -1,0 +1,40 @@
+{
+  "version": "1.0.4",
+  "target": "C:\\Azeroth\\World of Warcraft\\_retail_\\Interface\\AddOns\\WoWButlerCollector",
+  "backup": "C:\\Users\\56424\\AppData\\Local\\WoWButlerBackups\\collector-item-details-20261113-214059",
+  "files": [
+    {
+      "file": "core.lua",
+      "sha256": "1f1335dfc9043839a7d9eeed33a01c3dbb947232a1043f7c45c1c2522a84f25d",
+      "installedMatch": true
+    },
+    {
+      "file": "ui.lua",
+      "sha256": "a96412c3e36f805a9dcee201a178f9c9be284f2e050efc20fb044e2e38d330db",
+      "installedMatch": true
+    },
+    {
+      "file": "WoWButlerCollector.toc",
+      "sha256": "a2810d45f4b8d0203993086f965b5b83a18fbcdb74b8f2f6e21827ef3171b09b",
+      "installedMatch": true
+    },
+    {
+      "file": "locales/zhCN.lua",
+      "sha256": "f035a4b5e1cdddd261665d30c1515f8c251e37fafddeece61aaedb20e16593e2",
+      "installedMatch": true
+    },
+    {
+      "file": "README.md",
+      "sha256": "98ce730f989d514585426df4f603689c488d3d1ed05d9284afeb7316ef65093c",
+      "installedMatch": true
+    },
+    {
+      "file": "CHANGELOG.md",
+      "sha256": "dcbe2e66ecef54f48c0b40e5940040e7da8d0df516fcc02845522f9e4f327b66",
+      "installedMatch": true
+    }
+  ],
+  "savedVariablesModified": false,
+  "savedVariablesHashUnchanged": true,
+  "liveGameValidated": false
+}
