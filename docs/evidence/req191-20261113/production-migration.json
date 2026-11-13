@@ -1,0 +1,48 @@
+{
+  "date": "2026-11-13",
+  "authorization": "运营明确要求先执行SQL45",
+  "environment": "production: supabase-db / postgres / supabase_admin",
+  "migration": "sql/45_req191_loot_observations.sql",
+  "backup": {
+    "directory": "/root/wowbutler-backups/req191-20261113-235208",
+    "mode": "directory 700; files 600",
+    "loot_before_dump": {
+      "bytes": 25078,
+      "sha256": "880cafd4612c559191a223f2997774a656c2fcf6d1d7aa5182c521f35b896920"
+    },
+    "public_schema_before_sql": {
+      "bytes": 108979,
+      "sha256": "9480ec98ffcdb5972acce6d3c4fd9656bd78055e093f1919c50240636a7919d4"
+    },
+    "archive_list_check": "passed"
+  },
+  "attempts": [
+    {
+      "result": "rolled_back",
+      "reason": "临时校验脚本JavaScript replace将双美元符转义为单美元符，COMMIT前失败；断开回滚后确认新表不存在、旧索引仍在"
+    },
+    {
+      "result": "committed",
+      "guard": "10s lock timeout; 60s statement timeout; locked affected tables; original JSON fields compared before COMMIT"
+    }
+  ],
+  "checks": {
+    "original_loot_drops": 4,
+    "original_loot_records": 109,
+    "all_original_fields_unchanged": true,
+    "new_observations": 0,
+    "observations_rls_enabled": true,
+    "anon_submit_denied": true,
+    "authenticated_submit_and_review_denied": true,
+    "service_role_submit_and_review_allowed": true,
+    "match_and_unique_allocation_indexes_present": true,
+    "old_exact_time_index_removed": true,
+    "postgrest_schema_reload_notified": true
+  },
+  "scope": "Database migration only; no application restart, deployment, user data correction, addon installation, git commit or push.",
+  "health": {
+    "homepage": 200,
+    "hidden_env": 404,
+    "live_resource_version": "20261113.135"
+  }
+}

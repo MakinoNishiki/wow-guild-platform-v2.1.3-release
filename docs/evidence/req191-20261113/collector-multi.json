@@ -1,0 +1,45 @@
+{
+  "environment": "Lua 5.1, mocked APIs, not live game",
+  "results": [
+    {
+      "name": "stable source and monotonic events across clear",
+      "ok": true
+    },
+    {
+      "name": "two real chat lines within same second survive",
+      "ok": true
+    },
+    {
+      "name": "no line identity does not guess duplicate",
+      "ok": true
+    },
+    {
+      "name": "repeated native line identity suppressed",
+      "ok": true
+    },
+    {
+      "name": "explicit cross realm preserved",
+      "ok": true
+    },
+    {
+      "name": "unknown other realm remains missing",
+      "ok": true
+    },
+    {
+      "name": "own realm and region captured",
+      "ok": true
+    },
+    {
+      "name": "multiple count retained",
+      "ok": true
+    },
+    {
+      "name": "encounter context frozen before async completion",
+      "ok": true
+    },
+    {
+      "name": "source persists on Lua reload",
+      "ok": true
+    }
+  ]
+}

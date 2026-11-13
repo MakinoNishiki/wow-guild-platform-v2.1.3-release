@@ -35,7 +35,7 @@ function CreateFrame()
 end
 function wipe(t) for k in pairs(t) do t[k]=nil end end
 function StaticPopup_Show() end
-function loot() handler(nil,'CHAT_MSG_LOOT','You receive loot: |cffa335ee|Hitem:123:0|h[Test Item]|h|r.') end
+function loot(lineID) handler(nil,'CHAT_MSG_LOOT','You receive loot: |cffa335ee|Hitem:123:0|h[Test Item]|h|r.','','','','','',0,0,'',0,lineID) end
 function boss() handler(nil,'ENCOUNTER_END',1,'Test Boss',16,20,1) end
 '''
 
@@ -67,8 +67,8 @@ cases = {
     'outside raid and uncommon items excluded': lambda: check("kind='party'; loot(); assert(#WoWButlerCollectorDB==0); now=1010; kind='raid'; quality=3; loot(); assert(#WoWButlerCollectorDB==0)"),
     'dead target is not a boss evidence': lambda: check('loot(); assert(#WoWButlerCollectorDB==1); assert(WoWButlerCollectorDB[1].bossName==nil)'),
     'zone change clears boss context': lambda: check("boss(); handler(nil,'ZONE_CHANGED_NEW_AREA'); loot(); assert(WoWButlerCollectorDB[1].bossName==nil)"),
-    'duplicate loot callback suppressed': lambda: check('boss(); loot(); loot(); assert(#WoWButlerCollectorDB==1)'),
-    'cold duplicate suppressed': lambda: check('ready=false; loot(); loot(); ready=true; flush(); assert(#WoWButlerCollectorDB==1)'),
+    'duplicate loot callback suppressed': lambda: check('boss(); loot(55); loot(55); assert(#WoWButlerCollectorDB==1)'),
+    'cold duplicate suppressed': lambda: check('ready=false; loot(55); loot(55); ready=true; flush(); assert(#WoWButlerCollectorDB==1)'),
     'clear cancels pending retry': lambda: check("ready=false; loot(); SlashCmdList.WBC('clear'); StaticPopupDialogs.WBC_CLEAR_CONFIRM.OnAccept(); ready=true; flush(); assert(#WoWButlerCollectorDB==0); loot(); assert(#WoWButlerCollectorDB==1)"),
     'export waits for pending item data': lambda: check("ready=false; loot(); SlashCmdList.WBC('export'); assert(#messages>1 and #WoWButlerCollectorDB==0)"),
     'expired boss window is empty': lambda: check('boss(); now=1181; loot(); assert(WoWButlerCollectorDB[1].bossName==nil)'),

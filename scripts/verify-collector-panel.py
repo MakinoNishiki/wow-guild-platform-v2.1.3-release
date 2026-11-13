@@ -168,7 +168,7 @@ if __name__ == '__main__':
         except Exception as e:
             results.append({'name': name, 'ok': False, 'error': str(e)})
     report = {'environment': 'Lua 5.1; simulated game controls/events, no visual or live game validation',
-              'version': '1.0.4', 'results': results}
+              'version': '1.0.5', 'results': results}
     if args.output:
         Path(args.output).write_text(json.dumps(report, ensure_ascii=False, indent=2)+'\n', encoding='utf-8')
     print(json.dumps(report, ensure_ascii=False, indent=2))

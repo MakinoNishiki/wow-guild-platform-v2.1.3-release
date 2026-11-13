@@ -2,7 +2,7 @@
 ## Title: WoWButlerCollector
 ## Notes: 魔兽管家自动拾取记录插件
 ## Author: WoW Butler
-## Version: 1.0.4
+## Version: 1.0.5
 ## SavedVariables: WoWButlerCollectorDB, WoWButlerCollectorSettings
 
 locales\zhCN.lua

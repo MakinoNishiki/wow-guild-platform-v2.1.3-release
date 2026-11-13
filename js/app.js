@@ -1437,6 +1437,7 @@ function cloudCrudSentinelCheck(dataType, operation, payload) {
     : dataType === 'activities' ? appData.activities
     : dataType === 'lootDrops' ? appData.lootDrops : null;
   if (!Array.isArray(coll)) return true;
+  if(dataType==='lootDrops'&&operation==='submit')return Array.isArray(payload.result?.ids)&&payload.result.ids.every(id=>coll.some(r=>r.id===id));
   const id = payload && payload.id;
   if (!id) return true;
   const row = coll.find(r => r.id === id);
@@ -2978,6 +2979,8 @@ const modalDirtyChecks = {
 
 // 遮罩点击/ESC 的统一关闭入口：有未保存内容时二次确认
 function requestCloseModal(id) {
+  if(id==='lootDropImportModal'&&lootDropImportSaving){showToast('正在提交，请等待结果后关闭','warning');return;}
+  if(id==='lootDropReviewModal'&&lootDropDeleting.size){showToast('正在保存核对结果，请稍候','warning');return;}
   const check = modalDirtyChecks[id];
   if (check && check() && !confirm('内容未保存，确定放弃吗？')) return;
   closeModal(id);
@@ -7024,30 +7027,56 @@ let lootDropsLoadError = '';      // 加载失败原因（门禁/网络），渲
 const lootDropDeleting = new Set(); // BUG-119：每条删除在回读完成前不重复提交
 
 async function lootDropDelete(id) {
-  const cloud = window.CloudSync;
-  const guildId = cloud.getCurrentGuild()?.id;
-  const userId = cloud.getCachedUser()?.id;
-  if (!guildId || !cloud.canEdit()) { showToast('仅公会管理者可删除拾取记录', 'error'); return; }
-  if (lootDropDeleting.has(id)) return;
-  const row = (appData.lootDrops || []).find(r => r.id === id && r.guild_id === guildId);
-  if (!row) { showToast('记录不存在或已更新，请刷新列表', 'warning'); return; }
-  if (!confirm(`删除这条拾取记录？\n装备：${row.item_name}\n拾取人：${row.player_name}\n时间：${new Date(row.timestamp).toLocaleString('zh-CN')}\n\n仅删除这条拾取流水，不会删除分配记录、考勤或游戏内装备。原导出文本再次导入仍可能恢复该记录。`)) return;
-  const sameContext = () => cloud.getCurrentGuild()?.id === guildId && cloud.getCachedUser()?.id === userId;
-  if (!sameContext() || !cloud.canEdit()) return;
-  lootDropDeleting.add(id);
-  lootDropsRenderTable();
+  return lootDropReviewAction(id, 'ignore');
+}
+
+async function lootDropReviewAction(id, action, targetId) {
+  const cloud=window.CloudSync, guildId=cloud.getCurrentGuild()?.id;
+  if(!guildId||!cloud.canEdit()||lootDropDeleting.has(id))return;
+  const row=(appData.lootDrops||[]).find(r=>r.id===id&&r.guild_id===guildId);
+  if(!row)return;
+  const message=action==='activity'?'更正这条拾取及其采集来源的所属活动？记录会重新进入待核对。':action==='ignore'?'忽略这条误录？保留来源证据，重复提交不会恢复；不删除装备分配或考勤。':action==='merge'?'确认这是同一件实际掉落？归并来源，不增加件数。请勿合并两件真实装备。':'确认已核对这条拾取？这不会自动生成分配记录，也不代表拾取人就是最终获得者。';
+  if(!confirm(message))return;
+  lootDropDeleting.add(id);lootDropsRenderTable();
   try {
-    await cloudCrud('lootDrops', 'delete', { id }, { silentError: true });
-    if (!sameContext()) return;
-    if ((appData.lootDrops || []).some(r => r.id === id)) throw new Error('回读仍存在该记录，请刷新核对后重试');
-    showToast('拾取记录已删除', 'success');
-  } catch (e) {
-    if (sameContext()) showToast('删除结果未确认：' + (e.message || '请刷新核对后重试'), 'error');
-  } finally {
-    lootDropDeleting.delete(id);
-    if (sameContext()) lootDropsRenderTable();
+    await cloudCrud('lootDrops','review',{id,action,targetId},{silentError:true});
+    if(cloud.getCurrentGuild()?.id!==guildId)return;
+    const current=(appData.lootDrops||[]).find(r=>r.id===id);
+    const expected={confirm:'confirmed',ignore:'ignored',merge:'merged',activity:'needs_review'}[action];
+    if(current?.review_status!==expected)throw new Error('回读尚未确认，请刷新核对');
+    closeModal('lootDropReviewModal');showToast('核对结果已保存','success');
+  }catch(e){showToast('核对结果未确认：'+e.message,'error');}
+  finally{lootDropDeleting.delete(id);if(cloud.getCurrentGuild()?.id===guildId)lootDropsRenderTable();}
+}
+
+async function lootDropReviewOpen(id) {
+  const row=(appData.lootDrops||[]).find(r=>r.id===id);
+  if(!row||!window.CloudSync.canEdit())return;
+  const box=document.getElementById('lootDropReviewBody');
+  box.textContent='来源加载中…';openModal('lootDropReviewModal');
+  const guildId=window.CloudSync.getCurrentGuild()?.id;
+  const {data,error}=await window.CloudSync.getClient().from('loot_drop_observations')
+    .select('received_at,payload').eq('guild_id',guildId).eq('canonical_drop_id',id).order('received_at').limit(100);
+  if(window.CloudSync.getCurrentGuild()?.id!==guildId)return;
+  const peers=(appData.lootDrops||[]).filter(d=>d.id!==id&&!['ignored','merged'].includes(d.review_status)&&d.official_item_id===row.official_item_id&&d.player_name===row.player_name&&d.player_server===row.player_server&&d.activity_id===row.activity_id&&d.difficulty_id===row.difficulty_id&&d.quantity===row.quantity);
+  box.innerHTML=`<p class="form-group"><strong>${dropEsc(row.item_name)}</strong> × ${row.quantity||1} · ${dropEsc(row.player_name)} ${dropEsc(row.player_server)}</p>
+    <p class="form-group">${dropEsc(row.review_reason||'历史记录，请核对来源')}；拾取时间 ${dropEsc(new Date(row.timestamp).toLocaleString('zh-CN'))}</p>
+    <p class="form-group">记录拾取事实，最终分配需另行确认。</p>
+    ${error?'<p>来源读取失败，请关闭后重试。</p>':`<div class="table-container"><table class="data-table"><thead><tr><th>采集时间</th><th>服务器 / 难度</th><th>装等 / 数量</th></tr></thead><tbody>${(data||[]).map(o=>`<tr><td>${dropEsc(new Date(o.payload.timestamp).toLocaleString('zh-CN'))}</td><td>${dropEsc(o.payload.player_server||'未提供')} / ${dropEsc(o.payload.difficulty)}</td><td>${o.payload.ilvl||'—'} / ${o.payload.quantity}</td></tr>`).join('')||'<tr><td colspan="3">旧记录没有采集来源</td></tr>'}</tbody></table></div>`}
+    <div class="form-group" style="margin-top:16px"><label class="form-label" for="lootDropMergeTarget">确认属于同一次拾取时，可合并到已有记录</label>
+    <select class="form-select" id="lootDropMergeTarget"><option value="">请选择，保留两件时无需合并</option>${peers.map(d=>`<option value="${dropEsc(d.id)}">${dropEsc(new Date(d.timestamp).toLocaleString('zh-CN'))} · ${dropEsc(d.item_name)} × ${d.quantity||1}</option>`).join('')}</select></div>
+    <div class="form-group"><label class="form-label" for="lootDropReviewActivity">更正所属活动</label><select class="form-select" id="lootDropReviewActivity"><option value="">选择正确活动</option>${(appData.activities||[]).filter(a=>a.status!=='cancelled').map(a=>`<option value="${dropEsc(a.id)}">${dropEsc(a.date||a.activity_date)} · ${dropEsc(a.name||a.raid)}</option>`).join('')}</select><button type="button" class="btn btn-secondary btn-sm" data-review-activity>更正活动</button></div>
+    <div class="toolbar"><button type="button" class="btn btn-primary" data-review-confirm>确认拾取</button><button type="button" class="btn btn-secondary" data-review-merge>合并重复</button><button type="button" class="btn btn-danger" data-review-ignore>忽略误录</button></div>`;
+  for(const [selector,action] of [['[data-review-confirm]','confirm'],['[data-review-merge]','merge'],['[data-review-ignore]','ignore'],['[data-review-activity]','activity']]) {
+    box.querySelector(selector).onclick=async event=>{
+      const targetId=document.getElementById(action==='activity'?'lootDropReviewActivity':'lootDropMergeTarget').value;
+      if(['merge','activity'].includes(action)&&!targetId){showToast('请先选择目标','warning');return;}
+      const buttons=box.querySelectorAll('button');buttons.forEach(b=>b.disabled=true);
+      try{await lootDropReviewAction(id,action,targetId);}finally{buttons.forEach(b=>b.disabled=false);}
+    };
   }
 }
+modalDirtyChecks.lootDropReviewModal=()=>lootDropDeleting.size>0||!!document.getElementById('lootDropMergeTarget')?.value||!!document.getElementById('lootDropReviewActivity')?.value;
 
 // 本区块局部转义器（拾取记录字段来自插件/外部 JSON，不走 app.js 历史裸插口径）
 const dropEsc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -7106,11 +7135,11 @@ function lootDropsRenderTable() {
   if (instSel) {
     const cur = instSel.value;
     const insts = [...new Set((appData.lootDrops || []).map(d => d.instance_name).filter(Boolean))].sort();
-    instSel.innerHTML = '<option value="">全部副本</option>' + insts.map(n => `<option value="${n}">${dropEsc(n)}</option>`).join('');
+    instSel.innerHTML = '<option value="">全部副本</option>' + insts.map(n => `<option value="${dropEsc(n)}">${dropEsc(n)}</option>`).join('');
     instSel.value = cur;
   }
 
-  let rows = [...(appData.lootDrops || [])];
+  let rows = (appData.lootDrops || []).filter(d=>d.review_status!=='merged'&&(document.getElementById('lootDropsShowIgnored')?.checked||d.review_status!=='ignored'));
   const kw = (document.getElementById('lootDropsSearch')?.value || '').trim().toLowerCase();
   if (kw) rows = rows.filter(d => (d.player_name || '').toLowerCase().includes(kw) || (d.item_name || '').toLowerCase().includes(kw));
   const inst = document.getElementById('lootDropsInstanceFilter')?.value || '';
@@ -7120,7 +7149,7 @@ function lootDropsRenderTable() {
 
   if (!(appData.lootDrops || []).length) {
     // §4.9 空态：文案 + 引导动作（导入钮 viewer 由 edit-only 门控）
-    tbody.innerHTML = `<tr><td colspan="9"><div class="empty-state"><div class="empty-icon">🎁</div><div class="empty-text">暂无拾取记录，用插件 WoWButlerCollector 采集后点击「导入拾取」入库</div><button class="btn btn-primary edit-only" onclick="lootDropImportOpen()">📥 导入拾取</button></div></td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="9"><div class="empty-state"><div class="empty-icon">🎁</div><div class="empty-text">暂无拾取记录，用插件 WoWButlerCollector 采集后点击「导入拾取」入库</div><button class="btn btn-primary" onclick="lootDropImportOpen()">📥 导入拾取</button></div></td></tr>`;
     return;
   }
   if (!rows.length) {
@@ -7139,16 +7168,17 @@ function lootDropsRenderTable() {
       : '';
     return `<tr>
       <td>${fmtTs(d.timestamp)}</td>
-      <td>${dropEsc(d.player_name || '—')}</td>
-      <td><span class="loot-name">${icon}${dropEsc(d.item_name || '—')}</span></td>
+      <td>${dropEsc(d.player_name || '—')}<br><small>${dropEsc(d.player_server||'服务器未提供')}</small></td>
+      <td><span class="loot-name">${icon}${dropEsc(d.item_name || '—')}</span> × ${d.quantity||1}<br><span class="tag">${dropEsc(({pending:'待确认',needs_review:'待核对',confirmed:'已核对',ignored:'已忽略',legacy:'旧记录'})[d.review_status]||'旧记录')}</span> <small>${d.observation_count||0} 份来源</small></td>
       <td class="num">${d.ilvl != null ? d.ilvl : '—'}</td>
-      <td>${dropEsc(d.slot_cn || d.slot || '—')}</td>
+      <td>${dropEsc(d.slot_cn || LOOT_DROP_INVTYPE_ZH[d.slot] || d.slot || '—')}</td>
       <td class="center">${dropEsc(d.difficulty || '—')}</td>
       <td>${dropEsc(d.boss_name || '—')}</td>
       <td>${dropEsc(d.instance_name || '—')}</td>
-      <td class="center edit-only"><button type="button" class="btn btn-danger btn-sm" data-drop-delete="${dropEsc(d.id)}" ${lootDropDeleting.has(d.id) ? 'disabled' : ''}>${lootDropDeleting.has(d.id) ? '删除中…' : '删除'}</button></td>
+      <td class="center edit-only"><button type="button" class="btn btn-secondary btn-sm" data-drop-review="${dropEsc(d.id)}" ${lootDropDeleting.has(d.id)?'disabled':''}>核对</button> <button type="button" class="btn btn-danger btn-sm" data-drop-delete="${dropEsc(d.id)}" ${lootDropDeleting.has(d.id)||d.review_status==='ignored'?'disabled':''}>${lootDropDeleting.has(d.id)?'保存中…':'忽略'}</button></td>
     </tr>`;
   }).join('');
+  tbody.querySelectorAll('[data-drop-review]').forEach(button=>button.addEventListener('click',()=>lootDropReviewOpen(button.dataset.dropReview)));
   tbody.querySelectorAll('[data-drop-delete]').forEach(button => {
     button.addEventListener('click', () => lootDropDelete(button.dataset.dropDelete));
   });
@@ -7158,7 +7188,10 @@ function lootDropsRenderTable() {
 let lootDropImportRows = []; // 解析后的待入库行（含 checked/dup/valid 标记）
 
 function lootDropImportOpen() {
+  if(lootDropImportSaving)return;
   lootDropImportRows = [];
+  const select=document.getElementById('lootDropActivity');
+  select.innerHTML='<option value="">暂不关联，提交后待核对</option>'+(appData.activities||[]).filter(a=>a.status!=='cancelled').map(a=>`<option value="${dropEsc(a.id)}">${dropEsc(a.date||a.activity_date)} · ${dropEsc(a.name||a.raid)} ${dropEsc(a.team_label||'')}</option>`).join('');
   const ta = document.getElementById('lootDropImportText');
   if (ta) ta.value = '';
   const pv = document.getElementById('lootDropImportPreview');
@@ -7201,12 +7234,6 @@ function lootDropReadFile(f) {
   reader.readAsText(f);
 }
 
-// 重复判定键：拾取者+物品+时刻（与 sql/42 唯一索引 uq_loot_drops_event 同口径）
-function lootDropDupKey(playerName, itemId, ts) {
-  const t = typeof ts === 'number' ? new Date(ts * 1000).toISOString() : new Date(ts).toISOString();
-  return `${playerName}|${itemId}|${t}`;
-}
-
 // INVTYPE → 中文部位（任务书 #75-补丁1：转换脚本删除后前端承接槽位中文化；
 // 词表口径与原转换脚本一致，与 js/lootTaxonomy.js 对齐）
 const LOOT_DROP_INVTYPE_ZH = {
@@ -7226,31 +7253,16 @@ function lootDropImportParse() {
   try { data = JSON.parse(raw); } catch (e) { showToast('JSON 解析失败：' + e.message, 'error'); return; }
   if (!Array.isArray(data) || !data.length) { showToast('JSON 内容不是非空数组', 'error'); return; }
 
-  const existKeys = new Set((appData.lootDrops || []).map(d => {
-    try { return lootDropDupKey(d.player_name, d.official_item_id, d.timestamp); } catch { return ''; }
-  }));
-  lootDropImportRows = data.map(r => {
-    const item = {
-      player_name: String(r.playerName || '').trim(),
-      item_name: String(r.itemName || '').trim(),
-      official_item_id: typeof r.itemID === 'number' ? r.itemID : null,
-      icon_id: typeof r.iconID === 'number' ? r.iconID : null,
-      quality: typeof r.quality === 'number' ? r.quality : null,
-      ilvl: typeof r.ilvl === 'number' ? r.ilvl : null,
-      slot: typeof r.slot === 'string' ? r.slot : '',
-      slot_cn: (typeof r.slotCN === 'string' && r.slotCN) ? r.slotCN : (LOOT_DROP_INVTYPE_ZH[r.slot] || ''),
-      item_type: typeof r.itemType === 'string' ? r.itemType : '',
-      boss_name: typeof r.bossName === 'string' ? r.bossName : '',
-      instance_name: typeof r.instanceName === 'string' ? r.instanceName : '',
-      difficulty: typeof r.difficulty === 'string' ? r.difficulty : '',
-      difficulty_id: typeof r.difficultyID === 'number' ? r.difficultyID : null,
-      timestamp: r.timestampISO || (typeof r.timestamp === 'number' ? new Date(r.timestamp * 1000).toISOString() : null),
-      source: 'plugin',
-    };
-    let dup = false;
-    try { dup = item.official_item_id != null && !!item.timestamp && existKeys.has(lootDropDupKey(item.player_name, item.official_item_id, item.timestamp)); } catch { dup = false; }
-    const valid = !!(item.player_name && item.item_name && item.official_item_id != null && item.timestamp);
-    return { ...item, dup, valid, checked: valid && !dup };
+  if(data.length>2000){showToast('每次最多提交2000条，请分次导出','error');return;}
+  const seen=new Set();
+  lootDropImportRows=data.map(raw=>{
+    const r=raw&&typeof raw==='object'&&!Array.isArray(raw)?raw:{};
+    const numericDate=typeof r.timestamp==='number'?new Date(r.timestamp*1000):null;
+    const ts=typeof r.timestampISO==='string'?r.timestampISO:(numericDate&&!isNaN(numericDate)?numericDate.toISOString():null);
+    const key=JSON.stringify(r); // Only skip identical copies; conflicting source IDs reach the transactional validator.
+    const dup=seen.has(key);seen.add(key);
+    const valid=!!(r.playerName&&r.itemName&&Number.isSafeInteger(r.itemID)&&ts&&!isNaN(Date.parse(ts)));
+    return {raw:r,player_name:r.playerName,item_name:r.itemName,official_item_id:r.itemID,ilvl:Number.isSafeInteger(r.ilvl)?r.ilvl:null,slot:r.slot,slot_cn:r.slotCN||LOOT_DROP_INVTYPE_ZH[r.slot]||'',instance_name:r.instanceName,boss_name:r.bossName,timestamp:ts,dup,valid,checked:valid&&!dup};
   });
   lootDropImportRenderPreview();
 }
@@ -7266,7 +7278,7 @@ function lootDropImportRenderPreview() {
   pv.style.display = '';
   pv.innerHTML = `
     <div style="font-size:12px;color:var(--text-muted);margin:10px 0 6px">
-      共 ${total} 条 · 可入库 ${readyN} 条 · 已存在跳过 ${dupN} 条 · 缺字段 ${invalidN} 条
+      共 ${total} 条 · 可入库 ${readyN} 条 · 本批重复 ${dupN} 条 · 缺字段 ${invalidN} 条
       ${readyN ? `<span class="quick-action" style="margin-left:10px;cursor:pointer;color:var(--blue-highlight)" onclick="lootDropImportToggleAll(true)">全选</span> <span style="color:var(--text-muted)">|</span> <span class="quick-action" style="cursor:pointer;color:var(--blue-highlight)" onclick="lootDropImportToggleAll(false)">清空</span>` : ''}
     </div>
     <div class="drop-import-preview-wrap">
@@ -7280,14 +7292,14 @@ function lootDropImportRenderPreview() {
             <td class="num">${r.ilvl != null ? r.ilvl : '—'}</td>
             <td>${dropEsc(r.slot_cn || r.slot || '—')}</td>
             <td>${dropEsc([r.instance_name, r.boss_name].filter(Boolean).join(' · ') || '—')}</td>
-            <td>${r.timestamp ? r.timestamp.slice(0, 10) : '—'}</td>
-            <td class="center">${r.dup ? '<span class="tag">已存在</span>' : (!r.valid ? '<span class="tag" style="color:var(--danger)">缺字段</span>' : '<span class="tag tag-gold">待入库</span>')}</td>
+            <td>${dropEsc(r.timestamp ? r.timestamp.slice(0, 10) : '—')}</td>
+            <td class="center">${r.dup ? '<span class="tag">本批重复</span>' : (!r.valid ? '<span class="tag" style="color:var(--danger)">缺字段</span>' : '<span class="tag tag-gold">待匹配</span>')}</td>
           </tr>`).join('')}
         </tbody>
       </table>
     </div>`;
   btn.disabled = checkedN === 0;
-  btn.textContent = checkedN ? `确认入库（${checkedN} 条）` : '确认入库';
+  btn.textContent = checkedN ? `提交并匹配（${checkedN} 条）` : '提交并匹配';
 }
 
 function lootDropImportToggle(i, checked) {
@@ -7302,59 +7314,35 @@ function lootDropImportToggleAll(checked) {
 
 let lootDropImportSaving = false;
 async function lootDropImportConfirm() {
-  if (lootDropImportSaving) return;
-  const rows = lootDropImportRows.filter(r => r.checked && r.valid && !r.dup);
-  if (!rows.length) { showToast('没有可入库的记录', 'error'); return; }
-  const btn = document.getElementById('lootDropImportConfirmBtn');
-  lootDropImportSaving = true;
-  if (btn) { btn.disabled = true; btn.textContent = '入库中...'; }
-
-  let ok = 0, fail = 0, gateHit = false;
-  // 规范 1.2.2 批处理例外：批量导入循环 saveCloudData（每行独立写），完成后统一 reload 一次（智能导入先例）
-  for (const r of rows) {
-    const { checked, dup, valid, ...payload } = r;
-    try {
-      await window.CloudSync.saveCloudData('lootDrops', 'add', payload);
-      ok++;
-    } catch (e) {
-      fail++;
-      const msg = String((e && e.message) || '');
-      if (/loot_drops|42P01|PGRST|404/.test(msg)) { gateHit = true; break; } // 迁移门禁：表未就绪，中止剩余
+  if(lootDropImportSaving)return;
+  const rows=lootDropImportRows.filter(r=>r.checked&&r.valid&&!r.dup).map(r=>r.raw);
+  if(!rows.length)return;
+  const guildId=window.CloudSync.getCurrentGuild()?.id;
+  if(!guildId)return;
+  const activityId=document.getElementById('lootDropActivity').value||null;
+  const btn=document.getElementById('lootDropImportConfirmBtn');
+  lootDropImportSaving=true;btn.disabled=true;
+  const controls=[...document.querySelectorAll('#lootDropImportModal input, #lootDropImportModal textarea, #lootDropImportModal select, #lootDropImportModal button')].map(el=>({el,disabled:el.disabled}));
+  controls.forEach(({el})=>el.disabled=true);
+  const totals={created:0,merged:0,repeated:0,ignored:0};
+  try {
+    for(let offset=0;offset<rows.length;offset+=200){
+      if(window.CloudSync.getCurrentGuild()?.id!==guildId)throw new Error('公会已切换，请回原公会核对');
+      btn.textContent=`匹配中 ${offset}/${rows.length}…`;
+      const payload={activityId,rows:rows.slice(offset,offset+200)};
+      await cloudCrud('lootDrops','submit',payload,{silentError:true});
+      if(!cloudCrudSentinelCheck('lootDrops','submit',payload))throw new Error('写入后回读未确认，请保留原文重试');
+      for(const key of Object.keys(totals))totals[key]+=payload.result[key]||0;
     }
-  }
-
-  let reloadOk = true;
-  if (ok > 0) {
-    try {
-      await window.CloudSync.reloadData('lootDrops');
-      lootDropsLoadedFor = (window.CloudSync.getCurrentGuild() || {}).id;
-      saveData();
-    } catch (e) { reloadOk = false; }
-  }
-  lootDropImportSaving = false;
-
-  if (gateHit) {
-    showToast('拾取记录表未就绪（sql/42 待运营执行）', 'error');
-    if (btn) { btn.disabled = false; btn.textContent = `确认入库（${rows.length} 条）`; }
-    return; // 弹窗保持打开（失败路径不吞现场）
-  }
-  if (fail > 0) {
-    showToast(`部分失败：成功 ${ok} 条，失败 ${fail} 条（未入库行可重新导入，重复检测会自动跳过已入库部分）`, 'error');
-    if (btn) { btn.disabled = false; btn.textContent = `确认入库`; }
-    if (ok > 0) { lootDropImportParse(); } // 刷新重复标记
-    return;
-  }
-  if (!reloadOk) {
-    showToast(`已写入 ${ok} 条，但刷新列表失败，请手动刷新页面`, 'warning');
-  } else {
-    showToast(`拾取记录入库成功（${ok} 条）`, 'success');
-  }
-  closeModal('lootDropImportModal');
-  lootSwitchView('drops');
+    lootDropsLoadedFor=guildId;lootDropImportRows=[];closeModal('lootDropImportModal');
+    showToast(`提交完成：新增 ${totals.created} · 归并 ${totals.merged} · 重复 ${totals.repeated} · 已忽略 ${totals.ignored}。不会自动分配装备。`,'success');
+    lootSwitchView('drops');
+  }catch(e){showToast('提交未全部确认：'+e.message+'。保留原文可重试，已成功的记录不会重复计数。','error');}
+  finally{lootDropImportSaving=false;controls.forEach(({el,disabled})=>el.disabled=disabled);btn.disabled=false;btn.textContent='提交并匹配';}
 }
 
 // 规范 4.6 登记：导入弹窗——粘贴文本有内容或已解析待入库行即算未保存内容
-modalDirtyChecks.lootDropImportModal = () => isModalFormDirty('lootDropImportModal') || lootDropImportRows.length > 0;
+modalDirtyChecks.lootDropImportModal = () => lootDropImportSaving || isModalFormDirty('lootDropImportModal') || lootDropImportRows.length > 0;
 
 // 状态标签映射
 const lootStatusBadgeMap = {
@@ -8912,6 +8900,10 @@ function lootFillAssignedTo(idOrName) {
 // ==================== 初始化 ====================
 // ==================== 更新日志 ====================
 const changelogData = [
+  {id:'req191-feature',version:'v3.2.0',date:'2026-11-13',type:'feature',typeLabel:'新增功能',title:'公会成员共同提交拾取记录',summary:'所有公会成员均可提交插件采集，选择活动后由系统匹配来源。',details:['提交不会自动生成装备分配记录。']},
+  {id:'req191-improve',version:'v3.2.0',date:'2026-11-13',type:'improve',typeLabel:'功能优化',title:'多人记录归并与人工核对',summary:'相符记录汇总来源，信息不足或多件歧义保留待核对。',details:['管理者可确认拾取、合并重复、忽略误录；保留原始采集证据。']},
+  {id:'req191-fix',version:'v3.2.0',date:'2026-11-13',type:'fix',typeLabel:'修复BUG',title:'加强重复提交与多件拾取保护',summary:'重复提交不重复入库，忽略的误录不因相同采集再次上传恢复。',details:['Collector 1.0.5保留服务器、数量及来源编号；已安装旧版需另行更新，旧记录信息不足时仍需核对。']},
+  {id:'req191-scope',version:'v3.2.0',date:'2026-11-13',type:'refactor',typeLabel:'模块调整',title:'区分提交与管理权限',summary:'提交采集向公会成员开放，核对和分配仍由会长或管理员处理。',details:['自定义角色开关、交易采集和拾取转分配操作另行推进。']},
   {id:'req189-delete-feature',version:'v3.2.0',date:'2026-11-13',type:'feature',typeLabel:'新增功能',title:'删除误录的拾取记录',summary:'管理者可在拾取记录中删除单条误录，操作前确认装备和拾取人。',details:[]},
   {id:'req189-delete-improve',version:'v3.2.0',date:'2026-11-13',type:'improve',typeLabel:'功能优化',title:'明确拾取删除状态',summary:'删除中禁用重复操作，失败提示核对后重试。',details:[]},
   {id:'req189-delete-fix',version:'v3.2.0',date:'2026-11-13',type:'fix',typeLabel:'修复BUG',title:'补齐拾取误录撤回入口',summary:'修复拾取记录导入后无法从页面删除的问题。',details:[]},

@@ -1,0 +1,90 @@
+[
+  {
+    "name": "normal heroic mythic remain distinct even for same item at same time",
+    "ok": true
+  },
+  {
+    "name": "legacy normal and heroic map by ID without locale dependence",
+    "ok": true
+  },
+  {
+    "name": "both LFR IDs ignore self and others without item calls or counters",
+    "ok": true
+  },
+  {
+    "name": "special unknown and missing difficulties do not fall back to name",
+    "ok": true
+  },
+  {
+    "name": "ignored LFR cannot debounce a subsequent normal loot",
+    "ok": true
+  },
+  {
+    "name": "pending normal preserves original difficulty after entering LFR",
+    "ok": true
+  },
+  {
+    "name": "other player raid loot records difficulty",
+    "ok": true
+  },
+  {
+    "name": "modern API records actual linked item level",
+    "ok": true
+  },
+  {
+    "name": "legacy item API without binding proof retains review only",
+    "ok": true
+  },
+  {
+    "name": "cold cache retries with original context",
+    "ok": true
+  },
+  {
+    "name": "cold cache timeout is visible and bounded",
+    "ok": true
+  },
+  {
+    "name": "no item API warns without crashing",
+    "ok": true
+  },
+  {
+    "name": "outside raid and uncommon items excluded",
+    "ok": true
+  },
+  {
+    "name": "dead target is not a boss evidence",
+    "ok": true
+  },
+  {
+    "name": "zone change clears boss context",
+    "ok": true
+  },
+  {
+    "name": "duplicate loot callback suppressed",
+    "ok": true
+  },
+  {
+    "name": "cold duplicate suppressed",
+    "ok": true
+  },
+  {
+    "name": "clear cancels pending retry",
+    "ok": true
+  },
+  {
+    "name": "export waits for pending item data",
+    "ok": true
+  },
+  {
+    "name": "expired boss window is empty",
+    "ok": true
+  },
+  {
+    "name": "consumables excluded",
+    "ok": true
+  },
+  {
+    "name": "saved historical rows retained",
+    "ok": true
+  }
+]

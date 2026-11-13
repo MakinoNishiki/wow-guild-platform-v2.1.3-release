@@ -43,9 +43,9 @@ check('A3c 过滤：品质 ≥4 + classID 数字排除表（0/5/7/12，客户端
   /quality < 4 or EXCLUDE_CLASS\[classID\] then/.test(core) && /EXCLUDE_CLASS = \{ \[0\] = true, \[5\] = true, \[7\] = true, \[12\] = true \}/.test(core), '');
 check('A3d iconID 数字口径（GetItemInfo 第 10 返回值，与 Exporter REQ-092 同口径；无字符串 icon_name 伪字段）',
   /iconID = iconID/.test(core) && !/iconName/.test(core), '');
-check('A3e 首领归属 180s 窗 + 容量护栏 2000 + 去重防抖 2s',
+check('A3e 首领归属 180s 窗 + 容量护栏 2000 + 本客户端lineID去重',
   /BOSS_WINDOW_SEC = 180/.test(core) && /MAX_ENTRIES = 2000/.test(core) &&
-  /lastLoot\.itemID == itemID and lastLoot\.looter == looter/.test(core), '');
+  /if seenLines\[lineID\] then return end/.test(core), '');
 check('A3f 斜杠命令 /wbc（export 弹窗直出 + clear StaticPopup 二次确认）',
   /SLASH_WBC1 = "\/wbc"/.test(core) && /showExportFrame\(JSONEncode\(rows\)\)/.test(core) &&
   /StaticPopup_Show\("WBC_CLEAR_CONFIRM"\)/.test(core) && /wipe\(WoWButlerCollectorDB\)/.test(core), '');
@@ -111,11 +111,10 @@ check('B1 INVTYPE→中文部位映射入 app.js（词表与原转换脚本同�
   /const LOOT_DROP_INVTYPE_ZH = \{/.test(app) && /INVTYPE_HEAD: '头部'/.test(app) &&
   /INVTYPE_ROBE: '胸部'/.test(app) && /INVTYPE_HOLDABLE: '副手'/.test(app), '');
 check('B2 解析器 slot_cn 回退链：slotCN 优先 → INVTYPE 映射 → 空串',
-  /slot_cn: \(typeof r\.slotCN === 'string' && r\.slotCN\) \? r\.slotCN : \(LOOT_DROP_INVTYPE_ZH\[r\.slot\] \|\| ''\)/.test(app), '');
+  app.includes("slot_cn:r.slotCN||LOOT_DROP_INVTYPE_ZH[r.slot]||''"), '');
 const idx = read('index.html');
-check('B3 导入弹窗：/wbc export 粘贴主通道提示 + 拖放降备选',
-  /\/wbc export<\/code>，复制弹窗中的 JSON 内容，粘贴到下方/.test(idx) &&
-  /备选通道：拖放 JSON 文件到此/.test(idx), '');
+check('B3 导入弹窗：游戏面板导出粘贴主通道 + 拖放备选',
+  idx.includes('点击导出并复制文本，粘贴到下方') && idx.includes('备选通道：拖放 JSON 文件到此'), '');
 
 const fails = results.filter(r => !r.ok);
 console.log(`\n===== 结果：${results.length - fails.length}/${results.length} 通过 =====`);

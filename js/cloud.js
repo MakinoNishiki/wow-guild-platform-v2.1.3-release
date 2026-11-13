@@ -890,29 +890,34 @@
   }
 
   // ---- 拾取记录（任务书 #75-Day2 / REQ-163）：loot_drops 公会私有流水 ----
-  // 读走 SDK 直连（RLS 公会成员可读），写走 dbInsert/dbDelete 代理（公会级鉴权，server.js 白名单已登记）。
-  // 行保持 snake_case 直存（流水表无前端结构映射差异）；PostgREST 默认 1000 行上限，
-  // 单公会拾取流水远超阈值需翻页时再扩（当前导入场景量级远低于此，申报在案）。
+  // 读走 SDK 直连（RLS 公会成员可读），按500行分页；行保持 snake_case。
+  // REQ-191 写走专用提交/核对事务，禁止通用代理直接增删改；cloudCrud统一回读。
   async function reloadLootDrops(guildId) {
-    const { data, error } = await supabaseClient
-      .from('loot_drops')
-      .select('*')
-      .eq('guild_id', guildId)
-      .order('timestamp', { ascending: false });
-    if (error) throw error;
+    const rows = [];
+    for (let offset=0;;offset+=500) {
+      const {data,error}=await supabaseClient.from('loot_drops').select('*').eq('guild_id',guildId)
+        .order('timestamp',{ascending:false}).order('id').range(offset,offset+499);
+      if(error)throw error;
+      rows.push(...(data||[]));
+      if((data||[]).length<500)break;
+    }
+    if (currentGuild?.id !== guildId) throw new Error('公会已切换，请在当前公会重新查看');
     if (typeof window.appData !== 'undefined') {
-      window.appData.lootDrops = data || [];
+      window.appData.lootDrops = rows;
     }
   }
 
   async function syncLootDrop(guildId, operation, item) {
-    if (operation === 'add') {
-      const row = { ...item, guild_id: guildId };
-      delete row.id;
-      await dbInsert('loot_drops', row);
-    } else if (operation === 'delete') {
-      await dbDelete('loot_drops', { id: item.id });
-    }
+    if (!['submit','review'].includes(operation)) throw new Error('拾取记录请使用提交或核对入口');
+    const token=await getAccessToken();
+    if(!token)throw new Error('请先登录');
+    const userId=currentUser.id;
+    const body=operation==='submit'?{guildId,activityId:item.activityId||null,rows:item.rows}:{guildId,id:item.id,action:item.action,targetId:item.targetId||null};
+    const response=await fetch('/api/loot-observations/'+operation,{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify(body)});
+    const result=await response.json();
+    if(!response.ok)throw new Error(result.message||'提交未确认，请重试');
+    if(currentGuild?.id!==guildId||currentUser?.id!==userId)throw new Error('账号或公会已切换，原公会提交可能已成功，请稍后核对');
+    item.result=result; // RPC receipt checked after cloudCrud reload; never mutate appData before DB read.
   }
 
   // ---- 方案单（任务书 #58-WP1；#58-WP2-1 多方案口径改造）----  // 用户行级 RLS 制式（user_profiles 先例）：读写均 SDK 直连，RLS 为最后防线，不经 /api/db 代理

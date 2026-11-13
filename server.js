@@ -864,6 +864,9 @@ async function authorizeProxyRequest(user, table, method, queryString, rawBody) 
     }
   }
 
+  // REQ-191: raw evidence and canonical records only change through transactional routes.
+  if (table === 'loot_drops') return deny('拾取记录请使用提交或核对入口');
+  if (table === 'loot_records' && rows.some(row => row && 'source_drop_id' in row)) return deny('拾取关联请使用专用分配入口');
   // ---- 公会业务表：raid_members / activities / activity_attendance / loot_records / wishlists / claim_requests / deleted_raid_members / loot_drops ----
   // claim_requests（任务书 #21 WP2）：owner/editor 审批操作（PATCH 批准/拒绝、DELETE）走本通用分支；
   // viewer 的 INSERT/撤回已在上方窄例外处理。
@@ -1489,6 +1492,7 @@ function serveFile(res, filePath, req) {
   });
 }
 
+const handleLootObservations = require('./lib/lootObservationRoutes.cjs')({auth:verifyTokenCached,get:supabaseRestGet,write:supabaseRestWrite,body:readBody});
 const handleWclUser = require('./lib/wclUserRoutes.cjs')({
   auth: verifyTokenCached, role: getGuildRoleCached, get: supabaseRestGet,
   write: supabaseRestWrite, body: readBody,
@@ -1552,6 +1556,7 @@ const server = http.createServer(async (req, res) => {
   }
 
   // REQ-185: authenticated account linking and confirmed batch claims.
+  if (await handleLootObservations(req, res, corsHeaders, urlPath)) return;
   if (await handleWclUser(req, res)) return;
 
   // API: Supabase config

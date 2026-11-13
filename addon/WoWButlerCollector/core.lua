@@ -28,7 +28,7 @@ WoWButlerCollectorSettings = WoWButlerCollectorSettings or {}
 if WoWButlerCollectorSettings.enabled == nil then WoWButlerCollectorSettings.enabled = true end
 WBC_Collector = {} -- ui.lua 只消费状态与动作，采集/导出保持一个实现
 local API = WBC_Collector
-API.version = "1.0.4"
+API.version = "1.0.5"
 
 local MAX_ENTRIES = 2000      -- 容量护栏：超出丢弃最旧（SavedVariables 体积保护）
 local CAP_WARN_AT = 1000      -- 达到即每次上线提醒导出
@@ -51,31 +51,33 @@ local RAID_DIFFICULTY = {
 local function fmtToPattern(fmt)
   local p = fmt:gsub("([%^%$%(%)%%%.%[%]%*%+%-%?])", "%%%1") -- 先转义全部模式魔法字符
   p = p:gsub("%%%%s", "(.+)")                               -- 还原 %s 为捕获组
-  p = p:gsub("%%%%d", "%%d+")                               -- 还原 %d（多件后缀 xN，丢弃数值）
-  return "^" .. p
+  p = p:gsub("%%%%d", "(%%d+)")                               -- 保留多件数量
+  return "^" .. p .. "$"
 end
 
 local lootPatterns = {} -- { {pattern=..., selfLoot=bool, nameIdx=n} }
 local function buildLootPatterns()
   local defs = {
+    { fmt = LOOT_ITEM_SELF_MULTIPLE, selfLoot = true, multiple = true },
     { fmt = LOOT_ITEM_SELF, selfLoot = true },
-    { fmt = LOOT_ITEM_SELF_MULTIPLE, selfLoot = true },
-    { fmt = LOOT_ITEM, selfLoot = false },          -- 团员拾取：第 1 捕获 = 拾取者名
-    { fmt = LOOT_ITEM_MULTIPLE, selfLoot = false },
+    { fmt = LOOT_ITEM_MULTIPLE, selfLoot = false, multiple = true },
+    { fmt = LOOT_ITEM, selfLoot = false },
   }
   for _, d in ipairs(defs) do
     if type(d.fmt) == "string" then
-      table.insert(lootPatterns, { pattern = fmtToPattern(d.fmt), selfLoot = d.selfLoot })
+      table.insert(lootPatterns, { pattern = fmtToPattern(d.fmt), selfLoot = d.selfLoot, multiple = d.multiple })
     end
   end
 end
 
 -- ---- 首领归属上下文 ----
+local lastEncounterID = nil
 local lastEncounterName = nil
 local lastEncounterAt = 0
 
--- ---- 去重防抖（同拾取者同物品 2 秒内只记一次，聊天双发保险） ----
-local lastLoot = { itemID = nil, looter = nil, at = 0 }
+-- ---- 本客户端聊天事件去重：只认lineID，不以时间窗吞掉真实多件 ----
+local lastLoot = { itemID = nil, looter = nil, at = 0 } -- retained for clear compatibility
+local seenLines, lineOrder = {}, {} -- local chat event identity only, never shared across clients
 local pendingCount = 0
 local clearGeneration = 0 -- 清空后取消尚未完成的缓存重试，防止旧记录重新出现
 local failedCount, lastError = 0, nil -- 本次登录诊断，不混入可导出的拾取数组
@@ -86,7 +88,7 @@ end
 
 -- 旧记录没有原始链接，无法核实绑定/真实装等：保留原样，但不再混入正常导出。
 local function isExportable(row)
-  return row.captureVersion == "1.0.4" and row.itemLink and not row.reviewReason
+  return (row.captureVersion == "1.0.4" or row.captureVersion == "1.0.5") and row.itemLink and not row.reviewReason
     and type(row.ilvl) == "number" and row.ilvl > 0 and row.bindingStatus == "ordinary"
 end
 
@@ -170,7 +172,28 @@ local function linkedDetails(link)
   return ilvl, bindingKnown and (bound and "account" or "ordinary") or nil, source
 end
 
-local function recordLoot(itemID, itemLink, looterName)
+local function playerIdentity(raw, own)
+  local name, realm = raw:match("^(.-)%-(.+)$")
+  if name then return name, realm end
+  if own then
+    if type(UnitFullName) == "function" then
+      local ok, n, r = pcall(UnitFullName, "player")
+      if ok and n then return n, (r and r ~= "" and r) or safeCall(GetRealmName) end
+    end
+    return raw, safeCall(GetRealmName)
+  end
+  -- Resolve only a unique roster match. Never assume another player belongs to our realm.
+  local foundName, foundRealm, count = nil, nil, 0
+  if type(UnitFullName) == "function" then
+    for i=1,(safeCall(GetNumGroupMembers) or 0) do
+      local ok,n,r = pcall(UnitFullName, "raid"..i)
+      if ok and n == raw then count=count+1; foundName=n; foundRealm=(r and r ~= "" and r) or safeCall(GetRealmName) end
+    end
+  end
+  return foundName or raw, count == 1 and foundRealm or nil
+end
+
+local function recordLoot(itemID, itemLink, looterName, looterServer, quantity)
   -- 只记录团本（任务书 #75-补丁1）：raid=团本 ✅；party=大秘境/地下城 ❌；none=世界BOSS/野外 ❌
   local instName, instanceType, difficultyID = GetInstanceInfo()
   if instanceType ~= "raid" then return end
@@ -184,6 +207,13 @@ local function recordLoot(itemID, itemLink, looterName)
   end
   -- 所有上下文在事件发生时捕获，缓存加载结束时可能已离开副本或击杀下一首领。
   local capturedAt, generation = time(), clearGeneration
+  local encounterID, encounterAt = bossName and lastEncounterID or nil, bossName and lastEncounterAt or nil
+  local settings = WoWButlerCollectorSettings
+  if not settings.collectorSourceID then settings.collectorSourceID=tostring(time()).."-"..tostring(math.random(1,999999999)).."-"..tostring(math.random(1,999999999)) end
+  settings.eventSequence=(tonumber(settings.eventSequence) or 0)+1
+  local sourceID, eventID = settings.collectorSourceID, tostring(settings.eventSequence)
+  local region = safeCall(GetCurrentRegion)
+  region = region and tostring(region) or nil
   local getInfo = (C_Item and C_Item.GetItemInfo) or GetItemInfo
   if type(getInfo) ~= "function" then
     reportFailure("WoWButler: 物品接口不可用，本次拾取未记录，请检查客户端与插件版本。")
@@ -224,6 +254,13 @@ local function recordLoot(itemID, itemLink, looterName)
     pendingCount = pendingCount - 1
     local reviewReason = not binding and "绑定信息未确认" or (not ilvl and "实际装等未确认" or nil)
     table.insert(WoWButlerCollectorDB, {
+    collectorSourceID = sourceID,
+    sourceEventID = eventID,
+    playerServer = looterServer,
+    playerRegion = region,
+    quantity = quantity or 1,
+    encounterID = encounterID,
+    encounterAt = encounterAt,
     itemLink = itemLink,
     captureVersion = API.version,
     bindingStatus = binding,
@@ -271,11 +308,12 @@ frame:SetScript("OnEvent", function(_, event, ...)
       print(string.format(L.CAP_WARN or "cap warn", #WoWButlerCollectorDB, MAX_ENTRIES))
     end
   elseif event == "ZONE_CHANGED_NEW_AREA" or event == "ENCOUNTER_START" then
-    lastEncounterName, lastEncounterAt = nil, 0
+    lastEncounterName, lastEncounterAt, lastEncounterID = nil, 0, nil
     notify()
   elseif event == "ENCOUNTER_END" then
-    local _, encounterName, _, _, success = ...
+    local encounterID, encounterName, _, _, success = ...
     if success == 1 then
+      lastEncounterID = encounterID
       lastEncounterName = encounterName
       lastEncounterAt = time()
     end
@@ -299,18 +337,18 @@ frame:SetScript("OnEvent", function(_, event, ...)
           looter = UnitName("player")
         else
           if not IsInRaid() then return end -- 非团队场景不记他人拾取（世界频道噪声隔离）
-          looter = (caps[1] or ""):gsub("%-[^%-]*$", "") -- 剥服务器后缀（名字-服务器 → 名字）
+          looter = caps[1] or "" -- 保留服务器用于身份核对
           if looter == "" then return end
         end
-        -- 去重防抖
-        local now = time()
-        if lastLoot.itemLink == itemLink and lastLoot.itemID == itemID and lastLoot.looter == looter
-          and lastLoot.difficultyID == difficultyID and lastLoot.instanceName == instName
-          and (now - lastLoot.at) <= 2 then return end
-        lastLoot.itemID, lastLoot.looter, lastLoot.at = itemID, looter, now
-        lastLoot.itemLink = itemLink
-        lastLoot.difficultyID, lastLoot.instanceName = difficultyID, instName
-        recordLoot(itemID, itemLink, looter)
+        local lineID = select(11, ...)
+        if type(lineID) == "number" and lineID > 0 then
+          if seenLines[lineID] then return end
+          seenLines[lineID]=true; table.insert(lineOrder,lineID)
+          if #lineOrder > MAX_ENTRIES then seenLines[table.remove(lineOrder,1)]=nil end
+        end
+        local name, server = playerIdentity(looter, lp.selfLoot)
+        local quantity = lp.multiple and tonumber(caps[#caps]) or 1
+        recordLoot(itemID, itemLink, name, server, quantity)
         return
       end
     end

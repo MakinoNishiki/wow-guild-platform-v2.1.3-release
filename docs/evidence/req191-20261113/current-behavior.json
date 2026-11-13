@@ -1,0 +1,41 @@
+{
+  "kind": "current-behavior-characterization",
+  "simulated": true,
+  "productionAccess": false,
+  "fixed": false,
+  "checks": 8,
+  "results": [
+    {
+      "name": "exact-repeat",
+      "finding": "同秒旧记录可在当前缓存中识别"
+    },
+    {
+      "name": "one-second-offset",
+      "finding": "相差一秒未识别为重复"
+    },
+    {
+      "name": "duplicate-in-one-batch",
+      "finding": "同批相同行均被选中"
+    },
+    {
+      "name": "different-difficulty",
+      "finding": "去重键未区分难度"
+    },
+    {
+      "name": "different-variant",
+      "finding": "去重键未区分物品变体"
+    },
+    {
+      "name": "lost-link",
+      "finding": "入库映射未保留完整链接"
+    },
+    {
+      "name": "shared-db-unique-key",
+      "finding": "数据库精确唯一键不含上传者：同秒可拦，时间不同不拦；仅核DDL，未执行数据库"
+    },
+    {
+      "name": "realm-stripping",
+      "finding": "插件代码剥服务器后缀；仅源码核查"
+    }
+  ]
+}
