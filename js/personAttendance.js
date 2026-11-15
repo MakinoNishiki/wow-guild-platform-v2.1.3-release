@@ -50,7 +50,7 @@ async function personLinkSave(){
   const signature=JSON.stringify({memberIds,personId,name});if(personLinkAttempt&&signature!==personLinkAttempt){personLinkRequestId=crypto.randomUUID();}personLinkAttempt=signature;
   personLinkBusy=true;document.getElementById('personLinkSave').disabled=true;
   document.querySelectorAll('#personLinkModal input,#personLinkModal select').forEach(e=>e.disabled=true);
-  try{const payload={memberIds,personId,name,allowReassign:true,requestId:personLinkRequestId};await cloudCrud('people','link',payload,{renderFn:renderMembers,silentError:true});if(!cloudCrudSentinelCheck('people','link',payload))throw Error('回读未确认角色归属，请保留表单重试');personLinkSnapshot=personLinkForm();closeModal('personLinkModal');showToast('团员角色关系已保存','success');}
+  try{const payload={memberIds,personId,name,allowReassign:true,requestId:personLinkRequestId};await cloudCrud('people','link',payload,{renderFn:renderMembers,silentError:true});if(!cloudCrudSentinelCheck('people','link',payload))throw Error('回读未确认角色归属，请保留表单重试');memberClearSelection();personLinkSnapshot=personLinkForm();closeModal('personLinkModal');showToast('团员角色关系已保存','success');}
   catch(e){error.textContent=e.message;}finally{personLinkBusy=false;document.getElementById('personLinkSave').disabled=false;document.querySelectorAll('#personLinkModal input,#personLinkModal select').forEach(e=>e.disabled=false);}
 }
 async function personEnsure(){

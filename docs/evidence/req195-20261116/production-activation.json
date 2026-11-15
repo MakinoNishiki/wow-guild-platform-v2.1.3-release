@@ -1,0 +1,14 @@
+{
+  "date": "2026-11-16",
+  "commit": "63369ab",
+  "appVersion": "20261116.139",
+  "script": "sql/46a_req195_activate_after_deploy.sql",
+  "transactionCommitted": true,
+  "defaultReadback": "person",
+  "existingActivityModes": {"legacy":30},
+  "existingCounts": {"activity_attendance":812,"raid_members":190,"loot_records":113},
+  "newTablesRowCounts": {"guild_people":0,"guild_person_attendance":0},
+  "backupHashUnchanged": true,
+  "productionBusinessTestWrites": false,
+  "userAcceptance": "pending"
+}

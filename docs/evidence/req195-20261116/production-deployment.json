@@ -1,0 +1,56 @@
+{
+  "date": "2026-11-16",
+  "commit": "63369ab",
+  "version": "20261116.139",
+  "checks": [
+    {
+      "file": "index.html",
+      "status": 200,
+      "normalizedHashMatches": true
+    },
+    {
+      "file": "js/app.js",
+      "status": 200,
+      "normalizedHashMatches": true
+    },
+    {
+      "file": "js/cloud.js",
+      "status": 200,
+      "normalizedHashMatches": true
+    },
+    {
+      "file": "js/personAttendance.js",
+      "status": 200,
+      "normalizedHashMatches": true
+    },
+    {
+      "file": "css/main.css",
+      "status": 200,
+      "normalizedHashMatches": true
+    },
+    {
+      "action": "ensure",
+      "status": 401,
+      "message": "请先登录"
+    },
+    {
+      "action": "link",
+      "status": 401,
+      "message": "请先登录"
+    },
+    {
+      "action": "save",
+      "status": 401,
+      "message": "请先登录"
+    },
+    {
+      "path": "/.env",
+      "status": 404
+    },
+    {
+      "path": "/lib/peopleRoutes.cjs",
+      "status": 404
+    }
+  ],
+  "note": "Read-only deployment and unauthenticated API boundary probes. No production CRUD tests or business writes."
+}

@@ -7698,6 +7698,7 @@ function tierSetBadgeHtml(name) {
 }
 
 function lootRender() {
+  window.LootDetails?.close();
   const tbody = document.getElementById('lootTableBody');
   if (!tbody) return;
 
@@ -7831,7 +7832,7 @@ function lootRender() {
     
     return `
       <tr>
-        <td><span class="loot-name">${loot.pickup_source?lootPickupIcon(loot.pickup_source,loot.name):itemIconImgHtml(loot.name, loot.raid, loot.boss)}${dropEsc(loot.name)}${tierSetBadgeHtml(loot.name)}</span>${loot.source_drop_id?`<br><small>拾取来源 · ${dropEsc(loot.allocation_activity_name||'未关联活动')}</small>`:''}${loot.effect ? `<div class="loot-effect-green" style="font-size:11px;margin-top:2px" title="${loot.effect.replace(/"/g, '&quot;')}">${loot.effect.length > 30 ? loot.effect.slice(0, 30) + '…' : loot.effect}</div>` : ''}</td>
+        <td><button type="button" class="loot-name loot-detail-trigger" data-loot-detail="${dropEsc(loot.id)}" aria-expanded="false" aria-controls="lootDetailPopover" aria-label="查看${dropEsc(loot.name)}装备详情">${loot.pickup_source?lootPickupIcon(loot.pickup_source,loot.name):itemIconImgHtml(loot.name, loot.raid, loot.boss)}${dropEsc(loot.name)}${tierSetBadgeHtml(loot.name)}</button>${loot.source_drop_id?`<br><small>拾取来源 · ${dropEsc(loot.allocation_activity_name||'未关联活动')}</small>`:''}${loot.effect ? `<div class="loot-effect-green" style="font-size:11px;margin-top:2px" title="${loot.effect.replace(/"/g, '&quot;')}">${loot.effect.length > 30 ? loot.effect.slice(0, 30) + '…' : loot.effect}</div>` : ''}</td>
         <td class="num loot-item-level">${Number(loot.item_level)>0?dropEsc(loot.item_level):'—'}</td>
         <td class="center">${wishlistBadge}</td>
         <td><span class="wishlist-raid-tag">${dropEsc(loot.raid || '-')}</span></td>
@@ -9073,6 +9074,10 @@ function lootFillAssignedTo(idOrName) {
 // ==================== 初始化 ====================
 // ==================== 更新日志 ====================
 const changelogData = [
+  {id:'req196-feature',version:'v3.2.0',date:'2026-11-16',type:'feature',typeLabel:'新增功能',title:'分配列表可悬浮查看装备资料',summary:'鼠标移到装备图标或名称即可查看副本掉落图鉴卡片，也支持键盘聚焦。',details:['本次装等与难度单独展示，图鉴属性保留原始参考档。']},
+  {id:'req196-improve',version:'v3.2.0',date:'2026-11-16',type:'improve',typeLabel:'功能优化',title:'装备详情无需离开分配列表',summary:'浮层可移入阅读，长特效完整显示，移开或按Escape关闭。',details:['缺少资料或无法唯一匹配时明确提示，不猜测装备属性。']},
+  {id:'bug124-fix',version:'v3.2.0',date:'2026-11-16',type:'fix',typeLabel:'修复BUG',title:'关联团员成功后清空批量选择',summary:'确认保存成功后取消列表勾选并收起批量操作栏，失败或取消时保留选择。',details:['公会权限与个人角色认领关系不变。']},
+  {id:'req196-refactor',version:'v3.2.0',date:'2026-11-16',type:'refactor',typeLabel:'模块调整',title:'装备详情共用副本图鉴卡片',summary:'复用已有卡片渲染、属性色板和品质边框，不新增数据库结构。',details:['仅展示资料，不改动装备分配记录。']},
   {id:'req195-feature',version:'v3.2.0',date:'2026-11-16',type:'feature',typeLabel:'新增功能',title:'团员与主小号共用考勤',summary:'管理者可将同一人的角色关联为团员，新活动每人记录一次考勤。',details:['未认领角色也可关联；实际参战角色可展开查看，换号不重复计人。']},
   {id:'req195-improve',version:'v3.2.0',date:'2026-11-16',type:'improve',typeLabel:'功能优化',title:'WCL按团员核对出勤',summary:'日志中关联角色的参战记录归到同一团员，可补入本场遗漏团员。',details:['重复同步补充参战角色，并保护人工修正；最终保存前仍可核对。']},
   {id:'req195-fix',version:'v3.2.0',date:'2026-11-16',type:'fix',typeLabel:'修复BUG',title:'避免闲置小号造成重复缺勤',summary:'新活动按团员统计，未上场小号不再单独记作缺席。',details:['历史活动保留原口径；角色后来改归属，也不重复计算同场出席。']},

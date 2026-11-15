@@ -639,7 +639,9 @@
   const PRIMARY_TAG_CLASS = { '力量': 'dp-tag-p1', '敏捷': 'dp-tag-p2', '智力': 'dp-tag-p3' };
   // 金星变体 SVG（§4.2 已注册：右上角金色五角星，自绘；R1：行容器 overflow 放开后任何缩放完整可见）
   const STAR_SVG = '<svg viewBox="0 0 10 10" aria-hidden="true"><path d="M5 0l1.4 3.1L10 3.6 7.3 6l.8 3.4L5 7.6 1.9 9.4 2.7 6 0 3.6l3.6-.5z" fill="#ffd700"/></svg>';
-  function itemCard(l) {
+  // Keep the list callback unary: Array.map supplies an index as its second argument.
+  function itemCard(l) { return renderItemCard(l, state.tierPieces || []); }
+  function renderItemCard(l, tierPieces = []) {
     const pv = l.primary_values || {};
     const sv = l.secondary_values || {};
     // 主属性行（有才渲染）：库内原序 + 色板；缺数值只显属性名（裁定 E）
@@ -669,7 +671,7 @@
     if (l.slot === '套装兑换物') srcParts.push('可兑换本赛季套装');
     const iconUrl = LootTaxonomy.lootIconUrl(l.icon_id, l.icon_name);
     const token = LootTaxonomy.tierTokenMatch(l);
-    const redeemable = LootTaxonomy.redeemableTierPieces(state.tierPieces || [], token, l.season_id);
+    const redeemable = LootTaxonomy.redeemableTierPieces(tierPieces, token, l.season_id);
     // REQ-116（S2-装等批次）：物品等级 meta 行首 tag——ilvl 非空才渲染（RPC 白名单透出，sql/26_s2_ilvl）。
     // 【同档绑定（运营硬性前提，钉死）】装等显示档与 effect 数值必须同档——禁止「装等取 A 档、数值取 B 档」
     // 的混搭路径。当前单值结构天然满足（effect=史诗档实测文本、ilvl=史诗档静态表值）；日后若拆档
@@ -1134,6 +1136,8 @@
   let started = false;
   let reloading = false; // 重拉防重入（进行中的 activate 不再叠加请求）
   window.DPLootDrop = {
+    // REQ-196: allocation details reuse the public card without mounting its page or filters.
+    renderItemCard,
     mount(el) {
       if (started) return;
       started = true;

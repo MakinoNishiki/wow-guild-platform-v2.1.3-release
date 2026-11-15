@@ -5188,3 +5188,28 @@ img.class-icon[src$=".png"] { border-radius: 3px; }
 
 #personLinkModal > .modal { max-width:680px; }
 #personLinkModal .modal-body > p:first-child { margin-bottom:16px; color:var(--text-secondary); }
+/* REQ-196: allocation details reuse the public .dp-item card, outside table clipping. */
+.loot-detail-trigger {
+  appearance: none; border: 0; background: transparent; padding: 0;
+  font: inherit; color: var(--gold); font-weight: 600; text-align: left;
+  cursor: help; border-radius: 4px;
+}
+.loot-detail-trigger:hover { color: var(--gold-light); }
+.loot-detail-trigger:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; }
+.loot-detail-trigger:active { color: var(--gold-light); }
+.loot-detail-popover {
+  position: fixed; z-index: 60; width: min(360px, calc(100vw - 16px));
+  max-height: calc(100vh - 16px); overflow: auto; box-sizing: border-box;
+  padding: 12px; border: 1px solid var(--border-color); border-radius: 8px;
+  background: var(--bg-secondary); color: var(--text-primary);
+  box-shadow: 0 8px 28px rgba(0,0,0,.5); font-size: 13px; line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.loot-detail-popover[hidden] { display: none; }
+.loot-detail-record strong { color: var(--gold); }
+.loot-detail-record > div { margin-top: 4px; }
+.loot-detail-note { color: var(--text-secondary); margin: 8px 0; font-size: 12px; }
+.loot-detail-popover .dp-item-name { white-space: normal; }
+.loot-detail-popover .dp-item-stats { flex-wrap: wrap; }
+.loot-detail-popover .dp-item-effect-wrap { height: auto; max-height: none; overflow: visible; }
+.loot-detail-popover .dp-item-effect-preview { height: auto; max-height: none; overflow: visible; -webkit-line-clamp: unset; }
