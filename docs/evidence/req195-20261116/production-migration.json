@@ -1,0 +1,22 @@
+{
+  "date": "2026-11-16",
+  "authorization": "User explicitly authorized production SQL46 migration",
+  "state": "schema_applied_activation_pending_deployment",
+  "websiteVersionBefore": "20261115.138",
+  "sql46Sha256": "0ee7855821bf492645ac0539988ee76ebc2e22e8c2d1e5f0995077b16e58d997",
+  "stagedSqlSha256": "0f035d448bf3f83292c12537e408d8c30e231ec5e1c774ccfdf44c689ed3a151",
+  "backupSha256": "961c7f36c2886c97dc47bce125d24adf816a26fa11aec3b61320510b51827f5b",
+  "backupBytes": 981281,
+  "backupMode": "600",
+  "archiveListParsed": true,
+  "transactionCommitted": true,
+  "originalFieldsUnchanged": true,
+  "countsBeforeAndAfter": {"activities":30,"activity_attendance":812,"raid_members":190,"loot_records":113},
+  "newTablesRowCounts": {"guild_people":0,"guild_person_attendance":0},
+  "activityDefault": "legacy",
+  "rlsEnabledTables": 2,
+  "enabledTriggers": 3,
+  "rpcExecute": {"anon":false,"authenticated":false,"service_role":true},
+  "productionSyntheticBusinessWrites": false,
+  "appDeployed": false
+}

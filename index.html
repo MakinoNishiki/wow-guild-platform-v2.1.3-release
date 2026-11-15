@@ -4,13 +4,13 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>魔兽管家</title>
-<!-- 静态资源版本号：20261115.138（任务书 #22 WP3-②：凡改动 js/css 的 commit 必须同步递增此处与所有 ?v= 查询串，见 docs/开发规范.md 第五章） -->
+<!-- 静态资源版本号：20261116.139（任务书 #22 WP3-②：凡改动 js/css 的 commit 必须同步递增此处与所有 ?v= 查询串，见 docs/开发规范.md 第五章） -->
 <link rel="icon" type="image/png" sizes="32x32" href="assets/brand/favicon-32.png">
 <link rel="icon" type="image/png" sizes="16x16" href="assets/brand/favicon-16.png">
-<link rel="stylesheet" href="css/main.css?v=20261115.138">
-<link rel="stylesheet" href="css/data-public.css?v=20261115.138"><!-- 任务书 #28 WP5：副本掉落 tab（选择器全 .dp- 前缀 + #page-lootdrop 作用域，零泄漏） -->
-<link rel="stylesheet" href="css/decor-public.css?v=20261115.138"><!-- 任务书 #51：家宅图鉴（选择器全 .dh- 前缀，零泄漏，双壳共用） -->
-<script src="assets/vendor/supabase-js-2.js?v=20261115.138"></script>
+<link rel="stylesheet" href="css/main.css?v=20261116.139">
+<link rel="stylesheet" href="css/data-public.css?v=20261116.139"><!-- 任务书 #28 WP5：副本掉落 tab（选择器全 .dp- 前缀 + #page-lootdrop 作用域，零泄漏） -->
+<link rel="stylesheet" href="css/decor-public.css?v=20261116.139"><!-- 任务书 #51：家宅图鉴（选择器全 .dh- 前缀，零泄漏，双壳共用） -->
+<script src="assets/vendor/supabase-js-2.js?v=20261116.139"></script>
 </head>
 <body>
 
@@ -370,6 +370,7 @@
           <div id="memberBatchToolbar" class="batch-toolbar edit-only" style="display:none">
             <span class="batch-toolbar-count" id="memberBatchCount">已选择 0 人</span>
             <button class="btn btn-sm" id="memberBatchDepartBtn" onclick="memberBatchDepart()">批量离队</button>
+            <button class="btn btn-secondary btn-sm" onclick="personLinkOpen()">关联为同一团员</button>
             <button class="btn btn-danger btn-sm" id="memberBatchDeleteBtn" onclick="memberBatchHardDelete()">批量删除</button>
             <button class="btn btn-sm" onclick="memberClearSelection()">取消选择</button>
           </div>
@@ -564,6 +565,7 @@
               <thead>
                 <tr>
                   <th>装备名称</th>
+                  <th class="num">装等</th>
                   <th class="center">心愿</th>
                   <th>所属团本</th>
                   <th>掉落难度</th>
@@ -574,7 +576,7 @@
                   <th>分配给谁</th>
                   <th class="center">分配状态</th>
                   <th>分配方式</th>
-                  <th class="num">Roll</th>
+                  <th class="num">点数</th>
                   <th>活动日期</th>
                   <th style="width:90px" class="center">操作</th>
                 </tr>
@@ -765,6 +767,7 @@
             <div class="data-action-card" style="opacity:0.7">
               <h4 style="color:var(--text-muted)">💾 本地 JSON 备份/迁移</h4>
               <p style="color:var(--text-muted)">仅作为数据备份或跨环境迁移使用，不参与日常 CRUD 实时数据流。</p>
+              <p>含团员关系或团员考勤的备份目前仅支持导出留存，恢复入口尚未开放。</p>
               <div style="display:flex; gap:10px">
                 <button class="btn btn-sm" onclick="exportData()" id="btnExportLocal">导出 JSON</button>
                 <button class="btn btn-sm edit-only" onclick="document.getElementById('importFile').click()" id="btnImportLocal">导入 JSON</button>
@@ -1634,13 +1637,13 @@
       <p id="lootAllocationHint" class="form-group"></p>
       <div class="form-row">
         <div class="form-group"><label class="form-label" for="lootAllocationStatus">分配状态</label><select class="form-select" id="lootAllocationStatus" onchange="lootAllocationStatusChanged(true)"><option>待分配</option><option>已分配</option></select></div>
-        <div class="form-group"><label class="form-label" for="lootAllocationMember">最终获得者</label><select class="form-select" id="lootAllocationMember"><option value="">尚未确定</option></select></div>
+        <div class="form-group"><label class="form-label" for="lootAllocationMember">最终获得者</label><select class="form-select" id="lootAllocationMember" onchange="lootAllocationMemberChanged()"><option value="">尚未确定</option></select></div>
       </div>
       <div class="form-group"><label class="form-label" for="lootAllocationActivity">所属活动（可稍后关联）</label><select class="form-select" id="lootAllocationActivity"></select><small>没有当天活动也能保存。创建活动后，可从「查看分配」补选；不会据此改写考勤。</small></div>
       <div class="form-group"><label class="form-label" for="lootAllocationBoss">分配记录中的首领</label><input class="form-input" id="lootAllocationBoss" maxlength="160" placeholder="采集缺失时可人工补充，也可暂时留空"><small>人工修正用于分配记录，原始拾取证据保留。</small></div>
       <div class="form-row">
         <div class="form-group"><label class="form-label" for="lootAllocationMethod">分配方式</label><select class="form-select" id="lootAllocationMethod"><option value="custom">自定义 / 未指定</option><option value="roll">直接 Roll</option><option value="roll_rule">规则 Roll</option><option value="cl">CL 决定</option><option value="master_loot">团长分配</option><option value="dkp">DKP</option><option value="epgp">EPGP</option><option value="gkp">GKP</option></select></div>
-        <div class="form-group"><label class="form-label" for="lootAllocationRoll">Roll 点（可选）</label><input class="form-input" id="lootAllocationRoll" type="number" min="1" max="100"></div>
+        <div class="form-group"><label class="form-label" for="lootAllocationRoll">掷骰点数（可选）</label><input class="form-input" id="lootAllocationRoll" type="number" min="1" max="100"></div>
       </div>
       <div class="form-group"><label class="form-label" for="lootAllocationNote">分配备注</label><textarea class="form-textarea" id="lootAllocationNote" maxlength="2000" rows="2" placeholder="例如先代拿，再交易给最终获得者"></textarea></div>
       <p id="lootAllocationError" role="alert" style="color:var(--danger)"></p>
@@ -1648,6 +1651,15 @@
     <div class="modal-footer"><button type="button" class="btn btn-secondary" onclick="requestCloseModal('lootAllocationModal')">关闭</button><button type="button" class="btn btn-primary edit-only" id="lootAllocationSave" onclick="lootAllocationSave()">保存分配记录</button></div>
   </div>
 </div>
+<div class="modal-overlay" id="personLinkModal"><div class="modal">
+  <div class="modal-header"><div class="modal-title">关联团员与角色</div><button type="button" class="modal-close" onclick="requestCloseModal('personLinkModal')">×</button></div>
+  <div class="modal-body"><p>同一团员的角色共用一次考勤。只改变之后活动的归属，历史考勤保留。</p>
+    <div class="form-group" id="personLinkMembers"></div>
+    <div class="form-group"><label class="form-label" for="personLinkTarget">所属团员</label><select class="form-select" id="personLinkTarget"></select></div>
+    <div class="form-group"><label class="form-label" for="personLinkName">团员称呼</label><input class="form-input" id="personLinkName" maxlength="80"></div>
+    <p id="personLinkError" role="alert"></p></div>
+  <div class="modal-footer"><button type="button" class="btn btn-secondary" onclick="requestCloseModal('personLinkModal')">取消</button><button type="button" class="btn btn-primary" id="personLinkSave" onclick="personLinkSave()">保存关系</button></div>
+</div></div>
 <div class="toast-container" id="toastContainer"></div>
 
 <!-- ===== 弹窗：添加/编辑心愿 ===== -->
@@ -2304,22 +2316,23 @@
   </div>
 </div>
 
-<script src="js/cloud.js?v=20261115.138"></script>
+<script src="js/cloud.js?v=20261116.139"></script>
 <!-- 任务书 #14：主数据层（快照兜底 + 加载层），须在 app.js 之前 -->
-<script src="js/masterDataSnapshot.js?v=20261115.138"></script>
-<script src="js/masterData.js?v=20261115.138"></script>
+<script src="js/masterDataSnapshot.js?v=20261116.139"></script>
+<script src="js/masterData.js?v=20261116.139"></script>
 <!-- 任务书 #22 WP2：职业/专精/职责图标集中映射（全站唯一取图处） -->
-<script src="js/iconMap.js?v=20261115.138"></script>
+<script src="js/iconMap.js?v=20261116.139"></script>
 <!-- 任务书 #31（REQ-097）：装备分类词表单一真源（公示页 chips / picker 过滤 / BUG-057 回填三处消费，须在 dataPublic.js 与 app.js 之前） -->
-<script src="js/itemQualityData.js?v=20261115.138"></script>
-<script src="js/lootTaxonomy.js?v=20261115.138"></script>
+<script src="js/itemQualityData.js?v=20261116.139"></script>
+<script src="js/lootTaxonomy.js?v=20261116.139"></script>
 <!-- 任务书 #28 WP5：副本掉落渲染层（双壳同源；无 data-public-body 不自动启动，由 app.js 懒挂载，须在 app.js 之前） -->
-<script src="js/dataPublic.js?v=20261115.138"></script>
+<script src="js/dataPublic.js?v=20261116.139"></script>
 <!-- 任务书 #51（REQ-137 一期）：家宅图鉴词表单一真源（价格/分类/尺寸/来源词表，须在 decorData.js 之前） -->
-<script src="js/decorDict.js?v=20261115.138"></script>
+<script src="js/decorDict.js?v=20261116.139"></script>
 <!-- 任务书 #51：家宅图鉴数据层+渲染层（双壳同源；无 data-decor-body 不自动启动，由 app.js 懒挂载，须在 app.js 之前） -->
-<script src="js/decorData.js?v=20261115.138"></script>
-<script src="js/app.js?v=20261115.138"></script>
-<script src="js/track.js?v=20261115.138"></script><!-- 任务书 #54 WP1：全站埋点采集层（REQ-141，零依赖静默兜底） -->
+<script src="js/decorData.js?v=20261116.139"></script>
+<script src="js/app.js?v=20261116.139"></script>
+<script src="js/personAttendance.js?v=20261116.139"></script>
+<script src="js/track.js?v=20261116.139"></script><!-- 任务书 #54 WP1：全站埋点采集层（REQ-141，零依赖静默兜底） -->
 </body>
 </html>

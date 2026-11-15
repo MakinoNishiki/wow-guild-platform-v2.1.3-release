@@ -1,0 +1,15 @@
+{
+  "kind": "VM actual cloud.js with controlled transport",
+  "checks": [
+    "reloadMembers / raid_members / guild",
+    "reloadMembers / guild_people / guild",
+    "reloadMembers / guild_people / logout",
+    "reloadMembers / guild_people / same-user",
+    "reloadActivities / guild_person_attendance / guild",
+    "reloadActivities / guild_person_attendance / logout",
+    "reloadActivities / guild_person_attendance / same-user",
+    "same-account relogin invalidates old selectGuild",
+    "mutation: removed read guards is detected",
+    "mutation: removed logout selection invalidation is detected"
+  ]
+}

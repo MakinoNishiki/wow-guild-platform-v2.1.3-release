@@ -400,6 +400,8 @@
   // ---- 用户登出后 ----
   function onUserSignedOut() {
     isCloudMode = false;
+    guildSelectionSequence++;
+    clearPeopleContext();
     if (window.appData) { window.appData.decorPlans = []; window.appData.decorPlan = null; }
     // BUG-078（任务书 #44 WP1）：登出清偏好内存态与本地数据缓存——否则同浏览器换号后，
     // 新账号在自身偏好加载完成前沿用上一账号的 nav_order/calendar_density（导航串号病灶）。
@@ -442,6 +444,7 @@
   // ---- 选择公会 ----
   async function selectGuild(guildId) {
     if (!supabaseClient || !currentUser) return;
+    const selectionUserId=currentUser.id,selection=++guildSelectionSequence;
 
     const { data: guildData, error: guildError } = await supabaseClient
       .from('guilds')
@@ -451,7 +454,9 @@
 
     if (guildError) throw guildError;
     if (!guildData) throw new Error('公会不存在');
+    if(currentUser?.id!==selectionUserId||selection!==guildSelectionSequence)return;
 
+    clearPeopleContext();
     currentGuild = guildData;
 
     const { data: memberData, error: memberError } = await supabaseClient
@@ -462,6 +467,7 @@
       .maybeSingle();
 
     if (memberError) throw memberError;
+    if(currentUser?.id!==selectionUserId||selection!==guildSelectionSequence)return;
     currentMembership = memberData;
 
     localStorage.setItem(lastGuildStorageKey(), guildId); // BUG-078：用户维度键，跨账号不串
@@ -647,6 +653,11 @@
 
     try {
       switch (dataType) {
+        case 'people':
+        case 'personAttendance':
+          await reloadMembers(guildId);
+          await reloadActivities(guildId);
+          break;
         case 'members':
           await reloadMembers(guildId);
           break;
@@ -679,7 +690,13 @@
     }
   }
 
+  let guildSelectionSequence=0,peopleContextEpoch=0;
+  function clearPeopleContext(){
+    peopleContextEpoch++;
+    if(window.appData){window.appData.people=[];window.appData.peopleReady=false;window.appData.peopleError='';window.appData.members=[];window.appData.activities=[];}
+  }
   async function reloadMembers(guildId) {
+    const readUserId=currentUser?.id,readEpoch=peopleContextEpoch;
     const { data, error } = await supabaseClient
       .from('raid_members')
       .select('*')
@@ -702,12 +719,18 @@
       join_date: m.join_date || formatDate(new Date()),
       notes: m.notes || '',
       user_id: m.user_id || null, // 任务书 #18 WP2：认领人（多角色认领的读取入口）
+      person_id: m.person_id || null,
       created_at: m.created_at,
       updated_at: m.updated_at
     }));
 
     if (typeof window.appData !== 'undefined') {
+      const people = data?.[0] && !Object.prototype.hasOwnProperty.call(data[0],'person_id') ? {data:[],error:true} : await readPeopleRows('guild_people',guildId);
+      if(currentGuild?.id!==guildId||currentUser?.id!==readUserId||readEpoch!==peopleContextEpoch)throw new Error('账号或公会已切换，请重新读取');
       window.appData.members = members;
+      window.appData.people = people.data || [];
+      window.appData.peopleReady = !people.error;
+      window.appData.peopleError = people.error ? '团员考勤尚未配置或读取失败，请稍后重试' : '';
     }
   }
 
@@ -801,6 +824,7 @@
   }
 
   async function reloadActivities(guildId) {
+    const readUserId=currentUser?.id,readEpoch=peopleContextEpoch;
     const { data: activitiesData, error: activitiesError } = await supabaseClient
       .from('activities')
       .select('*')
@@ -815,6 +839,9 @@
       .in('activity_id', (activitiesData || []).map(a => a.id));
 
     if (attendanceError) throw attendanceError;
+
+    const personResult=(activitiesData||[]).some(a=>a.attendance_mode==='person')?await readPeopleRows('guild_person_attendance',guildId):{data:[],error:null};
+    if(personResult.error&&(activitiesData||[]).some(a=>a.attendance_mode==='person'))throw new Error('团员考勤读取失败，请重试');
 
     const attendanceMap = {};
     (attendanceData || []).forEach(att => {
@@ -844,9 +871,12 @@
       // REQ-037（任务书 #12）：WCL 同步快照（已导入提示条的数据来源，刷新后仍需可读）
       wcl_snapshot: a.wcl_snapshot || null,
       attendees: attendanceMap[a.id] || []
+      ,attendance_mode:a.attendance_mode||'legacy'
+      ,person_attendees:(personResult.data||[]).filter(p=>p.activity_id===a.id)
     }));
 
     if (typeof window.appData !== 'undefined') {
+      if(currentGuild?.id!==guildId||currentUser?.id!==readUserId||readEpoch!==peopleContextEpoch)throw new Error('账号或公会已切换，请重新读取');
       window.appData.activities = activities;
     }
   }
@@ -863,6 +893,10 @@
 
     try {
       switch (dataType) {
+        case 'people':
+        case 'personAttendance':
+          await syncPeople(guildId,operation,item);
+          break;
         case 'members':
           await syncMember(guildId, operation, item);
           break;
@@ -909,6 +943,28 @@
     if (typeof window.appData !== 'undefined') {
       window.appData.lootDrops = rows;
     }
+  }
+
+  async function readPeopleRows(table,guildId){
+    const rows=[];
+    for(let offset=0;;offset+=500){
+      let q=supabaseClient.from(table).select('*').eq('guild_id',guildId);
+      q=table==='guild_people'?q.order('id'):q.order('activity_id').order('person_id');
+      const {data,error}=await q.range(offset,offset+499);
+      if(error)return {data:[],error};
+      rows.push(...(data||[]));if((data||[]).length<500)return{data:rows,error:null};
+    }
+  }
+
+  async function syncPeople(guildId,operation,item) {
+    if(!['ensure','link','save'].includes(operation))throw new Error('团员操作无效');
+    const token=await getAccessToken(),userId=currentUser?.id;
+    if(!token)throw new Error('请先登录');
+    const response=await fetch('/api/people/'+operation,{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify({...item,guildId})});
+    const result=await response.json();
+    if(!response.ok)throw new Error(result.message||'团员保存未确认，请重试');
+    if(currentGuild?.id!==guildId||currentUser?.id!==userId)throw new Error('账号或公会已切换，请在原公会核对保存结果');
+    item.result=result;
   }
 
   async function syncLootDrop(guildId, operation, item) {

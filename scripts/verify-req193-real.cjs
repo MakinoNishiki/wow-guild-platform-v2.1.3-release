@@ -3,7 +3,7 @@ const assert=require('node:assert/strict'),crypto=require('node:crypto'),fs=requ
 const {chromium}=require('playwright');
 module.exports=async config=>{
   assert.equal(config.ENVIRONMENT,'isolated-test');assert.equal(config.SUPABASE_URL,'http://127.0.0.1:18000');
-  const out='docs/evidence/req193-20261115';fs.mkdirSync(out,{recursive:true});
+  const out=config.verifyLootDisplay?'docs/evidence/req194-20261116':'docs/evidence/req193-20261115';fs.mkdirSync(out,{recursive:true});
   const headers={apikey:config.SUPABASE_SERVICE_ROLE_KEY,Authorization:'Bearer '+config.SUPABASE_SERVICE_ROLE_KEY,'Content-Type':'application/json',Prefer:'return=representation'};
   const call=async(path,method='GET',body)=>{const r=await fetch(config.SUPABASE_URL+path,{method,headers,body:body===undefined?undefined:JSON.stringify(body)});const t=await r.text();assert(r.ok,path+' '+r.status+' '+t.slice(0,120));return t?JSON.parse(t):null;};
   const checks=[],errors=[],users=[],guilds=[];let browser,p,v;
@@ -26,12 +26,14 @@ module.exports=async config=>{
     const owner=await createUser(),viewer=await createUser(),outsider=await createUser();const g=await createGuild(owner),foreign=await createGuild(outsider);
     await call('/rest/v1/guild_members','POST',{guild_id:g.id,user_id:viewer.id,role:'viewer'});
     const [m1,m2]=await call('/rest/v1/raid_members','POST',[{guild_id:g.id,name:'同名成员',server:'罗宁',class:'战士',spec:'武器',status:'正式'},{guild_id:g.id,name:'同名成员',server:'金色平原',class:'战士',spec:'武器',status:'正式'}]);
+    if(config.verifyLootDisplay)await call('/rest/v1/raid_members','POST',['法师','牧师','盗贼','猎人','圣骑士','萨满','德鲁伊','术士','武僧','恶魔猎手','死亡骑士','唤魔师'].map(cls=>({guild_id:g.id,name:cls+'测试',class:cls,status:'正式'})));
     const [fm]=await call('/rest/v1/raid_members','POST',{guild_id:foreign.id,name:'外会成员',class:'战士',status:'正式'});
     for(const m of [m1,m2])await call('/rest/v1/wishlists','POST',{guild_id:g.id,member_id:m.id,items:[{id:crypto.randomUUID(),itemName:'剧毒悔恨束带',obtained:false}]});
     const [fa]=await call('/rest/v1/activities','POST',{guild_id:foreign.id,name:'外会活动',activity_date:'2026-11-15'});
     browser=await chromium.launch({channel:'chrome',headless:true});p=await login(owner);v=await login(viewer);
     const time=Math.floor(Date.now()/1000)-60;
     const sample={playerName:'代拿者',playerServer:'罗宁',itemID:268259,itemName:'剧毒悔恨束带',itemLink:'|Hitem:268259:0:0:0:0:0:0:0:90:0:0:0:1:12345|h[剧毒悔恨束带]|h',iconID:7730297,quality:4,ilvl:344,slot:'INVTYPE_WAIST',slotCN:'腰部',itemType:'护甲',difficultyID:16,instanceName:'烈毒之渊',bossName:'',timestamp:time,quantity:1,captureVersion:'1.0.6',bindingStatus:'ordinary',collectorSourceID:'req193',sourceEventID:'first'};
+    if(config.verifyLootDisplay)delete sample.slotCN; // Actual Collector export need not contain translated slot.
     // Real pasted export -> parsing -> API -> DB, then review through UI.
     await p.locator('#lootViewDrops .toolbar-right button').click();await p.locator('#lootDropImportText').fill(JSON.stringify([sample,{...sample,playerName:'另一拾取人',sourceEventID:'second'}]));
     await p.getByRole('button',{name:'解析预览',exact:true}).click();await p.locator('#lootDropImportConfirmBtn').click();
@@ -39,6 +41,21 @@ module.exports=async config=>{
     const rows=await call('/rest/v1/loot_drops?guild_id=eq.'+g.id);const d1=rows.find(r=>r.player_name==='代拿者'),d2=rows.find(r=>r.player_name==='另一拾取人');
     const alloc=(page,body)=>api(page,'/api/loot-observations/allocate',{guildId:g.id,sourceDropId:d1.id,status:'待分配',...body});
     check('未核对来源不能转分配',(await alloc(p,{})).status===409);
+    if(config.verifyLootDisplay){
+      const row=p.locator('#lootDropsTableBody tr').filter({hasText:'代拿者'});
+      check('未核对且缺首领的记录给出下一步', (await row.innerText()).includes('先核对，再分配')&&(await row.innerText()).includes('未采集'));
+      await p.screenshot({path:out+'/pickup-next-step.png',fullPage:true,animations:'disabled'});
+      await row.locator('[data-drop-review]').click();await p.locator('[data-review-allocate]').waitFor();
+      p.once('dialog',d=>d.dismiss());await p.locator('[data-review-allocate]').click();
+      check('取消核对不跳转、不写入',await p.locator('#lootDropReviewModal.show').isVisible()&&(await call('/rest/v1/loot_drops?id=eq.'+d1.id))[0].review_status!=='confirmed');
+      await p.route('**/api/loot-observations/review',r=>r.fulfill({status:503,json:{message:'测试核对失败'}}));
+      p.once('dialog',d=>d.accept());await p.locator('[data-review-allocate]').click();await p.waitForFunction(()=>lootDropDeleting.size===0);
+      check('核对保存失败不打开分配，按钮恢复',await p.locator('#lootDropReviewModal.show').isVisible()&&await p.locator('[data-review-allocate]').isEnabled()&&!await p.locator('#lootAllocationModal.show').isVisible());
+      await p.unroute('**/api/loot-observations/review');
+      p.once('dialog',d=>d.accept());await p.locator('[data-review-allocate]').click();await p.locator('#lootAllocationModal.show').waitFor();
+      check('晚拾取缺首领可确认后连续填写分配',await p.locator('#lootAllocationBoss').inputValue()===''&&(await call('/rest/v1/loot_records?guild_id=eq.'+g.id)).length===0);
+      await p.locator('#lootAllocationModal .modal-close').click();
+    }
     for(const d of [d1,d2]){await p.locator('[data-drop-review="'+d.id+'"]').click();await p.locator('[data-review-confirm]').waitFor();p.once('dialog',d=>d.accept());await p.locator('[data-review-confirm]').click();await p.waitForFunction(()=>lootDropDeleting.size===0&&!document.getElementById('lootDropReviewModal').classList.contains('show'));}
     await open(d1.id);
     await p.locator('#lootAllocationModal .modal-body').evaluate(el=>el.scrollTop=0);
@@ -53,6 +70,17 @@ module.exports=async config=>{
     check('未选最终获得者就地拦截且没有入库',(await p.locator('#lootAllocationError').innerText()).includes('请选择最终获得者')&&(await call('/rest/v1/loot_records?guild_id=eq.'+g.id)).length===0);
     await p.locator('#lootAllocationStatus').selectOption('待分配');await p.locator('#lootAllocationBoss').fill('盘卷祭坛');
     check('切回待分配清除不适用错误',await p.locator('#lootAllocationError').innerText()==='');
+    if(config.verifyLootDisplay){
+      check('13职业选项与既有职业色同源',await p.evaluate(()=>{
+        const options=[...document.querySelectorAll('#lootAllocationMember option')].filter(o=>o.value);
+        return options.length===14&&options.every(o=>{const m=appData.members.find(m=>m.id===o.value),probe=document.createElement('span');probe.style.color=IconMap.classColor(m.class);document.body.append(probe);const expected=getComputedStyle(probe).color;probe.remove();return getComputedStyle(o).color===expected;});
+      }));
+      await p.locator('#lootAllocationStatus').selectOption('已分配');await p.locator('#lootAllocationMember').selectOption(m1.id);
+      check('选中获得者保留职业色',await p.locator('#lootAllocationMember').evaluate(el=>el.style.color==='rgb(199, 156, 110)'));
+      await p.locator('#lootAllocationStatus').selectOption('待分配');
+      check('待分配清空获得者和职业色',await p.locator('#lootAllocationMember').inputValue()===''&&await p.locator('#lootAllocationMember').evaluate(el=>el.style.color==='var(--text-primary)'));
+      await p.locator('#lootAllocationMethod').selectOption('roll_rule');await p.locator('#lootAllocationRoll').fill('88');
+    }
     await p.locator('#lootAllocationNote').fill('晚拾取，确认后再交易。'.repeat(100));
     check('长备注不造成弹窗横向溢出',await p.locator('#lootAllocationModal .modal').evaluate(el=>el.scrollWidth<=el.clientWidth+1));
     p.once('dialog',d=>d.dismiss());await p.locator('#lootAllocationModal .modal-close').click();check('未保存关闭可取消',await p.locator('#lootAllocationModal.show').isVisible());
@@ -61,6 +89,17 @@ module.exports=async config=>{
     let [record]=await call('/rest/v1/loot_records?guild_id=eq.'+g.id);
     check('真实保存待分配并自动出现在分配表',record.source_drop_id===d1.id&&record.item_stats.status==='待分配'&&record.character_id===null&&(await p.locator('#lootTableBody').innerText()).includes('剧毒悔恨束带'));
     check('装等难度原链接品质保留；修正首领不改采集证据',record.item_level===344&&record.difficulty==='史诗'&&record.boss_name==='盘卷祭坛'&&record.item_stats.pickup_source.quality===4&&record.item_stats.pickup_source.item_link===sample.itemLink&&(await call('/rest/v1/loot_drops?id=eq.'+d1.id))[0].boss_name==='');
+    if(config.verifyLootDisplay){
+      const row=p.locator('#lootTableBody tr').filter({hasText:'剧毒悔恨束带'});
+      check('分配表独立装等列、史诗和中文部位方式',await row.locator('.loot-item-level').innerText()==='344'&&(await row.innerText()).includes('史诗')&&(await row.innerText()).includes('腰部')&&(await row.innerText()).includes('按规则掷骰')&&!(await row.innerText()).includes('INVTYPE_')&&!(await row.innerText()).includes('roll_rule'));
+      check('规则掷骰显示实际点数88',(await row.innerText()).includes('88'));
+      for(const [slot,cn] of [['INVTYPE_LEGS','腿部'],['INVTYPE_CHEST','胸部'],['INVTYPE_WAIST','腰部']]){
+        await call('/rest/v1/loot_records?id=eq.'+record.id,'PATCH',{item_slot:slot});await p.evaluate(async()=>{await CloudSync.reloadData('loots');lootRender();});
+        check('已有部位代码显示中文：'+slot,(await row.innerText()).includes(cn)&&!(await row.innerText()).includes(slot));
+      }
+      for(const width of [1366,1920]){await p.setViewportSize({width,height:1080});await p.screenshot({path:out+'/allocation-list-'+width+'.png',fullPage:true,animations:'disabled'});check(width+'分配表不撑宽页面',await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));}
+      await p.setViewportSize({width:1366,height:768});
+    }
     const savedId=record.id;
     check('重复创建返回原记录且不覆盖',(await alloc(p,{status:'已分配',characterId:m1.id})).body.id===savedId&&(await call('/rest/v1/loot_records?id=eq.'+savedId))[0].character_id===null);
     await p.reload();await p.waitForFunction(()=>CloudSync.getCurrentGuild());await p.locator('#lootViewTabs [data-lootview="assign"]').click();

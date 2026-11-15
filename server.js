@@ -657,6 +657,12 @@ async function authorizeProxyRequest(user, table, method, queryString, rawBody) 
   const filters = parseEqFilters(queryString);
   const rows = parseBodyRows(rawBody);
 
+  if (['guild_people','guild_person_attendance'].includes(table) ||
+      table==='raid_members'&&rows.some(r=>r&&Object.prototype.hasOwnProperty.call(r,'person_id')) ||
+      table==='activities'&&rows.some(r=>r&&Object.prototype.hasOwnProperty.call(r,'attendance_mode'))) {
+    return deny('团员关联与考勤口径请使用专用入口');
+  }
+
   if ((method === "POST" || method === "PATCH") && rows.length === 0) {
     return badRequest("新增或修改必须提供有效的 JSON 数据");
   }
@@ -1500,6 +1506,7 @@ function serveFile(res, filePath, req) {
 }
 
 const handleLootObservations = require('./lib/lootObservationRoutes.cjs')({auth:verifyTokenCached,get:supabaseRestGet,write:supabaseRestWrite,body:readBody});
+const handlePeople = require('./lib/peopleRoutes.cjs')({auth:verifyTokenCached,get:supabaseRestGet,write:supabaseRestWrite,body:readBody});
 const handleWclUser = require('./lib/wclUserRoutes.cjs')({
   auth: verifyTokenCached, role: getGuildRoleCached, get: supabaseRestGet,
   write: supabaseRestWrite, body: readBody,
@@ -1564,6 +1571,7 @@ const server = http.createServer(async (req, res) => {
 
   // REQ-185: authenticated account linking and confirmed batch claims.
   if (await handleLootObservations(req, res, corsHeaders, urlPath)) return;
+  if (await handlePeople(req, res, corsHeaders, urlPath)) return;
   if (await handleWclUser(req, res)) return;
 
   // API: Supabase config

@@ -146,3 +146,10 @@
 ## 物品图标品质描边（REQ-179）
 
 物品及装备图标统一使用 `data-item-quality="0…7"` 和 `css/main.css` 品质色板。品质顺序为粗糙 #9D9D9D、普通 #FFFFFF、优秀 #1EFF00、精良 #0070DD、史诗 #A335EE、传说 #FF8000、神器 #E6CC80、传家宝 #00CCFF。优先使用记录品质；当前掉落目录缺字段时可用 12.1.5 客户端中同名且品质一致的已核对照。品质缺失或存在歧义时使用组件默认中性边框。品质与职业色、主题色分别维护。新增物品图标入口须复用该规则。
+
+## REQ194 / REQ195 登记（2026-11-16）
+
+- 装备分配新增 `.loot-next-step` 说明未核对的下一步，`.loot-item-level` 独立装等数字列；分配表最小宽度1280px，窄桌面在表内滚动，装备名最小180px避免竖排。获得者选项及选中值复用IconMap职业色，原生选择高亮仍由既有样式/系统负责。
+- `.person-stat-mode` 复用toolbar/form-select，明确“按团员（新活动）”和“按角色（历史活动）”，禁止两个口径混加；`.person-owner-label` 说明角色所属团员。
+- `.person-attendance-row` 复用考勤行，原生details/summary展开实际参战角色；`.person-attendance-add` 提供保存前显式补入名单；`#personLinkModal` 沿用既有弹窗、勾选、主次按钮及错误提示。
+- 两块均不改主色、职业配色、图标资产或移动端封存取舍。审计证据见design-plans/req194-loot-feedback.md和req195-person-attendance.md。

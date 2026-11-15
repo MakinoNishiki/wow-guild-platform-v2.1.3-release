@@ -667,7 +667,9 @@ async function loadMyClaims() {
       const ids = new Set(mineHere.map(r => r.id));
       const names = new Set(mineHere.map(r => r.name));
       let present = 0, total = 0;
+      const attendancePeople=new Set();
       mineHere.forEach(r => {
+        const key=personMode()==='person'?(appData.members.find(m=>m.id===r.id)?.person_id||r.id):r.id;if(attendancePeople.has(key))return;attendancePeople.add(key);
         const s = getAttendanceStats(r.id, appData.activities);
         present += s.present;
         total += s.total;
@@ -676,7 +678,7 @@ async function loadMyClaims() {
         (l.character_id && ids.has(l.character_id)) || (l.assignedTo && names.has(l.assignedTo))).length;
       const wishCount = (appData.wishlist || []).filter(w => ids.has(w.memberId)).length;
       const rate = total > 0 ? Math.round((present / total) * 100) : 0;
-      sumEl.textContent = `本公会认领 ${mineHere.length} 人 · 合计出勤率 ${rate}%（出勤 ${present}/应到 ${total}） · 装备 ${lootCount} 件 · 心愿 ${wishCount} 条`;
+      sumEl.textContent = `本公会认领 ${mineHere.length} 个角色 · ${personMode()==='person'?'团员':'历史角色'}出勤率 ${rate}%（出勤 ${present}/应到 ${total}） · 装备 ${lootCount} 件 · 心愿 ${wishCount} 条`;
     }
   }
 }
@@ -1431,6 +1433,8 @@ async function syncToCloudAndReload(dataType, operation, item, extra, renderFn) 
 // 同名的标量键值逐一相等（对象/数组键如 attendees/off_specs/item_stats 因前后端结构映射差异不比对，
 // payload 缺 id 或未知数据类型不校验）。appData 集合映射：members/loots/wishlist(s)/activities。
 function cloudCrudSentinelCheck(dataType, operation, payload) {
+  if(dataType==='people')return operation==='ensure'?appData.members.filter(m=>!isDepartedStatus(m.status)).every(m=>m.person_id):!!payload.result?.id&&payload.memberIds.every(id=>appData.members.find(m=>m.id===id)?.person_id===payload.result.id);
+  if(dataType==='personAttendance')return payload.rows.every(row=>appData.activities.find(a=>a.id===payload.activityId)?.person_attendees?.some(a=>a.person_id===row.person_id&&a.status===row.status&&JSON.stringify((a.characters||[]).map(c=>c.id).sort())===JSON.stringify([...new Set(row.character_ids||[])].sort())));
   const coll = dataType === 'members' ? appData.members
     : dataType === 'loots' ? appData.loots
     : (dataType === 'wishlist' || dataType === 'wishlists') ? appData.wishlist
@@ -3040,8 +3044,9 @@ document.addEventListener('click', (e) => {
 
 // ==================== 仪表盘 ====================
 function renderDashboard() {
+  personStatsControl('page-dashboard');
   const members = appData.members.filter(m => m.status !== '离队');
-  const activities = appData.activities;
+  const activities = appData.activities.filter(a=>(a.attendance_mode==='person')===(personMode()==='person'));
   const today = formatDate(new Date());
   
   // 本月活动数
@@ -3052,7 +3057,7 @@ function renderDashboard() {
   // 今日出勤（与考勤模块口径一致：出席+替补+迟到）
   const todayActivity = activities.find(a => a.date === today);
   const todayAttendance = todayActivity ? 
-    todayActivity.attendees.filter(a => a.status === '出席' || a.status === '替补' || a.status === '迟到').length : 0;
+    attendanceRows(todayActivity).filter(a => a.status === '出席' || a.status === '替补' || a.status === '迟到').length : 0;
   
   // 平均出勤率
   const avgRate = calculateAvgAttendanceRate(activities);
@@ -3097,7 +3102,7 @@ function renderDashboard() {
   // 最近活动（与考勤模块口径一致：出席+替补+迟到）
   const recent = [...activities].sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 5);
   const recentHtml = recent.length ? recent.map(a => {
-    const presentCount = a.attendees.filter(att => att.status === '出席' || att.status === '替补' || att.status === '迟到').length;
+    const presentCount = attendanceRows(a).filter(att => att.status === '出席' || att.status === '替补' || att.status === '迟到').length;
     // REQ-100（任务书 #32 F1）：状态徽标一级可见——判定来源 = 既有 activities.status（REQ-020），禁新造语义；
     // 已取消条目整体灰化降饱和 + 「已取消」高对比实色徽标
     const isCancelled = a.status === 'cancelled';
@@ -3147,13 +3152,13 @@ function getAttendanceStatsCore(activities, matchFn) {
 // 任务书 #27 WP2：已删除成员的考勤记录保留——考勤详情按 member_name 快照灰显「已删除」展示不篡改；
 // BUG-107 补丁（任务书 #62 终审裁定）起各统计排行同口径剔除已删除成员，原伪行聚合函数随裁定移除
 function getAttendanceStats(memberId, activities) {
-  return getAttendanceStatsCore(activities, a => a.member_id === memberId);
+  return personStats(memberId, activities);
 }
 
 
 function calculateAvgAttendanceRate(activities) {
   // BUG-014：与成员级口径同源 = 全成员（非离队）出勤率的平均
-  const members = appData.members.filter(m => m.status !== '离队');
+  const members = statisticsMembers(activities);
   if (!members.length || !activities.length) return 0;
   const sum = members.reduce((acc, m) => acc + getAttendanceStats(m.id, activities).rate, 0);
   return Math.round(sum / members.length);
@@ -3178,7 +3183,7 @@ function renderRankList(containerId, limit, activities) {
 // 不再隐式依赖报表页的 reportRange，算法统一走 getAttendanceStats。
 // BUG-107 补丁（任务书 #62 终审裁定）：已删除成员不再聚合成伪行——各排行统一只含在册（非离队）成员
 function getAttendanceRankings(activities) {
-  const members = appData.members.filter(m => m.status !== '离队');
+  const members = statisticsMembers(activities);
 
   const rows = members.map(member => {
     const stats = getAttendanceStats(member.id, activities);
@@ -3398,6 +3403,7 @@ function claimerLabelHtml(member) {
 
 
 function renderMembers() {
+  personStatsControl('page-members');
   const search = document.getElementById('memberSearch').value.toLowerCase();
   const classFilter = document.getElementById('classFilter').value;
   // 任务书 #18 WP2：认领/解除认领按钮按当前用户判定
@@ -3476,6 +3482,7 @@ function renderMembers() {
         <td class="class-${cls}">
           <div style="font-weight:500">${memberDisplayName(m)}</div>
           ${m.user_id ? claimerLabelHtml(m) : ''}
+          ${personMemberLabel(m)}
         </td>
         <td style="color:var(--text-secondary)">${(m.server || '').trim() || '—'}</td>
         <td>
@@ -4713,12 +4720,12 @@ function getAttFilteredActivities() {
   }
   // 成员：该活动有此成员的考勤记录
   if (attFilter.memberId) {
-    list = list.filter(a => (a.attendees || []).some(att => att.member_id === attFilter.memberId));
+    list = list.filter(a => attendanceRows(a).some(att => att.member_id === attFilter.memberId || att.person_id === appData.members.find(m=>m.id===attFilter.memberId)?.person_id));
   }
   // 状态多选：选中具体成员时按其状态匹配；全部成员时任一成员状态命中即保留
   if (attFilter.statuses.size > 0) {
-    list = list.filter(a => (a.attendees || []).some(att =>
-      (!attFilter.memberId || att.member_id === attFilter.memberId) && attFilter.statuses.has(att.status)));
+    list = list.filter(a => attendanceRows(a).some(att =>
+      (!attFilter.memberId || att.member_id === attFilter.memberId || att.person_id === appData.members.find(m=>m.id===attFilter.memberId)?.person_id) && attFilter.statuses.has(att.status)));
   }
   return list;
 }
@@ -4730,7 +4737,7 @@ function attRenderFilterSubtotal(activities) {
   if (!el) return;
   const targets = attFilter.memberId
     ? appData.members.filter(m => m.id === attFilter.memberId)
-    : appData.members.filter(m => m.status !== '离队');
+    : statisticsMembers();
   let present = 0, total = 0;
   targets.forEach(m => {
     const s = getAttendanceStats(m.id, activities);
@@ -4738,7 +4745,7 @@ function attRenderFilterSubtotal(activities) {
     total += s.total;
   });
   const rate = total > 0 ? Math.round((present / total) * 100) : 0;
-  el.textContent = `小计：出勤率 ${rate}%（出勤 ${present}/应到 ${total}）`;
+  el.textContent = `小计（${personMode()==='person'?'团员':'历史角色'}）：出勤率 ${rate}%（出勤 ${present}/应到 ${total}）`;
 }
 
 // ==================== REQ-017-B：活动批量删除 ====================
@@ -4866,10 +4873,10 @@ function renderActivityList() {
     // BUG-107（任务书 #62 §3）：统计剔除已删除成员考勤行——判定口径同 #27-补丁2（id 优先、状态回退）：
     // id 命中成员表（含离队）= 在案；id 定位不到 / id 为空（硬删除 DB 置 NULL，member_name 快照保留）= 已删除。
     // 只改统计口径，考勤记录与明细灰显「已删除」不动。
-    const attActive = a.attendees.filter(att => att.member_id && appData.members.some(m => m.id === att.member_id));
+    const attActive = a.attendance_mode==='person' ? attendanceRows(a) : a.attendees.filter(att => att.member_id && appData.members.some(m => m.id === att.member_id));
     const present = attActive.filter(att => att.status === '出席' || att.status === '替补' || att.status === '迟到').length;
     const absent = attActive.filter(att => att.status === '缺席').length;
-    const total = appData.members.filter(m => m.status !== '离队').length;
+    const total = a.attendance_mode==='person' ? attendanceRows(a).length : appData.members.filter(m => m.status !== '离队').length;
     const rate = total > 0 ? Math.round((present / total) * 100) : 0;
     // REQ-020：已取消活动灰显 + 徽标
     const isCancelled = a.status === 'cancelled';
@@ -4889,7 +4896,7 @@ function renderActivityList() {
             <span>📅 ${a.date}</span>
             <span>⏰ ${a.start_time || '--:--'} - ${a.end_time || '--:--'}</span>
             ${a.team_label ? `<span class="tag tag-gold" title="团号">${/^\d+$/.test((a.team_label || '').trim()) ? `${(a.team_label || '').trim()} 团` : `团号：${a.team_label}`}</span>` : ''}
-            <span>👥 ${a.attendees.length} 人登记</span>
+            <span>👥 ${attendanceRows(a).length} ${a.attendance_mode==='person'?'团员':'角色（历史口径）'}登记</span>
             ${a.wcl_snapshot ? '<span class="tag tag-blue" title="已核对 WCL 报告并保存快照；已有考勤标记保留">WCL 已核对</span>' : ''}
           </div>
           ${conflicts.length ? `<div class="activity-conflict-line">⚠ 与 ${conflicts.map(c => `《${c.raid_name || '未命名活动'}》${c.start_time || '--:--'}-${c.end_time || '--:--'}`).join('、')} 冲突</div>` : ''}
@@ -5098,7 +5105,9 @@ async function saveActivity() {
           return;
         }
       }
-      const attendees = appData.members.filter(m => m.status !== '离队').map(m => ({
+      if(!appData.peopleReady)throw Error(appData.peopleError||'团员资料尚未加载完成，请稍后重试创建活动');
+      await cloudCrud('people','ensure',{}, {renderFn:()=>{},silentError:true});
+      const attendees = appData.peopleReady ? [] : appData.members.filter(m => m.status !== '离队').map(m => ({
         member_id: m.id, status: '缺席', notes: ''
       }));
       const payload = { ...activityData, id: activityCreateId, status: 'normal', attendees };
@@ -5241,6 +5250,7 @@ function updateWclImportedBanner(activity) {
   const banner = document.getElementById('attendanceWclBanner');
   if (!banner) return;
   const snap = activity.wcl_snapshot;
+  if(activity.attendance_mode==='person'){banner.textContent=snap?'WCL按团员合并：同一人的参战角色只计一次出席。未参战团员请人工核对。':'';banner.style.display=snap?'':'none';return;}
   if (!snap) { banner.style.display = 'none'; return; }
   const members = appData.members.filter(m => m.status !== '离队');
   const marked = members.filter(m => {
@@ -5254,6 +5264,7 @@ function updateWclImportedBanner(activity) {
 }
 
 function renderAttendanceMembers(activity) {
+  if(activity.attendance_mode==='person'){renderPersonAttendance(activity);return;}
   // REQ-042（软删除）：活跃成员全量展示；已离队成员若在该活动有考勤行（历史记录）也展示，
   // 名字后加灰色「已离队」标记，状态仍可编辑（其考勤行随 saveAttendance 整表收集而保留）
   const members = appData.members.filter(m =>
@@ -5321,6 +5332,7 @@ function renderAttendanceMembers(activity) {
 
 // REQ-055：考勤编辑弹窗实时统计行——从 DOM 下拉当前值聚合（0 项灰显不隐藏，位置稳定）
 function updateAttendanceStatsLine() {
+  personSyncSelections();
   const el = document.getElementById('attendanceStatsLine');
   if (!el) return;
   const counts = { '出席': 0, '替补': 0, '请假': 0, '缺席': 0, '迟到': 0 };
@@ -5382,6 +5394,7 @@ function updateAttendCheckbox(select) {
   const checkbox = document.querySelector(`.attend-checkbox[data-member="${memberId}"]`);
   const status = select.value;
   checkbox.checked = status === '出席' || status === '替补' || status === '迟到';
+  if(['缺席','请假'].includes(status))document.querySelectorAll(`.person-character[data-person="${memberId}"]`).forEach(c=>c.checked=false);
   updateAttendanceStatsLine(); // REQ-055
 }
 
@@ -5399,6 +5412,8 @@ function setAllAttendance(status) {
 let attendanceSaving = false;
 
 async function saveAttendance() {
+  const personActivity=appData.activities.find(a=>a.id===currentActivityId);
+  if(personActivity?.attendance_mode==='person')return savePersonAttendance(personActivity);
   if (attendanceSaving) return;
   attendanceSaving = true;
   const saveBtn = document.getElementById('attendanceSaveBtn');
@@ -5975,9 +5990,10 @@ let wclSyncDirty = false; // 弹窗防误关：忽略过角色即视为有未确
 let wclSyncing = false;
 
 function attendanceHasUnsavedMarks(activity) {
+  if(activity.attendance_mode==='person'&&currentActivityId===activity.id&&document.getElementById('attendanceDetailModal').classList.contains('show'))return personAttendanceForm()!==personAttendanceSnapshot;
   if (currentActivityId !== activity.id || !document.getElementById('attendanceDetailModal').classList.contains('show')) return false;
   return [...document.querySelectorAll('#attendanceDetailModal .attend-status-select')].some(el =>
-    el.value !== (activity.attendees.find(a => String(a.member_id) === el.dataset.member)?.status || '缺席'));
+    el.value !== (attendanceRows(activity).find(a => String(a.person_id||a.member_id) === el.dataset.member)?.status || '缺席'));
 }
 
 async function syncAttendanceFromWcl() {
@@ -6013,11 +6029,11 @@ function buildWclSyncPreview(activity, reportCode, data, replacement = null) {
   // "已手动标记"口径：创建活动时会给全员预置"缺席"占位行（saveActivity），
   // 真正手动标过的状态（出席/迟到/替补/请假）一律不动、计入保留数
   // REQ-046（任务书 #13）：保留名单同时存明细（成员名：状态），预览页悬浮展开
-  const preservedList = activity.attendees
+  const preservedList = attendanceRows(activity)
     .filter(a => a.status && (replacement || a.status !== '缺席'))
     .map(a => {
       const m = appData.members.find(mm => mm.id === a.member_id);
-      return { name: m ? m.name : '（名单外成员）', status: a.status };
+      return { name: a.person_name || (m ? m.name : '（名单外成员）'), status: a.status };
     });
   const preservedCount = preservedList.length;
   const members = appData.members.filter(m => !isDepartedStatus(m.status));
@@ -6028,12 +6044,12 @@ function buildWclSyncPreview(activity, reportCode, data, replacement = null) {
       bossFights: p.bossFights || 0, memberId: null, status: '出席', ignored: false
     };
     // 按角色名逐一匹配（REQ-095 统一口径：单候选宽松、多候选须 (name,server) 精确相等），
-    // 同一人多个号各算各的，不做合并
+    // 角色匹配保留证据；按人活动写入时聚合所属团员。
     const member = wclMatchRosterMember(members, p);
     if (!member) return { ...base, zone: 'unmatched' };
     // 已有标记（非占位"缺席"）的成员不进预览，同步一律不动
-    const att = activity.attendees.find(a => a.member_id === member.id);
-    if (att && att.status && (replacement || att.status !== '缺席')) return null;
+    const att = activity.attendance_mode==='person' ? activity.person_attendees?.find(a=>a.person_id===personIdForActivity(activity,member)) : activity.attendees.find(a => a.member_id === member.id);
+    if (att && att.status && (replacement || att.status !== '缺席') && !(activity.attendance_mode==='person'&&att.source==='wcl'&&att.status==='出席'&&!replacement)) return null;
     return { ...base, memberId: member.id, zone: base.bossFights >= bossFightTotal ? 'full' : 'partial' };
   }).filter(Boolean);
   const oldPlayers = activity.wcl_snapshot?.players || [];
@@ -6070,7 +6086,9 @@ function renderWclSyncPreview() {
   document.getElementById('wclSyncConfirmBtn').textContent = meta.replacement ? '确认更换并保留已有考勤' : '确认写入考勤';
   document.getElementById('wclSyncConfirmBtn').disabled = !meta.bossFightTotal;
 
-  const statusSelect = (r, i, opts) =>
+  const byPerson=appData.activities.find(a=>a.id===meta.activityId)?.attendance_mode==='person';
+  if(byPerson){const activity=appData.activities.find(a=>a.id===meta.activityId),ids=new Set([...full,...partial].map(r=>{const member=appData.members.find(m=>m.id===r.memberId);return member?personIdForActivity(activity,member):r.memberId;}));document.getElementById('wclSyncStats').textContent=`匹配 ${full.length+partial.length} 个参战角色，合并为 ${ids.size} 名团员正常出席；未上场小号不记缺席。未关联角色先独立记录，归属请在成员管理核对。`;}
+  const statusSelect = (r, i, opts) => byPerson ? '<span class="tag">正常出席（按团员合并）</span>' :
     `<select class="form-select" id="wclSyncStatus${i}" style="height:26px;padding:2px 6px;width:76px" onchange="wclSyncSetStatus(${i},this.value)">` +
     opts.map(o => `<option value="${o}" ${r.status === o ? 'selected' : ''}>${o}</option>`).join('') + '</select>';
   const rowShell = (i, cls, inner) =>
@@ -6096,7 +6114,7 @@ function renderWclSyncPreview() {
     html += partial.map(r => {
       const i = wclSyncRows.indexOf(r);
       return rowShell(i, 'wcl-sync-partial', `${nameHtml(r)}
-        <span style="color:var(--warning);font-size:11px;margin-left:8px">仅参加 ${r.bossFights}/${meta.bossFightTotal} 场 BOSS 战，可改为替补</span>
+        <span style="color:var(--warning);font-size:11px;margin-left:8px">参加 ${r.bossFights}/${meta.bossFightTotal} 场 BOSS 战${byPerson?'，换号仍算团员正常出席':'，可改为替补'}</span>
         <span style="margin-left:auto">${statusSelect(r, i, ['出席', '替补'])}</span>`);
     }).join('') + '</div>';
   }
@@ -6222,7 +6240,8 @@ async function wclSyncConfirm() {
     if (!token) throw new Error('未登录，请先登录');
     let added = 0, kept = 0;
     // 规范 1.2.2 批处理例外：循环写入 activity_attendance（代理），完成后统一 reload 一次
-    for (const r of rows) {
+    if(activity.attendance_mode==='person')added=await personWclSave(activity,rows,meta.replacement);
+    for (const r of activity.attendance_mode==='person'?[]:rows) {
       if (window.CloudSync.getCurrentGuild()?.id !== meta.guildId) throw Error('公会已切换，同步已停止');
       // 幂等：写前再查已有考勤，已有标记（非占位"缺席"）的一律不动；重复点同步不产生重复记录
       const att = activity.attendees.find(a => a.member_id === r.memberId);
@@ -6321,6 +6340,7 @@ function setReportRange(days) {
 }
 
 function renderReports() {
+  personStatsControl('page-reports');
   // BUG-014：报表页尊重用户自选时间范围，算法与仪表盘/成员列表同源
   // BUG-107 补丁（任务书 #62 终审裁定）：主排名表同步剔除已删除成员——与活动卡/缺席榜同口径；
   // 考勤明细灰显「已删除」保留不篡改（#27 WP2「报表含伪行」口径自此收口）
@@ -6494,7 +6514,7 @@ function drawLineChart() {
   ctx.clearRect(0, 0, w, h);
   
   // 获取最近10次活动（REQ-020：已取消活动无真实出勤，不进出勤趋势图）
-  const recent = [...appData.activities].filter(a => a.status !== 'cancelled').sort((a, b) => new Date(a.date) - new Date(b.date)).slice(-10);
+  const recent = [...appData.activities].filter(a => a.status !== 'cancelled' && (a.attendance_mode==='person')===(personMode()==='person')).sort((a, b) => new Date(a.date) - new Date(b.date)).slice(-10);
   
   if (!recent.length) {
     ctx.fillStyle = '#6e7681';
@@ -6504,12 +6524,13 @@ function drawLineChart() {
     return;
   }
   
-  const totalMembers = appData.members.filter(m => m.status !== '离队').length;
+  const totalMembers = statisticsMembers().length;
   
   // 计算每次活动的出勤率
   const rates = recent.map(a => {
-    const present = a.attendees.filter(att => att.status === '出席' || att.status === '替补' || att.status === '迟到').length;
-    return totalMembers > 0 ? (present / totalMembers) * 100 : 0;
+    const present = attendanceRows(a).filter(att => att.status === '出席' || att.status === '替补' || att.status === '迟到').length;
+    const denominator=a.attendance_mode==='person'?attendanceRows(a).length:totalMembers;
+    return denominator > 0 ? (present / denominator) * 100 : 0;
   });
   
   // 网格线
@@ -6595,7 +6616,7 @@ function drawLineChart() {
 function renderDataPage() {
   const memberCount = appData.members.length;
   const activityCount = appData.activities.length;
-  const totalAttendances = appData.activities.reduce((sum, a) => sum + a.attendees.length, 0);
+  const totalAttendances = appData.activities.filter(a=>(a.attendance_mode==='person')===(personMode()==='person')).reduce((sum, a) => sum + attendanceRows(a).length, 0);
   
   // 计算数据大小
   const dataSize = new Blob([JSON.stringify(appData)]).size;
@@ -6648,6 +6669,19 @@ function exportData() {
   showToast('数据已导出', 'success');
 }
 
+// REQ195: the legacy JSON restorer cannot rebuild person/character identities.
+// Reject before any writes, including before a destructive overwrite of a new-model guild.
+function personBackupImportError(data, current, overwrite = false) {
+  if (current.peopleReady === false || current.peopleError) return '当前团员与考勤数据尚未完整读取，暂不能导入备份。请完成配置或刷新重试，原数据未改动。';
+  const hasPeople = value => !!((value.people || []).length ||
+    (value.members || []).some(m => m.person_id) ||
+    (value.activities || []).some(a => a.attendance_mode === 'person' || (a.person_attendees || []).length));
+  if (hasPeople(data)) return '此备份含团员关系或按团员考勤，当前导入器尚不支持恢复。未导入或删除数据，请保留备份。';
+  if (current.peopleReady && (data.activities || []).length) return '旧考勤备份不能直接导入团员考勤模式，需先适配历史恢复。未导入或删除数据，请保留备份。';
+  if (overwrite && hasPeople(current)) return '当前公会已有团员关系或按团员考勤，不能用旧备份覆盖。未删除任何数据。';
+  return '';
+}
+
 function handleImportFile(event) {
   const file = event.target.files[0];
   if (!file) return;
@@ -6661,8 +6695,12 @@ function handleImportFile(event) {
         showToast('文件格式不正确', 'error');
         return;
       }
+      const importError = personBackupImportError(data, appData);
+      if (importError) { showToast(importError, 'error'); return; }
       
       const mode = confirm('点击"确定"合并数据，点击"取消"覆盖现有数据。\n\n合并：保留现有数据，添加新数据\n覆盖：删除所有现有数据，替换为导入的数据');
+      const overwriteError = personBackupImportError(data, appData, !mode);
+      if (overwriteError) { showToast(overwriteError, 'error'); return; }
       
       // 规范 1.2.2 批处理例外：JSON 导入属于备份/迁移的批量写入，
       // 循环 saveCloudData 写入，全部完成后统一 reload 一次再渲染（与 importMembers 同款写法）
@@ -7046,6 +7084,7 @@ async function lootDropReviewAction(id, action, targetId) {
     const expected={confirm:'confirmed',ignore:'ignored',merge:'merged',activity:'needs_review'}[action];
     if(current?.review_status!==expected)throw new Error('回读尚未确认，请刷新核对');
     closeModal('lootDropReviewModal');showToast('核对结果已保存','success');
+    return true;
   }catch(e){showToast('核对结果未确认：'+e.message,'error');}
   finally{lootDropDeleting.delete(id);if(cloud.getCurrentGuild()?.id===guildId)lootDropsRenderTable();}
 }
@@ -7062,12 +7101,19 @@ async function lootDropReviewOpen(id) {
   const peers=(appData.lootDrops||[]).filter(d=>d.id!==id&&!['ignored','merged'].includes(d.review_status)&&d.official_item_id===row.official_item_id&&d.player_name===row.player_name&&d.player_server===row.player_server&&d.activity_id===row.activity_id&&d.difficulty_id===row.difficulty_id&&d.quantity===row.quantity);
   box.innerHTML=`<p class="form-group"><strong>${dropEsc(row.item_name)}</strong> × ${row.quantity||1} · ${dropEsc(row.player_name)} ${dropEsc(row.player_server)}</p>
     <p class="form-group">${dropEsc(row.review_reason||'历史记录，请核对来源')}；拾取时间 ${dropEsc(new Date(row.timestamp).toLocaleString('zh-CN'))}</p>
-    <p class="form-group">记录拾取事实，最终分配需另行确认。</p>
+    <p class="form-group">记录拾取事实，最终分配需另行确认。${row.boss_name?'':'首领未采集，可在分配时补充；不影响核对这件拾取。'}</p>
     ${error?'<p>来源读取失败，请关闭后重试。</p>':`<div class="table-container"><table class="data-table"><thead><tr><th>采集时间</th><th>服务器 / 难度</th><th>装等 / 数量</th></tr></thead><tbody>${(data||[]).map(o=>`<tr><td>${dropEsc(new Date(o.payload.timestamp).toLocaleString('zh-CN'))}</td><td>${dropEsc(o.payload.player_server||'未提供')} / ${dropEsc(o.payload.difficulty)}</td><td>${o.payload.ilvl||'—'} / ${o.payload.quantity}</td></tr>`).join('')||'<tr><td colspan="3">旧记录没有采集来源</td></tr>'}</tbody></table></div>`}
     <div class="form-group" style="margin-top:16px"><label class="form-label" for="lootDropMergeTarget">确认属于同一次拾取时，可合并到已有记录</label>
     <select class="form-select" id="lootDropMergeTarget"><option value="">请选择，保留两件时无需合并</option>${peers.map(d=>`<option value="${dropEsc(d.id)}">${dropEsc(new Date(d.timestamp).toLocaleString('zh-CN'))} · ${dropEsc(d.item_name)} × ${d.quantity||1}</option>`).join('')}</select></div>
     <div class="form-group"><label class="form-label" for="lootDropReviewActivity">更正所属活动</label><select class="form-select" id="lootDropReviewActivity"><option value="">选择正确活动</option>${(appData.activities||[]).filter(a=>a.status!=='cancelled').map(a=>`<option value="${dropEsc(a.id)}">${dropEsc(a.date||a.activity_date)} · ${dropEsc(a.name||a.raid)}</option>`).join('')}</select><button type="button" class="btn btn-secondary btn-sm" data-review-activity>更正活动</button></div>
-    <div class="toolbar"><button type="button" class="btn btn-primary" data-review-confirm>确认拾取</button><button type="button" class="btn btn-secondary" data-review-merge>合并重复</button><button type="button" class="btn btn-danger" data-review-ignore>忽略误录</button></div>`;
+    <div class="toolbar"><button type="button" class="btn btn-secondary" data-review-confirm ${error?'disabled':''}>确认拾取</button>${row.quantity===1?`<button type="button" class="btn btn-primary" data-review-allocate ${error?'disabled':''}>确认并填写分配</button>`:''}<button type="button" class="btn btn-secondary" data-review-merge>合并重复</button><button type="button" class="btn btn-danger" data-review-ignore>忽略误录</button></div>`;
+  box.querySelector('[data-review-allocate]')?.addEventListener('click',async()=>{
+    const buttons=[...box.querySelectorAll('button')];buttons.forEach(b=>b.disabled=true);
+    try{
+      const confirmed=await lootDropReviewAction(id,'confirm');
+      if(confirmed&&window.CloudSync.getCurrentGuild()?.id===guildId)await lootAllocationOpen(id);
+    }finally{buttons.forEach(b=>b.disabled=false);}
+  });
   for(const [selector,action] of [['[data-review-confirm]','confirm'],['[data-review-merge]','merge'],['[data-review-ignore]','ignore'],['[data-review-activity]','activity']]) {
     box.querySelector(selector).onclick=async event=>{
       const targetId=document.getElementById(action==='activity'?'lootDropReviewActivity':'lootDropMergeTarget').value;
@@ -7175,9 +7221,9 @@ function lootDropsRenderTable() {
       <td class="num">${d.ilvl != null ? d.ilvl : '—'}</td>
       <td>${dropEsc(d.slot_cn || LOOT_DROP_INVTYPE_ZH[d.slot] || d.slot || '—')}</td>
       <td class="center">${dropEsc(d.difficulty || '—')}</td>
-      <td>${dropEsc(d.boss_name || '—')}</td>
+      <td>${dropEsc(d.boss_name || '未采集')}</td>
       <td>${dropEsc(d.instance_name || '—')}</td>
-      <td class="center"><div class="toolbar">${allocation?`<button type="button" class="btn btn-secondary btn-sm" data-drop-allocate="${dropEsc(d.id)}">查看分配 · ${dropEsc(allocation.status)}</button>`:`<button type="button" class="btn btn-secondary btn-sm edit-only" data-drop-review="${dropEsc(d.id)}" ${lootDropDeleting.has(d.id)?'disabled':''}>核对</button> ${d.review_status==='confirmed'&&d.quantity===1?`<button type="button" class="btn btn-primary btn-sm edit-only" data-drop-allocate="${dropEsc(d.id)}">转分配</button>`:''}<button type="button" class="btn btn-danger btn-sm edit-only" data-drop-delete="${dropEsc(d.id)}" ${lootDropDeleting.has(d.id)||d.review_status==='ignored'?'disabled':''}>${lootDropDeleting.has(d.id)?'保存中…':'忽略'}</button>`}</div>${d.quantity>1?'<small>多件记录需先核实每件去向</small>':''}</td>
+      <td class="center"><div class="toolbar">${allocation?`<button type="button" class="btn btn-secondary btn-sm" data-drop-allocate="${dropEsc(d.id)}">查看分配 · ${dropEsc(allocation.status)}</button>`:`<button type="button" class="btn btn-secondary btn-sm edit-only" data-drop-review="${dropEsc(d.id)}" ${lootDropDeleting.has(d.id)?'disabled':''}>核对</button> ${d.review_status==='confirmed'&&d.quantity===1?`<button type="button" class="btn btn-primary btn-sm edit-only" data-drop-allocate="${dropEsc(d.id)}">转分配</button>`:''}<button type="button" class="btn btn-danger btn-sm edit-only" data-drop-delete="${dropEsc(d.id)}" ${lootDropDeleting.has(d.id)||d.review_status==='ignored'?'disabled':''}>${lootDropDeleting.has(d.id)?'保存中…':'忽略'}</button>`}</div>${!allocation&&d.review_status!=='confirmed'&&d.review_status!=='ignored'?'<small class="loot-next-step">先核对，再分配</small>':''}${d.quantity>1?'<small>多件记录需先核实每件去向</small>':''}</td>
     </tr>`;
   }).join('');
   tbody.querySelectorAll('[data-drop-review]').forEach(button=>button.addEventListener('click',()=>lootDropReviewOpen(button.dataset.dropReview)));
@@ -7198,6 +7244,14 @@ function lootAllocationStatusChanged(clearError=false){
   const pending=document.getElementById('lootAllocationStatus').value==='待分配';
   if(pending)member.value='';
   member.disabled=pending||!window.CloudSync.canEdit();
+  lootAllocationMemberChanged();
+}
+function lootAllocationMemberChanged(){
+  const select=document.getElementById('lootAllocationMember');
+  for(const cls of [...select.classList])if(cls.startsWith('class-'))select.classList.remove(cls);
+  const member=(appData.members||[]).find(m=>m.id===select.value);
+  if(classMap[member?.class])select.classList.add('class-'+classMap[member.class]);
+  select.style.color=window.IconMap?.classColor(member?.class)||'var(--text-primary)';
 }
 function lootPickupIcon(source,name){
   const id=Number(source?.icon_id);
@@ -7224,15 +7278,17 @@ async function lootAllocationOpen(sourceDropId){
     document.getElementById('lootAllocationHint').textContent=record?'已关联一条分配记录。修改后保存，不会新增第二条。':'装备资料已带入。拾取人可能代拿；请明确选择最终获得者，或先保存为待分配。';
     document.getElementById('lootAllocationStatus').value=record?.status||'待分配';
     const members=(appData.members||[]).filter(m=>!['离队','inactive'].includes(m.status));
-    document.getElementById('lootAllocationMember').innerHTML='<option value="">尚未确定</option>'+members.map(m=>`<option value="${dropEsc(m.id)}">${dropEsc(m.name)} · ${dropEsc(m.server||'服务器未提供')} · ${dropEsc(m.class||'')}</option>`).join('');
+    document.getElementById('lootAllocationMember').innerHTML='<option value="">尚未确定</option>'+members.map(m=>`<option class="${classMap[m.class]?'class-'+classMap[m.class]:''}" style="color:${window.IconMap?.classColor(m.class)||'var(--text-primary)'}" value="${dropEsc(m.id)}">${dropEsc(m.name)} · ${dropEsc(m.server||'服务器未提供')} · ${dropEsc(m.class||'')}</option>`).join('');
     const memberId=record?.character_id||'';
     if(memberId&&!members.some(m=>m.id===memberId))document.getElementById('lootAllocationMember').insertAdjacentHTML('beforeend',`<option value="${dropEsc(memberId)}">${dropEsc(record.assignedTo||'原获得者')}（已离队，请重新选择）</option>`);
     document.getElementById('lootAllocationMember').value=memberId;
-    document.getElementById('lootAllocationActivity').innerHTML='<option value="">暂不关联活动</option>'+(appData.activities||[]).filter(a=>a.status!=='cancelled').map(a=>`<option value="${dropEsc(a.id)}">${dropEsc(a.date||a.activity_date)} · ${dropEsc(a.name||a.raid)}</option>`).join('');
+    document.getElementById('lootAllocationActivity').innerHTML='<option value="">暂不关联活动</option>'+(appData.activities||[]).filter(a=>a.status!=='cancelled').map(a=>`<option value="${dropEsc(a.id)}">${dropEsc(a.date||a.activity_date)} · ${dropEsc(a.name||a.raidName||a.raid||'未命名活动')}</option>`).join('');
     document.getElementById('lootAllocationActivity').value=(record?record.allocation_activity_id:drop.activity_id)||'';
     if(!document.getElementById('lootAllocationActivity').value)document.getElementById('lootAllocationActivity').value='';
     document.getElementById('lootAllocationBoss').value=record?record.boss:drop.boss_name||'';
-    document.getElementById('lootAllocationMethod').value=record?.distribution_method||'custom';
+    const methodSelect=document.getElementById('lootAllocationMethod');
+    methodSelect.innerHTML=Object.entries(LOOT_DISTRIBUTION_LABELS).map(([value,label])=>`<option value="${value}">${label}</option>`).join('');
+    methodSelect.value=record?.distribution_method||'custom';
     document.getElementById('lootAllocationRoll').value=record?.roll_value||'';
     document.getElementById('lootAllocationNote').value=record?.note||'';
     document.getElementById('lootAllocationError').textContent='';
@@ -7346,6 +7402,12 @@ const LOOT_DROP_INVTYPE_ZH = {
   INVTYPE_WEAPON: '武器', INVTYPE_2HWEAPON: '武器', INVTYPE_WEAPONMAINHAND: '武器',
   INVTYPE_WEAPONOFFHAND: '武器', INVTYPE_RANGED: '武器', INVTYPE_RANGEDRIGHT: '武器',
   INVTYPE_SHIELD: '副手', INVTYPE_HOLDABLE: '副手',
+};
+
+// REQ-194: human labels only at display boundaries; preserve stored enum values.
+const LOOT_DISTRIBUTION_LABELS = {
+  roll:'掷骰分配', roll_rule:'按规则掷骰', cl:'团队议会分配', master_loot:'团长分配',
+  dkp:'团本积分分配', epgp:'贡献／装备积分分配', gkp:'金币竞拍', custom:'自定义'
 };
 
 function lootDropImportParse() {
@@ -7714,7 +7776,7 @@ function lootRender() {
     // 任务书 #59 WP4 空态填充：文案承诺的「添加装备」落成真实入口钮（viewer 由 edit-only 门控隐藏）
     tbody.innerHTML = `
       <tr>
-        <td colspan="14">
+        <td colspan="15">
           <div class="empty-state">
             <div class="empty-icon">⚔️</div>
             <div class="empty-text">暂无装备记录，点击「添加装备」开始记录</div>
@@ -7738,14 +7800,8 @@ function lootRender() {
     const secondaryStatsHtml = (loot.secondaryStats || [])
       .map(s => `<span class="loot-stat-tag">${s}</span>`).join('');
     
-    const distMethodMap = {
-      'roll': 'Roll',
-      'cl': 'CL',
-      'master_loot': '队长',
-      'custom': '自定义'
-    };
-    const distMethodText = distMethodMap[loot.distribution_method] || loot.distribution_method || '-';
-    const rollText = loot.distribution_method === 'roll' 
+    const distMethodText = LOOT_DISTRIBUTION_LABELS[loot.distribution_method] || loot.distribution_method || '—';
+    const rollText = ['roll','roll_rule'].includes(loot.distribution_method)
       ? `${loot.player_action === 'need' ? '需求' : loot.player_action === 'greed' ? '贪婪' : loot.player_action === 'pass' ? '放弃' : ''} ${loot.roll_value || ''}`.trim() || '-'
       : '-';
     // REQ-008："心愿"独立成列，非心愿装备显示 —
@@ -7775,17 +7831,18 @@ function lootRender() {
     
     return `
       <tr>
-        <td><span class="loot-name">${loot.pickup_source?lootPickupIcon(loot.pickup_source,loot.name):itemIconImgHtml(loot.name, loot.raid, loot.boss)}${dropEsc(loot.name)}${tierSetBadgeHtml(loot.name)}</span>${loot.source_drop_id?`<br><small>拾取来源 · 装等 ${loot.item_level||'未提供'} · ${dropEsc(loot.allocation_activity_name||'未关联活动')}</small>`:''}${loot.effect ? `<div class="loot-effect-green" style="font-size:11px;margin-top:2px" title="${loot.effect.replace(/"/g, '&quot;')}">${loot.effect.length > 30 ? loot.effect.slice(0, 30) + '…' : loot.effect}</div>` : ''}</td>
+        <td><span class="loot-name">${loot.pickup_source?lootPickupIcon(loot.pickup_source,loot.name):itemIconImgHtml(loot.name, loot.raid, loot.boss)}${dropEsc(loot.name)}${tierSetBadgeHtml(loot.name)}</span>${loot.source_drop_id?`<br><small>拾取来源 · ${dropEsc(loot.allocation_activity_name||'未关联活动')}</small>`:''}${loot.effect ? `<div class="loot-effect-green" style="font-size:11px;margin-top:2px" title="${loot.effect.replace(/"/g, '&quot;')}">${loot.effect.length > 30 ? loot.effect.slice(0, 30) + '…' : loot.effect}</div>` : ''}</td>
+        <td class="num loot-item-level">${Number(loot.item_level)>0?dropEsc(loot.item_level):'—'}</td>
         <td class="center">${wishlistBadge}</td>
         <td><span class="wishlist-raid-tag">${dropEsc(loot.raid || '-')}</span></td>
-        <td>${loot.difficulty || ''}</td>
+        <td>${dropEsc(loot.difficulty || '—')}</td>
         <td>${dropEsc(loot.boss || '')}</td>
-        <td>${dropEsc(loot.slot || '')}</td>
+        <td>${dropEsc(LOOT_DROP_INVTYPE_ZH[loot.slot] || loot.slot || '—')}</td>
         <td>${loot.primaryStat || ''}</td>
         <td><div class="loot-secondary-stats">${secondaryStatsHtml || '-'}</div></td>
         <td>${assignedToHtml}${claimerLabelHtml(assignedMark === '' ? assignedMember : null)}</td>
         <td class="center"><span class="badge ${statusBadge}">${loot.status || '待分配'}</span></td>
-        <td>${distMethodText}</td>
+        <td>${dropEsc(distMethodText)}</td>
         <td class="num">${rollText}</td>
         <td>${loot.date || '-'}</td>
         <td class="center">
@@ -9016,6 +9073,14 @@ function lootFillAssignedTo(idOrName) {
 // ==================== 初始化 ====================
 // ==================== 更新日志 ====================
 const changelogData = [
+  {id:'req195-feature',version:'v3.2.0',date:'2026-11-16',type:'feature',typeLabel:'新增功能',title:'团员与主小号共用考勤',summary:'管理者可将同一人的角色关联为团员，新活动每人记录一次考勤。',details:['未认领角色也可关联；实际参战角色可展开查看，换号不重复计人。']},
+  {id:'req195-improve',version:'v3.2.0',date:'2026-11-16',type:'improve',typeLabel:'功能优化',title:'WCL按团员核对出勤',summary:'日志中关联角色的参战记录归到同一团员，可补入本场遗漏团员。',details:['重复同步补充参战角色，并保护人工修正；最终保存前仍可核对。']},
+  {id:'req195-fix',version:'v3.2.0',date:'2026-11-16',type:'fix',typeLabel:'修复BUG',title:'避免闲置小号造成重复缺勤',summary:'新活动按团员统计，未上场小号不再单独记作缺席。',details:['历史活动保留原口径；角色后来改归属，也不重复计算同场出席。']},
+  {id:'req195-scope',version:'v3.2.0',date:'2026-11-16',type:'refactor',typeLabel:'模块调整',title:'区分团员考勤与角色装备',summary:'新旧考勤口径分别查看，装备、心愿和认领仍归具体角色。',details:['团员关系不改变账号权限；历史转换入口与新结构备份恢复暂未开放。']},
+  {id:'req194-feature',version:'v3.2.0',date:'2026-11-16',type:'feature',typeLabel:'新增功能',title:'核对后连续填写分配',summary:'拾取核对面板增加“确认并填写分配”，确认成功后直接打开原分配表单。',details:['仍需明确确认最终获得者；不会把拾取人自动当成最终获得者。']},
+  {id:'req194-improve',version:'v3.2.0',date:'2026-11-16',type:'improve',typeLabel:'功能优化',title:'装备信息更清楚',summary:'分配列表独立显示装等并保留难度；获得者下拉按职业色显示。',details:['未核对记录明确提示先核对再分配；首领未采集时可在分配表单补充。']},
+  {id:'req194-fix',version:'v3.2.0',date:'2026-11-16',type:'fix',typeLabel:'修复BUG',title:'修复装备部位与分配方式显示代码',summary:'插件部位代码和规则掷骰等内部值显示为中文，规则掷骰同时显示已填点数。',details:['已有记录直接兼容，无需重新导入；活动选择显示团本名称。']},
+  {id:'req194-scope',version:'v3.2.0',date:'2026-11-16',type:'refactor',typeLabel:'模块调整',title:'沿用核对与分配权限',summary:'复用已有核对、分配记录和职业色，不改变原始拾取证据。',details:['本项不更新游戏插件；团员考勤调整作为另一验收块。']},
   {id:'bug122-feature',version:'v3.2.0',date:'2026-11-15',type:'feature',typeLabel:'新增功能',title:'拾取导入可靠性补丁',summary:'本次不新增业务功能，完善现有导入流程。',details:[]},
   {id:'bug122-improve',version:'v3.2.0',date:'2026-11-15',type:'improve',typeLabel:'功能优化',title:'更换原文后重新核对预览',summary:'修改导入文本后，旧预览自动失效，解析后再提交。',details:[]},
   {id:'bug122-fix',version:'v3.2.0',date:'2026-11-15',type:'fix',typeLabel:'修复BUG',title:'修复旧预览误提交与插件链接导出',summary:'修复替换原文仍提交旧记录；Collector 1.0.6保留复制后的完整物品链接。',details:['插件更新后重新导出已有记录，无需新掉落。']},
