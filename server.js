@@ -867,6 +867,13 @@ async function authorizeProxyRequest(user, table, method, queryString, rawBody) 
   // REQ-191: raw evidence and canonical records only change through transactional routes.
   if (table === 'loot_drops') return deny('拾取记录请使用提交或核对入口');
   if (table === 'loot_records' && rows.some(row => row && 'source_drop_id' in row)) return deny('拾取关联请使用专用分配入口');
+  if(table==='loot_records'&&method==='PATCH') {
+    if(!filters.id?.length)return deny('修改分配须指定记录');
+    for(const id of filters.id){
+      const row=await fetchRowById('loot_records',id,'source_drop_id');
+      if(row?.source_drop_id)return deny('有拾取来源的分配请使用专用分配入口');
+    }
+  }
   // ---- 公会业务表：raid_members / activities / activity_attendance / loot_records / wishlists / claim_requests / deleted_raid_members / loot_drops ----
   // claim_requests（任务书 #21 WP2）：owner/editor 审批操作（PATCH 批准/拒绝、DELETE）走本通用分支；
   // viewer 的 INSERT/撤回已在上方窄例外处理。

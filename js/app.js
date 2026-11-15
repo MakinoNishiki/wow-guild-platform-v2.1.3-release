@@ -2981,6 +2981,7 @@ const modalDirtyChecks = {
 function requestCloseModal(id) {
   if(id==='lootDropImportModal'&&lootDropImportSaving){showToast('正在提交，请等待结果后关闭','warning');return;}
   if(id==='lootDropReviewModal'&&lootDropDeleting.size){showToast('正在保存核对结果，请稍候','warning');return;}
+  if(id==='lootAllocationModal'&&lootAllocationBusy){showToast('正在保存分配，请稍候','warning');return;}
   const check = modalDirtyChecks[id];
   if (check && check() && !confirm('内容未保存，确定放弃吗？')) return;
   closeModal(id);
@@ -7162,6 +7163,7 @@ function lootDropsRenderTable() {
     return `${d.getMonth() + 1}月${d.getDate()}日 ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
   };
   tbody.innerHTML = rows.map(d => {
+    const allocation=(appData.loots||[]).find(l=>l.source_drop_id===d.id);
     // #79-Patch1 起：Blizzard render CDN 数字 fileDataID + onerror 占位图（不再隐藏裂图）
     const icon = d.icon_id != null
       ? `<img class="loot-item-icon"${LootTaxonomy.itemQualityAttr(d.quality, d.item_name)} src="https://render.worldofwarcraft.com/icons/56/${d.icon_id}.jpg" loading="lazy" alt="" onerror="this.onerror=null;this.src='assets/decor-icons/_placeholder.png'">`
@@ -7175,17 +7177,116 @@ function lootDropsRenderTable() {
       <td class="center">${dropEsc(d.difficulty || '—')}</td>
       <td>${dropEsc(d.boss_name || '—')}</td>
       <td>${dropEsc(d.instance_name || '—')}</td>
-      <td class="center edit-only"><button type="button" class="btn btn-secondary btn-sm" data-drop-review="${dropEsc(d.id)}" ${lootDropDeleting.has(d.id)?'disabled':''}>核对</button> <button type="button" class="btn btn-danger btn-sm" data-drop-delete="${dropEsc(d.id)}" ${lootDropDeleting.has(d.id)||d.review_status==='ignored'?'disabled':''}>${lootDropDeleting.has(d.id)?'保存中…':'忽略'}</button></td>
+      <td class="center"><div class="toolbar">${allocation?`<button type="button" class="btn btn-secondary btn-sm" data-drop-allocate="${dropEsc(d.id)}">查看分配 · ${dropEsc(allocation.status)}</button>`:`<button type="button" class="btn btn-secondary btn-sm edit-only" data-drop-review="${dropEsc(d.id)}" ${lootDropDeleting.has(d.id)?'disabled':''}>核对</button> ${d.review_status==='confirmed'&&d.quantity===1?`<button type="button" class="btn btn-primary btn-sm edit-only" data-drop-allocate="${dropEsc(d.id)}">转分配</button>`:''}<button type="button" class="btn btn-danger btn-sm edit-only" data-drop-delete="${dropEsc(d.id)}" ${lootDropDeleting.has(d.id)||d.review_status==='ignored'?'disabled':''}>${lootDropDeleting.has(d.id)?'保存中…':'忽略'}</button>`}</div>${d.quantity>1?'<small>多件记录需先核实每件去向</small>':''}</td>
     </tr>`;
   }).join('');
   tbody.querySelectorAll('[data-drop-review]').forEach(button=>button.addEventListener('click',()=>lootDropReviewOpen(button.dataset.dropReview)));
+  tbody.querySelectorAll('[data-drop-allocate]').forEach(button=>button.addEventListener('click',()=>lootAllocationOpen(button.dataset.dropAllocate)));
   tbody.querySelectorAll('[data-drop-delete]').forEach(button => {
     button.addEventListener('click', () => lootDropDelete(button.dataset.dropDelete));
   });
 }
 
+// REQ-193: one source -> one allocation; forms never assume pickup means final ownership.
+let lootAllocationContext=null,lootAllocationBusy=false,lootAllocationOpenSequence=0;
+const lootAllocationFields=['Status','Member','Activity','Boss','Method','Roll','Note'];
+function lootAllocationFormSnapshot(){return JSON.stringify(lootAllocationFields.map(k=>document.getElementById('lootAllocation'+k).value));}
+modalDirtyChecks.lootAllocationModal=()=>lootAllocationBusy||!!lootAllocationContext&&lootAllocationFormSnapshot()!==lootAllocationContext.snapshot;
+function lootAllocationStatusChanged(clearError=false){
+  if(clearError)document.getElementById('lootAllocationError').textContent='';
+  const member=document.getElementById('lootAllocationMember');
+  const pending=document.getElementById('lootAllocationStatus').value==='待分配';
+  if(pending)member.value='';
+  member.disabled=pending||!window.CloudSync.canEdit();
+}
+function lootPickupIcon(source,name){
+  const id=Number(source?.icon_id);
+  return Number.isSafeInteger(id)&&id>0?`<img class="loot-item-icon"${LootTaxonomy.itemQualityAttr(source.quality,name)} src="https://render.worldofwarcraft.com/icons/56/${id}.jpg" alt="" loading="lazy" onerror="this.onerror=null;this.src='assets/decor-icons/_placeholder.png'">`:'';
+}
+async function lootAllocationOpen(sourceDropId){
+  if(lootAllocationBusy)return;
+  const seq=++lootAllocationOpenSequence,guildId=window.CloudSync.getCurrentGuild()?.id;
+  if(!guildId)return;
+  const triggers=[...document.querySelectorAll('[data-drop-allocate]')].filter(b=>b.dataset.dropAllocate===sourceDropId);
+  const labels=triggers.map(b=>b.textContent);
+  triggers.forEach(b=>{b.disabled=true;b.textContent='读取中…';});
+  try{
+    await Promise.all([window.CloudSync.reloadData('loots'),window.CloudSync.reloadData('lootDrops'),window.CloudSync.reloadData('activities'),window.CloudSync.reloadData('members')]);
+    if(seq!==lootAllocationOpenSequence||window.CloudSync.getCurrentGuild()?.id!==guildId)return;
+    const drop=(appData.lootDrops||[]).find(d=>d.id===sourceDropId);
+    const record=(appData.loots||[]).find(l=>l.source_drop_id===sourceDropId);
+    if(!drop)throw new Error('拾取不存在，请刷新列表');
+    if(drop.review_status!=='confirmed'||drop.quantity!==1)throw new Error('请先核对为单件拾取，再转分配');
+    if(!record&&!window.CloudSync.canEdit())throw new Error('仅管理者可创建分配');
+    lootAllocationContext={guildId,sourceDropId,id:record?.id||null,snapshot:null};
+    const summary=document.getElementById('lootAllocationSummary');
+    summary.innerHTML=`<p><strong>${lootPickupIcon(drop,drop.item_name)}${dropEsc(drop.item_name)}</strong> · 装等 ${drop.ilvl||'未提供'} · ${dropEsc(drop.difficulty||'未提供')} · ${dropEsc(drop.slot_cn||LOOT_DROP_INVTYPE_ZH[drop.slot]||drop.slot||'')}</p><p>拾取人：${dropEsc(drop.player_name)} · ${dropEsc(drop.player_server||'服务器未提供')}<br>原始来源：${dropEsc(drop.instance_name||'未提供')} · ${dropEsc(drop.boss_name||'首领未采集')}<br>拾取时间：${dropEsc(new Date(drop.timestamp).toLocaleString('zh-CN'))}</p>`;
+    document.getElementById('lootAllocationHint').textContent=record?'已关联一条分配记录。修改后保存，不会新增第二条。':'装备资料已带入。拾取人可能代拿；请明确选择最终获得者，或先保存为待分配。';
+    document.getElementById('lootAllocationStatus').value=record?.status||'待分配';
+    const members=(appData.members||[]).filter(m=>!['离队','inactive'].includes(m.status));
+    document.getElementById('lootAllocationMember').innerHTML='<option value="">尚未确定</option>'+members.map(m=>`<option value="${dropEsc(m.id)}">${dropEsc(m.name)} · ${dropEsc(m.server||'服务器未提供')} · ${dropEsc(m.class||'')}</option>`).join('');
+    const memberId=record?.character_id||'';
+    if(memberId&&!members.some(m=>m.id===memberId))document.getElementById('lootAllocationMember').insertAdjacentHTML('beforeend',`<option value="${dropEsc(memberId)}">${dropEsc(record.assignedTo||'原获得者')}（已离队，请重新选择）</option>`);
+    document.getElementById('lootAllocationMember').value=memberId;
+    document.getElementById('lootAllocationActivity').innerHTML='<option value="">暂不关联活动</option>'+(appData.activities||[]).filter(a=>a.status!=='cancelled').map(a=>`<option value="${dropEsc(a.id)}">${dropEsc(a.date||a.activity_date)} · ${dropEsc(a.name||a.raid)}</option>`).join('');
+    document.getElementById('lootAllocationActivity').value=(record?record.allocation_activity_id:drop.activity_id)||'';
+    if(!document.getElementById('lootAllocationActivity').value)document.getElementById('lootAllocationActivity').value='';
+    document.getElementById('lootAllocationBoss').value=record?record.boss:drop.boss_name||'';
+    document.getElementById('lootAllocationMethod').value=record?.distribution_method||'custom';
+    document.getElementById('lootAllocationRoll').value=record?.roll_value||'';
+    document.getElementById('lootAllocationNote').value=record?.note||'';
+    document.getElementById('lootAllocationError').textContent='';
+    lootAllocationFields.forEach(k=>document.getElementById('lootAllocation'+k).disabled=!window.CloudSync.canEdit());
+    lootAllocationStatusChanged();
+    document.getElementById('lootAllocationSave').disabled=!window.CloudSync.canEdit();
+    lootAllocationContext.snapshot=lootAllocationFormSnapshot();
+    openModal('lootAllocationModal');
+  }catch(e){showToast(e.message||'分配资料加载失败，请重试','error');}
+  finally{triggers.forEach((b,i)=>{b.disabled=false;b.textContent=labels[i];});}
+}
+async function lootAllocationSave(){
+  const ctx=lootAllocationContext,cloud=window.CloudSync;
+  if(lootAllocationBusy||!ctx||!cloud.canEdit())return;
+  const err=document.getElementById('lootAllocationError');err.textContent='';
+  if(cloud.getCurrentGuild()?.id!==ctx.guildId){err.textContent='公会已切换，请关闭后重新打开';return;}
+  const status=document.getElementById('lootAllocationStatus').value,memberId=document.getElementById('lootAllocationMember').value;
+  if(status==='已分配'&&!memberId){err.textContent='请选择最终获得者；拾取人不会自动作为获得者。';document.getElementById('lootAllocationMember').focus();return;}
+  const roll=document.getElementById('lootAllocationRoll').value;
+  if(roll&&(!Number.isInteger(Number(roll))||Number(roll)<1||Number(roll)>100)){err.textContent='Roll点须为1至100';return;}
+  const payload={id:ctx.id,source_drop_id:ctx.sourceDropId,character_id:memberId||null,status,
+    allocation_activity_id:document.getElementById('lootAllocationActivity').value||null,boss:document.getElementById('lootAllocationBoss').value.trim(),
+    distribution_method:document.getElementById('lootAllocationMethod').value,roll_value:roll?Number(roll):null,note:document.getElementById('lootAllocationNote').value.trim()};
+  const oldLoot=(appData.loots||[]).find(l=>l.id===ctx.id);
+  lootAllocationBusy=true;
+  const btn=document.getElementById('lootAllocationSave');btn.disabled=true;btn.textContent='保存中…';
+  lootAllocationFields.forEach(k=>document.getElementById('lootAllocation'+k).disabled=true);
+  try{
+    await cloudCrud('loots','allocate',payload,{silentError:true,renderFn:()=>{lootRender();lootDropsRenderTable();}});
+    if(cloud.getCurrentGuild()?.id!==ctx.guildId)throw new Error('公会已切换，请在原公会核对保存结果');
+    const saved=(appData.loots||[]).find(l=>l.id===payload.id&&l.source_drop_id===ctx.sourceDropId);
+    if(!saved)throw new Error('回读尚未确认保存结果，请保留表单重试');
+    ctx.id=saved.id;
+    // Re-read authoritative allocation even on a lost-response retry; wishlist sync is idempotent.
+    await syncWishlistLinkages(saved,oldLoot);
+    if(window.WBTrack&&!payload.repeated)WBTrack.event('loot_assign',{count:1});
+    ctx.snapshot=lootAllocationFormSnapshot();
+    closeModal('lootAllocationModal');
+    lootSwitchView('assign');
+    showToast(payload.repeated?'该拾取已有分配记录，已打开分配列表':`已保存为${saved.status}，可在分配记录中继续编辑`,'success');
+  }catch(e){err.textContent=e.message||'保存未确认，请保留表单重试';}
+  finally{lootAllocationBusy=false;btn.disabled=!cloud.canEdit();btn.textContent='保存分配记录';lootAllocationFields.forEach(k=>document.getElementById('lootAllocation'+k).disabled=!cloud.canEdit());lootAllocationStatusChanged();}
+}
+
 // ---- 导入弹窗 ----
 let lootDropImportRows = []; // 解析后的待入库行（含 checked/dup/valid 标记）
+let lootDropParsedText = null;
+function lootDropInvalidatePreview() {
+  lootDropImportRows=[];lootDropParsedText=null;
+  const pv=document.getElementById('lootDropImportPreview');
+  if(pv){pv.style.display='none';pv.innerHTML='';}
+  const btn=document.getElementById('lootDropImportConfirmBtn');
+  if(btn){btn.disabled=true;btn.textContent='请先解析预览';}
+}
 
 function lootDropImportOpen() {
   if(lootDropImportSaving)return;
@@ -7193,7 +7294,8 @@ function lootDropImportOpen() {
   const select=document.getElementById('lootDropActivity');
   select.innerHTML='<option value="">暂不关联，提交后待核对</option>'+(appData.activities||[]).filter(a=>a.status!=='cancelled').map(a=>`<option value="${dropEsc(a.id)}">${dropEsc(a.date||a.activity_date)} · ${dropEsc(a.name||a.raid)} ${dropEsc(a.team_label||'')}</option>`).join('');
   const ta = document.getElementById('lootDropImportText');
-  if (ta) ta.value = '';
+  lootDropParsedText=null;
+  if (ta) {ta.value = '';ta.oninput=lootDropInvalidatePreview;}
   const pv = document.getElementById('lootDropImportPreview');
   if (pv) { pv.style.display = 'none'; pv.innerHTML = ''; }
   const btn = document.getElementById('lootDropImportConfirmBtn');
@@ -7247,6 +7349,7 @@ const LOOT_DROP_INVTYPE_ZH = {
 };
 
 function lootDropImportParse() {
+  lootDropInvalidatePreview(); // Invalid or replaced text must never retain old writable rows.
   const raw = (document.getElementById('lootDropImportText').value || '').trim();
   if (!raw) { showToast('请先拖入 JSON 文件或粘贴 JSON 文本', 'error'); return; }
   let data;
@@ -7264,6 +7367,7 @@ function lootDropImportParse() {
     const valid=!!(r.playerName&&r.itemName&&Number.isSafeInteger(r.itemID)&&ts&&!isNaN(Date.parse(ts)));
     return {raw:r,player_name:r.playerName,item_name:r.itemName,official_item_id:r.itemID,ilvl:Number.isSafeInteger(r.ilvl)?r.ilvl:null,slot:r.slot,slot_cn:r.slotCN||LOOT_DROP_INVTYPE_ZH[r.slot]||'',instance_name:r.instanceName,boss_name:r.bossName,timestamp:ts,dup,valid,checked:valid&&!dup};
   });
+  lootDropParsedText=raw;
   lootDropImportRenderPreview();
 }
 
@@ -7315,6 +7419,9 @@ function lootDropImportToggleAll(checked) {
 let lootDropImportSaving = false;
 async function lootDropImportConfirm() {
   if(lootDropImportSaving)return;
+  if(lootDropParsedText!==(document.getElementById('lootDropImportText').value||'').trim()){
+    lootDropInvalidatePreview();showToast('原文已更新，请先解析预览，再提交当前记录。','error');return;
+  }
   const rows=lootDropImportRows.filter(r=>r.checked&&r.valid&&!r.dup).map(r=>r.raw);
   if(!rows.length)return;
   const guildId=window.CloudSync.getCurrentGuild()?.id;
@@ -7668,12 +7775,12 @@ function lootRender() {
     
     return `
       <tr>
-        <td><span class="loot-name">${itemIconImgHtml(loot.name, loot.raid, loot.boss)}${loot.name}${tierSetBadgeHtml(loot.name)}</span>${loot.effect ? `<div class="loot-effect-green" style="font-size:11px;margin-top:2px" title="${loot.effect.replace(/"/g, '&quot;')}">${loot.effect.length > 30 ? loot.effect.slice(0, 30) + '…' : loot.effect}</div>` : ''}</td>
+        <td><span class="loot-name">${loot.pickup_source?lootPickupIcon(loot.pickup_source,loot.name):itemIconImgHtml(loot.name, loot.raid, loot.boss)}${dropEsc(loot.name)}${tierSetBadgeHtml(loot.name)}</span>${loot.source_drop_id?`<br><small>拾取来源 · 装等 ${loot.item_level||'未提供'} · ${dropEsc(loot.allocation_activity_name||'未关联活动')}</small>`:''}${loot.effect ? `<div class="loot-effect-green" style="font-size:11px;margin-top:2px" title="${loot.effect.replace(/"/g, '&quot;')}">${loot.effect.length > 30 ? loot.effect.slice(0, 30) + '…' : loot.effect}</div>` : ''}</td>
         <td class="center">${wishlistBadge}</td>
-        <td><span class="wishlist-raid-tag">${loot.raid || '-'}</span></td>
+        <td><span class="wishlist-raid-tag">${dropEsc(loot.raid || '-')}</span></td>
         <td>${loot.difficulty || ''}</td>
-        <td>${loot.boss || ''}</td>
-        <td>${loot.slot || ''}</td>
+        <td>${dropEsc(loot.boss || '')}</td>
+        <td>${dropEsc(loot.slot || '')}</td>
         <td>${loot.primaryStat || ''}</td>
         <td><div class="loot-secondary-stats">${secondaryStatsHtml || '-'}</div></td>
         <td>${assignedToHtml}${claimerLabelHtml(assignedMark === '' ? assignedMember : null)}</td>
@@ -7928,6 +8035,8 @@ async function lootShowModal(lootId = null) {
 
 // 编辑装备
 function lootEdit(lootId) {
+  const record=(appData.loots||[]).find(l=>l.id===lootId);
+  if(record?.source_drop_id)return lootAllocationOpen(record.source_drop_id);
   lootShowModal(lootId);
 }
 
@@ -8022,7 +8131,14 @@ async function syncWishlistLinkages(newLoot, oldLoot) {
 
   try {
     // 1. 从已分配变为非已分配：取消对应心愿单的已获取标记
-    if (wasAssigned && !isAssigned) {
+    // REQ-193: correcting the recipient/item must also release the previous wishlist match.
+    // Another saved allocation of the same item to that member still proves ownership.
+    const changedAssignment=wasAssigned&&isAssigned&&(oldLoot.name!==newLoot.name||
+      (oldLoot.character_id||oldLoot.assignedTo)!==(newLoot.character_id||newLoot.assignedTo));
+    const oldStillOwned=wasAssigned&&(appData.loots||[]).some(l=>l.status==='已分配'&&
+      l.name.toLowerCase()===oldLoot.name.toLowerCase()&&
+      (oldLoot.character_id?l.character_id===oldLoot.character_id:l.assignedTo===oldLoot.assignedTo));
+    if (wasAssigned && (!isAssigned||changedAssignment) && !oldStillOwned) {
       await window.CloudSync.reloadData('wishlists');
       const toUnmark = (appData.wishlist || []).filter(w =>
         w.obtained &&
@@ -8900,6 +9016,14 @@ function lootFillAssignedTo(idOrName) {
 // ==================== 初始化 ====================
 // ==================== 更新日志 ====================
 const changelogData = [
+  {id:'bug122-feature',version:'v3.2.0',date:'2026-11-15',type:'feature',typeLabel:'新增功能',title:'拾取导入可靠性补丁',summary:'本次不新增业务功能，完善现有导入流程。',details:[]},
+  {id:'bug122-improve',version:'v3.2.0',date:'2026-11-15',type:'improve',typeLabel:'功能优化',title:'更换原文后重新核对预览',summary:'修改导入文本后，旧预览自动失效，解析后再提交。',details:[]},
+  {id:'bug122-fix',version:'v3.2.0',date:'2026-11-15',type:'fix',typeLabel:'修复BUG',title:'修复旧预览误提交与插件链接导出',summary:'修复替换原文仍提交旧记录；Collector 1.0.6保留复制后的完整物品链接。',details:['插件更新后重新导出已有记录，无需新掉落。']},
+  {id:'bug122-scope',version:'v3.2.0',date:'2026-11-15',type:'refactor',typeLabel:'模块调整',title:'维持原有校验与保存规则',summary:'不放宽物品链接校验，不修改数据库结构或历史拾取。',details:[]},
+  {id:'req193-feature',version:'v3.2.0',date:'2026-11-15',type:'feature',typeLabel:'新增功能',title:'拾取记录转为装备分配',summary:'已核对单件直接带入装备资料，确认最终获得者或先保存待分配。',details:['同一拾取只关联一条分配记录，已有记录可继续编辑。']},
+  {id:'req193-improve',version:'v3.2.0',date:'2026-11-15',type:'improve',typeLabel:'功能优化',title:'未建活动也可继续分配',summary:'活动可稍后关联，分配首领可人工补充，保留原始拾取证据。',details:['拾取人不自动成为最终获得者。']},
+  {id:'req193-fix',version:'v3.2.0',date:'2026-11-15',type:'fix',typeLabel:'修复BUG',title:'补齐核对后的操作路径',summary:'已核对记录显示转分配，已有分配显示查看分配，重试不重复创建。',details:['异常时保留表单，服务端校验成员、活动和来源归属。']},
+  {id:'req193-scope',version:'v3.2.0',date:'2026-11-15',type:'refactor',typeLabel:'模块调整',title:'复用现有分配记录和权限',summary:'管理者确认去向，普通成员仍可提交拾取；无需新增数据库结构。',details:['交易自动采集与掉落完整性提醒另行验证，尚未完成。']},
   {id:'req191-feature',version:'v3.2.0',date:'2026-11-13',type:'feature',typeLabel:'新增功能',title:'公会成员共同提交拾取记录',summary:'所有公会成员均可提交插件采集，选择活动后由系统匹配来源。',details:['提交不会自动生成装备分配记录。']},
   {id:'req191-improve',version:'v3.2.0',date:'2026-11-13',type:'improve',typeLabel:'功能优化',title:'多人记录归并与人工核对',summary:'相符记录汇总来源，信息不足或多件歧义保留待核对。',details:['管理者可确认拾取、合并重复、忽略误录；保留原始采集证据。']},
   {id:'req191-fix',version:'v3.2.0',date:'2026-11-13',type:'fix',typeLabel:'修复BUG',title:'加强重复提交与多件拾取保护',summary:'重复提交不重复入库，忽略的误录不因相同采集再次上传恢复。',details:['Collector 1.0.5保留服务器、数量及来源编号；已安装旧版需另行更新，旧记录信息不足时仍需核对。']},

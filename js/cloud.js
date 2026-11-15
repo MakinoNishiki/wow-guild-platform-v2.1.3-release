@@ -736,6 +736,10 @@
 
     const loots = (data || []).map(l => ({
       id: l.id,
+      source_drop_id: l.source_drop_id || null,
+      pickup_source: l.item_stats?.pickup_source || null,
+      allocation_activity_id: l.item_stats?.activity_id || null,
+      allocation_activity_name: l.item_stats?.activity_name || '',
       name: l.item_name,
       raid: l.raid_name || '',
       difficulty: l.difficulty || '',
@@ -1183,6 +1187,18 @@
 
   // ---- 同步装备 (写入走代理) ----
   async function syncLoot(guildId, operation, item) {
+    if(operation==='allocate') {
+      const userId=currentUser?.id,token=await getAccessToken();
+      if(!token)throw new Error('请先登录');
+      const response=await fetch('/api/loot-observations/allocate',{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},
+        body:JSON.stringify({guildId,sourceDropId:item.source_drop_id,id:item.id||null,characterId:item.character_id||null,
+          activityId:item.allocation_activity_id||null,status:item.status,boss:item.boss,note:item.note,method:item.distribution_method,rollValue:item.roll_value})});
+      const result=await response.json();
+      if(!response.ok)throw new Error(result.message||'分配未确认，请重试');
+      if(currentGuild?.id!==guildId||currentUser?.id!==userId)throw new Error('账号或公会已切换，原公会分配可能已保存，请稍后核对');
+      item.id=result.id;item.repeated=!!result.repeated;
+      return;
+    }
     const itemStats = {
       category: item.category,
       primaryStat: item.primaryStat,

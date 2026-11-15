@@ -4,13 +4,13 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>魔兽管家</title>
-<!-- 静态资源版本号：20261113.136（任务书 #22 WP3-②：凡改动 js/css 的 commit 必须同步递增此处与所有 ?v= 查询串，见 docs/开发规范.md 第五章） -->
+<!-- 静态资源版本号：20261115.138（任务书 #22 WP3-②：凡改动 js/css 的 commit 必须同步递增此处与所有 ?v= 查询串，见 docs/开发规范.md 第五章） -->
 <link rel="icon" type="image/png" sizes="32x32" href="assets/brand/favicon-32.png">
 <link rel="icon" type="image/png" sizes="16x16" href="assets/brand/favicon-16.png">
-<link rel="stylesheet" href="css/main.css?v=20261113.136">
-<link rel="stylesheet" href="css/data-public.css?v=20261113.136"><!-- 任务书 #28 WP5：副本掉落 tab（选择器全 .dp- 前缀 + #page-lootdrop 作用域，零泄漏） -->
-<link rel="stylesheet" href="css/decor-public.css?v=20261113.136"><!-- 任务书 #51：家宅图鉴（选择器全 .dh- 前缀，零泄漏，双壳共用） -->
-<script src="assets/vendor/supabase-js-2.js?v=20261113.136"></script>
+<link rel="stylesheet" href="css/main.css?v=20261115.138">
+<link rel="stylesheet" href="css/data-public.css?v=20261115.138"><!-- 任务书 #28 WP5：副本掉落 tab（选择器全 .dp- 前缀 + #page-lootdrop 作用域，零泄漏） -->
+<link rel="stylesheet" href="css/decor-public.css?v=20261115.138"><!-- 任务书 #51：家宅图鉴（选择器全 .dh- 前缀，零泄漏，双壳共用） -->
+<script src="assets/vendor/supabase-js-2.js?v=20261115.138"></script>
 </head>
 <body>
 
@@ -499,7 +499,7 @@
       <div class="page" id="page-loot">
         <details class="team-flow-guide">
           <summary>③ 确认装备最终去向 · 团队管理怎么用</summary>
-          <ol><li>先在 <a href="#/team/attendance">考勤记录</a> 核对活动与名单，拾取采集可以在打团时提前进行。</li><li>已有 Collector 导出的数据，在本页「拾取记录」中导入并检查；没有插件也可以直接添加分配记录。</li><li>拾取者可能只是代拿。请在「分配记录」中选择装备与最终接收人，确认后保存。当前导入拾取不会自动生成分配记录。</li></ol>
+          <ol><li>在「拾取记录」导入插件数据，核对每件装备；没有当天考勤活动也可以先继续。</li><li>已核对的单件点击「转分配」，装备资料自动带入。尚未决定给谁时，保存为「待分配」。</li><li>确认最终获得者后保存为「已分配」。拾取人可能只是代拿，不会自动作为获得者；活动可在分配表单中稍后补关联。</li></ol>
         </details>
         <div class="card">
           <div class="card-header">
@@ -1626,6 +1626,28 @@
 </div>
 
 <!-- 提示消息容器 -->
+<div class="modal-overlay" id="lootAllocationModal">
+  <div class="modal" style="max-width:720px">
+    <div class="modal-header"><div class="modal-title">确认装备分配</div><button type="button" class="modal-close" onclick="requestCloseModal('lootAllocationModal')">×</button></div>
+    <div class="modal-body">
+      <div class="form-group" id="lootAllocationSummary"></div>
+      <p id="lootAllocationHint" class="form-group"></p>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label" for="lootAllocationStatus">分配状态</label><select class="form-select" id="lootAllocationStatus" onchange="lootAllocationStatusChanged(true)"><option>待分配</option><option>已分配</option></select></div>
+        <div class="form-group"><label class="form-label" for="lootAllocationMember">最终获得者</label><select class="form-select" id="lootAllocationMember"><option value="">尚未确定</option></select></div>
+      </div>
+      <div class="form-group"><label class="form-label" for="lootAllocationActivity">所属活动（可稍后关联）</label><select class="form-select" id="lootAllocationActivity"></select><small>没有当天活动也能保存。创建活动后，可从「查看分配」补选；不会据此改写考勤。</small></div>
+      <div class="form-group"><label class="form-label" for="lootAllocationBoss">分配记录中的首领</label><input class="form-input" id="lootAllocationBoss" maxlength="160" placeholder="采集缺失时可人工补充，也可暂时留空"><small>人工修正用于分配记录，原始拾取证据保留。</small></div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label" for="lootAllocationMethod">分配方式</label><select class="form-select" id="lootAllocationMethod"><option value="custom">自定义 / 未指定</option><option value="roll">直接 Roll</option><option value="roll_rule">规则 Roll</option><option value="cl">CL 决定</option><option value="master_loot">团长分配</option><option value="dkp">DKP</option><option value="epgp">EPGP</option><option value="gkp">GKP</option></select></div>
+        <div class="form-group"><label class="form-label" for="lootAllocationRoll">Roll 点（可选）</label><input class="form-input" id="lootAllocationRoll" type="number" min="1" max="100"></div>
+      </div>
+      <div class="form-group"><label class="form-label" for="lootAllocationNote">分配备注</label><textarea class="form-textarea" id="lootAllocationNote" maxlength="2000" rows="2" placeholder="例如先代拿，再交易给最终获得者"></textarea></div>
+      <p id="lootAllocationError" role="alert" style="color:var(--danger)"></p>
+    </div>
+    <div class="modal-footer"><button type="button" class="btn btn-secondary" onclick="requestCloseModal('lootAllocationModal')">关闭</button><button type="button" class="btn btn-primary edit-only" id="lootAllocationSave" onclick="lootAllocationSave()">保存分配记录</button></div>
+  </div>
+</div>
 <div class="toast-container" id="toastContainer"></div>
 
 <!-- ===== 弹窗：添加/编辑心愿 ===== -->
@@ -2282,22 +2304,22 @@
   </div>
 </div>
 
-<script src="js/cloud.js?v=20261113.136"></script>
+<script src="js/cloud.js?v=20261115.138"></script>
 <!-- 任务书 #14：主数据层（快照兜底 + 加载层），须在 app.js 之前 -->
-<script src="js/masterDataSnapshot.js?v=20261113.136"></script>
-<script src="js/masterData.js?v=20261113.136"></script>
+<script src="js/masterDataSnapshot.js?v=20261115.138"></script>
+<script src="js/masterData.js?v=20261115.138"></script>
 <!-- 任务书 #22 WP2：职业/专精/职责图标集中映射（全站唯一取图处） -->
-<script src="js/iconMap.js?v=20261113.136"></script>
+<script src="js/iconMap.js?v=20261115.138"></script>
 <!-- 任务书 #31（REQ-097）：装备分类词表单一真源（公示页 chips / picker 过滤 / BUG-057 回填三处消费，须在 dataPublic.js 与 app.js 之前） -->
-<script src="js/itemQualityData.js?v=20261113.136"></script>
-<script src="js/lootTaxonomy.js?v=20261113.136"></script>
+<script src="js/itemQualityData.js?v=20261115.138"></script>
+<script src="js/lootTaxonomy.js?v=20261115.138"></script>
 <!-- 任务书 #28 WP5：副本掉落渲染层（双壳同源；无 data-public-body 不自动启动，由 app.js 懒挂载，须在 app.js 之前） -->
-<script src="js/dataPublic.js?v=20261113.136"></script>
+<script src="js/dataPublic.js?v=20261115.138"></script>
 <!-- 任务书 #51（REQ-137 一期）：家宅图鉴词表单一真源（价格/分类/尺寸/来源词表，须在 decorData.js 之前） -->
-<script src="js/decorDict.js?v=20261113.136"></script>
+<script src="js/decorDict.js?v=20261115.138"></script>
 <!-- 任务书 #51：家宅图鉴数据层+渲染层（双壳同源；无 data-decor-body 不自动启动，由 app.js 懒挂载，须在 app.js 之前） -->
-<script src="js/decorData.js?v=20261113.136"></script>
-<script src="js/app.js?v=20261113.136"></script>
-<script src="js/track.js?v=20261113.136"></script><!-- 任务书 #54 WP1：全站埋点采集层（REQ-141，零依赖静默兜底） -->
+<script src="js/decorData.js?v=20261115.138"></script>
+<script src="js/app.js?v=20261115.138"></script>
+<script src="js/track.js?v=20261115.138"></script><!-- 任务书 #54 WP1：全站埋点采集层（REQ-141，零依赖静默兜底） -->
 </body>
 </html>

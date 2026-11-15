@@ -1,0 +1,40 @@
+{
+  "date": "2026-11-14",
+  "commit": "e51e7431ddfabcc810d66ef84f3ca8a1d6bb4d46",
+  "checks": [
+    {
+      "file": "index.html",
+      "status": 200,
+      "normalizedHashMatches": true
+    },
+    {
+      "file": "js/app.js",
+      "status": 200,
+      "normalizedHashMatches": true
+    },
+    {
+      "file": "js/cloud.js",
+      "status": 200,
+      "normalizedHashMatches": true
+    },
+    {
+      "action": "submit",
+      "status": 401,
+      "message": "请先登录"
+    },
+    {
+      "action": "review",
+      "status": 401,
+      "message": "请先登录"
+    },
+    {
+      "path": "/.env",
+      "status": 404
+    },
+    {
+      "path": "/lib/lootObservationRoutes.cjs",
+      "status": 404
+    }
+  ],
+  "note": "First probe during deployment returned 405; later probes returned expected authentication 401 after deployment completed. No manual restart or production business writes. Authenticated CRUD remains subject to user acceptance."
+}

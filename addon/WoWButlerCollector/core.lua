@@ -28,7 +28,7 @@ WoWButlerCollectorSettings = WoWButlerCollectorSettings or {}
 if WoWButlerCollectorSettings.enabled == nil then WoWButlerCollectorSettings.enabled = true end
 WBC_Collector = {} -- ui.lua 只消费状态与动作，采集/导出保持一个实现
 local API = WBC_Collector
-API.version = "1.0.5"
+API.version = "1.0.6"
 
 local MAX_ENTRIES = 2000      -- 容量护栏：超出丢弃最旧（SavedVariables 体积保护）
 local CAP_WARN_AT = 1000      -- 达到即每次上线提醒导出
@@ -88,7 +88,7 @@ end
 
 -- 旧记录没有原始链接，无法核实绑定/真实装等：保留原样，但不再混入正常导出。
 local function isExportable(row)
-  return (row.captureVersion == "1.0.4" or row.captureVersion == "1.0.5") and row.itemLink and not row.reviewReason
+  return (row.captureVersion == "1.0.4" or row.captureVersion == "1.0.5" or row.captureVersion == "1.0.6") and row.itemLink and not row.reviewReason
     and type(row.ilvl) == "number" and row.ilvl > 0 and row.bindingStatus == "ordinary"
 end
 
@@ -367,7 +367,7 @@ local function JSONEncode(tbl)
       if type(v) == "string" then
         val = "\"" .. v:gsub("\\", "\\\\"):gsub("\"", "\\\""):gsub("[%z\1-\31]", function(c)
           return string.format("\\u%04x", string.byte(c))
-        end) .. "\""
+        end):gsub("|", "\\u007c") .. "\"" -- BUG-121: prevent EditBox hyperlink rendering; JSON.parse restores exact pipes.
       elseif type(v) == "number" then
         val = tostring(v)
       end

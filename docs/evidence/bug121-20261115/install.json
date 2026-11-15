@@ -1,0 +1,33 @@
+{
+  "version": "1.0.6",
+  "backup": "C:\\Users\\56424\\AppData\\Local\\WoWButlerBackups\\collector-export-20261115-210202",
+  "target": "C:\\Azeroth\\World of Warcraft\\_retail_\\Interface\\AddOns\\WoWButlerCollector",
+  "files": [
+    {
+      "file": "core.lua",
+      "match": true
+    },
+    {
+      "file": "ui.lua",
+      "match": true
+    },
+    {
+      "file": "WoWButlerCollector.toc",
+      "match": true
+    },
+    {
+      "file": "locales/zhCN.lua",
+      "match": true
+    },
+    {
+      "file": "README.md",
+      "match": true
+    },
+    {
+      "file": "CHANGELOG.md",
+      "match": true
+    }
+  ],
+  "savedVariablesUnchangedDuringInstall": true,
+  "liveGameValidated": false
+}

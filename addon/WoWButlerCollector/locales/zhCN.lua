@@ -1,6 +1,6 @@
 -- WoWButlerCollector 简体中文本地化（唯一语言包；后续加语言在此目录扩展并修改 .toc 加载序）
 WBC_LOCALE = {
-  LOADED        = "魔兽管家拾取记录 1.0.5 已加载：点击小地图背包图标，或在设置 > 插件中打开面板。",
+  LOADED        = "魔兽管家拾取记录 1.0.6 已加载：点击小地图背包图标，或在设置 > 插件中打开面板。",
   HELP_1        = "WoWButlerCollector 命令：",
   HELP_COUNT    = "  /wbc count — 查看已记录条数",
   HELP_EXPORT   = "  /wbc export — 弹出 JSON 导出框（Ctrl+C 复制后粘贴到网站导入）",
