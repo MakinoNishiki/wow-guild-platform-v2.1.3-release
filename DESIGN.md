@@ -162,3 +162,7 @@
 - `.person-stat-mode` 复用toolbar/form-select，明确“按团员（新活动）”和“按角色（历史活动）”，禁止两个口径混加；`.person-owner-label` 说明角色所属团员。
 - `.person-attendance-row` 复用考勤行，原生details/summary展开实际参战角色；`.person-attendance-add` 提供保存前显式补入名单；`#personLinkModal` 沿用既有弹窗、勾选、主次按钮及错误提示。
 - 两块均不改主色、职业配色、图标资产或移动端封存取舍。审计证据见design-plans/req194-loot-feedback.md和req195-person-attendance.md。
+
+
+## REQ198 分配结果（2026-11-16）
+“无人需求”表示已确认没人需要，不等于分解或销毁；获得者清空并禁用，可重新分配。复用中性灰badge-loot-disenchant、form-select及form-hint。只在已分配且存在获得者时联动心愿已获取。

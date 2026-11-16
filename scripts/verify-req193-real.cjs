@@ -3,7 +3,7 @@ const assert=require('node:assert/strict'),crypto=require('node:crypto'),fs=requ
 const {chromium}=require('playwright');
 module.exports=async config=>{
   assert.equal(config.ENVIRONMENT,'isolated-test');assert.equal(config.SUPABASE_URL,'http://127.0.0.1:18000');
-  const out=config.verifyLootDisplay?'docs/evidence/req194-20261116':'docs/evidence/req193-20261115';fs.mkdirSync(out,{recursive:true});
+  const out=config.verifyNoDemand?'docs/evidence/req198-20261116':config.verifyLootDisplay?'docs/evidence/req194-20261116':'docs/evidence/req193-20261115';fs.mkdirSync(out,{recursive:true});
   const headers={apikey:config.SUPABASE_SERVICE_ROLE_KEY,Authorization:'Bearer '+config.SUPABASE_SERVICE_ROLE_KEY,'Content-Type':'application/json',Prefer:'return=representation'};
   const call=async(path,method='GET',body)=>{const r=await fetch(config.SUPABASE_URL+path,{method,headers,body:body===undefined?undefined:JSON.stringify(body)});const t=await r.text();assert(r.ok,path+' '+r.status+' '+t.slice(0,120));return t?JSON.parse(t):null;};
   const checks=[],errors=[],users=[],guilds=[];let browser,p,v;
@@ -110,6 +110,7 @@ module.exports=async config=>{
     check('最终获得者心愿随保存标记',(await call('/rest/v1/wishlists?member_id=eq.'+m2.id))[0].items[0].obtained===true);
     await open(d1.id);await p.locator('#lootAllocationMember').selectOption(m1.id);await save();
     check('改最终获得者后新旧心愿同步',(await call('/rest/v1/wishlists?member_id=eq.'+m1.id))[0].items[0].obtained===true&&(await call('/rest/v1/wishlists?member_id=eq.'+m2.id))[0].items[0].obtained===false);
+    if(config.verifyNoDemand)await require('./verify-req198-states.cjs')({p,v,open,save,alloc,call,check,out,savedId,d1,d2,m1,g});
     // Create actual activity using existing UI, with no attendance assumptions.
     await p.goto('http://127.0.0.1:18779/#/team/attendance');await p.getByRole('button',{name:'+ 创建活动',exact:true}).click();
     await p.locator('#activityDate').fill('2026-11-15');await p.locator('#activityRaidName').fill('烈毒之渊');await p.locator('#activitySaveBtn').click();await p.locator('#activityModal').waitFor({state:'hidden'});

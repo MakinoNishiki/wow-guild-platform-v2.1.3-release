@@ -7235,8 +7235,11 @@ modalDirtyChecks.lootAllocationModal=()=>lootAllocationBusy||!!lootAllocationCon
 function lootAllocationStatusChanged(clearError=false){
   if(clearError)document.getElementById('lootAllocationError').textContent='';
   const member=document.getElementById('lootAllocationMember');
-  const pending=document.getElementById('lootAllocationStatus').value==='待分配';
+  const status=document.getElementById('lootAllocationStatus').value;
+  const pending=status!=='已分配';
+  document.getElementById('lootAllocationStatusHint').textContent=status==='无人需求'?'已确认无人需要，无需指定获得者；之后仍可重新分配。':'';
   if(pending)member.value='';
+  if(member.options[0])member.options[0].textContent=status==='无人需求'?'无需指定获得者':'尚未确定';
   member.disabled=pending||!window.CloudSync.canEdit();
   lootAllocationMemberChanged();
 }
@@ -7269,7 +7272,7 @@ async function lootAllocationOpen(sourceDropId){
     lootAllocationContext={guildId,sourceDropId,id:record?.id||null,snapshot:null};
     const summary=document.getElementById('lootAllocationSummary');
     summary.innerHTML=`<p><strong>${lootPickupIcon(drop,drop.item_name)}${dropEsc(drop.item_name)}</strong> · 装等 ${drop.ilvl||'未提供'} · ${dropEsc(drop.difficulty||'未提供')} · ${dropEsc(drop.slot_cn||LOOT_DROP_INVTYPE_ZH[drop.slot]||drop.slot||'')}</p><p>拾取人：${dropEsc(drop.player_name)} · ${dropEsc(drop.player_server||'服务器未提供')}<br>原始来源：${dropEsc(drop.instance_name||'未提供')} · ${dropEsc(drop.boss_name||'首领未采集')}<br>拾取时间：${dropEsc(new Date(drop.timestamp).toLocaleString('zh-CN'))}</p>`;
-    document.getElementById('lootAllocationHint').textContent=record?'已关联一条分配记录。修改后保存，不会新增第二条。':'装备资料已带入。拾取人可能代拿；请明确选择最终获得者，或先保存为待分配。';
+    document.getElementById('lootAllocationHint').textContent=record?'已关联一条分配记录。修改后保存，不会新增第二条。':'装备资料已带入。拾取人可能代拿；请明确选择最终获得者，或保存为待分配、无人需求。';
     document.getElementById('lootAllocationStatus').value=record?.status||'待分配';
     const members=(appData.members||[]).filter(m=>!['离队','inactive'].includes(m.status));
     document.getElementById('lootAllocationMember').innerHTML='<option value="">尚未确定</option>'+members.map(m=>`<option class="${classMap[m.class]?'class-'+classMap[m.class]:''}" style="color:${window.IconMap?.classColor(m.class)||'var(--text-primary)'}" value="${dropEsc(m.id)}">${dropEsc(m.name)} · ${dropEsc(m.server||'服务器未提供')} · ${dropEsc(m.class||'')}</option>`).join('');
@@ -7511,6 +7514,7 @@ modalDirtyChecks.lootDropImportModal = () => lootDropImportSaving || isModalForm
 const lootStatusBadgeMap = {
   '待分配': 'badge-loot-pending',
   '已分配': 'badge-loot-assigned',
+  '无人需求': 'badge-loot-disenchant',
   '分解': 'badge-loot-disenchant',
   '销毁': 'badge-loot-destroyed'
 };
@@ -8082,8 +8086,8 @@ async function lootShowModal(lootId = null) {
     document.getElementById('lootIsWishlist').checked = false;
   }
 
-  // 回显成员信息
-  lootUpdateMemberInfo();
+  // 回显成员信息及无人需求状态
+  lootManualStatusChanged();
   
   // 更新心愿单匹配
   lootUpdateWishlistMatches();
@@ -8095,6 +8099,16 @@ async function lootShowModal(lootId = null) {
   tierSetReset('loot');
 
   openModal('lootModal');
+}
+
+// REQ-198: no-demand is a decision without an assignee, independent of the pickup source.
+function lootManualStatusChanged(){
+  const member=document.getElementById('lootAssignedTo');
+  const noDemand=document.getElementById('lootStatus').value==='无人需求';
+  if(noDemand)member.value='';
+  if(member.options[0])member.options[0].textContent=noDemand?'无需指定获得者':'请选择成员';
+  member.disabled=noDemand||!window.CloudSync.canEdit();
+  lootUpdateMemberInfo();
 }
 
 // 编辑装备
@@ -8125,7 +8139,7 @@ async function lootSave() {
 
   // REQ-095（任务书 #45 WP5）：分配人下拉 value = 成员 id（名单内）或自定义名（名单外，无 id）。
   // 是 id 则 character_id=id + assignedTo=该成员裸名（名字快照语义不变）；自定义名则 character_id=null。
-  const assignedVal = document.getElementById('lootAssignedTo').value.trim();
+  const assignedVal = document.getElementById('lootStatus').value==='无人需求'?'':document.getElementById('lootAssignedTo').value.trim();
   const assignedMemberRow = assignedVal
     ? (appData.members || []).find(m => m.id === assignedVal)
     : null;
@@ -9080,6 +9094,10 @@ function lootFillAssignedTo(idOrName) {
 // ==================== 初始化 ====================
 // ==================== 更新日志 ====================
 const changelogData = [
+  {id:'req198-feature',version:'v3.2.0',date:'2026-11-16',type:'feature',typeLabel:'新增功能',title:'装备分配支持无人需求',summary:'确认没人需要时可保存，无需指定获得者。',details:[]},
+  {id:'req198-improve',version:'v3.2.0',date:'2026-11-16',type:'improve',typeLabel:'功能优化',title:'无人需求可筛选和重新分配',summary:'保留原始拾取人，之后可修改为已分配。',details:[]},
+  {id:'req198-fix',version:'v3.2.0',date:'2026-11-16',type:'fix',typeLabel:'修复BUG',title:'防止无人需求保留旧获得者',summary:'切换状态清空获得者，按现有规则撤回心愿已获取标记。',details:[]},
+  {id:'req198-refactor',version:'v3.2.0',date:'2026-11-16',type:'refactor',typeLabel:'模块调整',title:'复用现有分配状态链路',summary:'不新增数据库结构，不改拾取事实和管理权限。',details:[]},
   {id:'req197-feature',version:'v3.2.0',date:'2026-11-16',type:'feature',typeLabel:'新增功能',title:'分配表主属性颜色标签',summary:'力量红、敏捷绿、智力蓝；副属性改为亮绿色。',details:[]},
   {id:'req197-improve',version:'v3.2.0',date:'2026-11-16',type:'improve',typeLabel:'功能优化',title:'装备分配表更紧凑',summary:'缩小列间留白，保留完整字段及放大的装备名称图标。',details:[]},
   {id:'req197-fix',version:'v3.2.0',date:'2026-11-16',type:'fix',typeLabel:'修复BUG',title:'点数不再拆行，操作入口保持可见',summary:'需求与点数同排，窄桌面横滚时操作列固定在右侧。',details:[]},
