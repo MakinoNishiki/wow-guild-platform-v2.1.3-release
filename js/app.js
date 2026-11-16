@@ -2292,13 +2292,7 @@ function renderCurrentPage() {
     case 'attendance': renderAttendance(); break;
     case 'loot':
       lootRender(); // BUG-034：修正未定义函数名（原 renderLoot 不存在，ReferenceError）
-      // 任务书 #80：MasterData 未加载完成时首渲染无图标（getItemIconId 返回 null），
-      // init 完成后补一次重渲补齐图标（快照兜底态 isLoaded 终为 true，不阻塞）
-      if (window.MasterData && !MasterData.isLoaded()) {
-        MasterData.init().then(() => {
-          if (document.querySelector('.nav-item.active')?.getAttribute('data-page') === 'loot') lootRender();
-        });
-      }
+      // BUG-125: dictionary completion refresh now lives in lootRender, including direct route entry.
       break;
     case 'wishlist':
       wishlistRender(); // 同上（原 renderWishlist）
@@ -7697,8 +7691,15 @@ function tierSetBadgeHtml(name) {
   return hit ? ' <span class="tag tag-gold" title="套装装备">🏷️套装</span>' : '';
 }
 
+let lootDictionaryRefresh = null;
 function lootRender() {
   window.LootDetails?.close();
+  if (window.MasterData && !MasterData.isLoaded() && !lootDictionaryRefresh) {
+    lootDictionaryRefresh = MasterData.init().then(() => {
+      if (MasterData.isLoaded() && document.getElementById('page-loot')?.getClientRects().length) lootRender();
+    }).catch(() => showToast('装备图鉴暂时无法加载，属性可稍后重试', 'warning'))
+      .finally(() => { lootDictionaryRefresh = null; });
+  }
   const tbody = document.getElementById('lootTableBody');
   if (!tbody) return;
 
@@ -7795,11 +7796,14 @@ function lootRender() {
     return (b.createdAt || 0) - (a.createdAt || 0);
   });
   
+  const readAttributes = window.LootDetails?.attributeReader();
   tbody.innerHTML = loots.map(loot => {
     const statusBadge = lootStatusBadgeMap[loot.status] || '';
     const priorityBadge = lootPriorityBadgeMap[loot.priority] || '';
-    const secondaryStatsHtml = (loot.secondaryStats || [])
-      .map(s => `<span class="loot-stat-tag">${s}</span>`).join('');
+    const attributes = readAttributes ? readAttributes(loot) : {primary:loot.primaryStat || '', secondary:loot.secondaryStats || []};
+    const pickupLabel = [loot.pickup_source?.player_name, loot.pickup_source?.player_server].filter(Boolean).join(' · ') || '未记录';
+    const secondaryStatsHtml = attributes.secondary
+      .map(s => `<span class="loot-stat-tag">${dropEsc(s)}</span>`).join('');
     
     const distMethodText = LOOT_DISTRIBUTION_LABELS[loot.distribution_method] || loot.distribution_method || '—';
     const rollText = ['roll','roll_rule'].includes(loot.distribution_method)
@@ -7832,15 +7836,15 @@ function lootRender() {
     
     return `
       <tr>
-        <td><button type="button" class="loot-name loot-detail-trigger" data-loot-detail="${dropEsc(loot.id)}" aria-expanded="false" aria-controls="lootDetailPopover" aria-label="查看${dropEsc(loot.name)}装备详情">${loot.pickup_source?lootPickupIcon(loot.pickup_source,loot.name):itemIconImgHtml(loot.name, loot.raid, loot.boss)}${dropEsc(loot.name)}${tierSetBadgeHtml(loot.name)}</button>${loot.source_drop_id?`<br><small>拾取来源 · ${dropEsc(loot.allocation_activity_name||'未关联活动')}</small>`:''}${loot.effect ? `<div class="loot-effect-green" style="font-size:11px;margin-top:2px" title="${loot.effect.replace(/"/g, '&quot;')}">${loot.effect.length > 30 ? loot.effect.slice(0, 30) + '…' : loot.effect}</div>` : ''}</td>
+        <td><button type="button" class="loot-name loot-detail-trigger" data-loot-detail="${dropEsc(loot.id)}" aria-expanded="false" aria-controls="lootDetailPopover" aria-label="查看${dropEsc(loot.name)}装备详情">${loot.pickup_source?lootPickupIcon(loot.pickup_source,loot.name):itemIconImgHtml(loot.name, loot.raid, loot.boss)}<span class="loot-detail-name">${dropEsc(loot.name)}</span>${tierSetBadgeHtml(loot.name)}</button>${loot.source_drop_id||loot.pickup_source?`<div class="loot-pickup-person">拾取人：${dropEsc(pickupLabel)}</div>`:''}${loot.effect ? `<div class="loot-effect-green" style="font-size:11px;margin-top:2px" title="${loot.effect.replace(/"/g, '&quot;')}">${loot.effect.length > 30 ? loot.effect.slice(0, 30) + '…' : loot.effect}</div>` : ''}</td>
         <td class="num loot-item-level">${Number(loot.item_level)>0?dropEsc(loot.item_level):'—'}</td>
         <td class="center">${wishlistBadge}</td>
         <td><span class="wishlist-raid-tag">${dropEsc(loot.raid || '-')}</span></td>
         <td>${dropEsc(loot.difficulty || '—')}</td>
         <td>${dropEsc(loot.boss || '')}</td>
         <td>${dropEsc(LOOT_DROP_INVTYPE_ZH[loot.slot] || loot.slot || '—')}</td>
-        <td>${loot.primaryStat || ''}</td>
-        <td><div class="loot-secondary-stats">${secondaryStatsHtml || '-'}</div></td>
+        <td${attributes.primaryReference ? ' title="属性名称来自副本图鉴；参考数值可悬浮装备查看"' : ''}>${dropEsc(attributes.primary) || '—'}</td>
+        <td${attributes.secondaryReference ? ' title="属性名称来自副本图鉴；参考数值可悬浮装备查看"' : ''}><div class="loot-secondary-stats">${secondaryStatsHtml || '—'}</div></td>
         <td>${assignedToHtml}${claimerLabelHtml(assignedMark === '' ? assignedMember : null)}</td>
         <td class="center"><span class="badge ${statusBadge}">${loot.status || '待分配'}</span></td>
         <td>${dropEsc(distMethodText)}</td>
@@ -9074,6 +9078,10 @@ function lootFillAssignedTo(idOrName) {
 // ==================== 初始化 ====================
 // ==================== 更新日志 ====================
 const changelogData = [
+  {id:'bug125-feature',version:'v3.2.0',date:'2026-11-16',type:'feature',typeLabel:'新增功能',title:'分配列表显示原始拾取人',summary:'装备名称下方显示原始拾取人及已记录的服务器，可与最终分配对象对照追溯。',details:['未知拾取人明确显示未记录，不使用最终获得者代替。']},
+  {id:'bug125-improve',version:'v3.2.0',date:'2026-11-16',type:'improve',typeLabel:'功能优化',title:'放大装备名称和图标，减少重复信息',summary:'图标与名称放大并同排，名称下方不再重复团本和日期；旧拾取分配记录直接补充缺失属性名称。',details:['已有人工录入内容按字段保留，数值仍在图鉴参考详情查看。']},
+  {id:'bug125-fix',version:'v3.2.0',date:'2026-11-16',type:'fix',typeLabel:'修复BUG',title:'修复详情有属性但分配列表为空',summary:'主、副属性两列与悬浮详情共用物品匹配，未知或多候选不猜测。',details:['没有资料的两列统一显示破折号。']},
+  {id:'bug125-refactor',version:'v3.2.0',date:'2026-11-16',type:'refactor',typeLabel:'模块调整',title:'列表与详情共用图鉴匹配',summary:'仅补充只读展示，不回写历史分配记录，不增加数据库结构。',details:[]},
   {id:'req196-feature',version:'v3.2.0',date:'2026-11-16',type:'feature',typeLabel:'新增功能',title:'分配列表可悬浮查看装备资料',summary:'鼠标移到装备图标或名称即可查看副本掉落图鉴卡片，也支持键盘聚焦。',details:['本次装等与难度单独展示，图鉴属性保留原始参考档。']},
   {id:'req196-improve',version:'v3.2.0',date:'2026-11-16',type:'improve',typeLabel:'功能优化',title:'装备详情无需离开分配列表',summary:'浮层可移入阅读，长特效完整显示，移开或按Escape关闭。',details:['缺少资料或无法唯一匹配时明确提示，不猜测装备属性。']},
   {id:'bug124-fix',version:'v3.2.0',date:'2026-11-16',type:'fix',typeLabel:'修复BUG',title:'关联团员成功后清空批量选择',summary:'确认保存成功后取消列表勾选并收起批量操作栏，失败或取消时保留选择。',details:['公会权限与个人角色认领关系不变。']},

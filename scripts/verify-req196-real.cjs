@@ -1,7 +1,7 @@
 const assert=require('node:assert/strict'),crypto=require('node:crypto'),fs=require('node:fs'),{chromium}=require('playwright');
 module.exports=async config=>{
  assert.equal(config.ENVIRONMENT,'isolated-test');assert.equal(config.SUPABASE_URL,'http://127.0.0.1:18000');
- const out='docs/evidence/req196-20261116',checks=[],errors=[];fs.mkdirSync(out,{recursive:true});
+ const out=config.verifyAttributes?'docs/evidence/bug125-20261116':'docs/evidence/req196-20261116',checks=[],errors=[];fs.mkdirSync(out,{recursive:true});
  const headers={apikey:config.SUPABASE_SERVICE_ROLE_KEY,Authorization:'Bearer '+config.SUPABASE_SERVICE_ROLE_KEY,'Content-Type':'application/json',Prefer:'return=representation'};
  const call=async(path,method='GET',body)=>{const r=await fetch(config.SUPABASE_URL+path,{method,headers,body:body===undefined?undefined:JSON.stringify(body)});assert(r.ok,path+' '+r.status);const t=await r.text();return t?JSON.parse(t):null;};
  const check=(name,result)=>{assert(result,name);checks.push(name);console.log('PASS '+name);};let user,guild,browser,page;
@@ -20,12 +20,17 @@ module.exports=async config=>{
   const roster=await call('/rest/v1/raid_members?guild_id=eq.'+guild.id);check('数据库两个角色关联同一团员且未修改认领人',roster[0].person_id&&roster[0].person_id===roster[1].person_id&&roster.every(m=>!m.user_id));
   const sample=await page.evaluate(async()=>{await MasterData.init();for(const r of MasterData.getRaids())for(const b of MasterData.getBosses(r.id))for(const l of MasterData.getLoot(b.id))if(l.item_name==='剧毒悔恨束带')return {row:l,raid:r.name,boss:b.name,season:r.season_id};});assert(sample,'Real dictionary belt available');
   const records=await call('/rest/v1/loot_records','POST',[
-   {guild_id:guild.id,item_name:sample.row.item_name,item_slot:sample.row.slot,item_level:344,raid_name:sample.raid,boss_name:sample.boss,difficulty:'史诗',obtained_date:'2026-11-16',item_stats:{status:'待分配',pickup_source:{official_item_id:sample.row.official_item_id,icon_id:sample.row.icon_id,quality:4}}},
+   {guild_id:guild.id,item_name:sample.row.item_name,item_slot:sample.row.slot,item_level:344,raid_name:sample.raid,boss_name:sample.boss,difficulty:'史诗',obtained_date:'2026-11-16',item_stats:{status:'待分配',pickup_source:{official_item_id:sample.row.official_item_id,icon_id:sample.row.icon_id,quality:4,...(config.verifyAttributes?{player_name:'原始拾取人',player_server:'罗宁'}:{})}}},
    {guild_id:guild.id,item_name:'未收录装备 <安全文本>',item_level:0,obtained_date:'2026-11-16',item_stats:{status:'待分配'}},
    {guild_id:guild.id,item_name:sample.row.item_name,item_level:344,obtained_date:'2026-11-16',item_stats:{status:'待分配',pickup_source:{official_item_id:999999999}}}
   ].map(row=>({item_slot:'',raid_name:'',boss_name:'',difficulty:'',...row})));
   await page.goto('http://127.0.0.1:18779/#/team/loot');await page.reload();await page.waitForFunction(()=>appData.loots.length===3);await page.locator('[onclick="lootSwitchView(\'assign\')"]').click();
   const trigger=page.locator('[data-loot-detail="'+records[0].id+'"]'),popup=page.locator('#lootDetailPopover');
+  if(config.verifyAttributes){
+   await require('./verify-bug125-columns.cjs')(page,sample,records,check,out);
+   const persisted=await call('/rest/v1/loot_records?id=eq.'+records[0].id);
+   check('显示补充属性不回写原分配记录',!persisted[0].item_stats.primaryStat&&!persisted[0].item_stats.secondaryStats);
+  }
   await trigger.hover();await popup.locator('.dp-item').waitFor();check('名称悬浮显示图鉴同源卡片',await popup.locator('.dp-item-name').innerText()===sample.row.item_name);
   check('本次344史诗与图鉴参考档明确分开',(await popup.locator('.loot-detail-record').innerText()).includes('344')&&(await popup.locator('.loot-detail-record').innerText()).includes('史诗')&&(await popup.locator('.loot-detail-note').innerText()).includes('不代表本次'));
   const shared=await page.evaluate(sample=>DPLootDrop.renderItemCard({...sample.row,source:'raid',instance_name:sample.raid,boss_name:sample.boss,season_id:sample.season},[]),sample);

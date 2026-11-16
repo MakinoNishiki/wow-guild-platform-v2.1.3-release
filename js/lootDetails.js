@@ -24,13 +24,26 @@
     }
     return rows;
   }
-  function match(loot) {
+  function match(loot, rows = pool()) {
     const id = loot.pickup_source?.official_item_id || loot.pickup_source?.item_link?.match(/item:(\d+)/)?.[1];
     // A supplied stable ID must never fall back to a different same-name item.
-    let rows = pool().filter(row => id ? String(row.official_item_id) === String(id) : row.item_name === loot.name);
+    rows = rows.filter(row => id ? String(row.official_item_id) === String(id) : row.item_name === loot.name);
     if (loot.raid) rows = rows.filter(row => row.instance_name === loot.raid);
     if (rows.length > 1 && loot.boss) rows = rows.filter(row => row.boss_name === loot.boss);
     return {row: rows.length === 1 ? rows[0] : null, ambiguous: rows.length > 1};
+  }
+  // BUG-125: one dictionary snapshot per table render; no mutation of allocation history.
+  function attributeReader() {
+    const rows = window.MasterData?.isLoaded() ? pool() : [];
+    const names = list => Array.isArray(list) ? list.filter(s => typeof s === 'string' && s.trim()).map(s => s.trim()) : [];
+    return loot => {
+      const savedPrimary = typeof loot.primaryStat === 'string' ? loot.primaryStat.trim() : '';
+      const savedSecondary = names(loot.secondaryStats);
+      const {row} = (!savedPrimary || !savedSecondary.length) ? match(loot, rows) : {row:null};
+      const primary = savedPrimary || names(row?.primary_stats).join(' / ');
+      const secondary = savedSecondary.length ? savedSecondary : names(row?.secondary_stats);
+      return {primary, secondary, primaryReference: !savedPrimary && !!primary, secondaryReference: !savedSecondary.length && secondary.length > 0};
+    };
   }
   async function open(el) {
     clearTimeout(leaveTimer);
@@ -83,5 +96,5 @@
   }, true);
   document.addEventListener('scroll', ev => { if (anchor && !panel?.contains(ev.target)) close(); }, true);
   window.addEventListener('resize', close); window.addEventListener('hashchange', close);
-  window.LootDetails = {close};
+  window.LootDetails = {close, attributeReader};
 })();
