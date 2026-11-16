@@ -1,7 +1,7 @@
 const assert=require('node:assert/strict'),crypto=require('node:crypto'),fs=require('node:fs'),{chromium}=require('playwright');
 module.exports=async config=>{
  assert.equal(config.ENVIRONMENT,'isolated-test');assert.equal(config.SUPABASE_URL,'http://127.0.0.1:18000');
- const out=config.verifyAttributes?'docs/evidence/bug125-20261116':'docs/evidence/req196-20261116',checks=[],errors=[];fs.mkdirSync(out,{recursive:true});
+ const out=config.verifyDensity?'docs/evidence/req197-20261116':config.verifyAttributes?'docs/evidence/bug125-20261116':'docs/evidence/req196-20261116',checks=[],errors=[];fs.mkdirSync(out,{recursive:true});
  const headers={apikey:config.SUPABASE_SERVICE_ROLE_KEY,Authorization:'Bearer '+config.SUPABASE_SERVICE_ROLE_KEY,'Content-Type':'application/json',Prefer:'return=representation'};
  const call=async(path,method='GET',body)=>{const r=await fetch(config.SUPABASE_URL+path,{method,headers,body:body===undefined?undefined:JSON.stringify(body)});assert(r.ok,path+' '+r.status);const t=await r.text();return t?JSON.parse(t):null;};
  const check=(name,result)=>{assert(result,name);checks.push(name);console.log('PASS '+name);};let user,guild,browser,page;
@@ -31,6 +31,7 @@ module.exports=async config=>{
    const persisted=await call('/rest/v1/loot_records?id=eq.'+records[0].id);
    check('显示补充属性不回写原分配记录',!persisted[0].item_stats.primaryStat&&!persisted[0].item_stats.secondaryStats);
   }
+  if(config.verifyDensity) await require('./verify-req197-density.cjs')(page,records,check,out);
   await trigger.hover();await popup.locator('.dp-item').waitFor();check('名称悬浮显示图鉴同源卡片',await popup.locator('.dp-item-name').innerText()===sample.row.item_name);
   check('本次344史诗与图鉴参考档明确分开',(await popup.locator('.loot-detail-record').innerText()).includes('344')&&(await popup.locator('.loot-detail-record').innerText()).includes('史诗')&&(await popup.locator('.loot-detail-note').innerText()).includes('不代表本次'));
   const shared=await page.evaluate(sample=>DPLootDrop.renderItemCard({...sample.row,source:'raid',instance_name:sample.raid,boss_name:sample.boss,season_id:sample.season},[]),sample);

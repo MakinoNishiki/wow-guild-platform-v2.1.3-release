@@ -7802,6 +7802,8 @@ function lootRender() {
     const priorityBadge = lootPriorityBadgeMap[loot.priority] || '';
     const attributes = readAttributes ? readAttributes(loot) : {primary:loot.primaryStat || '', secondary:loot.secondaryStats || []};
     const pickupLabel = [loot.pickup_source?.player_name, loot.pickup_source?.player_server].filter(Boolean).join(' · ') || '未记录';
+    const primaryStatsHtml = attributes.primary.split(/\s*[/、,，]\s*/).filter(Boolean)
+      .map(s => `<span class="dp-tag ${{'力量':'dp-tag-p1','敏捷':'dp-tag-p2','智力':'dp-tag-p3'}[s] || 'dp-tag-primary'}">${dropEsc(s)}</span>`).join('');
     const secondaryStatsHtml = attributes.secondary
       .map(s => `<span class="loot-stat-tag">${dropEsc(s)}</span>`).join('');
     
@@ -7836,14 +7838,14 @@ function lootRender() {
     
     return `
       <tr>
-        <td><button type="button" class="loot-name loot-detail-trigger" data-loot-detail="${dropEsc(loot.id)}" aria-expanded="false" aria-controls="lootDetailPopover" aria-label="查看${dropEsc(loot.name)}装备详情">${loot.pickup_source?lootPickupIcon(loot.pickup_source,loot.name):itemIconImgHtml(loot.name, loot.raid, loot.boss)}<span class="loot-detail-name">${dropEsc(loot.name)}</span>${tierSetBadgeHtml(loot.name)}</button>${loot.source_drop_id||loot.pickup_source?`<div class="loot-pickup-person">拾取人：${dropEsc(pickupLabel)}</div>`:''}${loot.effect ? `<div class="loot-effect-green" style="font-size:11px;margin-top:2px" title="${loot.effect.replace(/"/g, '&quot;')}">${loot.effect.length > 30 ? loot.effect.slice(0, 30) + '…' : loot.effect}</div>` : ''}</td>
+        <td><button type="button" class="loot-name loot-detail-trigger" data-loot-detail="${dropEsc(loot.id)}" aria-expanded="false" aria-controls="lootDetailPopover" aria-label="查看${dropEsc(loot.name)}装备详情">${loot.pickup_source?lootPickupIcon(loot.pickup_source,loot.name):itemIconImgHtml(loot.name, loot.raid, loot.boss)}<span class="loot-detail-name" title="${dropEsc(loot.name)}">${dropEsc(loot.name)}</span>${tierSetBadgeHtml(loot.name)}</button>${loot.source_drop_id||loot.pickup_source?`<div class="loot-pickup-person">拾取人：${dropEsc(pickupLabel)}</div>`:''}${loot.effect ? `<div class="loot-effect-green" style="font-size:11px;margin-top:2px" title="${loot.effect.replace(/"/g, '&quot;')}">${loot.effect.length > 30 ? loot.effect.slice(0, 30) + '…' : loot.effect}</div>` : ''}</td>
         <td class="num loot-item-level">${Number(loot.item_level)>0?dropEsc(loot.item_level):'—'}</td>
         <td class="center">${wishlistBadge}</td>
         <td><span class="wishlist-raid-tag">${dropEsc(loot.raid || '-')}</span></td>
         <td>${dropEsc(loot.difficulty || '—')}</td>
         <td>${dropEsc(loot.boss || '')}</td>
         <td>${dropEsc(LOOT_DROP_INVTYPE_ZH[loot.slot] || loot.slot || '—')}</td>
-        <td${attributes.primaryReference ? ' title="属性名称来自副本图鉴；参考数值可悬浮装备查看"' : ''}>${dropEsc(attributes.primary) || '—'}</td>
+        <td${attributes.primaryReference ? ' title="属性名称来自副本图鉴；参考数值可悬浮装备查看"' : ''}><div class="loot-primary-stats">${primaryStatsHtml || '—'}</div></td>
         <td${attributes.secondaryReference ? ' title="属性名称来自副本图鉴；参考数值可悬浮装备查看"' : ''}><div class="loot-secondary-stats">${secondaryStatsHtml || '—'}</div></td>
         <td>${assignedToHtml}${claimerLabelHtml(assignedMark === '' ? assignedMember : null)}</td>
         <td class="center"><span class="badge ${statusBadge}">${loot.status || '待分配'}</span></td>
@@ -9078,6 +9080,10 @@ function lootFillAssignedTo(idOrName) {
 // ==================== 初始化 ====================
 // ==================== 更新日志 ====================
 const changelogData = [
+  {id:'req197-feature',version:'v3.2.0',date:'2026-11-16',type:'feature',typeLabel:'新增功能',title:'分配表主属性颜色标签',summary:'力量红、敏捷绿、智力蓝；副属性改为亮绿色。',details:[]},
+  {id:'req197-improve',version:'v3.2.0',date:'2026-11-16',type:'improve',typeLabel:'功能优化',title:'装备分配表更紧凑',summary:'缩小列间留白，保留完整字段及放大的装备名称图标。',details:[]},
+  {id:'req197-fix',version:'v3.2.0',date:'2026-11-16',type:'fix',typeLabel:'修复BUG',title:'点数不再拆行，操作入口保持可见',summary:'需求与点数同排，窄桌面横滚时操作列固定在右侧。',details:[]},
+  {id:'req197-refactor',version:'v3.2.0',date:'2026-11-16',type:'refactor',typeLabel:'模块调整',title:'分配表独立列宽规则',summary:'样式仅限分配记录，不改变数据与权限。',details:[]},
   {id:'bug125-feature',version:'v3.2.0',date:'2026-11-16',type:'feature',typeLabel:'新增功能',title:'分配列表显示原始拾取人',summary:'装备名称下方显示原始拾取人及已记录的服务器，可与最终分配对象对照追溯。',details:['未知拾取人明确显示未记录，不使用最终获得者代替。']},
   {id:'bug125-improve',version:'v3.2.0',date:'2026-11-16',type:'improve',typeLabel:'功能优化',title:'放大装备名称和图标，减少重复信息',summary:'图标与名称放大并同排，名称下方不再重复团本和日期；旧拾取分配记录直接补充缺失属性名称。',details:['已有人工录入内容按字段保留，数值仍在图鉴参考详情查看。']},
   {id:'bug125-fix',version:'v3.2.0',date:'2026-11-16',type:'fix',typeLabel:'修复BUG',title:'修复详情有属性但分配列表为空',summary:'主、副属性两列与悬浮详情共用物品匹配，未知或多候选不猜测。',details:['没有资料的两列统一显示破折号。']},

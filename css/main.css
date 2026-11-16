@@ -5165,11 +5165,6 @@ img.class-icon[src$=".png"] { border-radius: 3px; }
 #lootAllocationMember option { background:var(--bg-primary); }
 #lootAllocationMember option[value=""] { color:var(--text-primary); }
 /* REQ194: keep equipment names readable; narrow desktops scroll within the table. */
-#lootViewAssign .data-table { min-width:1280px; }
-#lootViewAssign .data-table :is(th,td):first-child { min-width:180px; }
-#lootViewAssign .data-table :is(th,td):nth-child(10) { min-width:110px; }
-#lootViewAssign .data-table :is(th,td):nth-child(12) { min-width:100px; }
-#lootViewAssign .data-table :is(th,td):nth-child(14) { white-space:nowrap; }
 .person-stat-mode { margin-bottom:16px; flex-wrap:wrap; }
 .person-stat-mode label { display:flex; align-items:center; gap:8px; }
 .person-stat-mode .form-select { width:auto; }
@@ -5198,7 +5193,6 @@ img.class-icon[src$=".png"] { border-radius: 3px; }
 .loot-detail-trigger .loot-item-icon { width: 32px; height: 32px; margin: 0; flex-shrink: 0; }
 .loot-detail-name { white-space: nowrap; }
 .loot-pickup-person { margin-top: 4px; color: var(--text-secondary); font-size: 12px; line-height: 18px; }
-#lootViewAssign .data-table :is(th,td):first-child { min-width: 260px; }
 #lootViewAssign .wishlist-raid-tag { white-space: nowrap; }
 .loot-detail-trigger:hover { color: var(--gold-light); }
 .loot-detail-trigger:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; }
@@ -5219,3 +5213,36 @@ img.class-icon[src$=".png"] { border-radius: 3px; }
 .loot-detail-popover .dp-item-stats { flex-wrap: wrap; }
 .loot-detail-popover .dp-item-effect-wrap { height: auto; max-height: none; overflow: visible; }
 .loot-detail-popover .dp-item-effect-preview { height: auto; max-height: none; overflow: visible; -webkit-line-clamp: unset; }
+
+/* REQ-197: allocation-only column budget; preserve every column and action. */
+#page-loot #lootViewAssign .data-table { table-layout: fixed; min-width: 1280px; }
+#lootViewAssign .data-table :is(th,td) { padding: 8px; box-sizing: border-box; min-width: 0; }
+#lootViewAssign .data-table th:nth-child(1) { width: 220px; }
+#lootViewAssign .data-table th:nth-child(2) { width: 46px; }
+#lootViewAssign .data-table th:nth-child(3) { width: 44px; }
+#lootViewAssign .data-table th:nth-child(4) { width: 64px; }
+#lootViewAssign .data-table th:nth-child(5) { width: 64px; }
+#lootViewAssign .data-table th:nth-child(6) { width: 82px; }
+#lootViewAssign .data-table th:nth-child(7) { width: 64px; }
+#lootViewAssign .data-table th:nth-child(8),
+#lootViewAssign .data-table th:nth-child(9) { width: 56px; }
+#lootViewAssign .data-table th:nth-child(10) { width: 110px; }
+#lootViewAssign .data-table th:nth-child(11) { width: 64px; }
+#lootViewAssign .data-table th:nth-child(12) { width: 80px; }
+#lootViewAssign .data-table th:nth-child(13) { width: 64px; }
+#lootViewAssign .data-table th:nth-child(14) { width: 84px; }
+#lootViewAssign .data-table th:nth-child(15) { width: 80px; }
+#lootViewAssign .data-table :is(th,td):nth-child(13),
+#lootViewAssign .data-table :is(th,td):nth-child(14) { white-space: nowrap; }
+#lootViewAssign .data-table :is(th,td):last-child { position: sticky; right: 0; z-index: 2; background: inherit; }
+#lootViewAssign .data-table th:last-child { z-index: 4; background: var(--bg-tertiary); }
+#lootViewAssign .action-btns { gap: 4px; }
+#lootViewAssign .icon-btn { flex-shrink: 0; }
+#lootViewAssign .loot-detail-trigger { max-width: 100%; }
+#lootViewAssign .loot-detail-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+#lootViewAssign .loot-pickup-person { overflow-wrap: anywhere; }
+#lootViewAssign .loot-primary-stats,
+#lootViewAssign .loot-secondary-stats { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
+#lootViewAssign .loot-primary-stats .dp-tag,
+#lootViewAssign .loot-stat-tag { height: 20px; box-sizing: border-box; padding: 0 5px; border-radius: 5px; font-size: 11px; line-height: 20px; white-space: nowrap; }
+#lootViewAssign .loot-stat-tag { color: #1eff00; background: rgba(30,255,0,.12); }
