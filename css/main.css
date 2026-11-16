@@ -5246,3 +5246,22 @@ img.class-icon[src$=".png"] { border-radius: 3px; }
 #lootViewAssign .loot-primary-stats .dp-tag,
 #lootViewAssign .loot-stat-tag { height: 20px; box-sizing: border-box; padding: 0 5px; border-radius: 5px; font-size: 11px; line-height: 20px; white-space: nowrap; }
 #lootViewAssign .loot-stat-tag { color: #1eff00; background: rgba(30,255,0,.12); }
+
+/* REQ-199: scoped evidence and batch workflow, existing project tokens. */
+.loot-evidence-panel { padding:12px 16px; margin:12px 0; border:1px solid var(--border-color); border-radius:6px; background:var(--bg-dark); font-size:13px; line-height:1.6; }
+.loot-evidence-panel p { margin:6px 0; overflow-wrap:anywhere; }
+.loot-evidence-warning { color:var(--gold); }
+.loot-batch-check { margin-right:8px; }
+#lootBatchToolbar { margin:12px 0; gap:8px; }
+#lootBatchModal .modal { width:min(1120px,calc(100vw - 32px)); max-width:1120px; }
+#lootBatchModal th, #lootBatchModal td { padding:8px; }
+#lootBatchModal td:first-child { min-width:180px; }
+#lootBatchModal [data-batch-status] { min-width:100px; }
+#lootBatchModal [data-batch-member] { min-width:200px; max-width:280px; }
+#lootBatchModal [data-batch-boss] { min-width:110px; }
+#lootBatchModal [data-batch-result] { min-width:100px; max-width:200px; overflow-wrap:anywhere; }
+#lootBatchError, #lootBatchFeedback { color:var(--gold); line-height:1.6; }
+
+#lootBatchModal .modal-body > p:first-child { margin-bottom:16px; line-height:1.6; }
+
+.anx-count-note { color:var(--text-muted); font-size:12px; line-height:1.6; margin:12px 0; }

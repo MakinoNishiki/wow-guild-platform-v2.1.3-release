@@ -42,13 +42,15 @@ function API.RefreshUI()
   local function plain(value) return tostring(value or ""):gsub("|", "||") end
   latest:SetText(row and string.format(L.PANEL_LATEST, plain(row.playerName), plain(row.itemName), plain(row.difficulty or "未记录难度")) or L.PANEL_EMPTY)
   local warning = s.lastError or L.PANEL_HEALTHY
+  warning = warning .. "\n观察/交易证据 " .. #(WoWButlerCollectorSettings.evidence or {}) .. " 条；仅记录本机参与且可识别的交易。"
+  if WoWButlerCollectorSettings.evidenceTrimmed then warning=warning.."\n观察证据已达到容量，最早记录已移除，请及时导出。" end
   if s.reviewCount > 0 then warning = warning .. "\n" .. L.PANEL_REVIEW_WARNING end
   if s.count >= 1000 then warning = warning .. "\n" .. string.format(L.PANEL_CAPACITY, s.max) end
   errors:SetText(warning)
   errors:SetTextColor((s.failed > 0 or s.reviewCount > 0) and 1 or 0.85, s.failed > 0 and 0.35 or 0.85, s.failed > 0 and 0.3 or 0.85)
-  exportButton:SetEnabled(s.exportable > 0 and s.pending == 0)
+  exportButton:SetEnabled((s.exportable > 0 or #(WoWButlerCollectorSettings.evidence or {}) > 0) and s.pending == 0)
   exportButton:SetText(s.pending > 0 and L.EXPORT_WAIT or L.EXPORT_BUTTON)
-  clearButton:SetEnabled(s.count > 0 or s.pending > 0)
+  clearButton:SetEnabled(s.count > 0 or s.pending > 0 or #(WoWButlerCollectorSettings.evidence or {}) > 0)
   if launcher then launcher:SetShown(not WoWButlerCollectorSettings.hideMinimap) end
 end
 

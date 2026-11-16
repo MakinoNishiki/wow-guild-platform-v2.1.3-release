@@ -1,0 +1,34 @@
+{
+  "phase": "equipment_change_after_user_reported_reload",
+  "source_sha256": "202cad34da726aba31d4abc376c28f230c9feb22dfd653d7c0b48c14bc81a25e",
+  "file_bytes": 1212005,
+  "file_mtime": 1794843140.3167636,
+  "snapshot_finished_at": 1794843023,
+  "identity_unchanged": true,
+  "previous_snapshot_matches_baseline": true,
+  "changes": [
+    {
+      "slot": 16,
+      "before_item_id": 268198,
+      "after_item_id": 237846,
+      "before_actual_ilvl": 321,
+      "after_actual_ilvl": 285
+    }
+  ],
+  "average_ilvl_before": {
+    "overall": 321.4375,
+    "equipped": 321.4375
+  },
+  "average_ilvl_after": {
+    "overall": 321.4375,
+    "equipped": 316.9375
+  },
+  "diagnostics": {},
+  "before_reload_file_matched_baseline": true,
+  "limits": [
+    "Exact manual scan timing before first no-reload check was not independently observed",
+    "No logout or game-exit test yet",
+    "No multi-character test yet",
+    "No desktop automatic watcher implemented"
+  ]
+}

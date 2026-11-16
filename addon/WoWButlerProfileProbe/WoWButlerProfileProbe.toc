@@ -1,0 +1,7 @@
+## Interface: 120105
+## Title: 魔兽管家-个人档案验证
+## Notes: 本地只读验证；手动 /wbprofile 采集，不上传，不读取战网凭据。
+## Author: WoW Butler
+## Version: 0.1.0
+## SavedVariables: WoWButlerProfileProbeDB
+core.lua

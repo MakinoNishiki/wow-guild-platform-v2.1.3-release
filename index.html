@@ -4,13 +4,13 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>魔兽管家</title>
-<!-- 静态资源版本号：20261116.143（任务书 #22 WP3-②：凡改动 js/css 的 commit 必须同步递增此处与所有 ?v= 查询串，见 docs/开发规范.md 第五章） -->
+<!-- 静态资源版本号：20261117.144（任务书 #22 WP3-②：凡改动 js/css 的 commit 必须同步递增此处与所有 ?v= 查询串，见 docs/开发规范.md 第五章） -->
 <link rel="icon" type="image/png" sizes="32x32" href="assets/brand/favicon-32.png">
 <link rel="icon" type="image/png" sizes="16x16" href="assets/brand/favicon-16.png">
-<link rel="stylesheet" href="css/main.css?v=20261116.143">
-<link rel="stylesheet" href="css/data-public.css?v=20261116.143"><!-- 任务书 #28 WP5：副本掉落 tab（选择器全 .dp- 前缀 + #page-lootdrop 作用域，零泄漏） -->
-<link rel="stylesheet" href="css/decor-public.css?v=20261116.143"><!-- 任务书 #51：家宅图鉴（选择器全 .dh- 前缀，零泄漏，双壳共用） -->
-<script src="assets/vendor/supabase-js-2.js?v=20261116.143"></script>
+<link rel="stylesheet" href="css/main.css?v=20261117.144">
+<link rel="stylesheet" href="css/data-public.css?v=20261117.144"><!-- 任务书 #28 WP5：副本掉落 tab（选择器全 .dp- 前缀 + #page-lootdrop 作用域，零泄漏） -->
+<link rel="stylesheet" href="css/decor-public.css?v=20261117.144"><!-- 任务书 #51：家宅图鉴（选择器全 .dh- 前缀，零泄漏，双壳共用） -->
+<script src="assets/vendor/supabase-js-2.js?v=20261117.144"></script>
 </head>
 <body>
 
@@ -601,6 +601,14 @@
                 <button class="btn btn-primary" onclick="lootDropImportOpen()">📥 导入拾取</button>
               </div>
             </div>
+            <div id="lootBatchToolbar" class="toolbar edit-only">
+              <span id="lootBatchCount">已选 0 件</span>
+              <button class="btn btn-secondary btn-sm" onclick="LootWorkflow.selectAll()">选择当前结果（最多50件）</button>
+              <button class="btn btn-secondary btn-sm" onclick="LootWorkflow.clear()">取消选择</button>
+              <button class="btn btn-secondary btn-sm" onclick="LootWorkflow.review()">批量核对</button>
+              <button class="btn btn-primary btn-sm" onclick="LootWorkflow.open()">批量转分配</button>
+            </div>
+            <p id="lootBatchFeedback" role="status"></p>
             <div class="table-container">
               <table class="data-table">
                 <thead>
@@ -1631,6 +1639,19 @@
 </div>
 
 <!-- 提示消息容器 -->
+<div class="modal-overlay" id="lootBatchModal">
+  <div class="modal">
+    <div class="modal-header"><h3 class="modal-title">批量确认装备去向</h3><button class="modal-close" aria-label="关闭批量分配" onclick="requestCloseModal('lootBatchModal')">×</button></div>
+    <div class="modal-body">
+      <p>逐件确认最终获得者。拾取人可能代拿；待分配与无人需求无需选择获得者。交易参考可在单件“转分配/查看分配”中核对。</p>
+      <div class="form-row"><div class="form-group"><label class="form-label" for="lootBatchActivity">所属活动（整批，可稍后关联）</label><select class="form-input" id="lootBatchActivity"></select></div><div class="form-group"><label class="form-label" for="lootBatchMethod">分配方式（整批）</label><select class="form-input" id="lootBatchMethod"></select></div></div>
+      <div class="table-container"><table class="data-table"><thead><tr><th>装备与拾取人</th><th>分配状态</th><th>最终获得者</th><th>首领</th><th>保存结果</th></tr></thead><tbody id="lootBatchRows"></tbody></table></div>
+      <p id="lootBatchError" role="status"></p>
+    </div>
+    <div class="modal-footer"><button class="btn btn-secondary" onclick="requestCloseModal('lootBatchModal')">关闭</button><button class="btn btn-primary" id="lootBatchSave" onclick="LootWorkflow.save()">保存本批分配</button></div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="lootAllocationModal">
   <div class="modal" style="max-width:720px">
     <div class="modal-header"><div class="modal-title">确认装备分配</div><button type="button" class="modal-close" onclick="requestCloseModal('lootAllocationModal')">×</button></div>
@@ -2318,24 +2339,26 @@
   </div>
 </div>
 
-<script src="js/cloud.js?v=20261116.143"></script>
+<script src="js/cloud.js?v=20261117.144"></script>
 <!-- 任务书 #14：主数据层（快照兜底 + 加载层），须在 app.js 之前 -->
-<script src="js/masterDataSnapshot.js?v=20261116.143"></script>
-<script src="js/masterData.js?v=20261116.143"></script>
+<script src="js/masterDataSnapshot.js?v=20261117.144"></script>
+<script src="js/masterData.js?v=20261117.144"></script>
 <!-- 任务书 #22 WP2：职业/专精/职责图标集中映射（全站唯一取图处） -->
-<script src="js/iconMap.js?v=20261116.143"></script>
+<script src="js/iconMap.js?v=20261117.144"></script>
 <!-- 任务书 #31（REQ-097）：装备分类词表单一真源（公示页 chips / picker 过滤 / BUG-057 回填三处消费，须在 dataPublic.js 与 app.js 之前） -->
-<script src="js/itemQualityData.js?v=20261116.143"></script>
-<script src="js/lootTaxonomy.js?v=20261116.143"></script>
+<script src="js/itemQualityData.js?v=20261117.144"></script>
+<script src="js/lootTaxonomy.js?v=20261117.144"></script>
 <!-- 任务书 #28 WP5：副本掉落渲染层（双壳同源；无 data-public-body 不自动启动，由 app.js 懒挂载，须在 app.js 之前） -->
-<script src="js/dataPublic.js?v=20261116.143"></script>
+<script src="js/dataPublic.js?v=20261117.144"></script>
 <!-- 任务书 #51（REQ-137 一期）：家宅图鉴词表单一真源（价格/分类/尺寸/来源词表，须在 decorData.js 之前） -->
-<script src="js/decorDict.js?v=20261116.143"></script>
+<script src="js/decorDict.js?v=20261117.144"></script>
 <!-- 任务书 #51：家宅图鉴数据层+渲染层（双壳同源；无 data-decor-body 不自动启动，由 app.js 懒挂载，须在 app.js 之前） -->
-<script src="js/decorData.js?v=20261116.143"></script>
-<script src="js/app.js?v=20261116.143"></script>
-<script src="js/personAttendance.js?v=20261116.143"></script>
-<script src="js/lootDetails.js?v=20261116.143"></script>
-<script src="js/track.js?v=20261116.143"></script><!-- 任务书 #54 WP1：全站埋点采集层（REQ-141，零依赖静默兜底） -->
+<script src="js/decorData.js?v=20261117.144"></script>
+<script src="js/lootEvidence.js?v=20261117.144"></script>
+<script src="js/app.js?v=20261117.144"></script>
+<script src="js/lootWorkflow.js?v=20261117.144"></script>
+<script src="js/personAttendance.js?v=20261117.144"></script>
+<script src="js/lootDetails.js?v=20261117.144"></script>
+<script src="js/track.js?v=20261117.144"></script><!-- 任务书 #54 WP1：全站埋点采集层（REQ-141，零依赖静默兜底） -->
 </body>
 </html>

@@ -1,0 +1,49 @@
+{
+  "phase": "first_snapshot_after_user_reported_reload",
+  "client": {
+    "locale": "zhCN",
+    "build": "70783",
+    "version": "12.1.5",
+    "interface": 120105
+  },
+  "probe_version": "0.1.0",
+  "source_sha256": "8748e5429452654d16c43b264a60571aea790efc34d65c9eee2a2e814c1571d2",
+  "file_bytes": 605948,
+  "file_mtime": 1794842723.8938832,
+  "started_at": 1794842674,
+  "finished_at": 1794842685,
+  "identity_fields_present": [
+    "class",
+    "classID",
+    "classToken",
+    "level",
+    "name",
+    "race",
+    "raceID",
+    "raceToken",
+    "realm",
+    "region",
+    "sex",
+    "spec",
+    "specID"
+  ],
+  "equipment_slots": 19,
+  "equipped_items_including_shirt_and_tabard": 17,
+  "items_with_actual_level": 17,
+  "housing_entries": 2335,
+  "housing_entries_with_stored_field": 2335,
+  "housing_entries_with_placed_field": 2335,
+  "mythic_summary_returned": true,
+  "mythic_runs_returned": 4,
+  "raid_rows_returned": 2,
+  "raid_rows_locked": 0,
+  "raid_remaining_seconds_positive": 0,
+  "diagnostics": {},
+  "limits": [
+    "Panel values not yet compared by user",
+    "No before/after equipment change observed",
+    "No logout or exit comparison yet",
+    "Housing denominator and ownership semantics unverified",
+    "Raid entries are unlocked with zero reset time; not season progression"
+  ]
+}

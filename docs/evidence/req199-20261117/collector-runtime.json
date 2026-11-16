@@ -1,0 +1,65 @@
+{
+  "environment": "Lua 5.1 mocked game APIs; actual panel and JSON encoder, not live CN",
+  "checks": [
+    {
+      "name": "observed list remains separate from actual pickups",
+      "ok": true
+    },
+    {
+      "name": "same observation refresh does not multiply counts",
+      "ok": true
+    },
+    {
+      "name": "delayed pickup beyond old 180s retains unique original encounter",
+      "ok": true
+    },
+    {
+      "name": "ambiguous observed bosses never fall back to most recent boss",
+      "ok": true
+    },
+    {
+      "name": "missing history keeps unknown context",
+      "ok": true
+    },
+    {
+      "name": "LFR history excluded",
+      "ok": true
+    },
+    {
+      "name": "warbound observation marked excluded, pickup not recorded",
+      "ok": true
+    },
+    {
+      "name": "successful local trade requires both acceptance and completion message",
+      "ok": true
+    },
+    {
+      "name": "closing without success becomes unknown, never assigned",
+      "ok": true
+    },
+    {
+      "name": "cancel records cancellation",
+      "ok": true
+    },
+    {
+      "name": "success message without acceptance is not proof",
+      "ok": true
+    },
+    {
+      "name": "unrelated item never collected",
+      "ok": true
+    },
+    {
+      "name": "pause disables evidence too",
+      "ok": true
+    },
+    {
+      "name": "clear removes evidence and pending history timers",
+      "ok": true
+    },
+    {
+      "name": "evidence-only export through actual panel and nested JSON encoder",
+      "ok": true
+    }
+  ]
+}

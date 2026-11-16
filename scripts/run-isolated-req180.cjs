@@ -62,7 +62,7 @@ const root = path.resolve(__dirname, '..');
   try {
     await new Promise(resolve => server.listening ? resolve() : server.once('listening', resolve));
     const suite = {req191:'./verify-req191-real.cjs',req189:'./verify-req189-delete-real.cjs',req188:'./verify-req188-real.cjs',personalEntry:'./verify-personal-entry-real.cjs',req182:'./verify-req182-real.cjs', req183:'./verify-req183-real.cjs',req185:'./verify-req185-real.cjs',req186:'./verify-req186-real.cjs',req187:'./verify-req187-real.cjs'}[process.argv[2]] || './verify-req180-real.cjs';
-    await require(process.argv[2]==='req198'?'./verify-req198-real.cjs':process.argv[2]==='req197'?'./verify-req197-real.cjs':process.argv[2]==='bug125'?'./verify-bug125-real.cjs':process.argv[2]==='req196'?'./verify-req196-real.cjs':process.argv[2]==='req195ui'?'./verify-req195-ui.cjs':process.argv[2]==='req195api'?'./verify-req195-api.cjs':process.argv[2]==='req194'?'./verify-req194-real.cjs':process.argv[2]==='req193'?'./verify-req193-real.cjs':suite)(config);
+    await require(process.argv[2]==='req199'?'./verify-req199-real.cjs':process.argv[2]==='req198'?'./verify-req198-real.cjs':process.argv[2]==='req197'?'./verify-req197-real.cjs':process.argv[2]==='bug125'?'./verify-bug125-real.cjs':process.argv[2]==='req196'?'./verify-req196-real.cjs':process.argv[2]==='req195ui'?'./verify-req195-ui.cjs':process.argv[2]==='req195api'?'./verify-req195-api.cjs':process.argv[2]==='req194'?'./verify-req194-real.cjs':process.argv[2]==='req193'?'./verify-req193-real.cjs':suite)(config);
   } finally {
     await new Promise(resolve => server.close(resolve));
     await new Promise(resolve => bridge.close(resolve));

@@ -3,7 +3,7 @@ const assert=require('node:assert/strict'),crypto=require('node:crypto'),fs=requ
 const {chromium}=require('playwright');
 module.exports=async config=>{
   assert.equal(config.ENVIRONMENT,'isolated-test');assert.equal(config.SUPABASE_URL,'http://127.0.0.1:18000');
-  const out='docs/evidence/req191-20261113';fs.mkdirSync(out,{recursive:true});
+  const out='docs/evidence/req199-20261117/multi-observer';fs.mkdirSync(out,{recursive:true});
   const headers={apikey:config.SUPABASE_SERVICE_ROLE_KEY,Authorization:'Bearer '+config.SUPABASE_SERVICE_ROLE_KEY,'Content-Type':'application/json',Prefer:'return=representation'};
   const call=async(path,method='GET',body)=>{const r=await fetch(config.SUPABASE_URL+path,{method,headers,body:body===undefined?undefined:JSON.stringify(body)});const text=await r.text();assert(r.ok,path+' '+r.status+' '+text.slice(0,160));return text?JSON.parse(text):null;};
   const checks=[],errors=[],users=[],guilds=[];let browser,op,vp;

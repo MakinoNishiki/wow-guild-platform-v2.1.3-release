@@ -968,12 +968,12 @@
   }
 
   async function syncLootDrop(guildId, operation, item) {
-    if (!['submit','review'].includes(operation)) throw new Error('拾取记录请使用提交或核对入口');
+    if (!['submit','review','batchReview'].includes(operation)) throw new Error('拾取记录请使用提交或核对入口');
     const token=await getAccessToken();
     if(!token)throw new Error('请先登录');
     const userId=currentUser.id;
-    const body=operation==='submit'?{guildId,activityId:item.activityId||null,rows:item.rows}:{guildId,id:item.id,action:item.action,targetId:item.targetId||null};
-    const response=await fetch('/api/loot-observations/'+operation,{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify(body)});
+    const body=operation==='batchReview'?{guildId,action:'review',items:item.items}:operation==='submit'?{guildId,activityId:item.activityId||null,rows:item.rows,...(item.evidence?{evidence:item.evidence}:{})}:{guildId,id:item.id,action:item.action,targetId:item.targetId||null};
+    const response=await fetch('/api/loot-observations/'+(operation==='batchReview'?'batch':operation),{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify(body)});
     const result=await response.json();
     if(!response.ok)throw new Error(result.message||'提交未确认，请重试');
     if(currentGuild?.id!==guildId||currentUser?.id!==userId)throw new Error('账号或公会已切换，原公会提交可能已成功，请稍后核对');
@@ -1243,6 +1243,16 @@
 
   // ---- 同步装备 (写入走代理) ----
   async function syncLoot(guildId, operation, item) {
+    if(operation==='batchAllocate') {
+      const token=await getAccessToken(),userId=currentUser?.id;
+      if(!token)throw new Error('请先登录');
+      const response=await fetch('/api/loot-observations/batch',{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify({guildId,action:'allocate',items:item.items})});
+      const result=await response.json();
+      if(!response.ok)throw new Error(result.message||'批量分配未确认');
+      if(currentGuild?.id!==guildId||currentUser?.id!==userId)throw new Error('账号或公会已切换，请在原公会核对');
+      item.result=result;return;
+    }
+
     if(operation==='allocate') {
       const userId=currentUser?.id,token=await getAccessToken();
       if(!token)throw new Error('请先登录');

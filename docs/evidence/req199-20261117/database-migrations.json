@@ -1,0 +1,17 @@
+{
+  "date": "2026-11-17",
+  "isolated": [
+    "47_req199_loot_evidence.sql",
+    "48_bug115_analytics_counts.sql"
+  ],
+  "production": [
+    "47_req199_loot_evidence.sql",
+    "48_bug115_analytics_counts.sql"
+  ],
+  "productionSchemaBackup": "/opt/wowbutler-backups/req199-20261116162100/schema.sql",
+  "productionEvidenceRowsAfterMigration": 0,
+  "rpcACL": "service_role and database owners only; no authenticated/anon execution",
+  "analyticsBaselineGuardPassed": true,
+  "businessDataModified": false,
+  "appDeployed": false
+}

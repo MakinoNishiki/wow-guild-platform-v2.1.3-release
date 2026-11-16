@@ -1,0 +1,32 @@
+{
+  "phase": "restored_equipment_after_user_reported_logout_to_character_selection_without_reload",
+  "source_sha256": "02f4bf8722b9ab88003d27635e72f8599b60cb64e5b0a5ebd6a61c1c3f35f885",
+  "file_bytes": 1212005,
+  "file_mtime": 1794843363.9853666,
+  "snapshot_finished_at": 1794843359,
+  "identity_unchanged": true,
+  "previous_snapshot_matches_prior": true,
+  "changes": [
+    {
+      "slot": 16,
+      "before_item_id": 237846,
+      "after_item_id": 268198,
+      "before_actual_ilvl": 285,
+      "after_actual_ilvl": 321
+    }
+  ],
+  "average_ilvl_before": {
+    "overall": 321.4375,
+    "equipped": 316.9375
+  },
+  "average_ilvl_after": {
+    "overall": 321.4375,
+    "equipped": 321.4375
+  },
+  "diagnostics": {},
+  "limits": [
+    "User performed logout; agent verified resulting file, not the UI action",
+    "No game-exit or multi-character comparison yet",
+    "No automatic desktop watcher implemented"
+  ]
+}

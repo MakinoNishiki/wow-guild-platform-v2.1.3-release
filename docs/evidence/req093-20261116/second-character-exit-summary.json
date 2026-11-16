@@ -1,0 +1,25 @@
+{
+  "phase": "second_character_after_user_reported_normal_game_exit",
+  "source_sha256": "9b0eaf7fd08f906c995cf6fba9c88d99db9bde4b7ce664714b5777d5119597ec",
+  "file_bytes": 1213620,
+  "file_mtime": 1794843561.2667193,
+  "snapshot_finished_at": 1794843512,
+  "identity_changed": true,
+  "previous_snapshot_matches_prior": true,
+  "new_class_token": "PALADIN",
+  "new_spec_id": 70,
+  "equipment_slots": 19,
+  "equipped_items": 15,
+  "items_with_actual_ilvl": 15,
+  "mythic_runs": 8,
+  "housing_entries": 2335,
+  "housing_counts_identical_for_all_entries": true,
+  "diagnostics": {},
+  "limits": [
+    "Normal exit reported by user; resulting file read by agent",
+    "Only last two diagnostic snapshots retained; not a multi-character archive",
+    "No automatic desktop uploader implemented",
+    "Panel comparison and housing collection definition pending",
+    "Raid reset/locked fields require further semantic verification"
+  ]
+}

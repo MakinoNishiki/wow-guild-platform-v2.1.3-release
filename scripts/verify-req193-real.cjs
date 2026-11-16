@@ -3,7 +3,7 @@ const assert=require('node:assert/strict'),crypto=require('node:crypto'),fs=requ
 const {chromium}=require('playwright');
 module.exports=async config=>{
   assert.equal(config.ENVIRONMENT,'isolated-test');assert.equal(config.SUPABASE_URL,'http://127.0.0.1:18000');
-  const out=config.verifyNoDemand?'docs/evidence/req198-20261116':config.verifyLootDisplay?'docs/evidence/req194-20261116':'docs/evidence/req193-20261115';fs.mkdirSync(out,{recursive:true});
+  const out=config.verifyTeamCompletion?'docs/evidence/req199-20261117':config.verifyNoDemand?'docs/evidence/req198-20261116':config.verifyLootDisplay?'docs/evidence/req194-20261116':'docs/evidence/req193-20261115';fs.mkdirSync(out,{recursive:true});
   const headers={apikey:config.SUPABASE_SERVICE_ROLE_KEY,Authorization:'Bearer '+config.SUPABASE_SERVICE_ROLE_KEY,'Content-Type':'application/json',Prefer:'return=representation'};
   const call=async(path,method='GET',body)=>{const r=await fetch(config.SUPABASE_URL+path,{method,headers,body:body===undefined?undefined:JSON.stringify(body)});const t=await r.text();assert(r.ok,path+' '+r.status+' '+t.slice(0,120));return t?JSON.parse(t):null;};
   const checks=[],errors=[],users=[],guilds=[];let browser,p,v;
@@ -159,6 +159,7 @@ module.exports=async config=>{
     await p.unroute('**/api/loot-observations/allocate');await save();check('删除后可显式重新创建一条分配',(await call('/rest/v1/loot_records?source_drop_id=eq.'+d2.id)).length===1);
     await v.reload();await v.waitForFunction(()=>CloudSync.getCurrentGuild());await v.locator('#lootViewTabs [data-lootview="drops"]').click();await v.locator('[data-drop-allocate="'+d2.id+'"]').click();await v.locator('#lootAllocationModal.show').waitFor();
     check('普通成员可查看分配但不能编辑',await v.locator('#lootAllocationStatus').isDisabled()&&!(await v.locator('#lootAllocationSave').isVisible()));
+    if(config.verifyTeamCompletion)await require('./verify-req199-states.cjs')({p,v,api,call,check,out,g,foreign,m1,fm,refresh,sample});
     check('无未捕获浏览器异常',errors.length===0);
     fs.writeFileSync(out+'/verification.json',JSON.stringify({checks,errors,environment:'Real Chrome + isolated Supabase; synthetic events; injected lost response; no production writes'},null,2));
   }catch(e){if(p)await p.screenshot({path:out+'/failure.png',fullPage:true}).catch(()=>{});throw e;}

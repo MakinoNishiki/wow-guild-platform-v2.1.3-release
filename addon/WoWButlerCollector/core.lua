@@ -28,7 +28,7 @@ WoWButlerCollectorSettings = WoWButlerCollectorSettings or {}
 if WoWButlerCollectorSettings.enabled == nil then WoWButlerCollectorSettings.enabled = true end
 WBC_Collector = {} -- ui.lua 只消费状态与动作，采集/导出保持一个实现
 local API = WBC_Collector
-API.version = "1.0.6"
+API.version = "1.1.0"
 
 local MAX_ENTRIES = 2000      -- 容量护栏：超出丢弃最旧（SavedVariables 体积保护）
 local CAP_WARN_AT = 1000      -- 达到即每次上线提醒导出
@@ -88,7 +88,7 @@ end
 
 -- 旧记录没有原始链接，无法核实绑定/真实装等：保留原样，但不再混入正常导出。
 local function isExportable(row)
-  return (row.captureVersion == "1.0.4" or row.captureVersion == "1.0.5" or row.captureVersion == "1.0.6") and row.itemLink and not row.reviewReason
+  return (row.captureVersion == "1.0.4" or row.captureVersion == "1.0.5" or row.captureVersion == "1.0.6" or row.captureVersion == "1.1.0") and row.itemLink and not row.reviewReason
     and type(row.ilvl) == "number" and row.ilvl > 0 and row.bindingStatus == "ordinary"
 end
 
@@ -193,6 +193,8 @@ local function playerIdentity(raw, own)
   return foundName or raw, count == 1 and foundRealm or nil
 end
 
+API.LinkedDetails, API.PlayerIdentity, API.RaidDifficulty = linkedDetails, playerIdentity, RAID_DIFFICULTY
+
 local function recordLoot(itemID, itemLink, looterName, looterServer, quantity)
   -- 只记录团本（任务书 #75-补丁1）：raid=团本 ✅；party=大秘境/地下城 ❌；none=世界BOSS/野外 ❌
   local instName, instanceType, difficultyID = GetInstanceInfo()
@@ -208,6 +210,9 @@ local function recordLoot(itemID, itemLink, looterName, looterServer, quantity)
   -- 所有上下文在事件发生时捕获，缓存加载结束时可能已离开副本或击杀下一首领。
   local capturedAt, generation = time(), clearGeneration
   local encounterID, encounterAt = bossName and lastEncounterID or nil, bossName and lastEncounterAt or nil
+  local observed = API.MatchEncounter and API.MatchEncounter(itemLink, looterName, looterServer, instName, difficultyID)
+  if observed then bossName, encounterID, encounterAt = observed.bossName, observed.encounterID, observed.encounterAt
+  elseif observed==false then bossName,encounterID,encounterAt=nil,nil,nil end
   local settings = WoWButlerCollectorSettings
   if not settings.collectorSourceID then settings.collectorSourceID=tostring(time()).."-"..tostring(math.random(1,999999999)).."-"..tostring(math.random(1,999999999)) end
   settings.eventSequence=(tonumber(settings.eventSequence) or 0)+1
@@ -274,7 +279,7 @@ local function recordLoot(itemID, itemLink, looterName, looterServer, quantity)
     slot = equipLoc,           -- 原始 INVTYPE_*，中文映射在网站导入解析器
     itemType = itemType,       -- 本地化大类（武器/护甲）
     bossName = bossName,
-    bossSource = bossName and "encounter_window" or nil,
+    bossSource = observed and "observed_history" or (bossName and "encounter_window" or nil),
     instanceName = instName,
     difficulty = difficulty,
     difficultyID = difficultyID,
@@ -356,30 +361,17 @@ frame:SetScript("OnEvent", function(_, event, ...)
 end)
 
 -- ---- JSON 导出（任务书 #75-补丁1：插件内零依赖编码器 + 剪贴板弹窗，替代仓库转换脚本） ----
-local function JSONEncode(tbl)
-  local parts = {"["}
-  for i, item in ipairs(tbl) do
-    if i > 1 then table.insert(parts, ",") end
-    table.insert(parts, "{")
-    local fields = {}
-    for k, v in pairs(item) do
-      local val
-      if type(v) == "string" then
-        val = "\"" .. v:gsub("\\", "\\\\"):gsub("\"", "\\\""):gsub("[%z\1-\31]", function(c)
-          return string.format("\\u%04x", string.byte(c))
-        end):gsub("|", "\\u007c") .. "\"" -- BUG-121: prevent EditBox hyperlink rendering; JSON.parse restores exact pipes.
-      elseif type(v) == "number" then
-        val = tostring(v)
-      end
-      if val then -- nil/布尔等非预期类型跳过该字段（当前记录仅 string/number，防御性兜底）
-        table.insert(fields, "\"" .. k .. "\":" .. val)
-      end
-    end
-    table.insert(parts, table.concat(fields, ","))
-    table.insert(parts, "}")
+local function JSONEncode(value)
+  if type(value)=='string' then
+    return '"' .. value:gsub('\\','\\\\'):gsub('"','\\"'):gsub('[%z\1-\31]',function(c)return string.format('\\u%04x',string.byte(c))end):gsub('|','\\u007c') .. '"'
+  elseif type(value)=='number' or type(value)=='boolean' then return tostring(value)
+  elseif type(value)=='table' then
+    local parts={};local array=#value>0 or next(value)==nil
+    if array then for _,v in ipairs(value) do table.insert(parts,JSONEncode(v)) end
+    else for k,v in pairs(value) do table.insert(parts,JSONEncode(tostring(k))..':'..JSONEncode(v)) end end
+    return (array and '[' or '{')..table.concat(parts,',')..(array and ']' or '}')
   end
-  table.insert(parts, "]")
-  return table.concat(parts)
+  return 'null'
 end
 
 local function showExportFrame(json)
@@ -443,7 +435,7 @@ function API.Export()
     print("WoWButler: 仍有 " .. pendingCount .. " 条等待物品信息，请稍后再导出。")
     return
   end
-  if #WoWButlerCollectorDB == 0 then
+  if #WoWButlerCollectorDB == 0 and #(WoWButlerCollectorSettings.evidence or {}) == 0 then
     print(L.EXPORT_EMPTY or "尚无拾取记录；进入团本后会自动记录符合条件的拾取。")
     return
   end
@@ -452,8 +444,8 @@ function API.Export()
   if held > 0 then
     print("WoWButler: " .. held .. " 条旧版或信息未确认记录已保留待核对，不纳入本次导出。")
   end
-  if #rows == 0 then return end
-  showExportFrame(JSONEncode(rows))
+  if #rows == 0 and #(WoWButlerCollectorSettings.evidence or {}) == 0 then return end
+  showExportFrame(JSONEncode(API.ExportPayload and API.ExportPayload(rows) or rows))
 end
 
 function API.RequestClear()
@@ -466,6 +458,7 @@ function API.RequestClear()
       pendingCount = 0
       lastLoot = { itemID = nil, looter = nil, at = 0 }
       wipe(WoWButlerCollectorDB)
+      if API.ClearEvidence then API.ClearEvidence() end
       if _G.WoWButlerExportFrame then _G.WoWButlerExportFrame:Hide() end
       print(L.CLEARED or "拾取记录已清空")
       notify()
