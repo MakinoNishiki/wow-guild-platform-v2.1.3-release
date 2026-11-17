@@ -9116,6 +9116,10 @@ function lootFillAssignedTo(idOrName) {
 // ==================== 初始化 ====================
 // ==================== 更新日志 ====================
 const changelogData = [
+  {id:'req201-feature',version:'v3.2.0',date:'2026-11-17',type:'feature',typeLabel:'新增功能',title:'家宅方案单导出获取清单',summary:'文字导出可包含图鉴获取来源、区域、条件及单件参考价格，便于照单收集家具。',details:[]},
+  {id:'req201-improve',version:'v3.2.0',date:'2026-11-17',type:'improve',typeLabel:'功能优化',title:'简洁清单与获取清单自由切换',summary:'保留多个获取途径；切换覆盖手动修改前先确认，取消后文字保留。',details:[]},
+  {id:'req201-fix',version:'v3.2.0',date:'2026-11-17',type:'fix',typeLabel:'修复BUG',title:'来源价格与地区保持分行',summary:'修正原文货币价格补全时吞掉下一行换行的问题，详情与文字清单均保留地区行。',details:[]},
+  {id:'req201-refactor',version:'v3.2.0',date:'2026-11-17',type:'refactor',typeLabel:'模块调整',title:'家宅详情与导出共用来源格式',summary:'沿用图鉴来源及货币词表，不改方案保存、图片导出或公会数据。',details:[]},
   {id:'req199-feature',version:'v3.2.0',date:'2026-11-17',type:'feature',typeLabel:'新增功能',title:'拾取观察清单、交易参考与批量分配',summary:'导入时查看观察掉落与拾取差异，批量核对后逐件确认去向；交易作为人工确认参考。',details:[]},
   {id:'req199-improve',version:'v3.2.0',date:'2026-11-17',type:'improve',typeLabel:'功能优化',title:'晚拾取关联与失败重试',summary:'唯一观察候选帮助关联原首领；批量部分失败逐件反馈，重试不会重复创建分配。',details:[]},
   {id:'req199-fix',version:'v3.2.0',date:'2026-11-17',type:'fix',typeLabel:'修复BUG',title:'访问统计按事件类型计数',summary:'PV只计页面浏览，导航只计页签点击；修正结束日零桶影响日均数，导入前刷新活动选项。',details:[]},

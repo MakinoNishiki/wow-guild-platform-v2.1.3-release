@@ -464,16 +464,20 @@
     return parts.join(' + ');
   }
 
+  // REQ-201: keep raw source/currency wording identical in details and exported acquisition lists.
+  function rawSourceLines(r) {
+    let raw = stripRawText(r.source_text);
+    // 任务书 #79：价格行补货币名（剥离后的「价格：N（ N）」裸数字行整行替换为含币种完整行）
+    const priceLabel = rawPriceLabel(r.source_text);
+    if (priceLabel) raw = raw.replace(/价格：[\d \t]+/g, `价格：${priceLabel}`);
+    return raw ? raw.split('\n').filter(Boolean) : ['来源未知'];
+  }
+
   function renderSourceBlock(r) {
     if (Array.isArray(r.sources) && r.sources.length) {
       return r.sources.map(s => `<div class="dh-src-item">${esc(sourceText(s))}</div>`).join('');
     }
-    let raw = stripRawText(r.source_text);
-    // 任务书 #79：价格行补货币名（剥离后的「价格：N（ N）」裸数字行整行替换为含币种完整行）
-    const priceLabel = rawPriceLabel(r.source_text);
-    if (priceLabel) raw = raw.replace(/价格：[\d\s]+/g, `价格：${priceLabel}`);
-    if (raw) return `<div class="dh-src-item dh-src-raw">${raw.split('\n').filter(Boolean).map(esc).join('<br>')}</div>`;
-    return '<div class="dh-src-item dh-src-raw">来源未知</div>';
+    return `<div class="dh-src-item dh-src-raw">${rawSourceLines(r).map(esc).join('<br>')}</div>`;
   }
 
   // ---- 详情弹窗（只读不涉 modalDirtyChecks；document.body 单例，双壳自足） ----
@@ -944,13 +948,19 @@
   }
 
   // ---- 导出文字链路（WP1 仅文字模式；双壳可用，不写库） ----
-  function planExportText() {
+  function planExportText(includeSources = true) {
     const name = plan.cloudName || '我的方案单';
-    const lines = [`【魔兽管家 · 家宅方案单】${name}`];
+    const lines = [`【魔兽管家 · ${includeSources ? '家宅获取清单' : '家宅方案单'}】${name}`];
+    if (includeSources) lines.push('获取信息来自图鉴；价格为单件参考，多种途径分别列出，实际以游戏为准。');
     plan.items.forEach(it => {
       const row = state.rows.find(r => r.record_id === it.record_id);
       if (!row) return;
       lines.push(`${row.name} ×${it.qty}（容量 ${row.placement_cost != null ? row.placement_cost : '—'}/件）`);
+      if (includeSources) {
+        const known = Array.isArray(row.sources) ? row.sources.filter(s => s && typeof s === 'object').map(sourceText).filter(Boolean) : [];
+        const sources = known.length ? known : rawSourceLines(row);
+        sources.forEach(source => lines.push(`  · ${source}`));
+      }
     });
     lines.push('——————————');
     lines.push(`合计 ${planCount()} 件 · 容量 ${planCapacity()}`);
@@ -1162,6 +1172,7 @@
       </div>
       <div id="dhExpPaneText">
         <div class="dh-plan-export-hint">改动只影响本次导出，不回写方案单数据</div>
+        <label class="dh-exp-skin"><input type="checkbox" id="dhExpIncludeSources" checked> 包含获取来源（图鉴参考）</label>
         <textarea id="dhPlanExportText" class="dh-plan-export-text" spellcheck="false"></textarea>
         <div class="dh-plan-export-actions">
           <button type="button" class="btn btn-primary" id="dhPlanCopyBtn">复制文本清单</button>
@@ -1182,6 +1193,17 @@
     </div>`;
     const ta = exportEl.querySelector('#dhPlanExportText');
     ta.value = exportOriginal;
+    const includeSources = exportEl.querySelector('#dhExpIncludeSources');
+    let sourcesIncluded = true;
+    includeSources.onchange = () => {
+      if (planExportIsDirty() && !window.confirm('切换将重新生成清单并替换本次手动修改，是否继续？')) {
+        includeSources.checked = sourcesIncluded;
+        return;
+      }
+      sourcesIncluded = includeSources.checked;
+      exportOriginal = planExportText(sourcesIncluded);
+      ta.value = exportOriginal;
+    };
     exportEl.addEventListener('click', e => { if (e.target === exportEl) planCloseExport(false); });
     exportEl.querySelector('.dh-modal-close').onclick = () => planCloseExport(false);
     exportEl.querySelector('#dhPlanCopyBtn').onclick = planCopyExport;
