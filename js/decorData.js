@@ -473,9 +473,18 @@
     return raw ? raw.split('\n').filter(Boolean) : ['来源未知'];
   }
 
+  function knownSourceLines(r) {
+    const lines = Array.isArray(r.sources) ? r.sources
+      .filter(s => s && typeof s === 'object').map(sourceText).filter(Boolean) : [];
+    // BUG-127: dedupe complete display lines within this item, preserving first-seen order.
+    // Keep different routes/conditions; raw multi-line sources must not be deduped line by line.
+    return [...new Set(lines)];
+  }
+
   function renderSourceBlock(r) {
-    if (Array.isArray(r.sources) && r.sources.length) {
-      return r.sources.map(s => `<div class="dh-src-item">${esc(sourceText(s))}</div>`).join('');
+    const known = knownSourceLines(r);
+    if (known.length) {
+      return known.map(line => `<div class="dh-src-item">${esc(line)}</div>`).join('');
     }
     return `<div class="dh-src-item dh-src-raw">${rawSourceLines(r).map(esc).join('<br>')}</div>`;
   }
@@ -957,7 +966,7 @@
       if (!row) return;
       lines.push(`${row.name} ×${it.qty}（容量 ${row.placement_cost != null ? row.placement_cost : '—'}/件）`);
       if (includeSources) {
-        const known = Array.isArray(row.sources) ? row.sources.filter(s => s && typeof s === 'object').map(sourceText).filter(Boolean) : [];
+        const known = knownSourceLines(row);
         const sources = known.length ? known : rawSourceLines(row);
         sources.forEach(source => lines.push(`  · ${source}`));
       }

@@ -9116,6 +9116,7 @@ function lootFillAssignedTo(idOrName) {
 // ==================== 初始化 ====================
 // ==================== 更新日志 ====================
 const changelogData = [
+  {id:'bug127-fix',version:'v3.2.0',date:'2026-11-18',type:'fix',typeLabel:'修复BUG',title:'家宅获取来源不再重复显示',summary:'图鉴详情和获取清单合并单件家具内完全相同的来源；不同商人、地点、价格及条件仍分别保留。',details:[]},
   {id:'req201-feature',version:'v3.2.0',date:'2026-11-17',type:'feature',typeLabel:'新增功能',title:'家宅方案单导出获取清单',summary:'文字导出可包含图鉴获取来源、区域、条件及单件参考价格，便于照单收集家具。',details:[]},
   {id:'req201-improve',version:'v3.2.0',date:'2026-11-17',type:'improve',typeLabel:'功能优化',title:'简洁清单与获取清单自由切换',summary:'保留多个获取途径；切换覆盖手动修改前先确认，取消后文字保留。',details:[]},
   {id:'req201-fix',version:'v3.2.0',date:'2026-11-17',type:'fix',typeLabel:'修复BUG',title:'来源价格与地区保持分行',summary:'修正原文货币价格补全时吞掉下一行换行的问题，详情与文字清单均保留地区行。',details:[]},

@@ -1,0 +1,60 @@
+{
+  "record_id": 126,
+  "name": "卷起来的卷轴",
+  "sources": [
+    {
+      "type": "vendor",
+      "price": [
+        {
+          "amount": 100,
+          "currency_id": 824
+        },
+        {
+          "gold": 50
+        }
+      ],
+      "zones": [
+        "坠落之月"
+      ],
+      "vendor": "克劳勒中士",
+      "reputation": null
+    },
+    {
+      "type": "vendor",
+      "price": [
+        {
+          "amount": 100,
+          "currency_id": 824
+        },
+        {
+          "gold": 50
+        }
+      ],
+      "zones": [
+        "坠落之月"
+      ],
+      "vendor": "克劳勒中士",
+      "reputation": null
+    }
+  ],
+  "source_text": "|cFFFFD200商人出售：|r克劳勒中士|n|cFFFFD200地区：|r坠落之月|n|cFFFFD200价格：|r100|Hcurrency:824|h|Tinterface\\ICONS\\INV_Garrison_Resource.blp:0|t|h 50|TINTERFACE\\MONEYFRAME\\UI-GOLDICON.BLP:0|t|n|n|cFFFFD200商人出售：|r克劳勒中士|n|cFFFFD200地区：|r坠落之月|n|cFFFFD200价格：|r100|Hcurrency:824|h|Tinterface\\ICONS\\INV_Garrison_Resource.blp:0|t|h 50|TINTERFACE\\MONEYFRAME\\UI-GOLDICON.BLP:0|t",
+  "placement_cost": 1,
+  "entry_type": 1,
+  "quality": 2,
+  "category_ids": [
+    3
+  ],
+  "subcategory_ids": [
+    11
+  ],
+  "tags": {
+    "65": "微小",
+    "71": "民间",
+    "79": "人类",
+    "104": "德拉诺之王",
+    "154": "朴素",
+    "159": "联盟",
+    "190": "书 书籍 书典"
+  },
+  "icon_file_id": 7415897
+}
