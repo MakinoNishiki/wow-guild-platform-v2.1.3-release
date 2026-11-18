@@ -2944,7 +2944,7 @@ function isModalFormDirty(modalId) {
 
 // 各弹窗"有未保存内容"判定；未登记的弹窗遮罩点击/ESC 直接关闭（维持现状）
 const modalDirtyChecks = {
-  housingBuildEditor: () => isModalFormDirty('housingBuildEditor'),
+  housingBuildEditor: () => isModalFormDirty('housingBuildEditor') || HousingBuilds.photosChanged(),
   // 任务书 #58-WP1：方案单导出弹窗（decorData 双壳自足渲染，textarea 改动=未保存内容，规范 4.6 登记）
   decorPlanExport: () => !!(window.DecorCatalog && window.DecorCatalog.planExportIsDirty && window.DecorCatalog.planExportIsDirty()),
   importMembersModal: () => isModalFormDirty('importMembersModal') || importPreviewRows.length > 0,
@@ -9125,6 +9125,10 @@ function lootFillAssignedTo(idOrName) {
 // ==================== 初始化 ====================
 // ==================== 更新日志 ====================
 const changelogData = [
+  {id:'req203-photos',version:'v3.2.0',date:'2026-11-19',type:'feature',typeLabel:'新增功能',title:'家宅作品支持上传装修截图',summary:'作者可上传最多四张图片、挑选封面，访客可从公开作品列表进入详情逐张欣赏。',details:[]},
+  {id:'req203-code-options',version:'v3.2.0',date:'2026-11-19',type:'improve',typeLabel:'功能优化',title:'分别设置蓝图公开和一键复制',summary:'作者可选择只展示装修、公开原码，或同时开放一键复制。',details:[]},
+  {id:'req203-photo-only',version:'v3.2.0',date:'2026-11-19',type:'fix',typeLabel:'修复BUG',title:'纯截图作品也能发布',summary:'创建装修展示作品时可以留空蓝图码。',details:[]},
+  {id:'req203-cover',version:'v3.2.0',date:'2026-11-19',type:'refactor',typeLabel:'模块调整',title:'截图跟随家宅作品的发布状态',summary:'草稿截图仅作者可看。发布后展示封面和图集，撤回后恢复为作者私有。',details:[]},
   {id:'req203-builds',version:'v3.2.0',date:'2026-11-18',type:'feature',typeLabel:'新增功能',title:'家宅分享开放作品发布与蓝图展示',summary:'作者可保存草稿、发布、编辑或撤回作品，并选择是否公开蓝图码。访客可直接打开作品链接。',details:[]},
   {id:'req203-improve',version:'v3.2.0',date:'2026-11-18',type:'improve',typeLabel:'功能优化',title:'作者可以保留私有蓝图',summary:'发布时默认仅展示作品。作者开放蓝图后，访客可从作品页直接复制。',details:[]},
   {id:'req203-fix',version:'v3.2.0',date:'2026-11-18',type:'fix',typeLabel:'修复BUG',title:'移除采购页过期的分享提示',summary:'个人方案单不再提示从购物车发布装修作品。',details:[]},

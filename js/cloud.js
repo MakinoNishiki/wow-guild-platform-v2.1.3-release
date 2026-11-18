@@ -904,8 +904,8 @@
       options.method = 'POST';
       options.body = JSON.stringify(item);
     }
-    const response = await fetch('/api/housing-builds/' + action + '?' + new URLSearchParams(query), options);
-    const result = await response.json();
+    const response = await fetch('/api/housing-builds/' + action + '?' + new URLSearchParams({ ...query, v: '2' }), options);
+    const result = action === 'my-photo' && response.ok ? await response.blob() : await response.json();
     if (action !== 'gallery' && currentUser?.id !== owner) throw new Error('登录账号已切换，请重新打开作品');
     if (!response.ok) throw new Error(result.message || '作品服务暂不可用');
     return result;
@@ -917,7 +917,7 @@
 
   async function saveCloudData(dataType, operation, item, extra) {
     if (dataType === 'housingBuild') {
-      const saved = await housingRequest('save', {}, item);
+      const saved = await housingRequest('save-v2', {}, item);
       item.savedRevision = saved.revision;
       return;
     }
@@ -2056,6 +2056,7 @@
     saveCloudData: saveCloudData,
     reloadData: reloadData,
     readHousingBuilds,
+    readHousingPhoto: id => housingRequest('my-photo', { id }),
     hardDeleteRaidMember: hardDeleteRaidMember,
     getGuildMembers: getGuildMembers,
     setRaidMemberClaim: setRaidMemberClaim,

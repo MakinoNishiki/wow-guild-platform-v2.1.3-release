@@ -14,7 +14,7 @@ const { Client } = require('pg');
 const { chromium } = require('playwright');
 const assert = require('node:assert/strict');
 const root = path.resolve(__dirname, '..');
-const output = path.join(root, 'docs/evidence/req203-20261118');
+const output = path.join(root, 'docs/evidence/req203-photos-20261119');
 const host = '127.0.0.1';
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 async function port() {
@@ -25,6 +25,7 @@ async function port() {
   return number;
 }
 async function main() {
+  fs.mkdirSync(output, { recursive: true });
   const pgBin = process.env.WB_PG_BIN;
   const restExe = process.env.WB_POSTGREST;
   assert.ok(pgBin && restExe, '请指定本地 PostgreSQL、PostgREST 路径');
@@ -65,9 +66,24 @@ async function main() {
     const migration = fs.readFileSync(path.join(root, 'sql/49_req203_housing_builds.sql'), 'utf8');
     await db.query(migration);
     await db.query(migration);
+    const legacyIds = [randomUUID(), randomUUID()];
+    for (const [index, id] of legacyIds.entries()) {
+      await db.query("select save_housing_build($1,$2,0,'旧作品','','ABCDEF',$3,true)", [sessions[0].user.id, id, !!index]);
+    }
+    const photosMigration = fs.readFileSync(path.join(root, 'sql/50_req203_housing_screenshots.sql'), 'utf8');
+    await db.query(photosMigration);
+    await db.query(photosMigration);
+    for (const [index, id] of legacyIds.entries()) {
+      const { rows: [previous] } = await db.query('select allow_copy,code_public from housing_builds where id=$1', [id]);
+      assert.deepEqual(previous, { allow_copy: !!index, code_public: !!index });
+    }
+    await db.query('delete from housing_builds where id=any($1::uuid[])', [legacyIds]);
+    pass('重复运行新迁移，旧公开可复制及旧隐藏设置均得到保留');
     for (const role of ['anon', 'authenticated']) {
       const { rows: [acl] } = await db.query("select has_table_privilege($1,'housing_builds','select') as private, has_table_privilege($1,'housing_build_gallery','select') as gallery, has_function_privilege($1,'save_housing_build(uuid,uuid,integer,text,text,text,boolean,boolean)','execute') as write", [role]);
       assert.deepEqual(acl, { private: false, gallery: true, write: false });
+      const media = await db.query("select has_table_privilege($1,'housing_build_images','select') as readable", [role]);
+      assert.equal(media.rows[0].readable, false);
     }
     pass('迁移重复执行成功，访客与普通账号只能直接读取公开视图');
     const restPort = await port();
@@ -168,9 +184,33 @@ async function main() {
     await author.locator('#hbCreate').click();
     await titleInput.fill(title);
     await author.locator('#hbDescription').fill('一间能看海的书房');
+    assert.equal(await author.locator('#hbAllowCopy').isDisabled(), true);
+    async function fixturePhoto(name, width, height, color) {
+      const data = await author.evaluate(({ name, width, height, color }) => {
+        const canvas = document.createElement('canvas');
+        canvas.width = width; canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        const gradient = ctx.createLinearGradient(0, 0, width, height);
+        gradient.addColorStop(0, color); gradient.addColorStop(1, '#19313e');
+        ctx.fillStyle = gradient; ctx.fillRect(0, 0, width, height);
+        ctx.fillStyle = 'white'; ctx.font = '36px sans-serif';
+        ctx.fillText(name, 40, height / 2);
+        return canvas.toDataURL('image/png').split(',')[1];
+      }, { name, width, height, color });
+      return { name: name + '.png', mimeType: 'image/png', buffer: Buffer.from(data, 'base64') };
+    }
+    const wide = await fixturePhoto('横向截图测试', 1920, 1080, '#805a32');
+    const tall = await fixturePhoto('纵向截图测试', 720, 1080, '#325c75');
+    await author.locator('#hbPhotos').setInputFiles([wide, tall]);
+    await author.getByText('已选 2 / 4 张').waitFor();
+    await author.getByRole('button', { name: '设为封面' }).click();
+    await author.locator('#hbPhotos').setInputFiles([wide, wide, wide]);
+    await author.getByText(/请减少所选图片/).waitFor();
+    await author.locator('#hbPhotos').setInputFiles({ name: 'blank.png', mimeType: 'image/png', buffer: Buffer.from('invalid') });
+    await author.getByText(/无法读取这张图片/).waitFor();
     await author.locator('#hbCode').fill('invalid whitespace');
     await author.locator('#hbDraft').click();
-    await author.getByText('请填写作品名，并粘贴游戏复制的完整蓝图码。').waitFor();
+    await author.getByText(/蓝图码格式有误/).waitFor();
     await author.locator('#hbCode').fill(code);
     author.once('dialog', dialog => dialog.dismiss());
     await author.keyboard.press('Escape');
@@ -185,6 +225,16 @@ async function main() {
     await results.getByText(/私有草稿/).waitFor();
     await author.reload();
     await results.getByText(/私有草稿/).waitFor();
+    await author.waitForFunction(() => document.querySelector('.hb-cover img')?.naturalHeight > 0);
+    const draft = (await api('mine?v=2', sessions[0])).data.rows[0];
+    assert.equal(draft.image_ids.length, 2);
+    const photoURL = id => site + 'photo?id=' + id;
+    const photoStatus = async (id, session) => (await fetch(site + (session ? 'my-photo' : 'photo') + '?id=' + id, {
+      headers: session ? { Authorization: 'Bearer ' + session.access_token } : {} })).status;
+    assert.equal(await photoStatus(draft.image_ids[0]), 404);
+    assert.equal(await photoStatus(draft.image_ids[0], sessions[1]), 404);
+    assert.equal(await photoStatus(draft.image_ids[0], sessions[0]), 200);
+    pass('上传横竖图并设封面，重开后草稿图片仅作者可看，超量与损坏图片均保留已选内容');
     assert.equal((await api('gallery')).data.rows.length, 0);
     await other.locator('#hbMine').click();
     await other.locator('#hbResults').getByText('还没有自己的作品。').waitFor();
@@ -194,7 +244,7 @@ async function main() {
     await results.getByText('编辑作品').click();
     await author.locator('#hbPublish').click();
     await results.getByText('查看公开作品').waitFor();
-    const mine = (await api('mine', sessions[0])).data.rows[0];
+    const mine = (await api('mine?v=2', sessions[0])).data.rows[0];
     const link = base + '/' + await results.getByText('查看公开作品').getAttribute('href');
     const gallery = await api('gallery?id=' + mine.id);
     assert.equal(gallery.data.rows[0].blueprint_code, null);
@@ -203,27 +253,47 @@ async function main() {
     await guest.goto(link);
     await guest.getByText('作者仅展示作品').waitFor();
     assert.equal(await guest.locator('#hbResults').getByRole('button', { name: '复制蓝图码', exact: true }).count(), 0);
-    const payload = { id: mine.id, title, revision: mine.revision, description: mine.description, blueprint_code: code, code_public: false, published: true };
+    const payload = { id: mine.id, title, revision: mine.revision, description: mine.description, blueprint_code: code, code_public: false, allow_copy: false,
+      screenshots: mine.image_ids.map(id => ({ id })), published: true };
     assert.equal((await api('save', sessions[1], payload)).status, 409);
     assert.equal((await api('mine?id=' + mine.id, sessions[1])).status, 404);
     assert.equal((await api('save', sessions[0], payload)).data.revision, mine.revision);
     pass('仅展示作品可直达，公开响应已移除蓝图码，作者重复提交幂等，其他账号无法编辑');
     await results.getByText('编辑作品').click();
     await author.locator('#hbCodePublic').check();
+    assert.equal(await author.locator('#hbAllowCopy').isChecked(), false);
     await author.locator('#hbDescription').fill('改造后的海岸书房');
     await author.locator('#hbPublish').click();
     await results.getByText('改造后的海岸书房').waitFor();
+    await guest.reload();
+    assert.equal(await guest.getByRole('textbox', { name: '公开蓝图码' }).inputValue(), code);
+    assert.equal(await guest.getByRole('button', { name: '复制蓝图码' }).count(), 0);
+    assert.equal((await api('gallery?id=' + mine.id)).data.rows[0].blueprint_code, null);
+    await guest.waitForFunction(() => document.querySelector('.hb-stage img')?.naturalWidth === 720);
+    await guest.getByRole('button', { name: '查看第 2 张截图' }).click();
+    await guest.waitForFunction(() => document.querySelector('.hb-stage img')?.naturalWidth === 1920);
+    const photoResponse = await fetch(photoURL(draft.image_ids[0]));
+    assert.equal(photoResponse.headers.get('content-type').split(';')[0], 'image/jpeg');
+    assert.ok(photoResponse.headers.get('cache-control').includes('no-store'));
+    await guest.screenshot({ path: path.join(output, 'visible-detail-1366.png') });
+    pass('原码公开且关闭一键复制时，详情显示原码，旧入口不提供复制，可切换查看完整横竖图');
+    await results.getByText('编辑作品').click();
+    await author.locator('#hbAllowCopy').check();
+    await author.locator('#hbPublish').click();
+    await author.locator('#housingBuildEditor').waitFor({ state: 'hidden' });
     assert.equal((await api('save', sessions[0], { ...payload, title: '过期修改' })).status, 409);
     await guest.reload();
     await guest.getByRole('button', { name: '复制蓝图码' }).click();
     assert.equal(await guest.evaluate(() => navigator.clipboard.readText()), code);
     await guest.getByText('返回公开作品').click();
-    await guest.getByRole('link', { name: title }).waitFor();
+    await guest.getByRole('link', { name: title, exact: true }).waitFor();
     await guest.reload();
-    await guest.getByRole('link', { name: title }).waitFor();
+    await guest.getByRole('link', { name: title, exact: true }).waitFor();
+    await guest.waitForFunction(() => document.querySelector('.hb-cover img')?.naturalWidth === 720);
+    await guest.locator('.hb-cover img').evaluate(img => img.decode());
     await guest.screenshot({ path: path.join(output, 'web-gallery-1366.png') });
     assert.ok(await guest.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth));
-    await guest.getByRole('link', { name: title }).click();
+    await guest.getByRole('link', { name: title, exact: true }).click();
     await guest.getByRole('heading', { name: title }).waitFor();
     pass('作者开放蓝图并更新说明，访客从公开列表进详情、复制成功，旧版修改不覆盖新数据');
     await results.getByText('编辑作品').click();
@@ -243,6 +313,7 @@ async function main() {
     await results.getByText(/私有草稿/).waitFor();
     await guest.reload();
     await guest.getByText('作品不存在或已撤回').waitFor();
+    for (const id of draft.image_ids) assert.equal(await photoStatus(id), 404);
     assert.equal((await api('gallery')).data.rows.length, 0);
     assert.equal((await api('mine', sessions[0])).data.rows.length, 1);
     assert.ok(!await author.evaluate(key => JSON.stringify(Object.entries(localStorage)).includes(key), code));
@@ -262,14 +333,40 @@ async function main() {
     await other.getByText('暂无公开作品。').waitFor();
     const longTitle = '沿海小屋'.repeat(20);
     await results.getByText('编辑作品').click();
+    await author.getByRole('button', { name: '移除第 1 张截图' }).click();
+    author.once('dialog', dialog => dialog.dismiss());
+    await author.keyboard.press('Escape');
+    assert.ok(await titleInput.isVisible());
+    await author.locator('#hbCode').fill('');
     await titleInput.fill(longTitle);
     await author.locator('#hbDescription').fill('家具摆放与采光'.repeat(130));
     await author.locator('#hbPublish').click();
     await author.locator('#hbGallery').click();
-    await author.getByRole('link', { name: longTitle }).waitFor();
+    await author.getByRole('link', { name: longTitle, exact: true }).waitFor();
     await author.setViewportSize({ width: 1366, height: 768 });
     assert.ok(await author.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth));
+    const imageOnly = (await api('gallery?v=2&id=' + mine.id)).data.rows[0];
+    assert.equal(imageOnly.blueprint_code, null);
+    assert.deepEqual(imageOnly.image_ids, draft.image_ids.slice(1));
+    assert.equal(await photoStatus(draft.image_ids[0]), 404);
+    assert.equal(await photoStatus(draft.image_ids[1]), 200);
+    pass('装修图可独立于蓝图发布，单独改图有离开保护，移除后的旧图地址已失效');
     pass('加载、读取失败、重试和空态可区分，长标题和说明在 1366 宽度正常显示');
+    await other.locator('#hbCreate').click();
+    await other.locator('#hbTitle').fill('窗边的花房');
+    await other.locator('#hbPhotos').setInputFiles([wide, tall, wide, tall]);
+    await other.getByText('已选 4 / 4 张').waitFor();
+    await other.locator('#hbPublish').click();
+    const secondWork = other.locator('.hb-work').filter({ hasText: '窗边的花房' });
+    await secondWork.getByText('查看公开作品').waitFor();
+    const secondLink = await secondWork.getByText('查看公开作品').getAttribute('href');
+    await guest.goto(base + '/' + secondLink);
+    await guest.getByRole('button', { name: '查看第 4 张截图' }).click();
+    await guest.waitForFunction(() => document.querySelector('.hb-stage img')?.naturalHeight === 1080);
+    await guest.getByText('作者仅展示作品').waitFor();
+    assert.equal(await guest.getByRole('textbox', { name: '公开蓝图码' }).count(), 0);
+    assert.equal(await guest.getByRole('button', { name: '复制蓝图码' }).count(), 0);
+    pass('另一位无公会作者从空白表单一次上传四张截图，留空蓝图并直接发布，游客可浏览第四张');
     await guest.goto(base + '/#/house/decor');
     await guest.locator('[data-add="126"]').first().click();
     await guest.locator('[data-ia-key="decor-plan"]:visible').first().click();

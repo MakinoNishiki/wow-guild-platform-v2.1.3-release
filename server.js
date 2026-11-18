@@ -657,7 +657,7 @@ async function authorizeProxyRequest(user, table, method, queryString, rawBody) 
   const filters = parseEqFilters(queryString);
   const rows = parseBodyRows(rawBody);
 
-  if (['housing_builds', 'housing_build_gallery'].includes(table)) return deny('家宅作品请使用专用入口');
+  if (['housing_builds', 'housing_build_gallery', 'housing_build_images'].includes(table)) return deny('家宅作品请使用专用入口');
 
   if (['guild_people','guild_person_attendance'].includes(table) ||
       table==='raid_members'&&rows.some(r=>r&&Object.prototype.hasOwnProperty.call(r,'person_id')) ||
