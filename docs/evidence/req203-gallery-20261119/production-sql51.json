@@ -1,0 +1,27 @@
+{
+  "migrationHash": "9ce13d50ec54982f841eae389e6ce044bd81d526b18dc641fb898fe15e1ea87e",
+  "commit": "53b0dfb0246bb892dddf0db0b6af1c88a78f391f",
+  "before": {
+    "limit": "CHECK ((((NOT code_public) OR (blueprint_code IS NOT NULL)) AND ((NOT allow_copy) OR code_public) AND (cardinality(image_ids) <= 4)))",
+    "eight": false,
+    "works": 1,
+    "images": 4
+  },
+  "backup": {
+    "path": "/root/wowbutler-backups/req203-sql51-20261118174812/public-auth-before.dump",
+    "bytes": 1427997,
+    "sha256": "cddbd3885fdfc902a86f61e2874cdc9c48de47c7f00c4c77b0ddecf920f8050e",
+    "archiveListVerified": true
+  },
+  "committed": true,
+  "originalWorksAndImagesMatched": true,
+  "after": {
+    "limit": "CHECK ((((NOT code_public) OR (blueprint_code IS NOT NULL)) AND ((NOT allow_copy) OR code_public) AND (cardinality(image_ids) <= 8)))",
+    "eight": true,
+    "works": 1,
+    "images": 4
+  },
+  "columnAccessVerified": true,
+  "previousReleaseGalleryStatus": 200,
+  "finished": "2026-11-18T17:48:34.622Z"
+}

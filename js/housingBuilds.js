@@ -27,7 +27,7 @@ window.HousingBuilds = (() => {
     node.href = route;
     return node;
   }
-  const maxPhotos = 4;
+  const maxPhotos = 8;
   function dataUrl(blob) {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -37,8 +37,8 @@ window.HousingBuilds = (() => {
     });
   }
   async function preparePhoto(file) {
-    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type) || file.size > 16 * 1024 * 1024) {
-      throw new Error('请选择不超过 16 MB 的 JPG、PNG 或 WebP 图片。');
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type) || file.size > 20 * 1024 * 1024) {
+      throw new Error('请选择不超过 20 MB 的 JPG、PNG 或 WebP 图片。');
     }
     const bitmap = await createImageBitmap(file).catch(() => { throw new Error('无法读取这张图片，请重新导出后选择。'); });
     try {
@@ -78,12 +78,24 @@ window.HousingBuilds = (() => {
     }
     return img;
   }
-  function renderPreview() {
+  function renderPreview(message = '') {
     const preview = byId('hbPreview');
+    const previousImages = new Map(Array.from(preview.children, tile => [tile.dataset.photoId, tile.querySelector('img')]));
     preview.replaceChildren();
     editor.photos.forEach((photo, index) => {
       const tile = element('div', null, 'hb-tile');
-      tile.append(photoImage(photo, '装修截图 ' + (index + 1), true));
+      tile.dataset.photoId = photo.id;
+      const picker = element('input');
+      picker.type = 'file';
+      picker.accept = byId('hbPhotos').accept;
+      picker.hidden = true;
+      picker.onchange = () => selectPhotos(picker, index);
+      const replace = button('', () => picker.click());
+      replace.className = 'hb-replace';
+      replace.setAttribute('aria-label', '更换第 ' + (index + 1) + ' 张截图');
+      replace.append(previousImages.get(photo.id) || photoImage(photo, '', true), element('span', '更换', 'hb-replace-label'));
+      if (photo.data) replace.append(element('span', '待保存', 'hb-pending'));
+      tile.append(replace, picker);
       const actions = element('div', null, 'hb-tile-actions');
       if (index === 0) actions.append(element('span', '封面'));
       else actions.append(button('设为封面', () => {
@@ -97,34 +109,44 @@ window.HousingBuilds = (() => {
       tile.append(actions);
       preview.append(tile);
     });
-    byId('hbPhotoStatus').textContent = editor.photos.length ? '已选 ' + editor.photos.length + ' / ' + maxPhotos + ' 张' : '';
+    byId('hbPhotoStatus').textContent = [editor.photos.length ? '已选 ' + editor.photos.length + ' / ' + maxPhotos + ' 张' : '', message].filter(Boolean).join(' · ');
   }
-  async function addPhotos() {
+  async function selectPhotos(input, replaceAt = null) {
     const context = editor;
-    const input = byId('hbPhotos');
     const files = Array.from(input.files);
     input.value = '';
     if (!context || context.preparing || !files.length) return;
     const error = byId('hbFormError');
     error.textContent = '';
-    if (context.photos.length + files.length > maxPhotos) {
-      error.textContent = '每个作品最多 4 张截图，请减少所选图片或移除已有图片。';
+    if (replaceAt === null && context.photos.length + files.length > maxPhotos) {
+      error.textContent = '每个作品最多 8 张截图，请减少所选图片或点击已有截图更换。';
       return;
     }
     context.preparing = true;
-    byId('hbPhotoStatus').textContent = '正在处理截图…';
-    input.disabled = true;
-    byId('hbDraft').disabled = byId('hbPublish').disabled = true;
-    byId('hbPreview').inert = true;
+    byId('hbPhotoStatus').textContent = replaceAt === null ? '正在处理截图…' : '正在更换第 ' + (replaceAt + 1) + ' 张截图…';
+    setEditorControls();
+    let message = '';
     try {
       const prepared = [];
       for (const file of files) prepared.push(await preparePhoto(file));
-      if (editor === context) context.photos.push(...prepared);
+      if (editor !== context) return;
+      if (replaceAt === null) context.photos.push(...prepared);
+      else {
+        context.photos[replaceAt] = prepared[0];
+        message = '第 ' + (replaceAt + 1) + ' 张截图已更换，保存后生效。';
+      }
     } catch (e) {
-      if (editor === context) error.textContent = e.message;
+      if (editor === context) {
+        error.textContent = e.message;
+        if (replaceAt !== null) message = '更换失败，已保留第 ' + (replaceAt + 1) + ' 张原图。';
+      }
     } finally {
       context.preparing = false;
-      if (editor === context) { renderPreview(); setEditorControls(); }
+      if (editor === context) {
+        renderPreview(message);
+        setEditorControls();
+        if (replaceAt !== null) byId('hbPreview').querySelectorAll('.hb-replace')[replaceAt].focus({ preventScroll: true });
+      }
     }
   }
   function setEditorControls() {
@@ -156,7 +178,7 @@ window.HousingBuilds = (() => {
     byId('hbAllowCopy').checked = !!row?.allow_copy;
     byId('hbCodePublic').onchange = setEditorControls;
     byId('hbForm').oninput = () => { byId('hbFormError').textContent = ''; };
-    byId('hbPhotos').onchange = addPhotos;
+    byId('hbPhotos').onchange = event => selectPhotos(event.currentTarget);
     renderPreview();
     setEditorControls();
     byId('hbDraft').textContent = row?.published ? '撤回为草稿' : '保存草稿';
@@ -220,10 +242,58 @@ window.HousingBuilds = (() => {
     figure.append(stage, caption, choices);
     return figure;
   }
+  function cardAlbum(row, ids, mine) {
+    const cover = element('div', null, 'hb-cover hb-card-album');
+    cover.setAttribute('role', 'group');
+    cover.setAttribute('aria-label', row.title + '的装修截图');
+    let index = 0;
+    let start = null;
+    let dragged = false;
+    const count = element('span', '1 / ' + ids.length, 'hb-card-count');
+    count.setAttribute('aria-live', 'polite');
+    function cardPhoto() {
+      const image = photoImage({ id: ids[index] }, row.title + '，截图 ' + (index + 1), mine);
+      image.draggable = false;
+      return image;
+    }
+    function move(step) {
+      index = (index + step + ids.length) % ids.length;
+      cover.firstElementChild.replaceWith(cardPhoto());
+      count.textContent = (index + 1) + ' / ' + ids.length;
+    }
+    cover.append(cardPhoto());
+    for (const [step, name, arrow] of [[-1, '上一张截图', '‹'], [1, '下一张截图', '›']]) {
+      const turn = button('', event => {
+        if (!event.detail || !dragged) move(step);
+      });
+      turn.className = step === -1 ? 'hb-prev-photo' : 'hb-next-photo';
+      turn.setAttribute('aria-label', name);
+      turn.append(element('span', arrow));
+      cover.append(turn);
+    }
+    cover.append(count);
+    cover.onpointerdown = event => {
+      if (!event.isPrimary || event.button !== 0) return;
+      dragged = false;
+      start = { id: event.pointerId, x: event.clientX, y: event.clientY };
+      event.target.setPointerCapture(event.pointerId);
+    };
+    cover.onpointerup = event => {
+      if (start?.id !== event.pointerId) return;
+      const dx = event.clientX - start.x;
+      const dy = event.clientY - start.y;
+      start = null;
+      dragged = Math.max(Math.abs(dx), Math.abs(dy)) > 10;
+      if (Math.abs(dx) >= 35 && Math.abs(dx) > Math.abs(dy) * 1.3) move(dx < 0 ? 1 : -1);
+    };
+    cover.onpointercancel = cover.onlostpointercapture = () => { start = null; };
+    return cover;
+  }
   function work(row, mine, detail) {
     const card = element('article', null, 'hb-work');
     const photos = row.image_ids || [];
-    if (!detail && photos.length) {
+    if (!detail && photos.length > 1) card.append(cardAlbum(row, photos, mine));
+    else if (!detail && photos.length) {
       const cover = mine ? element('div') : link('', base + '/' + row.id);
       cover.className = 'hb-cover';
       cover.append(photoImage({ id: photos[0] }, row.title + '的封面', mine));
@@ -240,28 +310,24 @@ window.HousingBuilds = (() => {
     if (mine) {
       card.append(button('编辑作品', () => edit(row)));
       if (row.published) card.append(link('查看公开作品', base + '/' + row.id));
-    } else if (row.blueprint_code) {
-      const field = element('input', null, 'form-input hb-visible-code');
-      field.value = row.blueprint_code;
-      field.readOnly = true;
-      field.setAttribute('aria-label', '公开蓝图码');
-      if (detail) {
-        const label = element('label', '公开蓝图码', 'hb-code-label');
-        label.append(field);
-        card.append(label);
-      }
-      if (row.allow_copy) card.append(button('复制蓝图码', async () => {
-        try {
-          await navigator.clipboard.writeText(row.blueprint_code);
-          showToast('蓝图码已复制', 'success');
-        } catch {
-          if (!field.isConnected) card.append(field);
-          field.focus();
-          field.select();
-          showToast('蓝图码已选中，可手动复制。');
-        }
-      }));
-    } else card.append(element('span', '作者仅展示作品', 'hb-byline'));
+    } else if (detail) {
+      if (row.allow_copy === true) {
+        const copy = button('复制蓝图码', async () => {
+          copy.disabled = true;
+          copy.textContent = '正在复制…';
+          try {
+            await CloudSync.copyHousingCode(row.id);
+            showToast('蓝图码已复制', 'success');
+          } catch {
+            showToast('复制失败，请刷新详情并检查浏览器的剪贴板权限。', 'error');
+          } finally {
+            copy.textContent = '复制蓝图码';
+            copy.disabled = false;
+          }
+        });
+        card.append(copy);
+      } else card.append(element('span', row.code_public ? '作者未开放蓝图复制' : '作者仅展示作品', 'hb-byline'));
+    }
     return card;
   }
   async function show(route) {
@@ -270,6 +336,9 @@ window.HousingBuilds = (() => {
     const ticket = ++request;
     const mine = route === base + '/mine';
     const detail = !mine && route !== base;
+    const back = byId('hbBack');
+    back.hidden = !detail;
+    back.onclick = () => { location.hash = base; };
     const owner = userId();
     const target = byId('hbResults');
     byId('hbMine').classList.toggle('active', mine);
@@ -290,8 +359,7 @@ window.HousingBuilds = (() => {
       const grid = element('div', null, detail ? 'hb-detail' : 'hb-grid');
       result.rows.forEach(row => grid.append(work(row, mine, detail)));
       target.replaceChildren(grid);
-      if (detail) target.append(link('返回公开作品', base));
-      else {
+      if (!detail) {
         if (!result.rows.length) target.append(element('p', mine ? '还没有自己的作品。' : '暂无公开作品。'));
         function move(step) { page += step; show(route); }
         if (page > 0) target.append(button('上一页', () => move(-1)));

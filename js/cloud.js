@@ -893,7 +893,8 @@
   async function housingRequest(action, query, item) {
     const owner = currentUser?.id;
     const headers = {};
-    if (action !== 'gallery') {
+    const ownerOnly = action !== 'gallery' && action !== 'copy-code';
+    if (ownerOnly) {
       const token = await getAccessToken();
       if (!owner || !token || currentUser?.id !== owner) throw new Error('请登录后管理自己的作品');
       headers.Authorization = 'Bearer ' + token;
@@ -906,13 +907,27 @@
     }
     const response = await fetch('/api/housing-builds/' + action + '?' + new URLSearchParams({ ...query, v: '2' }), options);
     const result = action === 'my-photo' && response.ok ? await response.blob() : await response.json();
-    if (action !== 'gallery' && currentUser?.id !== owner) throw new Error('登录账号已切换，请重新打开作品');
+    if (ownerOnly && currentUser?.id !== owner) throw new Error('登录账号已切换，请重新打开作品');
     if (!response.ok) throw new Error(result.message || '作品服务暂不可用');
     return result;
   }
 
   function readHousingBuilds(scope, query = {}) {
     return housingRequest(scope === 'mine' ? 'mine' : 'gallery', query);
+  }
+
+  async function copyHousingCode(id) {
+    const clipboard = navigator.clipboard;
+    if (!clipboard?.write && !clipboard?.writeText) throw new Error('当前浏览器无法写入剪贴板。');
+    const code = housingRequest('copy-code', {}, { id }).then(result => result.blueprint_code);
+    // Initiate the clipboard write within the click gesture, even when fetching the code asynchronously.
+    if (typeof ClipboardItem === 'function' && clipboard.write) {
+      const content = code.then(value => new Blob([value], { type: 'text/plain' }));
+      const written = clipboard.write([new ClipboardItem({ 'text/plain': content })]);
+      await Promise.all([content, written]);
+    } else {
+      await clipboard.writeText(await code);
+    }
   }
 
   async function saveCloudData(dataType, operation, item, extra) {
@@ -2056,6 +2071,7 @@
     saveCloudData: saveCloudData,
     reloadData: reloadData,
     readHousingBuilds,
+    copyHousingCode,
     readHousingPhoto: id => housingRequest('my-photo', { id }),
     hardDeleteRaidMember: hardDeleteRaidMember,
     getGuildMembers: getGuildMembers,

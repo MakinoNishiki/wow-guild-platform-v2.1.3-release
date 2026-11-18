@@ -4,13 +4,13 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>魔兽管家</title>
-<!-- 静态资源版本号：20261119.148（任务书 #22 WP3-②：凡改动 js/css 的 commit 必须同步递增此处与所有 ?v= 查询串，见 docs/开发规范.md 第五章） -->
+<!-- 静态资源版本号：20261119.149（任务书 #22 WP3-②：凡改动 js/css 的 commit 必须同步递增此处与所有 ?v= 查询串，见 docs/开发规范.md 第五章） -->
 <link rel="icon" type="image/png" sizes="32x32" href="assets/brand/favicon-32.png">
 <link rel="icon" type="image/png" sizes="16x16" href="assets/brand/favicon-16.png">
-<link rel="stylesheet" href="css/main.css?v=20261119.148">
-<link rel="stylesheet" href="css/data-public.css?v=20261119.148"><!-- 任务书 #28 WP5：副本掉落 tab（选择器全 .dp- 前缀 + #page-lootdrop 作用域，零泄漏） -->
-<link rel="stylesheet" href="css/decor-public.css?v=20261119.148"><!-- 任务书 #51：家宅图鉴（选择器全 .dh- 前缀，零泄漏，双壳共用） -->
-<script src="assets/vendor/supabase-js-2.js?v=20261119.148"></script>
+<link rel="stylesheet" href="css/main.css?v=20261119.149">
+<link rel="stylesheet" href="css/data-public.css?v=20261119.149"><!-- 任务书 #28 WP5：副本掉落 tab（选择器全 .dp- 前缀 + #page-lootdrop 作用域，零泄漏） -->
+<link rel="stylesheet" href="css/decor-public.css?v=20261119.149"><!-- 任务书 #51：家宅图鉴（选择器全 .dh- 前缀，零泄漏，双壳共用） -->
+<script src="assets/vendor/supabase-js-2.js?v=20261119.149"></script>
 </head>
 <body>
 
@@ -948,6 +948,7 @@
             <a class="uc-tab" id="hbGallery" href="#/house/community">公开作品</a>
             <a class="uc-tab" id="hbMine" href="#/house/community/mine">我的作品</a>
           </div><button class="btn btn-primary" type="button" id="hbCreate">创建作品</button></div>
+          <button id="hbBack" type="button" class="btn" hidden><span aria-hidden="true">←</span> 返回公开作品</button>
           <div id="hbResults" aria-live="polite"></div>
         </div>
       </div>
@@ -2337,28 +2338,28 @@
   </div>
 </div>
 
-<script src="js/cloud.js?v=20261119.148"></script>
+<script src="js/cloud.js?v=20261119.149"></script>
 <!-- 任务书 #14：主数据层（快照兜底 + 加载层），须在 app.js 之前 -->
-<script src="js/masterDataSnapshot.js?v=20261119.148"></script>
-<script src="js/masterData.js?v=20261119.148"></script>
+<script src="js/masterDataSnapshot.js?v=20261119.149"></script>
+<script src="js/masterData.js?v=20261119.149"></script>
 <!-- 任务书 #22 WP2：职业/专精/职责图标集中映射（全站唯一取图处） -->
-<script src="js/iconMap.js?v=20261119.148"></script>
+<script src="js/iconMap.js?v=20261119.149"></script>
 <!-- 任务书 #31（REQ-097）：装备分类词表单一真源（公示页 chips / picker 过滤 / BUG-057 回填三处消费，须在 dataPublic.js 与 app.js 之前） -->
-<script src="js/itemQualityData.js?v=20261119.148"></script>
-<script src="js/lootTaxonomy.js?v=20261119.148"></script>
+<script src="js/itemQualityData.js?v=20261119.149"></script>
+<script src="js/lootTaxonomy.js?v=20261119.149"></script>
 <!-- 任务书 #28 WP5：副本掉落渲染层（双壳同源；无 data-public-body 不自动启动，由 app.js 懒挂载，须在 app.js 之前） -->
-<script src="js/dataPublic.js?v=20261119.148"></script>
+<script src="js/dataPublic.js?v=20261119.149"></script>
 <!-- 任务书 #51（REQ-137 一期）：家宅图鉴词表单一真源（价格/分类/尺寸/来源词表，须在 decorData.js 之前） -->
-<script src="js/decorDict.js?v=20261119.148"></script>
+<script src="js/decorDict.js?v=20261119.149"></script>
 <!-- 任务书 #51：家宅图鉴数据层+渲染层（双壳同源；无 data-decor-body 不自动启动，由 app.js 懒挂载，须在 app.js 之前） -->
-<script src="js/decorData.js?v=20261119.148"></script>
+<script src="js/decorData.js?v=20261119.149"></script>
 <div id="housingBuildEditor" class="modal-overlay">
   <section class="modal" role="dialog" aria-modal="true" aria-labelledby="hbEditorTitle">
     <div class="modal-header"><h2 class="modal-title" id="hbEditorTitle">创建作品</h2><button type="button" class="modal-close" aria-label="关闭" onclick="requestCloseModal('housingBuildEditor')">×</button></div>
     <form id="hbForm"><div class="modal-body">
       <div class="form-group"><label class="form-label" for="hbTitle">作品名称</label><input class="form-input" id="hbTitle" required maxlength="80"></div>
       <div class="form-group"><label class="form-label" for="hbPhotos">装修截图</label>
-        <p id="hbPhotoHint" class="hb-hint">最多 4 张，第一张作为封面。支持 JPG、PNG、WebP，每张不超过 16 MB。</p>
+        <p id="hbPhotoHint" class="hb-hint">最多 8 张，第一张作为封面。支持 JPG、PNG、WebP，每张不超过 20 MB。</p>
         <span class="hb-photo-picker"><span aria-hidden="true">选择截图…</span><input type="file" id="hbPhotos" multiple accept="image/jpeg,image/png,image/webp" aria-describedby="hbPhotoHint hbPhotoStatus"></span>
         <div id="hbPreview" class="hb-preview"></div>
         <span id="hbPhotoStatus" class="hb-hint" role="status"></span>
@@ -2366,9 +2367,9 @@
       <div class="form-group"><label class="form-label" for="hbDescription">作品说明（选填）</label><textarea class="form-input" id="hbDescription" rows="3" maxlength="1000"></textarea></div>
       <div class="form-group"><label class="form-label" for="hbCode">游戏内原生蓝图码（选填）</label><input class="form-input" id="hbCode" maxlength="512" autocomplete="off" spellcheck="false" placeholder="只展示装修时可以留空"></div>
       <div class="hb-sharing">
-        <label><input type="checkbox" id="hbCodePublic"> 公开蓝图码</label>
-        <label><input type="checkbox" id="hbAllowCopy" disabled aria-describedby="hbCopyHint"> 允许访客一键复制</label>
-        <p id="hbCopyHint" class="hb-hint">公开后访客可以看到原码，并可手动复制。</p>
+        <label><input type="checkbox" id="hbCodePublic"> 分享蓝图</label>
+        <label><input type="checkbox" id="hbAllowCopy" disabled aria-describedby="hbCopyHint"> 允许访客复制蓝图码</label>
+        <p id="hbCopyHint" class="hb-hint">两项都开启后，访客可在作品详情中复制蓝图码。原码仅在作者编辑时显示。</p>
       </div>
       <p id="hbFormError" role="alert"></p>
     </div><div class="modal-footer">
@@ -2377,12 +2378,12 @@
     </div></form>
   </section>
 </div>
-<script src="js/housingBuilds.js?v=20261119.148"></script>
-<script src="js/lootEvidence.js?v=20261119.148"></script>
-<script src="js/app.js?v=20261119.148"></script>
-<script src="js/lootWorkflow.js?v=20261119.148"></script>
-<script src="js/personAttendance.js?v=20261119.148"></script>
-<script src="js/lootDetails.js?v=20261119.148"></script>
-<script src="js/track.js?v=20261119.148"></script><!-- 任务书 #54 WP1：全站埋点采集层（REQ-141，零依赖静默兜底） -->
+<script src="js/housingBuilds.js?v=20261119.149"></script>
+<script src="js/lootEvidence.js?v=20261119.149"></script>
+<script src="js/app.js?v=20261119.149"></script>
+<script src="js/lootWorkflow.js?v=20261119.149"></script>
+<script src="js/personAttendance.js?v=20261119.149"></script>
+<script src="js/lootDetails.js?v=20261119.149"></script>
+<script src="js/track.js?v=20261119.149"></script><!-- 任务书 #54 WP1：全站埋点采集层（REQ-141，零依赖静默兜底） -->
 </body>
 </html>

@@ -9125,6 +9125,10 @@ function lootFillAssignedTo(idOrName) {
 // ==================== 初始化 ====================
 // ==================== 更新日志 ====================
 const changelogData = [
+  {id:'req203-card-album',version:'v3.2.0',date:'2026-11-19',type:'feature',typeLabel:'新增功能',title:'家宅作品卡片支持直接翻图',summary:'卡片初始显示作者选定的封面，点击左右两侧或横向拖动可浏览其他装修截图。',details:[]},
+  {id:'req203-eight-photos',version:'v3.2.0',date:'2026-11-19',type:'improve',typeLabel:'功能优化',title:'每件家宅作品可配八张截图',summary:'每张原图上限提高至 20 MB。点击缩略图可原位更换，编辑器会标记待保存的图片。',details:[]},
+  {id:'req203-explicit-copy',version:'v3.2.0',date:'2026-11-19',type:'fix',typeLabel:'修复BUG',title:'浏览装修时隐藏蓝图原码',summary:'作者开放复制后，访客在作品详情点击按钮即可将蓝图码写入剪贴板。',details:[]},
+  {id:'req203-detail-back',version:'v3.2.0',date:'2026-11-19',type:'refactor',typeLabel:'模块调整',title:'作品详情顶部提供返回按钮',summary:'打开详情后，可从截图上方直接返回公开作品。',details:[]},
   {id:'req203-photos',version:'v3.2.0',date:'2026-11-19',type:'feature',typeLabel:'新增功能',title:'家宅作品支持上传装修截图',summary:'作者可上传最多四张图片、挑选封面，访客可从公开作品列表进入详情逐张欣赏。',details:[]},
   {id:'req203-code-options',version:'v3.2.0',date:'2026-11-19',type:'improve',typeLabel:'功能优化',title:'分别设置蓝图公开和一键复制',summary:'作者可选择只展示装修、公开原码，或同时开放一键复制。',details:[]},
   {id:'req203-photo-only',version:'v3.2.0',date:'2026-11-19',type:'fix',typeLabel:'修复BUG',title:'纯截图作品也能发布',summary:'创建装修展示作品时可以留空蓝图码。',details:[]},

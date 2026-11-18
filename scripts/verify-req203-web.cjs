@@ -14,7 +14,7 @@ const { Client } = require('pg');
 const { chromium } = require('playwright');
 const assert = require('node:assert/strict');
 const root = path.resolve(__dirname, '..');
-const output = path.join(root, 'docs/evidence/req203-photos-20261119');
+const output = path.join(root, 'docs/evidence/req203-gallery-20261119');
 const host = '127.0.0.1';
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 async function port() {
@@ -73,6 +73,9 @@ async function main() {
     const photosMigration = fs.readFileSync(path.join(root, 'sql/50_req203_housing_screenshots.sql'), 'utf8');
     await db.query(photosMigration);
     await db.query(photosMigration);
+    const eightPhotoMigration = fs.readFileSync(path.join(root, 'sql/51_req203_eight_screenshots.sql'), 'utf8');
+    await db.query(eightPhotoMigration);
+    await db.query(eightPhotoMigration);
     for (const [index, id] of legacyIds.entries()) {
       const { rows: [previous] } = await db.query('select allow_copy,code_public from housing_builds where id=$1', [id]);
       assert.deepEqual(previous, { allow_copy: !!index, code_public: !!index });
@@ -80,8 +83,8 @@ async function main() {
     await db.query('delete from housing_builds where id=any($1::uuid[])', [legacyIds]);
     pass('重复运行新迁移，旧公开可复制及旧隐藏设置均得到保留');
     for (const role of ['anon', 'authenticated']) {
-      const { rows: [acl] } = await db.query("select has_table_privilege($1,'housing_builds','select') as private, has_table_privilege($1,'housing_build_gallery','select') as gallery, has_function_privilege($1,'save_housing_build(uuid,uuid,integer,text,text,text,boolean,boolean)','execute') as write", [role]);
-      assert.deepEqual(acl, { private: false, gallery: true, write: false });
+      const { rows: [acl] } = await db.query("select has_table_privilege($1,'housing_builds','select') as private, has_column_privilege($1,'housing_build_gallery','title','select') as gallery, has_column_privilege($1,'housing_build_gallery','visible_code','select') as raw, has_column_privilege($1,'housing_build_gallery','blueprint_code','select') as old_raw, has_function_privilege($1,'save_housing_build(uuid,uuid,integer,text,text,text,boolean,boolean)','execute') as write", [role]);
+      assert.deepEqual(acl, { private: false, gallery: true, raw: false, old_raw: false, write: false });
       const media = await db.query("select has_table_privilege($1,'housing_build_images','select') as readable", [role]);
       assert.equal(media.rows[0].readable, false);
     }
@@ -93,7 +96,7 @@ async function main() {
     const restBase = 'http://' + host + ':' + restPort;
     let ready = false;
     for (let i = 0; i < 100 && !ready; i++) {
-      ready = await fetch(restBase + '/housing_build_gallery?limit=1').then(r => r.ok, () => false);
+      ready = await fetch(restBase + '/housing_build_gallery?select=id&limit=1').then(r => r.ok, () => false);
       if (!ready) await delay(100);
     }
     assert.ok(ready, '隔离 PostgREST 未就绪');
@@ -167,6 +170,8 @@ async function main() {
     const author = await open(sessions[0], 1920);
     const other = await open(sessions[1], 1366);
     const guest = await open(null, 1366);
+    let visitorCopyRequests = 0;
+    guest.on('request', req => { if (req.url().includes('/housing-builds/copy-code')) visitorCopyRequests++; });
     const results = author.locator('#hbResults');
     const title = '海岸书房';
     const code = 'AgHTestLayoutExample1234';
@@ -202,10 +207,10 @@ async function main() {
     const wide = await fixturePhoto('横向截图测试', 1920, 1080, '#805a32');
     const tall = await fixturePhoto('纵向截图测试', 720, 1080, '#325c75');
     await author.locator('#hbPhotos').setInputFiles([wide, tall]);
-    await author.getByText('已选 2 / 4 张').waitFor();
+    await author.getByText(/2\s*\/\s*8 张/).waitFor();
     await author.getByRole('button', { name: '设为封面' }).click();
-    await author.locator('#hbPhotos').setInputFiles([wide, wide, wide]);
-    await author.getByText(/请减少所选图片/).waitFor();
+    await author.locator('#hbPhotos').setInputFiles(Array(7).fill(wide));
+    assert.match(await author.locator('#hbFormError').innerText(), /8 张/);
     await author.locator('#hbPhotos').setInputFiles({ name: 'blank.png', mimeType: 'image/png', buffer: Buffer.from('invalid') });
     await author.getByText(/无法读取这张图片/).waitFor();
     await author.locator('#hbCode').fill('invalid whitespace');
@@ -247,7 +252,7 @@ async function main() {
     const mine = (await api('mine?v=2', sessions[0])).data.rows[0];
     const link = base + '/' + await results.getByText('查看公开作品').getAttribute('href');
     const gallery = await api('gallery?id=' + mine.id);
-    assert.equal(gallery.data.rows[0].blueprint_code, null);
+    assert.equal(Object.hasOwn(gallery.data.rows[0], 'blueprint_code'), false);
     assert.equal(gallery.data.rows[0].author_name, '木匠甲');
     assert.ok(!JSON.stringify(gallery).includes(code));
     await guest.goto(link);
@@ -266,9 +271,10 @@ async function main() {
     await author.locator('#hbPublish').click();
     await results.getByText('改造后的海岸书房').waitFor();
     await guest.reload();
-    assert.equal(await guest.getByRole('textbox', { name: '公开蓝图码' }).inputValue(), code);
+    await guest.getByText('作者未开放蓝图复制').waitFor();
+    assert.equal(await guest.getByRole('textbox', { name: '公开蓝图码' }).count(), 0);
     assert.equal(await guest.getByRole('button', { name: '复制蓝图码' }).count(), 0);
-    assert.equal((await api('gallery?id=' + mine.id)).data.rows[0].blueprint_code, null);
+    assert.equal((await api('copy-code', null, { id: mine.id })).status, 404);
     await guest.waitForFunction(() => document.querySelector('.hb-stage img')?.naturalWidth === 720);
     await guest.getByRole('button', { name: '查看第 2 张截图' }).click();
     await guest.waitForFunction(() => document.querySelector('.hb-stage img')?.naturalWidth === 1920);
@@ -276,22 +282,52 @@ async function main() {
     assert.equal(photoResponse.headers.get('content-type').split(';')[0], 'image/jpeg');
     assert.ok(photoResponse.headers.get('cache-control').includes('no-store'));
     await guest.screenshot({ path: path.join(output, 'visible-detail-1366.png') });
-    pass('原码公开且关闭一键复制时，详情显示原码，旧入口不提供复制，可切换查看完整横竖图');
+    pass('作者只分享作品、关闭复制时，详情无原码与复制按钮；取码请求被拒，横竖图仍可切换');
     await results.getByText('编辑作品').click();
     await author.locator('#hbAllowCopy').check();
     await author.locator('#hbPublish').click();
     await author.locator('#housingBuildEditor').waitFor({ state: 'hidden' });
     assert.equal((await api('save', sessions[0], { ...payload, title: '过期修改' })).status, 409);
     await guest.reload();
+    await guest.getByRole('button', { name: '复制蓝图码' }).waitFor();
+    assert.equal(visitorCopyRequests, 0);
+    for (const path of ['gallery', 'gallery?v=2', 'gallery?id=' + mine.id, 'gallery?v=2&id=' + mine.id]) {
+      assert.ok(!JSON.stringify((await api(path)).data).includes(code));
+    }
+    assert.ok(!(await guest.locator('#hbResults').innerHTML()).includes(code));
     await guest.getByRole('button', { name: '复制蓝图码' }).click();
-    assert.equal(await guest.evaluate(() => navigator.clipboard.readText()), code);
-    await guest.getByText('返回公开作品').click();
+    await guest.waitForFunction(async expected => (await navigator.clipboard.readText()) === expected, code);
+    assert.equal(visitorCopyRequests, 1);
+    const back = guest.getByRole('button', { name: '返回公开作品' });
+    const isBeforeTitle = await back.evaluate(btn => !!(btn.compareDocumentPosition(document.querySelector('.hb-detail h2')) & Node.DOCUMENT_POSITION_FOLLOWING));
+    assert.ok(isBeforeTitle);
+    await back.click();
     await guest.getByRole('link', { name: title, exact: true }).waitFor();
+    assert.equal(await guest.getByRole('button', { name: '复制蓝图码' }).count(), 0);
     await guest.reload();
     await guest.getByRole('link', { name: title, exact: true }).waitFor();
     await guest.waitForFunction(() => document.querySelector('.hb-cover img')?.naturalWidth === 720);
     await guest.locator('.hb-cover img').evaluate(img => img.decode());
     await guest.screenshot({ path: path.join(output, 'web-gallery-1366.png') });
+    const card = guest.locator('.hb-work').filter({ has: guest.getByRole('link', { name: title, exact: true }) });
+    const album = card.locator('.hb-card-album');
+    const count = album.locator('.hb-card-count');
+    await album.getByRole('button', { name: '下一张截图' }).click();
+    assert.equal(await count.textContent(), '2 / 2');
+    const box = await album.boundingBox();
+    const py = box.y + box.height * 0.55;
+    // Rightward drag returns to the cover. Pointer release must not also advance once as a click.
+    await guest.mouse.move(box.x + box.width * 0.25, py);
+    await guest.mouse.down();
+    await guest.mouse.move(box.x + box.width * 0.75, py, { steps: 10 });
+    await guest.mouse.up();
+    assert.equal(await count.textContent(), '1 / 2');
+    await guest.mouse.click(box.x + box.width * 0.75, py);
+    assert.equal(await count.textContent(), '2 / 2');
+    assert.ok(guest.url().endsWith('#/house/community'));
+    await guest.reload();
+    await card.getByText('1 / 2', { exact: true }).waitFor();
+    pass('卡片箭头、点图与横拖逐张切换，停留列表；刷新恢复作者封面，标题仍可打开详情');
     assert.ok(await guest.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth));
     await guest.getByRole('link', { name: title, exact: true }).click();
     await guest.getByRole('heading', { name: title }).waitFor();
@@ -300,10 +336,13 @@ async function main() {
     await author.locator('#hbCodePublic').uncheck();
     await author.locator('#hbPublish').click();
     await author.locator('#housingBuildEditor').waitFor({ state: 'hidden' });
+    await guest.getByRole('button', { name: '复制蓝图码' }).click();
+    await guest.getByText(/复制失败/).waitFor();
+    assert.ok(!(await guest.locator('#hbResults').innerHTML()).includes(code));
     await guest.reload();
     await guest.getByText('作者仅展示作品').waitFor();
-    assert.equal((await api('gallery?id=' + mine.id)).data.rows[0].blueprint_code, null);
-    pass('已公开的作品可单独收回蓝图码，原链接仍可查看作品介绍');
+    assert.equal((await api('copy-code', null, { id: mine.id })).status, 404);
+    pass('访客只在详情主动点击后取码；列表、详情与复制失败状态均无明码，作者撤销授权后旧详情按钮也无法取码');
     await results.getByText('编辑作品').click();
     author.once('dialog', dialog => dialog.dismiss());
     await author.locator('#hbDraft').click();
@@ -313,6 +352,7 @@ async function main() {
     await results.getByText(/私有草稿/).waitFor();
     await guest.reload();
     await guest.getByText('作品不存在或已撤回').waitFor();
+    assert.ok(await guest.getByRole('button', { name: '返回公开作品' }).isVisible());
     for (const id of draft.image_ids) assert.equal(await photoStatus(id), 404);
     assert.equal((await api('gallery')).data.rows.length, 0);
     assert.equal((await api('mine', sessions[0])).data.rows.length, 1);
@@ -346,7 +386,7 @@ async function main() {
     await author.setViewportSize({ width: 1366, height: 768 });
     assert.ok(await author.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth));
     const imageOnly = (await api('gallery?v=2&id=' + mine.id)).data.rows[0];
-    assert.equal(imageOnly.blueprint_code, null);
+    assert.equal(Object.hasOwn(imageOnly, 'blueprint_code'), false);
     assert.deepEqual(imageOnly.image_ids, draft.image_ids.slice(1));
     assert.equal(await photoStatus(draft.image_ids[0]), 404);
     assert.equal(await photoStatus(draft.image_ids[1]), 200);
@@ -354,19 +394,104 @@ async function main() {
     pass('加载、读取失败、重试和空态可区分，长标题和说明在 1366 宽度正常显示');
     await other.locator('#hbCreate').click();
     await other.locator('#hbTitle').fill('窗边的花房');
-    await other.locator('#hbPhotos').setInputFiles([wide, tall, wide, tall]);
-    await other.getByText('已选 4 / 4 张').waitFor();
+    // Add a valid PNG text chunk to exercise the exact original-file limit before compression.
+    function pngAtSize(png, bytes) {
+      const text = Buffer.alloc(bytes - png.length - 12, 97);
+      Buffer.from('Comment\0').copy(text);
+      const chunk = Buffer.alloc(12 + text.length);
+      chunk.writeUInt32BE(text.length);
+      chunk.write('tEXt', 4);
+      text.copy(chunk, 8);
+      chunk.writeUInt32BE(require('node:zlib').crc32(chunk.subarray(4, -4)), chunk.length - 4);
+      return Buffer.concat([png.subarray(0, -12), chunk, png.subarray(-12)]);
+    }
+    const maxPng = path.join(temp, '20MiB.png');
+    const overPng = path.join(temp, 'over-20MiB.png');
+    fs.writeFileSync(maxPng, pngAtSize(tall.buffer, 20 * 1024 * 1024));
+    fs.writeFileSync(overPng, pngAtSize(tall.buffer, 20 * 1024 * 1024 + 1));
+    await other.locator('#hbPhotos').setInputFiles(overPng);
+    await other.locator('#hbFormError').getByText(/20 MB/).waitFor();
+    assert.equal(await other.locator('.hb-tile').count(), 0);
+    await other.locator('#hbPhotos').setInputFiles(maxPng);
+    await other.getByText(/1\s*\/\s*8 张/).waitFor();
+    // A detailed JPEG needs enough bytes to exercise the new save limit on a normal eight-image upload.
+    const detailedJpeg = await other.evaluate(() => {
+      const canvas = document.createElement('canvas');
+      canvas.width = 640; canvas.height = 560;
+      const ctx = canvas.getContext('2d');
+      const raster = ctx.createImageData(canvas.width, canvas.height);
+      let seed = 73;
+      for (let i = 0; i < raster.data.length; i += 4) {
+        seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+        raster.data[i] = seed >>> 24;
+        raster.data[i + 1] = seed >>> 16 & 255;
+        raster.data[i + 2] = seed >>> 8 & 255;
+        raster.data[i + 3] = 255;
+      }
+      ctx.putImageData(raster, 0, 0);
+      return canvas.toDataURL('image/jpeg', 0.92).split(',')[1];
+    });
+    const detailed = { name: 'dense.jpg', mimeType: 'image/jpeg', buffer: Buffer.from(detailedJpeg, 'base64') };
+    await other.locator('#hbPhotos').setInputFiles(Array(7).fill(detailed));
+    await other.getByText(/8\s*\/\s*8 张/).waitFor();
+    const saveRequest = other.waitForRequest(req => req.url().includes('/housing-builds/save-v2'));
     await other.locator('#hbPublish').click();
+    const uploadBytes = (await saveRequest).postDataBuffer().length;
+    assert.ok(uploadBytes > 1024 * 1024 && uploadBytes <= 2 * 1024 * 1024, '八图上传应覆盖超过 1 MiB 的实际请求，收到 ' + uploadBytes);
     const secondWork = other.locator('.hb-work').filter({ hasText: '窗边的花房' });
     await secondWork.getByText('查看公开作品').waitFor();
     const secondLink = await secondWork.getByText('查看公开作品').getAttribute('href');
     await guest.goto(base + '/' + secondLink);
-    await guest.getByRole('button', { name: '查看第 4 张截图' }).click();
-    await guest.waitForFunction(() => document.querySelector('.hb-stage img')?.naturalHeight === 1080);
+    await guest.getByRole('button', { name: '查看第 8 张截图' }).click();
+    await guest.waitForFunction(() => document.querySelector('.hb-stage img')?.naturalHeight === 560);
     await guest.getByText('作者仅展示作品').waitFor();
     assert.equal(await guest.getByRole('textbox', { name: '公开蓝图码' }).count(), 0);
     assert.equal(await guest.getByRole('button', { name: '复制蓝图码' }).count(), 0);
-    pass('另一位无公会作者从空白表单一次上传四张截图，留空蓝图并直接发布，游客可浏览第四张');
+    pass('20 MB 的有效 PNG 可上传，超出 1 字节被拒；八张一次保存，访客能看第八张。保存请求为 ' + uploadBytes + ' 字节');
+    const secondId = secondLink.split('/').pop();
+    const readSecond = async () => (await api('mine?v=2&id=' + secondId, sessions[1])).data.rows[0];
+    const original = await readSecond();
+    assert.equal(original.image_ids.length, 8);
+    const overflowPayload = { ...original, screenshots: [...original.image_ids, randomUUID()].map(id => ({id})) };
+    assert.equal((await api('save-v2', sessions[1], overflowPayload)).status, 400);
+    await assert.rejects(db.query('select save_housing_build_v2($1,$2,$3,$4,$5,null,false,false,true,$6::jsonb)',
+      [sessions[1].user.id, secondId, original.revision, original.title, original.description, JSON.stringify(overflowPayload.screenshots)]), /八张/);
+    await secondWork.getByRole('button', { name: '编辑作品' }).click();
+    async function replaceAt(index, file) {
+      const replace = other.getByRole('button', { name: '更换第 ' + index + ' 张截图', exact: true });
+      const choosing = other.waitForEvent('filechooser');
+      await replace.focus();
+      await replace.press('Enter');
+      const dialog = await choosing;
+      assert.equal(dialog.isMultiple(), false);
+      await dialog.setFiles(file);
+    }
+    const beforeReplace = other.locator('#hbPreview .hb-tile img').first();
+    await other.waitForFunction(() => document.querySelector('#hbPreview .hb-tile img')?.naturalWidth === 720);
+    const firstImage = await beforeReplace.getAttribute('src');
+    await replaceAt(1, []);
+    assert.equal(await beforeReplace.getAttribute('src'), firstImage);
+    await replaceAt(1, overPng);
+    await other.locator('#hbFormError').getByText(/20 MB/).waitFor();
+    await other.waitForFunction(() => document.querySelector('#hbPreview .hb-tile img')?.naturalWidth === 720);
+    await replaceAt(1, wide);
+    await other.locator('#hbPhotoStatus').getByText(/第 1 张截图已更换/).waitFor();
+    await replaceAt(8, maxPng);
+    await other.locator('#hbPhotoStatus').getByText(/第 8 张截图已更换/).waitFor();
+    assert.equal(await other.locator('#hbPreview .hb-tile').count(), 8);
+    await other.screenshot({ path: path.join(output, 'replace-eight-1366.png') });
+    await other.locator('#hbPublish').click();
+    await other.locator('#housingBuildEditor').waitFor({ state: 'hidden' });
+    const changed = await readSecond();
+    assert.notEqual(original.image_ids[0], changed.image_ids[0]);
+    assert.notEqual(original.image_ids[7], changed.image_ids[7]);
+    assert.deepEqual(changed.image_ids.slice(1,7), original.image_ids.slice(1,7));
+    assert.equal(await photoStatus(original.image_ids[0]), 404);
+    await guest.reload();
+    await guest.waitForFunction(() => document.querySelector('.hb-stage img')?.naturalWidth === 1920);
+    await guest.getByRole('button', { name: '查看第 8 张截图' }).click();
+    await guest.waitForFunction(() => document.querySelector('.hb-stage img')?.naturalWidth === 720);
+    pass('满八张时键盘打开单图更换；取消和超限保留原图，更换封面及第八张有待保存反馈。回读确认中间六个位置完全一致');
     await guest.goto(base + '/#/house/decor');
     await guest.locator('[data-add="126"]').first().click();
     await guest.locator('[data-ia-key="decor-plan"]:visible').first().click();

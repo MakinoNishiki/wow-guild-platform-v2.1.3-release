@@ -311,9 +311,17 @@ function proxyToSupabase(method, supabasePath, headers, body, callback) {
 }
 
 // ------------------------------------------------------------
-// 请求体边界：超过 1 MiB 后停止缓存，其余数据直接排空。
+// 家宅保存一次最多八张已压缩图片（每张 175 KiB，再作 Base64 编码）。
 // ------------------------------------------------------------
+function requestBodyLimit(req) {
+  if (req.method === 'POST' && req.url.split('?', 1)[0] === '/api/housing-builds/save-v2') {
+    return 2 * 1024 * 1024;
+  }
+  return MAX_REQUEST_BODY_BYTES;
+}
+
 function readBody(req) {
+  const limit = requestBodyLimit(req);
   return new Promise((resolve, reject) => {
     const chunks = [];
     let size = 0;
@@ -323,16 +331,16 @@ function readBody(req) {
       settled = true;
       req.removeListener("data", onData);
       req.resume();
-      const error = new Error("请求体超过 1 MiB 限制");
+      const error = new Error(`请求体超过 ${limit / (1024 * 1024)} MiB 限制`);
       error.statusCode = 413;
       reject(error);
     };
     const onData = (chunk) => {
       size += chunk.length;
-      if (size > MAX_REQUEST_BODY_BYTES) return failTooLarge();
+      if (size > limit) return failTooLarge();
       chunks.push(chunk);
     };
-    if (Number(req.headers["content-length"] || 0) > MAX_REQUEST_BODY_BYTES) {
+    if (Number(req.headers["content-length"] || 0) > limit) {
       failTooLarge();
       return;
     }
@@ -1554,11 +1562,11 @@ const server = http.createServer(async (req, res) => {
 
   if (
     urlPath.startsWith("/api/") &&
-    Number(req.headers["content-length"] || 0) > MAX_REQUEST_BODY_BYTES
+    Number(req.headers["content-length"] || 0) > requestBodyLimit(req)
   ) {
     req.resume();
     res.writeHead(413, { "Content-Type": "application/json", ...corsHeaders });
-    res.end(JSON.stringify({ message: "请求体超过 1 MiB 限制" }));
+    res.end(JSON.stringify({ message: `请求体超过 ${requestBodyLimit(req) / (1024 * 1024)} MiB 限制` }));
     return;
   }
 

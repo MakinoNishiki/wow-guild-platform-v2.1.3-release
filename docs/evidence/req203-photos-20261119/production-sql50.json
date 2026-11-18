@@ -1,0 +1,32 @@
+{
+  "migrationHash": "dbf3dbfade202da073177f3611bb4dedbdebec56c1265cf07b2dcf206e67b6c4",
+  "commit": "53b0dfb0246bb892dddf0db0b6af1c88a78f391f",
+  "before": {
+    "prerequisite": true,
+    "images": false,
+    "function": false,
+    "copy": false,
+    "ids": false,
+    "version": "17.6",
+    "works": 1
+  },
+  "backup": {
+    "path": "/root/wowbutler-backups/req203-sql50-20261118170826/public-auth-before.dump",
+    "bytes": 1025110,
+    "sha256": "9ed7c2c6e43611c8e740d518b9c8ba5258d2596287e8592f81e379dbf57103cc",
+    "archiveListVerified": true
+  },
+  "committed": true,
+  "originalWorkDataPreserved": true,
+  "after": {
+    "prerequisite": true,
+    "images": true,
+    "function": true,
+    "copy": true,
+    "ids": true,
+    "version": "17.6",
+    "works": 1
+  },
+  "accessVerified": true,
+  "finished": "2026-11-18T17:09:00.384Z"
+}
