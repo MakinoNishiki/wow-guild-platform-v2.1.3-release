@@ -1,0 +1,117 @@
+{
+  "task": "REQ-203",
+  "date": "2026-11-18",
+  "evidence": "user returned output after two read-only game commands; local matching against anonymously readable current production catalog",
+  "input_sha256": "cb4ba4db73b23b3984d20f4ea6ac156563cf40a5a6a247fde17711ce45e399e5",
+  "sorted_tuples_sha256": "a144dacd4401a42d8b041208663e7ef072a8be10d7162832206fbe42e5fc7037",
+  "tuple_rows": 207,
+  "by_content_type": {
+    "1": {
+      "distinct_entries": 1,
+      "quantity": 1
+    },
+    "2": {
+      "distinct_entries": 5,
+      "quantity": 7
+    },
+    "3": {
+      "distinct_entries": 196,
+      "quantity": 512
+    },
+    "5": {
+      "distinct_entries": 5,
+      "quantity": 6
+    }
+  },
+  "total_quantity": 526,
+  "matches_screenshot_decor_512": true,
+  "matches_screenshot_all_526": true,
+  "duplicate_type_id_pairs": 0,
+  "catalog_snapshot_rows": 2335,
+  "catalog_snapshot_sha256": "81c9ddb5e7c214756722dbaad20ef5db140d0ba2f3d2eed875015bb1ca0d21fd",
+  "decor_matches": 196,
+  "decor_matched_quantity": 512,
+  "room_matches": 5,
+  "room_matched_quantity": 7,
+  "decor_with_structured_sources": 196,
+  "decor_with_local_icon_file": 196,
+  "decor_with_displayed_reference_price": 163,
+  "decor_placement_cost_sum": 1216,
+  "screenshot_combined_decor_budget": 1216,
+  "budget_matches": true,
+  "unsupported_catalog_types": {
+    "HouseType": {
+      "rows": 1,
+      "quantity": 1
+    },
+    "Fixture": {
+      "rows": 5,
+      "quantity": 6
+    }
+  },
+  "namespace_collision": {
+    "record_id": 1436,
+    "types": [
+      3,
+      5
+    ],
+    "reason": "fixture 1436 must not match decor 1436"
+  },
+  "examples": [
+    {
+      "name": "小型艾尔文草丛",
+      "quantity": 12,
+      "record_id": 4845,
+      "source_lines": [
+        "商人：“伊恩”马龙（烈风海岸） · 10 金",
+        "商人：特雷弗·格伦纳（创始者之角） · 10 金"
+      ],
+      "price_labels": [
+        "10 金",
+        "10 金"
+      ]
+    },
+    {
+      "name": "罪油蜡烛",
+      "quantity": 12,
+      "record_id": 11386,
+      "source_lines": [
+        "制造：暗影界炼金（140）"
+      ],
+      "price_labels": []
+    },
+    {
+      "name": "贝拉梅斯大型平台",
+      "quantity": 28,
+      "record_id": 2110,
+      "source_lines": [
+        "任务：装饰宝藏猎人（创始者之角）",
+        "商人：巴伦·觅星（创始者之角） · 125 金",
+        "商人：贾扎尔·落星（烈风海岸） · 125 金"
+      ],
+      "price_labels": [
+        "125 金",
+        "125 金"
+      ]
+    },
+    {
+      "name": "幸运悬挂灯笼",
+      "quantity": 23,
+      "record_id": 3872,
+      "source_lines": [
+        "商人：飒安·红鳞（翡翠林） · 500 金 · 云端翔龙骑士团 - 尊敬"
+      ],
+      "price_labels": [
+        "500 金"
+      ]
+    }
+  ],
+  "verification_limits": [
+    "No sample code or tuple list was transmitted to third-party services. Public catalog was fetched without layout filters.",
+    "No writes to production or local application state.",
+    "Data mapping and existing formatting functions verified; no new publishing UI or CRUD tested.",
+    "Game output does not establish independent website decoding of the original short code.",
+    "Unavailable fixture/house-type names not guessed from decor records.",
+    "Known source and price coverage reflects current catalog, not a fresh game verification of every acquisition route."
+  ]
+}

@@ -826,7 +826,6 @@
 .dh-pp-progress-bar.over { background: var(--danger); }
 .dh-pp-over-hint { font-size: 11px; color: var(--danger); line-height: 1.5; }
 .dh-pp-export { width: 100%; justify-content: center; }
-.dh-pp-share { width: 100%; justify-content: center; }
 .dh-pp-sync { font-size: 11px; color: var(--text-muted); text-align: center; }
 
 /* ---- 768px 窄屏：表格横向滚动 + 摘要卡下移 ---- */

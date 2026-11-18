@@ -1359,7 +1359,6 @@
             <div class="dh-pp-progress"><div class="dh-pp-progress-bar${cap > DECOR_PLAN_CAPACITY_REF ? ' over' : ''}" style="width:${capPct}%"></div></div>
             ${cap > DECOR_PLAN_CAPACITY_REF ? '<div class="dh-pp-over-hint">已超参考上限（游戏内预算随住宅等级变化，仅提示不阻断）</div>' : ''}
             <button type="button" class="btn btn-primary dh-pp-export" id="dhPpExport">导出</button>
-            <button type="button" class="btn dh-pp-share" id="dhPpShare" disabled title="三期社区开放">分享方案</button>
             <div class="dh-pp-sync">${logged ? (plan.loading ? '正在读取云端方案' : plan.loadFailed ? '读取失败 · 未更新云端' : plan.notice ? '有本地草稿 · 保存后同步' : '云端已读取 · 跨设备可用') : '未登录 · 草稿本地暂存，保存时跳登录'}</div>
           </div>
         </aside>

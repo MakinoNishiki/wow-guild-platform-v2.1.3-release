@@ -104,11 +104,11 @@ function staticAsserts() {
     /function planActionRename/.test(dd) && /function planActionDelete/.test(dd) &&
     /function planBatchRemove/.test(dd) && /function planBatchInc/.test(dd) &&
     /我的方案 \$\{seq\}/.test(dd) && /仅剩一个方案，禁止删除/.test(dd));
-  check('A6 decorData.js：独立页渲染层（全宽表格/批量条/摘要卡/分享 disabled/空态引导）+ 徽标三处同源 + 导出入口',
+  check('A6 decorData.js：个人采购页（表格/批量条/摘要卡/空态引导）+ 徽标同源 + 导出入口',
     /function mountPlanPage/.test(dd) && /function planPageRender/.test(dd) &&
     /dh-pp-table/.test(dd) && /dh-pp-batch/.test(dd) && /dh-pp-summary/.test(dd) &&
     /已选 \$\{ids\.length\} 件 · 小计容量/.test(dd) &&
-    /id="dhPpShare" disabled title="三期社区开放"/.test(dd) &&
+    !/id="dhPpShare"/.test(dd) && /id="dhPpExport"/.test(dd) &&
     /去图鉴逛逛/.test(dd) && // 【任务书 #59 WP4 裁定驱动更新 2026-09-28：空态导流钮文案按任务书口径改「去图鉴逛逛」】
     /getElementById\('dhNavPlanBadge'\)/.test(dd) &&
     /mountPlanPage\(el\) \{ mountPlanPage\(el\); \}/.test(dd) &&

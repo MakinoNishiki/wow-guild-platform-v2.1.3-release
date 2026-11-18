@@ -5265,3 +5265,21 @@ img.class-icon[src$=".png"] { border-radius: 3px; }
 #lootBatchModal .modal-body > p:first-child { margin-bottom:16px; line-height:1.6; }
 
 .anx-count-note { color:var(--text-muted); font-size:12px; line-height:1.6; margin:12px 0; }
+.hb-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
+.hb-toolbar .uc-tabs { margin: 0; }
+.hb-toolbar a, .hb-work a { text-decoration: none; }
+.hb-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr)); gap: 12px; }
+.hb-work { border: 1px solid var(--border-color); border-radius: 8px; background: var(--bg-primary); padding: 16px; overflow-wrap: anywhere; }
+.hb-work h2, .hb-work h3 { margin: 0 0 6px; color: var(--gold); }
+.hb-work a, #hbResults > a { color: var(--gold); }
+.hb-work a:hover, #hbResults > a:hover { text-decoration: underline; }
+.hb-byline { color: var(--text-secondary); font-size: 13px; }
+.hb-description { white-space: pre-wrap; margin: 8px 0; line-height: 1.5; }
+.hb-work > .btn, .hb-work > span { display: inline-block; margin-top: 6px; }
+.hb-work :is(a, button):focus-visible, .hb-toolbar a:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+.hb-grid .hb-description { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.hb-work .btn + a { margin-left: 12px; }
+#housingBuildEditor form { display: flex; flex-direction: column; min-height: 0; }
+#hbResults > a, #hbResults > button { display: inline-block; margin: 12px 8px 0 0; }
+#hbFormError { color: var(--danger); }
+#hbFormError:empty { display: none; }

@@ -1,0 +1,86 @@
+{
+  "task": "REQ-203",
+  "observed_date": "2026-11-18",
+  "evidence_kind": "user_supplied_CN_game_screenshots_and_native_share_code",
+  "scope": "complete_layout",
+  "code_characters": 24,
+  "base64_decoded_bytes": 18,
+  "base64_roundtrip": true,
+  "code_sha256": "7da0981b04bfcb5b9bca624e1855185d4b001f51504ab5cdb331d7291aeeca10",
+  "decompression_checks": [
+    {
+      "format": "zlib",
+      "decoded": false
+    },
+    {
+      "format": "gzip",
+      "decoded": false
+    },
+    {
+      "format": "raw_deflate",
+      "decoded": false
+    }
+  ],
+  "recovered_furniture_list": false,
+  "network_requests_containing_sample": 0,
+  "screenshots": [
+    {
+      "file": "01-native-scope.png",
+      "bytes": 65559,
+      "sha256": "f78154353be4c96d15f9023c33f3e154369ede3deae8af56d6fcd72ae2343f88"
+    },
+    {
+      "file": "02-native-code.png",
+      "bytes": 82140,
+      "sha256": "680207027b1c3e42f31d712b12e01f43a01d905d3cc2a1dde314a965e09b2dc7"
+    },
+    {
+      "file": "03-native-overview.png",
+      "bytes": 399281,
+      "sha256": "67110d532aa969a3899017e37a3c5e657c0fd906e509145b00f5f589549c8157"
+    },
+    {
+      "file": "04-native-list.png",
+      "bytes": 1005907,
+      "sha256": "7d6ea5b03adda5207beea15bc995e39fbcf362805c9e498df5dfc4f66b7bc37f"
+    },
+    {
+      "file": "05-native-missing-filter.png",
+      "bytes": 172553,
+      "sha256": "f64896e1b0e5147f02ccbc09b6817d068f5a5178df1134fb9418676a8dfa79ae"
+    }
+  ],
+  "ui_observations": {
+    "available_all": [
+      526,
+      526
+    ],
+    "decor": [
+      512,
+      512
+    ],
+    "exterior_fixtures": [
+      6,
+      6
+    ],
+    "indoor_decor_budget": [
+      1063,
+      5545
+    ],
+    "room_budget": [
+      36,
+      124
+    ],
+    "outdoor_decor_budget": [
+      153,
+      350
+    ],
+    "missing_only_list_empty": true
+  },
+  "interpretation_limits": [
+    "Budget is not item quantity.",
+    "The 14 non-decor units have not been completely classified.",
+    "Short byte length suggests a reference but does not prove a complete binary format.",
+    "No game API probe or website import test performed."
+  ]
+}

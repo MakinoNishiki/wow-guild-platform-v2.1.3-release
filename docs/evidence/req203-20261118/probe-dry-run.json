@@ -1,0 +1,15 @@
+{
+  "environment": "mocked Lua 5.1; NOT game validation",
+  "command_lengths": [
+    239,
+    252
+  ],
+  "checks": [
+    "extracts exact group type, record ID and total only",
+    "does not export house GUID, share code, names or personal missing counts",
+    "original data unchanged",
+    "creates separate copy box, not game chat input",
+    "Escape hides temporary copy box"
+  ],
+  "real_encoding_and_UI": "pending user game execution"
+}

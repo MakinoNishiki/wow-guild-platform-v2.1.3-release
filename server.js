@@ -657,6 +657,8 @@ async function authorizeProxyRequest(user, table, method, queryString, rawBody) 
   const filters = parseEqFilters(queryString);
   const rows = parseBodyRows(rawBody);
 
+  if (['housing_builds', 'housing_build_gallery'].includes(table)) return deny('家宅作品请使用专用入口');
+
   if (['guild_people','guild_person_attendance'].includes(table) ||
       table==='raid_members'&&rows.some(r=>r&&Object.prototype.hasOwnProperty.call(r,'person_id')) ||
       table==='activities'&&rows.some(r=>r&&Object.prototype.hasOwnProperty.call(r,'attendance_mode'))) {
@@ -1507,6 +1509,7 @@ function serveFile(res, filePath, req) {
 
 const handleLootObservations = require('./lib/lootObservationRoutes.cjs')({auth:verifyTokenCached,get:supabaseRestGet,write:supabaseRestWrite,body:readBody});
 const handlePeople = require('./lib/peopleRoutes.cjs')({auth:verifyTokenCached,get:supabaseRestGet,write:supabaseRestWrite,body:readBody});
+const handleHousingBuilds = require('./lib/housingBuildRoutes.cjs')({auth:verifyTokenCached,get:supabaseRestGet,write:supabaseRestWrite,body:readBody});
 const handleWclUser = require('./lib/wclUserRoutes.cjs')({
   auth: verifyTokenCached, role: getGuildRoleCached, get: supabaseRestGet,
   write: supabaseRestWrite, body: readBody,
@@ -1572,6 +1575,7 @@ const server = http.createServer(async (req, res) => {
   // REQ-185: authenticated account linking and confirmed batch claims.
   if (await handleLootObservations(req, res, corsHeaders, urlPath)) return;
   if (await handlePeople(req, res, corsHeaders, urlPath)) return;
+  if (await handleHousingBuilds(req, res, corsHeaders, urlPath)) return;
   if (await handleWclUser(req, res)) return;
 
   // API: Supabase config

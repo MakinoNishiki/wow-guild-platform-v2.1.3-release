@@ -176,6 +176,7 @@
     supabaseClient.auth.onAuthStateChange((event, session) => {
       console.debug(`[diag] auth event: ${event}`);
       if (event === 'SIGNED_IN' && session) {
+        if (currentUser?.id && currentUser.id !== session.user.id) window.HousingBuilds?.reset();
         currentUser = session.user;
         setTimeout(() => { onUserSignedIn(); }, 0);
       } else if (event === 'SIGNED_OUT') {
@@ -399,6 +400,7 @@
 
   // ---- 用户登出后 ----
   function onUserSignedOut() {
+    window.HousingBuilds?.reset();
     isCloudMode = false;
     guildSelectionSequence++;
     clearPeopleContext();
@@ -640,7 +642,13 @@
   }
 
   // ---- 重新加载指定模块数据（写成功后回读数据库最新状态） ----
-  async function reloadData(dataType) {
+  async function reloadData(dataType, payload) {
+    if (dataType === 'housingBuild') {
+      const result = await readHousingBuilds('mine', { id: payload.id });
+      const row = result.rows[0];
+      if (!row || row.revision !== payload.savedRevision) throw new Error('作品已更新，请重新打开核对');
+      return row;
+    }
     // BUG-029（任务书 #12 补丁）：原来是静默 return——会话/公会上下文在写流程中途
     // 丢失（auth 事件竞态）时 reload 变 no-op，调用方照常 toast 成功但界面是旧数据
     // （假成功）。改为明确抛错，让调用方走失败提示（规范：禁止静默失败）。
@@ -882,7 +890,37 @@
   }
 
   // ---- 保存数据到云端 ----
+  async function housingRequest(action, query, item) {
+    const owner = currentUser?.id;
+    const headers = {};
+    if (action !== 'gallery') {
+      const token = await getAccessToken();
+      if (!owner || !token || currentUser?.id !== owner) throw new Error('请登录后管理自己的作品');
+      headers.Authorization = 'Bearer ' + token;
+    }
+    const options = { headers, cache: 'no-store' };
+    if (item) {
+      headers['Content-Type'] = 'application/json';
+      options.method = 'POST';
+      options.body = JSON.stringify(item);
+    }
+    const response = await fetch('/api/housing-builds/' + action + '?' + new URLSearchParams(query), options);
+    const result = await response.json();
+    if (action !== 'gallery' && currentUser?.id !== owner) throw new Error('登录账号已切换，请重新打开作品');
+    if (!response.ok) throw new Error(result.message || '作品服务暂不可用');
+    return result;
+  }
+
+  function readHousingBuilds(scope, query = {}) {
+    return housingRequest(scope === 'mine' ? 'mine' : 'gallery', query);
+  }
+
   async function saveCloudData(dataType, operation, item, extra) {
+    if (dataType === 'housingBuild') {
+      const saved = await housingRequest('save', {}, item);
+      item.savedRevision = saved.revision;
+      return;
+    }
     // BUG-029（任务书 #12 补丁）：同 reloadData，静默 return 会造成假成功，改为明确抛错
     // REQ-187：个人方案沿用本人 RLS，不能被团队前置条件拦截。
     if (!supabaseClient || !currentUser || (dataType !== 'decorPlan' && !currentGuild)) {
@@ -2017,6 +2055,7 @@
     loadCloudData: loadCloudData,
     saveCloudData: saveCloudData,
     reloadData: reloadData,
+    readHousingBuilds,
     hardDeleteRaidMember: hardDeleteRaidMember,
     getGuildMembers: getGuildMembers,
     setRaidMemberClaim: setRaidMemberClaim,

@@ -1388,7 +1388,9 @@ async function cloudCrud(dataType, operation, payload, options = {}) {
     const perfWrite = performance.now();
 
     // 2. 重新读取数据库最新状态并更新 appData
-    await window.CloudSync.reloadData(dataType);
+    const refreshed = await window.CloudSync.reloadData(dataType, payload);
+    // 作者的原始蓝图仅用于本次编辑，单条云端回读后返回，不写进公会缓存。
+    if (dataType === 'housingBuild') return { success: true, row: refreshed };
     const typesToReload = reloadTypes || [];
     for (const t of typesToReload) {
       await window.CloudSync.reloadData(t);
@@ -2391,7 +2393,7 @@ const pageTitles = {
   decor: '家宅图鉴', // 任务书 #51（REQ-137 一期）：双壳登录壳页签，只读
   'decor-plan': '我的方案单', // 任务书 #58-WP2-1：方案单独立页（形态B，「家宅」组内增量）
   home: '首页', // 任务书 #59 WP1：门户导航页
-  community: '家宅社区', // 任务书 #59 WP1：三期占位
+  community: '家宅分享',
   'team-guide': '团队管理' // 任务书 #59 WP1：游客/无公会引导卡（WP2 换装完整版）
 };
 
@@ -2523,7 +2525,7 @@ async function setCalendarDensity(d) {
   }
 }
 
-function switchPage(pageName) {
+function switchPage(pageName, routeHash) {
   // 切换导航激活状态
   document.querySelectorAll('.nav-item').forEach(item => {
     item.classList.toggle('active', item.dataset.page === pageName);
@@ -2577,6 +2579,7 @@ function switchPage(pageName) {
   if (pageName === 'decor-plan') {
     ensureDecorPlanPageMounted();
   }
+  if (pageName === 'community') HousingBuilds.show(routeHash || '#/house/community');
 
   // 移动端关闭侧边栏
   if (window.innerWidth <= 768) {
@@ -2596,7 +2599,7 @@ function switchPage(pageName) {
   // team-guide 不写 hash——路由守卫落引导卡时保留用户目标 hash 不改写（如 '#/team/members'）；
   // 与 iaApplyRoute 间经 iaLastHash 防环（hash 相同则不触发二次路由）。
   if (typeof iaSetHash === 'function' && pageName !== 'team-guide') {
-    iaSetHash(iaKeyToHash(pageName));
+    iaSetHash(pageName === 'community' && routeHash ? routeHash : iaKeyToHash(pageName));
     iaPaintRoute(pageName, iaTabOfPage(pageName));
   }
 }
@@ -2798,7 +2801,7 @@ function iaApplyRoute() {
     page = 'decor'; tab = 'house';
   } else if (h === '#/house/plan') {
     page = 'decor-plan'; tab = 'house';
-  } else if (h === '#/house/community') {
+  } else if (h === '#/house/community' || /^#\/house\/community\/(?:mine|[a-f\d-]{36})$/i.test(h)) {
     page = 'community'; tab = 'house';
   } else if (h === '#/team' || h === '#/team/') {
     if (hasGuild) {
@@ -2827,7 +2830,7 @@ function iaApplyRoute() {
   }
 
   iaPaintRoute(page, tab, activeKey);
-  switchPage(page);
+  switchPage(page, h);
 }
 
 window.addEventListener('hashchange', () => {
@@ -2941,6 +2944,7 @@ function isModalFormDirty(modalId) {
 
 // 各弹窗"有未保存内容"判定；未登记的弹窗遮罩点击/ESC 直接关闭（维持现状）
 const modalDirtyChecks = {
+  housingBuildEditor: () => isModalFormDirty('housingBuildEditor'),
   // 任务书 #58-WP1：方案单导出弹窗（decorData 双壳自足渲染，textarea 改动=未保存内容，规范 4.6 登记）
   decorPlanExport: () => !!(window.DecorCatalog && window.DecorCatalog.planExportIsDirty && window.DecorCatalog.planExportIsDirty()),
   importMembersModal: () => isModalFormDirty('importMembersModal') || importPreviewRows.length > 0,
@@ -2979,6 +2983,7 @@ const modalDirtyChecks = {
 
 // 遮罩点击/ESC 的统一关闭入口：有未保存内容时二次确认
 function requestCloseModal(id) {
+  if (id === 'housingBuildEditor' && HousingBuilds.isSaving()) return;
   if(id==='lootBatchModal'&&window.LootWorkflow?.isBusy()){showToast('正在保存本批分配，请稍候','warning');return;}
   if(id==='lootDropImportModal'&&lootDropImportSaving){showToast('正在提交，请等待结果后关闭','warning');return;}
   if(id==='lootDropReviewModal'&&lootDropDeleting.size){showToast('正在保存核对结果，请稍候','warning');return;}
@@ -3000,6 +3005,10 @@ function openModal(id) {
 }
 
 function closeModal(id) {
+  if (id === 'housingBuildEditor') {
+    HousingBuilds.clearEditor();
+    delete modalFormSnapshots[id];
+  }
   const el = document.getElementById(id);
   el.classList.remove('show');
   el.style.zIndex = '';
@@ -9116,6 +9125,10 @@ function lootFillAssignedTo(idOrName) {
 // ==================== 初始化 ====================
 // ==================== 更新日志 ====================
 const changelogData = [
+  {id:'req203-builds',version:'v3.2.0',date:'2026-11-18',type:'feature',typeLabel:'新增功能',title:'家宅分享开放作品发布与蓝图展示',summary:'作者可保存草稿、发布、编辑或撤回作品，并选择是否公开蓝图码。访客可直接打开作品链接。',details:[]},
+  {id:'req203-improve',version:'v3.2.0',date:'2026-11-18',type:'improve',typeLabel:'功能优化',title:'作者可以保留私有蓝图',summary:'发布时默认仅展示作品。作者开放蓝图后，访客可从作品页直接复制。',details:[]},
+  {id:'req203-fix',version:'v3.2.0',date:'2026-11-18',type:'fix',typeLabel:'修复BUG',title:'移除采购页过期的分享提示',summary:'个人方案单不再提示从购物车发布装修作品。',details:[]},
+  {id:'req203-adjust',version:'v3.2.0',date:'2026-11-18',type:'refactor',typeLabel:'模块调整',title:'家宅分享设为独立页面',summary:'个人方案单保留采购与导出，发布草稿和作品管理集中在家宅分享。',details:[]},
   {id:'bug127-fix',version:'v3.2.0',date:'2026-11-18',type:'fix',typeLabel:'修复BUG',title:'家宅获取来源不再重复显示',summary:'图鉴详情和获取清单合并单件家具内完全相同的来源；不同商人、地点、价格及条件仍分别保留。',details:[]},
   {id:'req201-feature',version:'v3.2.0',date:'2026-11-17',type:'feature',typeLabel:'新增功能',title:'家宅方案单导出获取清单',summary:'文字导出可包含图鉴获取来源、区域、条件及单件参考价格，便于照单收集家具。',details:[]},
   {id:'req201-improve',version:'v3.2.0',date:'2026-11-17',type:'improve',typeLabel:'功能优化',title:'简洁清单与获取清单自由切换',summary:'保留多个获取途径；切换覆盖手动修改前先确认，取消后文字保留。',details:[]},
@@ -16117,7 +16130,7 @@ const ANX_TAB_LABEL = {
   wishlist: '心愿单', reports: '统计报表', data: '数据管理', changelog: '更新日志',
   lootdrop: '副本掉落', decor: '家宅图鉴', datacenter: '数据中心', login: '登录墙',
   // 任务书 #60 WP1：新 IA 页签四键（旧键原样保留，历史数据兼容展示）
-  home: '首页', 'team-guide': '团队引导', 'decor-plan': '方案单', community: '家宅社区'
+  home: '首页', 'team-guide': '团队引导', 'decor-plan': '方案单', community: '家宅分享'
 };
 
 function anxEsc(s) {
@@ -16165,7 +16178,7 @@ function mdRenderAnalytics(panel) {
     ['index:attendance', '主站·考勤记录'], ['index:loot', '主站·装备分配'], ['index:wishlist', '主站·心愿单'],
     ['index:reports', '主站·统计报表'], ['index:data', '主站·数据管理'], ['index:changelog', '主站·更新日志'],
     ['index:datacenter', '主站·数据中心'], ['index:lootdrop', '主站·副本掉落'], ['index:decor', '主站·家宅图鉴'],
-    ['index:decor-plan', '主站·方案单'], ['index:community', '主站·家宅社区']]
+    ['index:decor-plan', '主站·方案单'], ['index:community', '主站·家宅分享']]
     .map(([v, l]) => `<option value="${v}"${anxState.page === v ? ' selected' : ''}>${l}</option>`).join('');
   const custom = anxState.range === 'custom';
   panel.innerHTML = `

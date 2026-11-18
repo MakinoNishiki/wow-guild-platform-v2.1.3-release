@@ -1,0 +1,3 @@
+/run local d=HousingBlueprintContentListFrame.blueprintContentInfo;assert(d,"Open blueprint list");WBbp203={};for _,g in ipairs(d.contentGroups)do for _,e in ipairs(g.entries)do WBbp203[#WBbp203+1]={g.contentType,e.recordID,e.total}end end
+
+/run local e=CreateFrame("EditBox",nil,UIParent,"InputBoxTemplate");e:SetSize(600,30);e:SetPoint("CENTER");e:SetFrameStrata("TOOLTIP");e:SetText(C_EncodingUtil.SerializeJSON(WBbp203));e:SetFocus();e:HighlightText();e:SetScript("OnEscapePressed",e.Hide)
