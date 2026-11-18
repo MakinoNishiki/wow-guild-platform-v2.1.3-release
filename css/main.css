@@ -4777,6 +4777,16 @@ img.class-icon[src$=".png"] { border-radius: 3px; }
 /* pill 内方案单徽标沿用 .dh-nav-plan-badge（#58 既有类），此处只补水平间距 */
 .ia-pill .dh-nav-plan-badge { margin-left: 2px; }
 
+/* REQ-208：团队、家宅、个人中心共用已选定的暗铁金边图标。 */
+:is(#iaSubnavTeam, #iaSubnavHouse) .ia-pill { gap: 8px; padding-block: 5px; }
+#userCenterModal .uc-tabs > .uc-tab { display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
+.wb-nav-icon { display: block; width: 20px; height: 20px; flex: 0 0 20px; }
+:is(#iaSubnavTeam, #iaSubnavHouse, #userCenterModal) button:is(:hover, :focus-visible) > .wb-nav-icon { filter: brightness(1.12); }
+:is(#iaSubnavTeam, #iaSubnavHouse, #userCenterModal) button.active > .wb-nav-icon { filter: brightness(1.16); }
+@media (max-width: 768px) {
+  #userCenterModal .uc-tabs > .uc-tab { flex-direction: column; padding-inline: 2px; }
+}
+
 /* 顶部栏「用户中心」按钮（侧栏退役后入口；#navNotifDot 通知点宿主迁此，位置改为按钮右上角） */
 .ia-uc-btn {
   position: relative;

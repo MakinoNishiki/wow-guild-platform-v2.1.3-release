@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" role="img">
+  <title>方案单 · 雕刻铜章</title>
+  <defs>
+    <linearGradient id="rim" x1="0.08" y1="0" x2=".78" y2=".98" gradientUnits="objectBoundingBox">
+      <stop stop-color="#f3c991"/><stop offset=".32" stop-color="#bd855a"/><stop offset=".64" stop-color="#6e412e"/><stop offset="1" stop-color="#cd9563"/>
+    </linearGradient>
+    <radialGradient id="face" cx=".34" cy=".18" r=".9">
+      <stop stop-color="#ab7854"/><stop offset=".55" stop-color="#825238"/><stop offset="1" stop-color="#4b3027"/>
+    </radialGradient>
+    <linearGradient id="relief" x1="0" y1="0" x2=".5" y2="1">
+      <stop stop-color="#ffdb9d"/><stop offset=".54" stop-color="#e1a86d"/><stop offset="1" stop-color="#ba8057"/>
+    </linearGradient>
+  </defs>
+  <circle cx="12" cy="12" r="11.45" fill="#35251e"/>
+  <circle cx="12" cy="11.75" r="10.8" fill="url(#face)" stroke="url(#rim)" stroke-width="1.15"/>
+  <path d="M3.4 14.2a8.9 8.9 0 0 0 6.2 6.2" fill="none" stroke="#c48959" stroke-opacity=".64" stroke-width=".6" stroke-linecap="round"/>
+  <path d="M6 4.1h11.4c1.65 0 2.54 1.14 2.55 2.4v1.1h-2.8l-.75 10c-.08 1.22-1.2 2.22-2.5 2.22H6.65a2.88 2.88 0 0 1-2.9-2.92v-1.07h2.3l.65-8.19H4.15v-1.1c0-1.33.69-2.44 1.85-2.44Z" fill="url(#relief)" stroke="#4b2c21" stroke-width="1.15" stroke-linejoin="round"/>
+  <path d="M15.8 5.13q1.65.65 1.49 2.33m-12.4 8.9h8q-.05 1.26 1.14 2.05" fill="none" stroke="#8a5234" stroke-width=".95" stroke-linecap="round"/>
+  <path d="m8.5 8.95 1.05 1.15 2.08-2.3m-3.4 5.02 1.04 1.04 1.99-2.17" fill="none" stroke="#603825" stroke-width="1.45" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="m12.8 9.05 2.15-.05m-2.45 3.75 2.04-.04" fill="none" stroke="#935e3b" stroke-width="1.05" stroke-linecap="round"/>
+</svg>

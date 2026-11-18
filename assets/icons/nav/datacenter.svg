@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" role="img">
+  <title>数据中心 · 暗铁金边</title>
+  <defs>
+    <linearGradient id="steel" x1="0" y1="0" x2=".72" y2="1">
+      <stop stop-color="#7f8a91"/><stop offset=".36" stop-color="#58636e"/><stop offset=".62" stop-color="#35424e"/><stop offset="1" stop-color="#26313c"/>
+    </linearGradient>
+    <linearGradient id="brass" x1="0" y1="0" x2=".65" y2="1">
+      <stop stop-color="#ffde8f"/><stop offset=".42" stop-color="#edbe64"/><stop offset="1" stop-color="#a87539"/>
+    </linearGradient>
+  </defs>
+  <path d="m4.86 1.9 14.4.03 1.3 1.59v17.21l-1.11 1.4H4.64l-1.17-1.29V3.59Z" fill="url(#steel)" stroke="url(#brass)" stroke-width="1.28" stroke-linejoin="bevel"/>
+  <path d="M5.27 4.27H18.8v4.41H5.27Zm0 5.61H18.8v4.4H5.27Zm0 5.61H18.8v4.42H5.27Z" fill="#34414a" stroke="#93948a" stroke-width=".67"/>
+  <path d="M9.36 5.57h5.26v1.42H9.36Zm0 5.62h5.26v1.42H9.36Zm0 5.58h5.26v1.42H9.36Z" fill="url(#brass)"/>
+  <path d="M4.74 2.7h13.97" stroke="#a3a59c" stroke-width=".8"/>
+</svg>

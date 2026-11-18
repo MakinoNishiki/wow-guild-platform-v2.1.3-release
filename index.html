@@ -4,13 +4,13 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>魔兽管家</title>
-<!-- 静态资源版本号：20261119.149（任务书 #22 WP3-②：凡改动 js/css 的 commit 必须同步递增此处与所有 ?v= 查询串，见 docs/开发规范.md 第五章） -->
+<!-- 静态资源版本号：20261119.150（任务书 #22 WP3-②：凡改动 js/css 的 commit 必须同步递增此处与所有 ?v= 查询串，见 docs/开发规范.md 第五章） -->
 <link rel="icon" type="image/png" sizes="32x32" href="assets/brand/favicon-32.png">
 <link rel="icon" type="image/png" sizes="16x16" href="assets/brand/favicon-16.png">
-<link rel="stylesheet" href="css/main.css?v=20261119.149">
-<link rel="stylesheet" href="css/data-public.css?v=20261119.149"><!-- 任务书 #28 WP5：副本掉落 tab（选择器全 .dp- 前缀 + #page-lootdrop 作用域，零泄漏） -->
-<link rel="stylesheet" href="css/decor-public.css?v=20261119.149"><!-- 任务书 #51：家宅图鉴（选择器全 .dh- 前缀，零泄漏，双壳共用） -->
-<script src="assets/vendor/supabase-js-2.js?v=20261119.149"></script>
+<link rel="stylesheet" href="css/main.css?v=20261119.150">
+<link rel="stylesheet" href="css/data-public.css?v=20261119.150"><!-- 任务书 #28 WP5：副本掉落 tab（选择器全 .dp- 前缀 + #page-lootdrop 作用域，零泄漏） -->
+<link rel="stylesheet" href="css/decor-public.css?v=20261119.150"><!-- 任务书 #51：家宅图鉴（选择器全 .dh- 前缀，零泄漏，双壳共用） -->
+<script src="assets/vendor/supabase-js-2.js?v=20261119.150"></script>
 </head>
 <body>
 
@@ -207,20 +207,20 @@
     </div>
     <!-- 团队管理二级导航（任务书 #59 WP1：原侧栏纵向导航 pill 化，数据中心显隐与 #navDatacenter 同步） -->
     <div class="ia-subnav" role="navigation" aria-label="团队管理" id="iaSubnavTeam" style="display:none">
-      <button type="button" class="ia-pill" data-ia-key="dashboard" onclick="iaGoKey('dashboard')">📊 仪表盘</button>
-      <button type="button" class="ia-pill" data-ia-key="members" onclick="iaGoKey('members')">👥 成员管理</button>
-      <button type="button" class="ia-pill" data-ia-key="attendance" onclick="iaGoKey('attendance')">📅 考勤记录</button>
-      <button type="button" class="ia-pill" data-ia-key="loot" onclick="iaGoKey('loot')">⚔️ 装备分配</button>
-      <button type="button" class="ia-pill" data-ia-key="wishlist" onclick="iaGoKey('wishlist')">🎯 心愿单</button>
-      <button type="button" class="ia-pill" data-ia-key="reports" onclick="iaGoKey('reports')">📈 统计报表</button>
-      <button type="button" class="ia-pill" data-ia-key="data" onclick="iaGoKey('data')">💾 数据管理</button>
-      <button type="button" class="ia-pill" data-ia-key="datacenter" id="iaPillDatacenter" style="display:none" onclick="iaGoKey('datacenter')">🗄 数据中心</button>
+      <button type="button" class="ia-pill" data-ia-key="dashboard" onclick="iaGoKey('dashboard')"><img class="wb-nav-icon" src="assets/icons/nav/dashboard.svg" width="20" height="20" alt=""><span>仪表盘</span></button>
+      <button type="button" class="ia-pill" data-ia-key="members" onclick="iaGoKey('members')"><img class="wb-nav-icon" src="assets/icons/nav/members.svg" width="20" height="20" alt=""><span>成员管理</span></button>
+      <button type="button" class="ia-pill" data-ia-key="attendance" onclick="iaGoKey('attendance')"><img class="wb-nav-icon" src="assets/icons/nav/attendance.svg" width="20" height="20" alt=""><span>考勤记录</span></button>
+      <button type="button" class="ia-pill" data-ia-key="loot" onclick="iaGoKey('loot')"><img class="wb-nav-icon" src="assets/icons/nav/loot.svg" width="20" height="20" alt=""><span>装备分配</span></button>
+      <button type="button" class="ia-pill" data-ia-key="wishlist" onclick="iaGoKey('wishlist')"><img class="wb-nav-icon" src="assets/icons/nav/wishlist.svg" width="20" height="20" alt=""><span>心愿单</span></button>
+      <button type="button" class="ia-pill" data-ia-key="reports" onclick="iaGoKey('reports')"><img class="wb-nav-icon" src="assets/icons/nav/reports.svg" width="20" height="20" alt=""><span>统计报表</span></button>
+      <button type="button" class="ia-pill" data-ia-key="data" onclick="iaGoKey('data')"><img class="wb-nav-icon" src="assets/icons/nav/data.svg" width="20" height="20" alt=""><span>数据管理</span></button>
+      <button type="button" class="ia-pill" data-ia-key="datacenter" id="iaPillDatacenter" style="display:none" onclick="iaGoKey('datacenter')"><img class="wb-nav-icon" src="assets/icons/nav/datacenter.svg" width="20" height="20" alt=""><span>数据中心</span></button>
     </div>
     <!-- 家宅房屋二级导航（任务书 #59 WP1；#dhNavPlanBadge 徽标自侧栏 nav-item 整节点迁入，id 唯一、decorData.js 绑定不变） -->
     <div class="ia-subnav" role="navigation" aria-label="家宅房屋" id="iaSubnavHouse" style="display:none">
-      <button type="button" class="ia-pill" data-ia-key="decor" onclick="iaGoKey('decor')">🏠 家宅图鉴</button>
-      <button type="button" class="ia-pill" data-ia-key="decor-plan" onclick="iaGoKey('decor-plan')">🧺 方案单 <span class="dh-nav-plan-badge" id="dhNavPlanBadge" style="display:none">0</span></button>
-      <button type="button" class="ia-pill" data-ia-key="community" onclick="iaGoKey('community')">家宅分享</button>
+      <button type="button" class="ia-pill" data-ia-key="decor" onclick="iaGoKey('decor')"><img class="wb-nav-icon" src="assets/icons/nav/decor.svg" width="20" height="20" alt=""><span>家宅图鉴</span></button>
+      <button type="button" class="ia-pill" data-ia-key="decor-plan" onclick="iaGoKey('decor-plan')"><img class="wb-nav-icon" src="assets/icons/nav/decor-plan.svg" width="20" height="20" alt=""><span>方案单 <span class="dh-nav-plan-badge" id="dhNavPlanBadge" style="display:none">0</span></span></button>
+      <button type="button" class="ia-pill" data-ia-key="community" onclick="iaGoKey('community')"><img class="wb-nav-icon" src="assets/icons/nav/community.svg" width="20" height="20" alt=""><span>家宅分享</span></button>
     </div>
     <!-- 顶部栏 -->
     <header class="topbar">
@@ -2125,13 +2125,11 @@
         </div>
         <!-- 标签页导航 -->
         <div class="uc-tabs">
-          <button class="uc-tab active" data-tab="profile" onclick="switchUserTab('profile')">📝 个人资料</button>
-          <button class="uc-tab" data-tab="password" onclick="switchUserTab('password')">🔒 修改密码</button>
-          <button class="uc-tab" data-tab="characters" onclick="switchUserTab('characters')">⚔️ 我的角色</button>
-          <button class="uc-tab" data-tab="claims" onclick="switchUserTab('claims')">🤝 我的认领</button>
-          <button class="uc-tab" data-tab="notifications" onclick="switchUserTab('notifications')">
-            🔔 通知 <span class="uc-badge" id="notifBadge" style="display:none">0</span>
-          </button>
+          <button class="uc-tab active" data-tab="profile" onclick="switchUserTab('profile')"><img class="wb-nav-icon" src="assets/icons/nav/profile.svg" width="20" height="20" alt=""><span>个人资料</span></button>
+          <button class="uc-tab" data-tab="password" onclick="switchUserTab('password')"><img class="wb-nav-icon" src="assets/icons/nav/password.svg" width="20" height="20" alt=""><span>修改密码</span></button>
+          <button class="uc-tab" data-tab="characters" onclick="switchUserTab('characters')"><img class="wb-nav-icon" src="assets/icons/nav/characters.svg" width="20" height="20" alt=""><span>我的角色</span></button>
+          <button class="uc-tab" data-tab="claims" onclick="switchUserTab('claims')"><img class="wb-nav-icon" src="assets/icons/nav/claims.svg" width="20" height="20" alt=""><span>我的认领</span></button>
+          <button class="uc-tab" data-tab="notifications" onclick="switchUserTab('notifications')"><img class="wb-nav-icon" src="assets/icons/nav/notifications.svg" width="20" height="20" alt=""><span>通知 <span class="uc-badge" id="notifBadge" style="display:none">0</span></span></button>
         </div>
 
         <!-- 个人资料标签页 -->
@@ -2338,21 +2336,21 @@
   </div>
 </div>
 
-<script src="js/cloud.js?v=20261119.149"></script>
+<script src="js/cloud.js?v=20261119.150"></script>
 <!-- 任务书 #14：主数据层（快照兜底 + 加载层），须在 app.js 之前 -->
-<script src="js/masterDataSnapshot.js?v=20261119.149"></script>
-<script src="js/masterData.js?v=20261119.149"></script>
+<script src="js/masterDataSnapshot.js?v=20261119.150"></script>
+<script src="js/masterData.js?v=20261119.150"></script>
 <!-- 任务书 #22 WP2：职业/专精/职责图标集中映射（全站唯一取图处） -->
-<script src="js/iconMap.js?v=20261119.149"></script>
+<script src="js/iconMap.js?v=20261119.150"></script>
 <!-- 任务书 #31（REQ-097）：装备分类词表单一真源（公示页 chips / picker 过滤 / BUG-057 回填三处消费，须在 dataPublic.js 与 app.js 之前） -->
-<script src="js/itemQualityData.js?v=20261119.149"></script>
-<script src="js/lootTaxonomy.js?v=20261119.149"></script>
+<script src="js/itemQualityData.js?v=20261119.150"></script>
+<script src="js/lootTaxonomy.js?v=20261119.150"></script>
 <!-- 任务书 #28 WP5：副本掉落渲染层（双壳同源；无 data-public-body 不自动启动，由 app.js 懒挂载，须在 app.js 之前） -->
-<script src="js/dataPublic.js?v=20261119.149"></script>
+<script src="js/dataPublic.js?v=20261119.150"></script>
 <!-- 任务书 #51（REQ-137 一期）：家宅图鉴词表单一真源（价格/分类/尺寸/来源词表，须在 decorData.js 之前） -->
-<script src="js/decorDict.js?v=20261119.149"></script>
+<script src="js/decorDict.js?v=20261119.150"></script>
 <!-- 任务书 #51：家宅图鉴数据层+渲染层（双壳同源；无 data-decor-body 不自动启动，由 app.js 懒挂载，须在 app.js 之前） -->
-<script src="js/decorData.js?v=20261119.149"></script>
+<script src="js/decorData.js?v=20261119.150"></script>
 <div id="housingBuildEditor" class="modal-overlay">
   <section class="modal" role="dialog" aria-modal="true" aria-labelledby="hbEditorTitle">
     <div class="modal-header"><h2 class="modal-title" id="hbEditorTitle">创建作品</h2><button type="button" class="modal-close" aria-label="关闭" onclick="requestCloseModal('housingBuildEditor')">×</button></div>
@@ -2378,12 +2376,12 @@
     </div></form>
   </section>
 </div>
-<script src="js/housingBuilds.js?v=20261119.149"></script>
-<script src="js/lootEvidence.js?v=20261119.149"></script>
-<script src="js/app.js?v=20261119.149"></script>
-<script src="js/lootWorkflow.js?v=20261119.149"></script>
-<script src="js/personAttendance.js?v=20261119.149"></script>
-<script src="js/lootDetails.js?v=20261119.149"></script>
-<script src="js/track.js?v=20261119.149"></script><!-- 任务书 #54 WP1：全站埋点采集层（REQ-141，零依赖静默兜底） -->
+<script src="js/housingBuilds.js?v=20261119.150"></script>
+<script src="js/lootEvidence.js?v=20261119.150"></script>
+<script src="js/app.js?v=20261119.150"></script>
+<script src="js/lootWorkflow.js?v=20261119.150"></script>
+<script src="js/personAttendance.js?v=20261119.150"></script>
+<script src="js/lootDetails.js?v=20261119.150"></script>
+<script src="js/track.js?v=20261119.150"></script><!-- 任务书 #54 WP1：全站埋点采集层（REQ-141，零依赖静默兜底） -->
 </body>
 </html>

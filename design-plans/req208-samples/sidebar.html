@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>桌面侧栏 · 原寸选稿</title>
+  <link rel="stylesheet" href="../../css/main.css">
+  <style>
+    /* Preserve the normal rail row height with a 20px image instead of a text glyph. */
+    #mainContent > .ia-subnav button.with-sample { gap:8px; padding-block:5px; }
+    .with-sample img { width:20px; height:20px; flex:0 0 20px; }
+    .with-sample:hover img, .with-sample:focus-visible img { filter:brightness(1.12); }
+    .with-sample.active img { filter:brightness(1.16); }
+    /* The sample frame begins at the rail edge, below the live masthead. */
+    #mainContent { padding:0; }
+    #mainContent > .ia-subnav { min-height:100vh; }
+    html,body { overflow:hidden; }
+  </style>
+</head>
+<body>
+  <!-- Both navigation fragments are from index.html at d71b58f. This review page owns clicks. -->
+  <main class="main-content" id="mainContent">
+<div class="ia-subnav" role="navigation" aria-label="家宅房屋" id="iaSubnavHouse" style="display:none">
+      <button type="button" class="ia-pill" data-ia-key="decor">🏠 家宅图鉴</button>
+      <button type="button" class="ia-pill" data-ia-key="decor-plan">🧺 方案单 <span class="dh-nav-plan-badge" id="dhNavPlanBadge" style="display:none">0</span></button>
+      <button type="button" class="ia-pill" data-ia-key="community">家宅分享</button>
+    </div>
+<div class="ia-subnav" role="navigation" aria-label="团队管理" id="iaSubnavTeam" style="display:none">
+      <button type="button" class="ia-pill" data-ia-key="dashboard">📊 仪表盘</button>
+      <button type="button" class="ia-pill" data-ia-key="members">👥 成员管理</button>
+      <button type="button" class="ia-pill" data-ia-key="attendance">📅 考勤记录</button>
+      <button type="button" class="ia-pill" data-ia-key="loot">⚔️ 装备分配</button>
+      <button type="button" class="ia-pill" data-ia-key="wishlist">🎯 心愿单</button>
+      <button type="button" class="ia-pill" data-ia-key="reports">📈 统计报表</button>
+      <button type="button" class="ia-pill" data-ia-key="data">💾 数据管理</button>
+      <button type="button" class="ia-pill" data-ia-key="datacenter" id="iaPillDatacenter" style="display:none">🗄 数据中心</button>
+    </div>
+  </main>
+  <script>
+    const params = new URLSearchParams(location.search);
+    const team = params.get('area') === 'team';
+    const material = params.get('material') === 'iron' ? 'iron' : 'bronze';
+    const rail = document.getElementById(team ? 'iaSubnavTeam' : 'iaSubnavHouse');
+    document.getElementById('mainContent').dataset.workspace = team ? 'team' : 'house';
+    const assets = {
+      decor:['decor','家宅图鉴'], 'decor-plan':['plan','方案单'],
+      community:['community','家宅分享'], loot:['loot','装备分配']
+    };
+    for (const button of rail.querySelectorAll('.ia-pill')) {
+      const key = button.dataset.iaKey;
+      if (assets[key]) {
+        const [file, label] = assets[key];
+        const icon = document.createElement('img');
+        icon.src = 'icons/' + material + '-' + file + '.svg';
+        icon.alt = '';
+        button.firstChild.replaceWith(icon, document.createTextNode(label));
+        button.classList.add('with-sample');
+      }
+      button.addEventListener('click', () => {
+        select(key);
+        parent.postMessage({type:'select-nav', key}, '*');
+      });
+    }
+    function select(key) {
+      for (const button of rail.querySelectorAll('.ia-pill')) {
+        const active = button.dataset.iaKey === key;
+        button.classList.toggle('active', active);
+        if (active) button.setAttribute('aria-current','page');
+        else button.removeAttribute('aria-current');
+      }
+    }
+    addEventListener('message', event => {
+      if (event.source === parent && event.data?.type === 'show-nav') select(event.data.key);
+    });
+    rail.style.display = 'flex';
+    select(team ? 'loot' : 'community');
+  </script>
+</body>
+</html>

@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" role="img">
+  <title>方案单 · 暗铁金边</title>
+  <defs>
+    <linearGradient id="steel" x1="0" y1="0" x2=".72" y2="1">
+      <stop stop-color="#7f8a91"/><stop offset=".36" stop-color="#58636e"/><stop offset=".62" stop-color="#35424e"/><stop offset="1" stop-color="#26313c"/>
+    </linearGradient>
+    <linearGradient id="brass" x1="0" y1="0" x2=".65" y2="1">
+      <stop stop-color="#ffde8f"/><stop offset=".42" stop-color="#edbe64"/><stop offset="1" stop-color="#a87539"/>
+    </linearGradient>
+  </defs>
+  <path d="M5.6 2.35h14.23l2.32 2.3-.48 2.65h-3.08l-1.05 12.02-2.29 2.27H3.93l-2.11-2.45.4-3.15h2.54l.95-9.56H2.9l.22-2.2Z" fill="url(#steel)" stroke="url(#brass)" stroke-width="1.35" stroke-linejoin="bevel"/>
+  <path d="m17.15 3.1 2.44 2.24-.17 1.48h2.02l.19-1.96-1.85-1.76Z" fill="#a1a6a4"/>
+  <path d="m6.79 4.22 9.82-.04-1.26 12.05H5.61Z" fill="#303c49"/>
+  <path d="m2.82 16.55 10.26.02 2.45 3.17 1.5-1.34" fill="none" stroke="#f0c575" stroke-width="1.08" stroke-linejoin="bevel"/>
+  <path d="m7.5 7.74 1.16 1.25 2.48-2.67m-3.99 6.35 1.12 1.26 2.48-2.71" fill="none" stroke="#ffda81" stroke-width="1.6" stroke-linecap="square" stroke-linejoin="bevel"/>
+  <path d="m12.25 7.79 2.65-.04m-3.02 4.8 2.6-.02" fill="none" stroke="#b4b9b4" stroke-width="1.15"/>
+  <path d="M4.23 18.97h7.44" fill="none" stroke="#a5a6a0" stroke-width=".7"/>
+</svg>

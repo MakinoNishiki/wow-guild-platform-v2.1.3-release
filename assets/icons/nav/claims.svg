@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" role="img">
+  <title>我的认领 · 暗铁金边</title>
+  <defs>
+    <linearGradient id="steel" x1="0" y1="0" x2=".72" y2="1">
+      <stop stop-color="#7f8a91"/><stop offset=".36" stop-color="#58636e"/><stop offset=".62" stop-color="#35424e"/><stop offset="1" stop-color="#26313c"/>
+    </linearGradient>
+    <linearGradient id="brass" x1="0" y1="0" x2=".65" y2="1">
+      <stop stop-color="#ffde8f"/><stop offset=".42" stop-color="#edbe64"/><stop offset="1" stop-color="#a87539"/>
+    </linearGradient>
+  </defs>
+  <path d="m10.32 7.7 4.45-4.4a4.55 4.55 0 0 1 6.44 6.43l-4.45 4.4a4.55 4.55 0 0 1-7.06-5.6l1.76 1.01a2.55 2.55 0 0 0 3.86 3.17l4.45-4.42a2.51 2.51 0 0 0-3.55-3.55l-4.45 4.4Z" fill="url(#steel)" stroke="url(#brass)" stroke-width="1.18" stroke-linejoin="round"/>
+  <path d="M14.1 15.8 9.55 20.3a4.55 4.55 0 0 1-6.47-6.41l4.5-4.48a4.54 4.54 0 0 1 7 .95l-1.83 1.01a2.49 2.49 0 0 0-3.73-.55L4.54 15.3a2.51 2.51 0 0 0 3.54 3.55l4.47-4.47Z" fill="url(#steel)" stroke="url(#brass)" stroke-width="1.18" stroke-linejoin="round"/>
+  <path d="m16.33 3.83 1.05-.46 1.01.07m-14.64 12.6.59-1.06 2.12-2.09" fill="none" stroke="#a5b2b1" stroke-width=".7" stroke-linecap="round"/>
+</svg>

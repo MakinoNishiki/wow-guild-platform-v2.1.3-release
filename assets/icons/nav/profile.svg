@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" role="img">
+  <title>个人资料 · 暗铁金边</title>
+  <defs>
+    <linearGradient id="steel" x1="0" y1="0" x2=".72" y2="1">
+      <stop stop-color="#7f8a91"/><stop offset=".36" stop-color="#58636e"/><stop offset=".62" stop-color="#35424e"/><stop offset="1" stop-color="#26313c"/>
+    </linearGradient>
+    <linearGradient id="brass" x1="0" y1="0" x2=".65" y2="1">
+      <stop stop-color="#ffde8f"/><stop offset=".42" stop-color="#edbe64"/><stop offset="1" stop-color="#a87539"/>
+    </linearGradient>
+  </defs>
+  <path d="m2.3 5.36 1.49-1.54h16.34l1.63 1.65v13.64l-1.55 1.38H3.68L2.3 19.26Z" fill="url(#steel)" stroke="url(#brass)" stroke-width="1.36" stroke-linejoin="bevel"/>
+  <path d="M9.24 3.27 10.21 1.8h3.47l1.12 1.47v2.68H9.24Z" fill="#58636c" stroke="#dcaf68" stroke-width=".98" stroke-linejoin="bevel"/>
+  <path d="M10.68 3.72h2.66" stroke="#242f38" stroke-width="1.08" stroke-linecap="round"/>
+  <path d="M4.19 7.42h8.68v10.24H4.19Z" fill="#2c3943" stroke="#8f8e80" stroke-width=".58"/>
+  <path d="m6.95 8.97.86-.82 1.64.04.8.92-.1 1.65-.88 1.35-1.27.07-.98-1.32Z" fill="#d9b77c"/>
+  <path d="m4.97 15.27.68-1.36 1.57-.84 1.31.72 1.42-.69 1.58.96.59 1.36v.73H4.97Z" fill="#c4a578"/>
+  <path d="M14.5 9.49h4.83m-4.83 3.8h4" stroke="#d9be84" stroke-width="1.25"/>
+  <path d="m18.54 16.41.7.84-.7.86-.75-.86Z" fill="#c5a26c"/>
+</svg>

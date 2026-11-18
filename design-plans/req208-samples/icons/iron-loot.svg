@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" role="img">
+  <title>装备分配 · 暗铁金边</title>
+  <defs>
+    <linearGradient id="steel" x1="0" y1="0" x2=".72" y2="1">
+      <stop stop-color="#7f8a91"/><stop offset=".36" stop-color="#58636e"/><stop offset=".62" stop-color="#35424e"/><stop offset="1" stop-color="#26313c"/>
+    </linearGradient>
+    <linearGradient id="brass" x1="0" y1="0" x2=".65" y2="1">
+      <stop stop-color="#ffde8f"/><stop offset=".42" stop-color="#edbe64"/><stop offset="1" stop-color="#a87539"/>
+    </linearGradient>
+  </defs>
+  <path d="m9.35 2.45 7.77 3.21-.76 7.98-2.04 3.23-4.96 3.69-5.08-3.69-2.15-3.23-.63-7.98Z" fill="url(#steel)" stroke="url(#brass)" stroke-width="1.4" stroke-linejoin="bevel"/>
+  <path d="m9.36 4.4 5.7 2.35-.52 5.96-1.58 2.63-3.58 2.78Z" fill="#2c3540"/>
+  <path d="m3.43 6.5 5.88-2.38v2.63L5.3 8.23l.42 4.41-1.7 1.08Z" fill="#859095"/>
+  <path d="m9.36 4.05.03 13.84" stroke="#ad9362" stroke-width=".88"/>
+  <path d="m7.45 15.76 10.5-11.03 4.13-1.59-1.04 4.42L10.17 18.5Z" fill="url(#brass)" stroke="#322f2d" stroke-width=".95" stroke-linejoin="bevel"/>
+  <path d="m9.55 15.94 9.06-9.68 2.16-1.84-1.05 2.8-9.22 9.53Z" fill="#cdd0bd"/>
+  <path d="m8.43 16.83-4.1 4.16.65 1.12 1.17.24 4.16-4.1Z" fill="url(#steel)" stroke="#d0aa69" stroke-width="1" stroke-linejoin="bevel"/>
+  <path d="m6.21 14.3.52-1.57 2.04.84 4.39 4.22.87 2.01-1.5.54-1.13-1.79-3.34-3.25Z" fill="url(#brass)" stroke="#382f25" stroke-width=".9" stroke-linejoin="bevel"/>
+</svg>

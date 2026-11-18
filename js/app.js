@@ -9125,6 +9125,10 @@ function lootFillAssignedTo(idOrName) {
 // ==================== 初始化 ====================
 // ==================== 更新日志 ====================
 const changelogData = [
+  {id:'req208-icons',version:'v3.2.0',date:'2026-11-19',type:'feature',typeLabel:'新增功能',title:'家宅分享入口新增炉石屋徽',summary:'家宅侧栏以屋顶、烟囱和炉石回纹标记装修作品入口。',details:[]},
+  {id:'req208-nav',version:'v3.2.0',date:'2026-11-19',type:'improve',typeLabel:'功能优化',title:'团队、家宅和用户中心统一导航图标',summary:'16 个入口采用暗铁金边图标，文字与图标对齐，悬浮和选中时提亮。',details:[]},
+  {id:'req208-align',version:'v3.2.0',date:'2026-11-19',type:'fix',typeLabel:'修复BUG',title:'家宅分享文字与同栏入口对齐',summary:'补齐家宅分享缺失的图位后，三个家宅入口的名称从同一位置开始。',details:[]},
+  {id:'req208-character',version:'v3.2.0',date:'2026-11-19',type:'refactor',typeLabel:'模块调整',title:'区分角色与装备入口',summary:'用户中心的「我的角色」使用头盔，团队的「装备分配」使用剑盾。',details:[]},
   {id:'req203-card-album',version:'v3.2.0',date:'2026-11-19',type:'feature',typeLabel:'新增功能',title:'家宅作品卡片支持直接翻图',summary:'卡片初始显示作者选定的封面，点击左右两侧或横向拖动可浏览其他装修截图。',details:[]},
   {id:'req203-eight-photos',version:'v3.2.0',date:'2026-11-19',type:'improve',typeLabel:'功能优化',title:'每件家宅作品可配八张截图',summary:'每张原图上限提高至 20 MB。点击缩略图可原位更换，编辑器会标记待保存的图片。',details:[]},
   {id:'req203-explicit-copy',version:'v3.2.0',date:'2026-11-19',type:'fix',typeLabel:'修复BUG',title:'浏览装修时隐藏蓝图原码',summary:'作者开放复制后，访客在作品详情点击按钮即可将蓝图码写入剪贴板。',details:[]},

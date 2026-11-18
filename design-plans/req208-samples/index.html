@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>导航图标选稿 · 魔兽管家</title>
+  <link rel="icon" href="../../assets/brand/favicon-32.png">
+  <link rel="stylesheet" href="../../css/main.css">
+  <style>
+    body { color-scheme:dark; margin:0; background:#10151b; }
+    .sheet { max-width:920px; margin:0 auto; padding:32px 24px; }
+    .final-proof { margin:20px 0; overflow:auto; background:#10151b; }
+    .final-proof img { display:block; max-width:none; margin:0 auto; }
+    .drafts > summary { color:var(--gold); cursor:pointer; padding:12px 0; }
+    .mast { display:flex; align-items:center; gap:14px; padding-bottom:18px; border-bottom:1px solid var(--border-color); }
+    .mast img { width:34px; height:34px; }
+    h1 { font-size:24px; letter-spacing:.5px; color:var(--text-primary); }
+    .instruction { margin:14px 0 22px; font-size:13px; line-height:1.6; color:#aeb9c3; }
+    #housingReference { margin-bottom:20px; border:1px solid #41474c; border-radius:7px; padding:16px 18px; background:#191e24; }
+    #housingReference h2 { margin:0 0 14px; color:#e7dfcf; font-size:16px; }
+    .mark-compare { display:grid; grid-template-columns:minmax(80px,auto) repeat(3,1fr); align-items:center; justify-items:center; gap:10px 6px; text-align:center; }
+    .mark-compare b { color:#d8d9d6; font-size:13px; font-weight:600; }
+    .mark-compare span { justify-self:start; color:#acb5be; font-size:12px; }
+    .mark-compare img { display:block; }
+    .pair { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:18px; }
+    .sample { --edge:#a7764f; --tone:#e2b384; --wash:#352820; margin:0; border:1px solid #424347; border-top:2px solid var(--edge); border-radius:7px; background:#191e24; overflow:hidden; }
+    .sample.iron { --edge:#bca055; --tone:#e4cd8d; --wash:#252b32; }
+    .material { padding:15px 17px; display:flex; gap:10px; align-items:center; background:linear-gradient(105deg,var(--wash),#1a1f25 85%); }
+    .letter { display:grid; place-items:center; width:25px; height:25px; color:var(--tone); border:1px solid var(--edge); border-radius:3px; font:600 15px Georgia,serif; }
+    h2 { font:600 19px/1.4 'Microsoft YaHei',sans-serif; }
+    .rails { display:grid; grid-template-columns:repeat(2,176px); justify-content:space-evenly; gap:6px; padding:12px 5px 16px; }
+    .rails h3 { color:#aeb9c3; font:500 12px/1.5 'Microsoft YaHei',sans-serif; margin:0 0 7px 1px; }
+    .viewport { width:176px; height:312px; overflow:clip; outline:1px solid #30363d; background:var(--bg-secondary); }
+    .viewport iframe { border:0; display:block; width:1366px; height:312px; }
+    .details { margin:0 14px 14px; padding:12px 0 4px; border-top:1px solid #363d45; }
+    .details > p { margin:0 0 14px; color:#9ba7b0; font-size:12px; }
+    .detail-grid { display:grid; grid-template-columns:repeat(4,1fr); }
+    figure { margin:0; text-align:center; }
+    figure img { display:block; width:60px; height:60px; margin:0 auto; }
+    figcaption { margin-top:8px; color:#c9d2d9; font-size:12px; }
+    @media (max-width:835px) {
+      .sheet { max-width:455px; padding:20px 10px; }
+      .pair { grid-template-columns:1fr; }
+    }
+    @media (max-width:378px) {
+      .sheet { padding-inline:4px; min-width:368px; }
+      .rails { gap:2px; padding-inline:2px; }
+    }
+  </style>
+</head>
+<body>
+  <main class="sheet">
+    <header class="mast"><img src="../../assets/brand/logo_B_64.png" alt="魔兽管家"><h1>暗铁金边 · 导航图标验收</h1></header>
+    <div class="final-proof"><img src="navigation-20px.png" alt="团队管理八项、家宅房屋三项、用户中心五个页签的原寸界面截图，图标均为 20 像素"></div>
+    <details class="drafts"><summary>查看最初四枚样张与游戏原图</summary>
+    <p class="instruction">侧栏图标为 20 × 20 像素。点击任一导航项，两版会同步显示选中效果。</p>
+    <section id="housingReference" aria-labelledby="markTitle">
+      <h2 id="markTitle">家宅分享 · 原图对照</h2>
+      <div class="mark-compare">
+        <span></span><b>游戏原图</b><b>A · 雕刻铜章</b><b>B · 暗铁金边</b>
+        <span>侧栏原寸</span>
+        <img width="20" height="20" src="homestone-reference.png" alt="国服家宅传送图标，20 像素">
+        <img width="20" height="20" src="icons/bronze-community.svg" alt="雕刻铜章，20 像素">
+        <img width="20" height="20" src="icons/iron-community.svg" alt="暗铁金边，20 像素">
+        <span>3 倍细节</span>
+        <img width="60" height="60" src="homestone-reference.png" alt="">
+        <img width="60" height="60" src="icons/bronze-community.svg" alt="">
+        <img width="60" height="60" src="icons/iron-community.svg" alt="">
+      </div>
+    </section>
+    <div class="pair" id="samples"></div>
+    </details>
+  </main>
+  <template id="sample">
+    <section class="sample">
+      <header class="material"><span class="letter"></span><h2></h2></header>
+      <div class="rails"></div>
+      <section class="details"><p>3 倍细节</p><div class="detail-grid"></div></section>
+    </section>
+  </template>
+  <script>
+    const works = [['decor','家宅图鉴'],['plan','方案单'],['community','家宅分享'],['loot','装备分配']];
+    const modules = [['house','家宅房屋'],['team','团队管理']];
+    const families = [['bronze','A','雕刻铜章'],['iron','B','暗铁金边']];
+    const frames = [];
+    for (const [material, letter, name] of families) {
+      const card = document.getElementById('sample').content.firstElementChild.cloneNode(true);
+      card.classList.add(material);
+      card.querySelector('.letter').textContent = letter;
+      card.querySelector('h2').textContent = name;
+      for (const [area, label] of modules) {
+        const group = document.createElement('section');
+        const title = document.createElement('h3');
+        title.textContent = label;
+        const viewport = document.createElement('div');
+        viewport.className = 'viewport';
+        const frame = document.createElement('iframe');
+        frame.dataset.area = area;
+        frame.title = name + ' · ' + label + '原寸侧栏';
+        frame.src = 'sidebar.html?material=' + material + '&area=' + area;
+        frames.push(frame);
+        viewport.append(frame);
+        group.append(title, viewport);
+        card.querySelector('.rails').append(group);
+      }
+      for (const [key, label] of works) {
+        const figure = document.createElement('figure');
+        const image = document.createElement('img');
+        image.src = 'icons/' + material + '-' + key + '.svg';
+        image.alt = '';
+        const caption = document.createElement('figcaption');
+        caption.textContent = label;
+        figure.append(image, caption);
+        card.querySelector('.detail-grid').append(figure);
+      }
+      document.getElementById('samples').append(card);
+    }
+    window.addEventListener('message', event => {
+      const source = frames.find(frame => frame.contentWindow === event.source);
+      if (!source || event.data?.type !== 'select-nav' || typeof event.data.key !== 'string') return;
+      for (const frame of frames.filter(frame => frame.dataset.area === source.dataset.area)) {
+        frame.contentWindow.postMessage({type:'show-nav', key:event.data.key}, '*');
+      }
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" role="img">
+  <title>装备分配 · 雕刻铜章</title>
+  <defs>
+    <linearGradient id="rim" x1="0.08" y1="0" x2=".78" y2=".98" gradientUnits="objectBoundingBox">
+      <stop stop-color="#f3c991"/><stop offset=".32" stop-color="#bd855a"/><stop offset=".64" stop-color="#6e412e"/><stop offset="1" stop-color="#cd9563"/>
+    </linearGradient>
+    <radialGradient id="face" cx=".34" cy=".18" r=".9">
+      <stop stop-color="#ab7854"/><stop offset=".55" stop-color="#825238"/><stop offset="1" stop-color="#4b3027"/>
+    </radialGradient>
+    <linearGradient id="relief" x1="0" y1="0" x2=".5" y2="1">
+      <stop stop-color="#ffdb9d"/><stop offset=".54" stop-color="#e1a86d"/><stop offset="1" stop-color="#ba8057"/>
+    </linearGradient>
+  </defs>
+  <circle cx="12" cy="12" r="11.45" fill="#35251e"/>
+  <circle cx="12" cy="11.75" r="10.8" fill="url(#face)" stroke="url(#rim)" stroke-width="1.15"/>
+  <path d="M3.4 14.2a8.9 8.9 0 0 0 6.2 6.2" fill="none" stroke="#c48959" stroke-opacity=".64" stroke-width=".6" stroke-linecap="round"/>
+  <path d="M10.2 4.28c2.32 1.24 4.02 1.68 7.12 1.88l-.33 5.18c-.15 3.15-2.74 6.16-6.7 8.29-3.97-2.2-6.47-4.9-6.8-8.15l-.42-5.23c2.82-.18 5.09-.83 7.13-1.97Z" fill="url(#relief)" stroke="#513425" stroke-width="1.1" stroke-linejoin="round"/>
+  <path d="M5.05 7.58q2.9-.3 5.12-1.5v11.18c-2.78-1.96-4.65-3.81-4.91-6.22Z" fill="#996744"/>
+  <path d="M6.18 8.46q2.02-.21 3.1-.86" fill="none" stroke="#edba83" stroke-width=".84" stroke-linecap="round"/>
+  <g stroke="#5b3624" stroke-width="1" stroke-linejoin="round">
+    <path d="m8.55 15.1 9.4-9.4 3.35-1.2-1.05 3.56-9.36 9.31Z" fill="url(#relief)"/>
+    <path d="m5.45 19.48 3.7-4.4 1.32 1.38-3.81 4.07Z" fill="#d1a16e"/>
+    <path d="m6.9 13.78.98-.99 5.05 4.54-1.11 1.14Z" fill="#f3c18c"/>
+  </g>
+  <path d="m11.2 14.3 8.35-8.3" fill="none" stroke="#fff0c5" stroke-width=".78" stroke-linecap="round"/>
+</svg>

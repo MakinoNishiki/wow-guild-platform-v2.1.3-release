@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" role="img">
+  <title>家宅分享 · 暗铁金边</title>
+  <defs>
+    <linearGradient id="steel" x1="0" y1="0" x2=".72" y2="1">
+      <stop stop-color="#7f8a91"/><stop offset=".36" stop-color="#58636e"/><stop offset=".62" stop-color="#35424e"/><stop offset="1" stop-color="#26313c"/>
+    </linearGradient>
+    <linearGradient id="brass" x1="0" y1="0" x2=".65" y2="1">
+      <stop stop-color="#ffde8f"/><stop offset=".42" stop-color="#edbe64"/><stop offset="1" stop-color="#a87539"/>
+    </linearGradient>
+  </defs>
+  <path d="m1.22 8.74 9.63-6.85 1.21.01 5.05 2.85V1.95l1.97.28.15 4.07 3.64 3.06.03 1.16-.85 1.12-.11 6.84.41 1.51-.83.67-1.65-.05-.34-.76.38-1.47.04-7.13.41-1.04-2.77-2.35-6.35-3.48L3.7 9.62l.19 1.05.06 7.65.53 1.75-.88.64-1.52-.23-.49-.94.33-1.42-.09-7.26-.61-.92Z" fill="url(#steel)" stroke="url(#brass)" stroke-width=".88" stroke-linejoin="bevel"/>
+  <path d="m2.05 8.68 9.09-6.44 1.11-.02 2.26 1.36-2.87-.59Z" fill="#c3b79b"/>
+  <path d="m17.59 2.49 1.07.14.13 3.22-.88-.38Z" fill="#a2a59b"/>
+  <path d="m20.78 10.68.52.12-.08 7.19-.52 1.37Z" fill="#83909b"/>
+  <path d="m9.19 21.76 2.56-1.1 2.29-1.62 1.36-2.03.39-2.01-.77-2.13-2.22-2.08-1.02-.17-2.68 1.88-.12 1.31 1.37 1.2 1.43-1.22.61.33-.43 1.07-1.44 1.71-1.14.11-2.38-2.1-.23-2.91 4.22-3.17 1.4-.23 1.66.93 2.32 2.36 1.23 2.79-.38 2.82-1.64 2.65-3.31 1.75-2.31.58Z" fill="url(#steel)" stroke="url(#brass)" stroke-width=".8" stroke-linejoin="bevel"/>
+  <path d="m7.07 12.08 4.17-3.06 1.1-.16 1.25.76-2.02-.08Z" fill="#a1a6a4"/>
+  <path d="m12.33 20.96 2.76-1.56 1.38-1.95-.94 2.16Z" fill="#b3b4aa"/>
+</svg>

@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" role="img">
+  <title>考勤记录 · 暗铁金边</title>
+  <defs>
+    <linearGradient id="steel" x1="0" y1="0" x2=".72" y2="1">
+      <stop stop-color="#7f8a91"/><stop offset=".36" stop-color="#58636e"/><stop offset=".62" stop-color="#35424e"/><stop offset="1" stop-color="#26313c"/>
+    </linearGradient>
+    <linearGradient id="brass" x1="0" y1="0" x2=".65" y2="1">
+      <stop stop-color="#ffde8f"/><stop offset=".42" stop-color="#edbe64"/><stop offset="1" stop-color="#a87539"/>
+    </linearGradient>
+  </defs>
+  <path d="M4.2 3.95h14.45l2 2v14.46l-1.53 1.3H4.18l-1.24-1.27V5.41Z" fill="url(#steel)" stroke="url(#brass)" stroke-width="1.38" stroke-linejoin="bevel"/>
+  <path d="M6.14 7.57h12.02v11.74H6.14Z" fill="#35414a" stroke="#9d9073" stroke-width=".82"/>
+  <path d="M6 3.03v3.23m4.05-3.23v3.23m4.07-3.23v3.23m3.88-3.23v3.23" fill="none" stroke="#242d34" stroke-width="2.7" stroke-linecap="round"/>
+  <path d="M6 2.4v3.25m4.05-3.25v3.25m4.07-3.25v3.25M18 2.4v3.25" fill="none" stroke="#e5be78" stroke-width="1.36" stroke-linecap="round"/>
+  <path d="m7.65 13.54 2.9 2.97 5.73-6.36" fill="none" stroke="url(#brass)" stroke-width="2.27" stroke-linejoin="bevel"/>
+  <path d="M5.43 20.22h12.35" fill="none" stroke="#9aa099" stroke-width=".7"/>
+</svg>

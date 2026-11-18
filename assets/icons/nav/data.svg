@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" role="img">
+  <title>数据管理 · 暗铁金边</title>
+  <defs>
+    <linearGradient id="steel" x1="0" y1="0" x2=".72" y2="1">
+      <stop stop-color="#7f8a91"/><stop offset=".36" stop-color="#58636e"/><stop offset=".62" stop-color="#35424e"/><stop offset="1" stop-color="#26313c"/>
+    </linearGradient>
+    <linearGradient id="brass" x1="0" y1="0" x2=".65" y2="1">
+      <stop stop-color="#ffde8f"/><stop offset=".42" stop-color="#edbe64"/><stop offset="1" stop-color="#a87539"/>
+    </linearGradient>
+  </defs>
+  <path d="m1.57 10.34 1.46-4.69 2.68-1.72h12.77l2.67 1.72 1.31 4.69v8.59l-1.55 1.54H3.1l-1.53-1.54Z" fill="url(#steel)" stroke="url(#brass)" stroke-width="1.35" stroke-linejoin="bevel"/>
+  <path d="M3.88 6.3 5.89 5.1h12.29l1.69 1.2Z" fill="#8f9c9f"/>
+  <path d="M2.26 11.25H21.8v2.08H2.26Z" fill="#243039"/>
+  <path d="M5.68 4.91h1.8l-.83 5.42H4.81Zm10.63 0h1.78l1.02 5.42h-1.84Z" fill="#c59c5c"/>
+  <path d="m9.41 10.03.81-.77h3.56l.83.77v4.52l-2.53 1.77-2.67-1.77Z" fill="url(#brass)" stroke="#3b362c" stroke-width=".75" stroke-linejoin="bevel"/>
+  <path d="M11.99 11.05v2.42" fill="none" stroke="#41403a" stroke-width="1.18" stroke-linecap="round"/>
+  <path d="M2.37 16.89h2.09l.1 2.75H3.18l-.81-.84Zm17.26 0h2.1v1.92l-.81.83h-1.28Z" fill="#b09464"/>
+</svg>

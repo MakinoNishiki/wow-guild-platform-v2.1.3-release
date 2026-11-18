@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" role="img">
+  <title>统计报表 · 暗铁金边</title>
+  <defs>
+    <linearGradient id="steel" x1="0" y1="0" x2=".72" y2="1">
+      <stop stop-color="#7f8a91"/><stop offset=".36" stop-color="#58636e"/><stop offset=".62" stop-color="#35424e"/><stop offset="1" stop-color="#26313c"/>
+    </linearGradient>
+    <linearGradient id="brass" x1="0" y1="0" x2=".65" y2="1">
+      <stop stop-color="#ffde8f"/><stop offset=".42" stop-color="#edbe64"/><stop offset="1" stop-color="#a87539"/>
+    </linearGradient>
+  </defs>
+  <path d="M1.45 19.54h21.1v2H1.45Z" fill="#67747d" stroke="url(#brass)" stroke-width="1.05" stroke-linejoin="bevel"/>
+  <path d="M2.64 12.91h4.24v6.47H2.64Z" fill="url(#steel)" stroke="url(#brass)" stroke-width="1.21" stroke-linejoin="bevel"/>
+  <path d="M9.51 8.68h4.32v10.7H9.51Z" fill="url(#steel)" stroke="url(#brass)" stroke-width="1.21" stroke-linejoin="bevel"/>
+  <path d="M16.61 2.24h4.35v17.14h-4.35Z" fill="url(#steel)" stroke="url(#brass)" stroke-width="1.21" stroke-linejoin="bevel"/>
+  <path d="M3.27 13.64h2.99v1.31H3.27Zm6.9-4.21h3.04v1.3h-3.04Zm7.1-6.42h3.05v1.34h-3.05Z" fill="#b4b4a6"/>
+</svg>
