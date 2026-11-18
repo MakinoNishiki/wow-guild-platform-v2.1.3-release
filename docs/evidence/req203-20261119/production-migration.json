@@ -1,0 +1,29 @@
+{
+  "migrationHash": "e5831558d75ad82dd29494fd880fab3cdc9994e8f7cf9b6df4e4877a78f31049",
+  "commit": "4877b744e91e1e7ea259b9525e3f624b0bb3a0bb",
+  "before": {
+    "table": false,
+    "gallery": false,
+    "function": false,
+    "accounts": true,
+    "cart": true,
+    "version": "17.6"
+  },
+  "backup": {
+    "path": "/root/wowbutler-backups/req203-20261118162901/public-auth-before.dump",
+    "bytes": 1017316,
+    "sha256": "b7bf62423827e9891195b1d681492c0fbff4fec40b5005709a93bab81d125c4b",
+    "archiveListVerified": true
+  },
+  "committed": true,
+  "after": {
+    "table": true,
+    "gallery": true,
+    "function": true,
+    "accounts": true,
+    "cart": true,
+    "version": "17.6"
+  },
+  "scope": "已部署版本的 SQL49。在生产库迁移前检查作品表、视图和函数均不存在，事务内检查初始空表与权限。",
+  "archiveLocation": "仅保留在生产机，已核验备份可列出 auth.users 数据项。"
+}
