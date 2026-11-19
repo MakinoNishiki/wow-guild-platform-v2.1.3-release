@@ -89,7 +89,7 @@ window.HousingBuilds = (() => {
       picker.type = 'file';
       picker.accept = byId('hbPhotos').accept;
       picker.hidden = true;
-      picker.onchange = () => selectPhotos(picker, index);
+      picker.onchange = () => readPhotoInput(picker, index);
       const replace = button('', () => picker.click());
       replace.className = 'hb-replace';
       replace.setAttribute('aria-label', '更换第 ' + (index + 1) + ' 张截图');
@@ -111,18 +111,27 @@ window.HousingBuilds = (() => {
     });
     byId('hbPhotoStatus').textContent = [editor.photos.length ? '已选 ' + editor.photos.length + ' / ' + maxPhotos + ' 张' : '', message].filter(Boolean).join(' · ');
   }
-  async function selectPhotos(input, replaceAt = null) {
-    const context = editor;
+  function readPhotoInput(input, replaceAt = null) {
     const files = Array.from(input.files);
     input.value = '';
-    if (!context || context.preparing || !files.length) return;
+    selectPhotos(files, replaceAt);
+  }
+  async function selectPhotos(files, replaceAt = null) {
+    const context = editor;
+    if (!context || saving || !files.length) return;
     const error = byId('hbFormError');
-    error.textContent = '';
-    if (replaceAt === null && context.photos.length + files.length > maxPhotos) {
+    if (replaceAt === null && context.photos.length + context.processingCount +
+        context.queuedPhotos.reduce((count, batch) => count + batch.length, 0) + files.length > maxPhotos) {
       error.textContent = '每个作品最多 8 张截图，请减少所选图片或点击已有截图更换。';
       return;
     }
+    if (context.preparing) {
+      if (replaceAt === null) context.queuedPhotos.push(files);
+      return;
+    }
+    error.textContent = '';
     context.preparing = true;
+    context.processingCount = replaceAt === null ? files.length : 0;
     byId('hbPhotoStatus').textContent = replaceAt === null ? '正在处理截图…' : '正在更换第 ' + (replaceAt + 1) + ' 张截图…';
     setEditorControls();
     let message = '';
@@ -142,10 +151,12 @@ window.HousingBuilds = (() => {
       }
     } finally {
       context.preparing = false;
+      context.processingCount = 0;
       if (editor === context) {
         renderPreview(message);
         setEditorControls();
         if (replaceAt !== null) byId('hbPreview').querySelectorAll('.hb-replace')[replaceAt].focus({ preventScroll: true });
+        if (context.queuedPhotos.length) selectPhotos(context.queuedPhotos.shift());
       }
     }
   }
@@ -169,7 +180,7 @@ window.HousingBuilds = (() => {
     if (!userId()) { iaOpenAuth(); return; }
     const ids = row?.image_ids || [];
     editor = { owner: userId(), id: row?.id || crypto.randomUUID(), revision: row?.revision || 0, published: !!row?.published,
-      initialIds: ids.join(','), photos: ids.map(id => ({ id })), preparing: false };
+      initialIds: ids.join(','), photos: ids.map(id => ({ id })), preparing: false, processingCount: 0, queuedPhotos: [] };
     byId('hbEditorTitle').textContent = row ? '编辑作品' : '创建作品';
     byId('hbTitle').value = row?.title || '';
     byId('hbDescription').value = row?.description || '';
@@ -178,7 +189,32 @@ window.HousingBuilds = (() => {
     byId('hbAllowCopy').checked = !!row?.allow_copy;
     byId('hbCodePublic').onchange = setEditorControls;
     byId('hbForm').oninput = () => { byId('hbFormError').textContent = ''; };
-    byId('hbPhotos').onchange = event => selectPhotos(event.currentTarget);
+    byId('hbPhotos').onchange = event => readPhotoInput(event.currentTarget);
+    const form = byId('hbForm');
+    const photoZone = byId('hbPhotoZone');
+    photoZone.classList.remove('hb-dragging');
+    form.onpaste = event => {
+      const data = event.clipboardData;
+      if (!data || !data.files.length) return;
+      if (event.target.matches('input:not([type=file]), textarea') && data.getData('text/plain')) return;
+      event.preventDefault();
+      selectPhotos(Array.from(data.files));
+    };
+    form.ondragover = event => {
+      if (!event.dataTransfer.types.includes('Files')) return;
+      event.preventDefault();
+      event.dataTransfer.dropEffect = saving ? 'none' : 'copy';
+      photoZone.classList.toggle('hb-dragging', !saving);
+    };
+    form.ondragleave = event => {
+      if (!form.contains(event.relatedTarget)) photoZone.classList.remove('hb-dragging');
+    };
+    form.ondrop = event => {
+      photoZone.classList.remove('hb-dragging');
+      if (!event.dataTransfer.types.includes('Files')) return;
+      event.preventDefault();
+      selectPhotos(Array.from(event.dataTransfer.files));
+    };
     renderPreview();
     setEditorControls();
     byId('hbDraft').textContent = row?.published ? '撤回为草稿' : '保存草稿';

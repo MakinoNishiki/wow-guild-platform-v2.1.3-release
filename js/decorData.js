@@ -24,14 +24,9 @@
     url: '', anon: '',
     rows: [],            // 全量 2062 件（内存索引）
     search: '',
-    category: 0,         // 主类 id（0=全部）
-    source: '',          // 来源类型 key（''=全部，'none'=无来源）
-    expansion: 0,        // 资料片分类 tag id（0=全部；BUG-108 勘定：暴雪主题风格标签非「加入版本」，键名维持 expansion 零逻辑改动）
-    race: 0,             // 种族 tag id（0=全部；任务书 #68，词表 DecorDict.RACE_TAGS）
-    costTier: '',        // 容量档 key
-    env: '',             // 摆放环境 key
-    petOnly: false,      // 可放宠物（subcategory 含 53，方案 A 终审）
-    roomsOnly: false,    // 房间/户型（entry_type=2）
+    category: [], source: [], expansion: [], race: [], costTier: [], env: [],
+    color: [], style: [], faction: [], feature: [], ability: [],
+    sort: 'default',     // 资料片主题标签与实际加入版本严格分离
     page: 1,
     pageSize: 0,         // 任务书 #51-补丁3：动态每页件数（0=未实测，首渲染前实测列数×8 行）
   };
@@ -39,7 +34,7 @@
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
   // ---- 数据管线 ----
-  const SELECT = 'record_id,entry_type,name,icon_file_id,quality,size,placement_cost,' +
+  const SELECT = 'record_id,entry_type,name,item_id,icon_file_id,quality,size,placement_cost,' +
     'category_ids,subcategory_ids,tags,indoors,outdoors,can_customize,source_text,sources';
 
   async function loadData() {
@@ -58,137 +53,132 @@
     state.rows = rows;
   }
 
-  // ---- 筛选（AND 跨组） ----
+  // REQ-209：同组 OR、跨组 AND；仅使用目录真实标签和可核验能力。
+  const FILTER_KEYS = ['category', 'source', 'expansion', 'race', 'costTier', 'env', 'color', 'style', 'faction', 'feature', 'ability'];
+  const ABILITY_LABELS = { cooking: '可烹饪', interactive: '可互动', effect: '有特效' };
+  const TAG_GROUP_LABELS = {
+    color: ['红色', '橙色', '黄色', '绿色', '蓝色', '紫罗兰', '紫色', '棕色', '黑色', '白色', '灰色', '粉色'],
+    style: ['粗犷', '民间', '阔绰', '大胆', '休闲', '悠然', '可爱', '高雅', '邪能', '奢华', '光明', '机械', '自然', '海盗', '浪漫', '朴素', '幽灵', '虚空', '奇异', '魔法'],
+    faction: ['暴风城', '联盟', '部落', '温西尔', '法夜', '格里恩', '通灵领主']
+  };
+  let filterGroups = [];
+  function factsOf(r) { return r.entry_type === 1 ? window.DecorFacts?.get(r.record_id) || {} : {}; }
+  function abilitiesOf(r) {
+    const values = factsOf(r).abilities;
+    return Array.isArray(values) ? values.filter(key => Object.hasOwn(ABILITY_LABELS, key)) : [];
+  }
   function activeFilterCount() {
-    let n = 0;
-    if (state.search) n++;
-    if (state.category) n++;
-    if (state.source) n++;
-    if (state.expansion) n++;
-    if (state.race) n++;
-    if (state.costTier) n++;
-    if (state.env) n++;
-    if (state.petOnly) n++;
-    if (state.roomsOnly) n++;
-    return n;
+    return (state.search ? 1 : 0) + FILTER_KEYS.reduce((n, key) => n + state[key].length, 0);
   }
-
+  function knownNumber(value) {
+    return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : null;
+  }
+  function patchParts(r) {
+    const patch = factsOf(r).patch;
+    return typeof patch === 'string' && /^\d+(?:\.\d+){1,3}$/.test(patch) ? patch.split('.').map(Number) : null;
+  }
+  function compareIntroduced(a, b, direction) {
+    const ap = patchParts(a), bp = patchParts(b);
+    // 未知永远置后，不用 record_id、采集时间或资料片主题猜测加入日期。
+    if (!ap || !bp) return ap ? -1 : bp ? 1 : 0;
+    for (let i = 0; i < Math.max(ap.length, bp.length); i++) {
+      const diff = (ap[i] || 0) - (bp[i] || 0);
+      if (diff) return diff * direction;
+    }
+    const ab = knownNumber(factsOf(a).build), bb = knownNumber(factsOf(b).build);
+    return ab == null || bb == null ? (ab == null ? (bb == null ? 0 : 1) : -1) : (ab - bb) * direction;
+  }
+  function compareRows(a, b) {
+    let diff = 0;
+    if (state.sort === 'name-asc' || state.sort === 'name-desc') {
+      diff = String(a.name || '').localeCompare(String(b.name || ''), 'zh-CN', { numeric: true }) * (state.sort === 'name-desc' ? -1 : 1);
+    } else if (state.sort === 'introduced-new' || state.sort === 'introduced-old') {
+      diff = compareIntroduced(a, b, state.sort === 'introduced-new' ? -1 : 1);
+    } else if (state.sort === 'likes' || state.sort === 'views') {
+      const av = knownNumber(window.DecorEngagement?.counts(a.record_id)?.[state.sort]);
+      const bv = knownNumber(window.DecorEngagement?.counts(b.record_id)?.[state.sort]);
+      diff = av == null || bv == null ? (av == null ? (bv == null ? 0 : 1) : -1) : bv - av;
+    } else {
+      diff = (a.entry_type === 2 ? 1 : 0) - (b.entry_type === 2 ? 1 : 0);
+    }
+    return diff || Number(a.record_id) - Number(b.record_id);
+  }
   function filteredRows() {
-    const kw = state.search;
-    const tier = D.COST_TIERS.find(t => t.key === state.costTier);
-    const env = D.ENV_OPTIONS.find(e => e.key === state.env);
     return state.rows.filter(r => {
-      if (kw && !r.name.toLowerCase().includes(kw)) return false;
-      if (state.category && !(Array.isArray(r.category_ids) && r.category_ids.includes(state.category))) return false;
-      if (state.source === 'none') { if (Array.isArray(r.sources) && r.sources.length) return false; }
-      else if (state.source && !(Array.isArray(r.sources) && r.sources.some(s => s.type === state.source))) return false;
-      if (state.expansion && !(r.tags && r.tags[String(state.expansion)])) return false;
-      if (state.race && !(r.tags && r.tags[String(state.race)])) return false;
-      if (tier && !tier.match(r.placement_cost || 0)) return false;
-      if (env && !env.match(r)) return false;
-      if (state.petOnly && !(Array.isArray(r.subcategory_ids) && r.subcategory_ids.includes(D.PET_SUBCATEGORY_ID))) return false;
-      if (state.roomsOnly && r.entry_type !== 2) return false;
-      return true;
-      // 任务书 #51-补丁 第一节（2026-09-18）：默认排序——装饰在前、房间沉底（观感修复：缺图标 41 件中
-      // 39 件为低 record_id 房间条目，旧序扎堆首屏）；第一键 entry_type===2 沉底，第二键 record_id 升序
-      // （filter 保 REST 原生 record_id asc，sort 稳定即组内原序）；不加排序选择器，默认序即唯一序
-    }).sort((a, b) => (a.entry_type === 2 ? 1 : 0) - (b.entry_type === 2 ? 1 : 0));
+      if (state.search && !String(r.name || '').toLowerCase().includes(state.search)) return false;
+      return filterGroups.every(group => !state[group.key].length ||
+        group.options.some(option => state[group.key].includes(option.key) && option.match(r)));
+    }).sort(compareRows);
   }
-
-  // ---- 筛选栏（结构 JS 生成，双壳零骨架差异） ----
   function chip(label, on, count) {
     return `<button type="button" class="dh-chip${on ? ' on' : ''}">${esc(label)}${count != null ? `<span class="dh-chip-n">${count}</span>` : ''}</button>`;
   }
-
+  function tagOptions(key) {
+    const labels = new Set(state.rows.flatMap(r => r.tags && typeof r.tags === 'object' ? Object.values(r.tags) : []));
+    return TAG_GROUP_LABELS[key].filter(label => labels.has(label)).map(label => ({
+      key: label, label, match: r => !!r.tags && Object.values(r.tags).includes(label)
+    }));
+  }
+  function defineFilterGroups() {
+    const tagMatch = id => r => !!r.tags && Object.hasOwn(r.tags, String(id));
+    filterGroups = [
+      { key: 'category', id: 'dhCatChips', label: '分类', options: D.CATEGORY_FILTER_ORDER.map(id => ({ key: id, label: D.CATEGORY_NAMES[id], match: r => Array.isArray(r.category_ids) && r.category_ids.includes(id) })) },
+      { key: 'source', id: 'dhSrcChips', label: '来源', options: D.SOURCE_TYPES.map(s => ({ key: s.key, label: s.label, match: r => s.key === 'none' ? !r.sources?.length : Array.isArray(r.sources) && r.sources.some(source => source.type === s.key) })) },
+      { key: 'expansion', id: 'dhExpChips', label: '资料片分类', note: '按装饰的主题归类，非实际加入版本', options: D.EXPANSION_TAGS.map(t => ({ key: t.id, label: t.label, match: tagMatch(t.id) })) },
+      { key: 'race', id: 'dhRaceChips', label: '种族', note: '按装饰的种族风格筛选', options: D.RACE_TAGS.map(t => ({ key: t.id, label: t.label, match: tagMatch(t.id) })) },
+      ...['color', 'style', 'faction'].map((key, i) => ({ key, id: ['dhColorChips', 'dhStyleChips', 'dhFactionChips'][i], label: ['颜色', '风格', '阵营/势力'][i], options: tagOptions(key) })),
+      { key: 'costTier', id: 'dhCostChips', label: '容量', options: D.COST_TIERS.map(t => ({ ...t, match: r => t.match(r.placement_cost || 0) })) },
+      { key: 'env', id: 'dhEnvChips', label: '摆放环境', options: D.ENV_OPTIONS },
+      { key: 'feature', id: 'dhFeatChips', label: '特性', options: [
+        { key: 'model', label: '可看 3D', match: r => r.entry_type === 1 && !!window.DecorModelManifest?.[r.record_id] },
+        { key: 'pet', label: '可放宠物', match: r => Array.isArray(r.subcategory_ids) && r.subcategory_ids.includes(D.PET_SUBCATEGORY_ID) },
+        { key: 'room', label: '房间/户型', match: r => r.entry_type === 2 }
+      ] },
+      { key: 'ability', id: 'dhAbilityChips', label: '功能', note: '有特效指国服模型含粒子或拖尾。烹饪与互动按已收录的玩家实测筛选。', options: Object.entries(ABILITY_LABELS).map(([key, label]) => ({ key, label, match: r => abilitiesOf(r).includes(key) })) }
+    ];
+  }
+  function sortNote() {
+    if (state.sort.startsWith('introduced-')) return '按已核实的实际加入版本排序，未核实置后；不使用主题标签推算。';
+    if (state.sort === 'likes' || state.sort === 'views') return '仅统计本站家具详情的点赞与浏览；暂不可用的数据置后。';
+    return '支持多选：同组满足任一项，不同组同时满足。';
+  }
   function buildFilterBar() {
-    const rows = state.rows;
-    const countBy = fn => rows.filter(fn).length;
-    const srcCount = key => key === 'none'
-      ? countBy(r => !Array.isArray(r.sources) || !r.sources.length)
-      : countBy(r => Array.isArray(r.sources) && r.sources.some(s => s.type === key));
-
+    defineFilterGroups();
+    const groupHtml = group => `<div class="dh-group"><div class="dh-group-head">${esc(group.label)}<span class="dh-chip-n">（多选）</span></div>${group.note ? `<div class="dh-group-note">${esc(group.note)}</div>` : ''}<div class="dh-chips" id="${group.id}"></div></div>`;
     filterBar.innerHTML = `
       <div class="dh-top-row">
-        <div class="uc-input-wrap dh-search-wrap"><input type="text" id="dhSearch" class="search-input" placeholder="搜索装饰名…"><button type="button" id="dhSearchClear" class="uc-clear-btn" aria-label="清除搜索" title="清空" style="display:none">&times;</button></div>
+        <div class="uc-input-wrap dh-search-wrap"><input type="text" id="dhSearch" class="search-input" placeholder="搜索装饰名…" aria-label="搜索装饰名称"><button type="button" id="dhSearchClear" class="uc-clear-btn" aria-label="清除搜索" title="清空" style="display:none">&times;</button></div>
+        <label class="dh-sort-label" for="dhSort">排序</label>
+        <select id="dhSort" class="form-select dh-sort"><option value="default">默认排序</option><option value="name-asc">名称升序</option><option value="name-desc">名称降序</option><option value="introduced-new">加入版本：新到旧</option><option value="introduced-old">加入版本：旧到新</option><option value="likes">站内点赞最多</option><option value="views">站内浏览最多</option></select>
         <button type="button" id="dhResetFilters" class="btn btn-secondary">重置筛选</button>
         <div class="dh-count" id="dhCount" role="status"></div>
         <button type="button" id="dhFilterToggle" aria-controls="dhFilterRows" aria-expanded="false" class="btn btn-secondary dh-filter-toggle">筛选 ▾</button>
       </div>
+      <div class="dh-group-note" id="dhSortNote" role="status"></div>
       <div class="dh-filter-rows" id="dhFilterRows">
-        <div class="dh-group"><div class="dh-group-head">分类<span class="dh-chip-n">（单选）</span></div><div class="dh-chips" id="dhCatChips"></div></div>
-        <div class="dh-group"><div class="dh-group-head">来源<span class="dh-chip-n">（单选）</span></div><div class="dh-chips" id="dhSrcChips"></div></div>
-        <details class="dh-advanced"><summary>更多筛选<span id="dhAdvancedSummary"></span></summary>
-        <div class="dh-group"><div class="dh-group-head">资料片分类<span class="dh-chip-n">（单选）</span></div><div class="dh-group-note">按装饰的主题风格归类，非物品加入版本</div><div class="dh-chips" id="dhExpChips"></div></div>
-        <div class="dh-group"><div class="dh-group-head">种族<span class="dh-chip-n">（单选）</span></div><div class="dh-group-note">按装饰的种族风格筛选</div><div class="dh-chips" id="dhRaceChips"></div></div>
-        <div class="dh-group"><div class="dh-group-head">容量<span class="dh-chip-n">（单选）</span></div><div class="dh-chips" id="dhCostChips"></div></div>
-        <div class="dh-group"><div class="dh-group-head">摆放环境<span class="dh-chip-n">（单选）</span></div><div class="dh-chips" id="dhEnvChips"></div></div>
-        <div class="dh-group"><div class="dh-group-head">特性</div><div class="dh-chips" id="dhFeatChips"></div></div>
-        </details>
+        ${filterGroups.slice(0, 2).map(groupHtml).join('')}
+        <details class="dh-advanced"><summary>更多筛选<span id="dhAdvancedSummary"></span></summary>${filterGroups.slice(2).map(groupHtml).join('')}</details>
       </div>`;
-
-    // 分类（主类单选，计数全量数据驱动）
-    $('dhCatChips').innerHTML = chip('全部', !state.category) + D.CATEGORY_FILTER_ORDER.map(id =>
-      chip(D.CATEGORY_NAMES[id], state.category === id, countBy(r => Array.isArray(r.category_ids) && r.category_ids.includes(id)))).join('');
-    [...$('dhCatChips').children].forEach((btn, i) => btn.onclick = () => {
-      state.category = i === 0 ? 0 : D.CATEGORY_FILTER_ORDER[i - 1]; state.page = 1; refreshChips(); render(true);
+    filterGroups.forEach(group => {
+      const box = $(group.id);
+      box.innerHTML = chip('全部', !state[group.key].length) + group.options.map(option =>
+        chip(option.label, state[group.key].includes(option.key), state.rows.filter(option.match).length)).join('');
+      [...box.children].forEach((button, index) => {
+        button.onclick = () => {
+          const selected = state[group.key], key = group.options[index - 1]?.key;
+          state[group.key] = index === 0 ? [] : selected.includes(key) ? selected.filter(value => value !== key) : [...selected, key];
+          state.page = 1; refreshChips(); render(true);
+        };
+      });
     });
-
-    // 来源（十一类单选，REQ-176新增等级解锁）
-    const srcDefs = [{ key: '', label: '全部' }, ...D.SOURCE_TYPES];
-    $('dhSrcChips').innerHTML = srcDefs.map(s => chip(s.label, state.source === s.key, s.key ? srcCount(s.key) : null)).join('');
-    [...$('dhSrcChips').children].forEach((btn, i) => btn.onclick = () => {
-      state.source = srcDefs[i].key; state.page = 1; refreshChips(); render(true);
-    });
-
-    // 资料片分类（tags 组单选；BUG-108 勘定裁定：99–110=暴雪官方主题风格标签，非「加入版本」）
-    const expDefs = [{ id: 0, label: '全部' }, ...D.EXPANSION_TAGS];
-    $('dhExpChips').innerHTML = expDefs.map(e =>
-      chip(e.label, state.expansion === e.id, e.id ? countBy(r => r.tags && r.tags[String(e.id)]) : null)).join('');
-    [...$('dhExpChips').children].forEach((btn, i) => btn.onclick = () => {
-      state.expansion = expDefs[i].id; state.page = 1; refreshChips(); render(true);
-    });
-
-    // 种族（tags 组单选；任务书 #68，词表 DecorDict.RACE_TAGS 30 项）
-    const raceDefs = [{ id: 0, label: '全部' }, ...D.RACE_TAGS];
-    $('dhRaceChips').innerHTML = raceDefs.map(e =>
-      chip(e.label, state.race === e.id, e.id ? countBy(r => r.tags && r.tags[String(e.id)]) : null)).join('');
-    [...$('dhRaceChips').children].forEach((btn, i) => btn.onclick = () => {
-      state.race = raceDefs[i].id; state.page = 1; refreshChips(); render(true);
-    });
-
-    // 容量档（单选）
-    const costDefs = [{ key: '', label: '全部' }, ...D.COST_TIERS];
-    $('dhCostChips').innerHTML = costDefs.map(t =>
-      chip(t.label, state.costTier === t.key, t.key ? countBy(r => t.match(r.placement_cost || 0)) : null)).join('');
-    [...$('dhCostChips').children].forEach((btn, i) => btn.onclick = () => {
-      state.costTier = costDefs[i].key; state.page = 1; refreshChips(); render(true);
-    });
-
-    // 摆放环境（单选；任务书 #51-补丁 第四节：四档砍三档——「室内」=全部无筛选价值、「均可」与「室外」恒等，
-    // 词表 ENV_OPTIONS 已同步精简；三档计数按新口径动态渲染，「全部」档同样带计数 2062）
-    const envDefs = [{ key: '', label: '全部' }, ...D.ENV_OPTIONS];
-    $('dhEnvChips').innerHTML = envDefs.map(e =>
-      chip(e.label, state.env === e.key, e.key ? countBy(r => e.match(r)) : rows.length)).join('');
-    [...$('dhEnvChips').children].forEach((btn, i) => btn.onclick = () => {
-      state.env = envDefs[i].key; state.page = 1; refreshChips(); render(true);
-    });
-
-    // 特性（可放宠物 / 房间·户型，独立开关）
-    $('dhFeatChips').innerHTML =
-      chip('可放宠物', state.petOnly, countBy(r => Array.isArray(r.subcategory_ids) && r.subcategory_ids.includes(D.PET_SUBCATEGORY_ID))) +
-      chip('房间/户型', state.roomsOnly, countBy(r => r.entry_type === 2));
-    const featBtns = [...$('dhFeatChips').children];
-    featBtns[0].onclick = () => { state.petOnly = !state.petOnly; state.page = 1; refreshChips(); render(true); };
-    featBtns[1].onclick = () => { state.roomsOnly = !state.roomsOnly; state.page = 1; refreshChips(); render(true); };
-
-    // 搜索（模糊即时，REQ-084 同款清除钮：有内容才显示、点击/Esc 清空、焦点留存）
+    $('dhSort').value = state.sort;
+    $('dhSort').onchange = e => { state.sort = e.target.value; state.page = 1; refreshCount(); render(true); };
     const searchInput = $('dhSearch'), searchClear = $('dhSearchClear');
     const syncClear = () => { searchClear.style.display = searchInput.value ? 'block' : 'none'; };
     const clearSearch = () => { searchInput.value = ''; state.search = ''; state.page = 1; syncClear(); searchInput.focus(); refreshCount(); render(true); };
     searchInput.oninput = e => { state.search = e.target.value.trim().toLowerCase(); state.page = 1; syncClear(); refreshCount(); render(true); };
     searchInput.onkeydown = e => { if (e.key === 'Escape' && searchInput.value) clearSearch(); };
     searchClear.onclick = clearSearch;
-
     $('dhResetFilters').onclick = () => { resetFilters(); refreshChips(); render(true); };
     $('dhFilterToggle').onclick = () => {
       const open = filterBar.classList.toggle('filters-open');
@@ -197,35 +187,30 @@
     };
     refreshCount();
   }
-
-  // chips 选中态刷新（计数不变，仅 .on 类迁移；避免整栏重建丢搜索框焦点）
   function refreshChips() {
-    const paint = (id, isOn) => [...$(id).children].forEach((btn, i) => btn.classList.toggle('on', isOn(i)));
-    paint('dhCatChips', i => (i === 0 ? !state.category : state.category === D.CATEGORY_FILTER_ORDER[i - 1]));
-    paint('dhSrcChips', i => state.source === (i === 0 ? '' : D.SOURCE_TYPES[i - 1].key));
-    paint('dhExpChips', i => state.expansion === (i === 0 ? 0 : D.EXPANSION_TAGS[i - 1].id));
-    paint('dhRaceChips', i => state.race === (i === 0 ? 0 : D.RACE_TAGS[i - 1].id));
-    paint('dhCostChips', i => state.costTier === (i === 0 ? '' : D.COST_TIERS[i - 1].key));
-    paint('dhEnvChips', i => state.env === (i === 0 ? '' : D.ENV_OPTIONS[i - 1].key));
-    paint('dhFeatChips', i => (i === 0 ? state.petOnly : state.roomsOnly));
+    filterGroups.forEach(group => [...$(group.id).children].forEach((button, index) =>
+      button.classList.toggle('on', index === 0 ? !state[group.key].length : state[group.key].includes(group.options[index - 1].key))));
     refreshCount();
   }
-
   function refreshCount() {
     const n = activeFilterCount();
-    filterBar.querySelectorAll('.dh-chip').forEach(button =>
-      button.setAttribute('aria-pressed', button.classList.contains('on')));
+    filterBar.querySelectorAll('.dh-chip').forEach(button => button.setAttribute('aria-pressed', button.classList.contains('on')));
     const selected = [...filterBar.querySelectorAll('.dh-advanced .dh-chip.on')]
-      .filter(button => button.parentElement.id === 'dhFeatChips' || button !== button.parentElement.firstElementChild)
+      .filter(button => button !== button.parentElement.firstElementChild)
       .map(button => button.firstChild.textContent.trim());
     $('dhAdvancedSummary').textContent = selected.length ? ' · ' + selected.join('、') : '';
     $('dhCount').textContent = n ? `命中 ${filteredRows().length} 件 · ${n} 项生效` : `共 ${state.rows.length} 件`;
+    $('dhSortNote').textContent = sortNote();
   }
-
   function resetFilters() {
-    Object.assign(state, { search: '', category: 0, source: '', expansion: 0, race: 0, costTier: '', env: '', petOnly: false, roomsOnly: false, page: 1 });
+    FILTER_KEYS.forEach(key => { state[key] = []; });
+    Object.assign(state, { search: '', sort: 'default', page: 1 });
     const si = $('dhSearch'); if (si) { si.value = ''; $('dhSearchClear').style.display = 'none'; }
+    if ($('dhSort')) $('dhSort').value = state.sort;
   }
+  window.addEventListener('decor-engagement-change', () => {
+    if (filterBar && (state.sort === 'likes' || state.sort === 'views')) { refreshCount(); render(false); }
+  });
 
   // ---- 网格渲染 ----
   function legacyIconSrc(r) {
@@ -330,7 +315,7 @@
       <div class="dh-cat">${esc(catPathText(r))}</div>
       <div class="dh-src${src.unknown ? ' dh-src-unknown' : ''}">${esc(src.text)}</div>
       ${badges.length ? `<div class="dh-badges">${badges.join('')}</div>` : ''}
-      <button type="button" class="dh-card-add${planQtyOf(r.record_id) ? ' added' : ''}" data-add="${r.record_id}">${planAddLabel(r.record_id)}</button>
+      <div class="dh-plan-entry"><button type="button" class="dh-card-add${planQtyOf(r.record_id) ? ' added' : ''}" data-add="${r.record_id}">${planAddLabel(r.record_id)}</button>${planTargetButton(r)}</div>
     </div>`;
   }
 
@@ -381,6 +366,7 @@
       btn.onclick = e => { e.stopPropagation(); planAdd(+btn.dataset.add); };
       btn.onkeydown = e => e.stopPropagation();
     });
+    bindPlanTargets(main, 'card');
     const pager = $('dhPager');
     if (pager) [...pager.querySelectorAll('button[data-pg]')].forEach(btn => btn.onclick = () => {
       if (btn.disabled) return;
@@ -492,8 +478,34 @@
   // ---- 详情弹窗（只读不涉 modalDirtyChecks；document.body 单例，双壳自足） ----
   let modalEl = null;
   let detailTrigger = null;
+  let detailModelPreview = null;
+  // Blizzard_HousingEventHandler.lua 的官方模型预览入口；名称/来源文本不进入命令。
+  function gamePreviewCommand(r) {
+    if (r.entry_type !== 1) return '';
+    const numericId = value => /^\d+$/.test(String(value)) && Number.isSafeInteger(Number(value)) && Number(value) > 0;
+    const useItem = numericId(r.item_id);
+    const id = useItem ? Number(r.item_id) : numericId(r.record_id) ? Number(r.record_id) : null;
+    if (id == null) return '';
+    const method = useItem ? 'PreviewHousingItem' : 'PreviewHousingDecorID';
+    return `/run local h=HousingFramesUtil;if not(h and h.${method} and h.${method}(${id})) then print("预览暂不可用") end`;
+  }
+  function detailFactsHtml(r) {
+    const facts = factsOf(r), patch = patchParts(r), abilities = abilitiesOf(r);
+    const build = knownNumber(facts.build);
+    return `<div class="dh-meta-row">加入版本：<b>${patch ? esc(facts.patch) : '尚待核实'}</b></div>
+      ${build != null ? `<div class="dh-meta-row">构建号：<b>${build}</b></div>` : ''}
+      <div class="dh-meta-row">已核实功能：<b>${abilities.length ? abilities.map(key => ABILITY_LABELS[key]).join('、') : '尚未收录'}</b></div>`;
+  }
+  function previewEntryHtml(r) {
+    const command = gamePreviewCommand(r);
+    return `<div class="dh-game-preview"><div class="dh-sec-title">游戏内预览</div>${command
+      ? `<button type="button" class="btn btn-secondary dh-copy-game-preview">复制游戏内预览命令</button><p class="dh-group-note dh-game-preview-note" role="status">复制后粘贴到游戏聊天框，按回车打开官方模型预览。不会购买或摆放家具。</p><input class="form-input dh-game-preview-command" aria-label="游戏内预览命令" readonly hidden value="${esc(command)}">`
+      : `<p class="dh-group-note">${r.entry_type === 2 ? '房间/户型暂不提供家具模型预览命令。' : '缺少可用的家具编号，暂无法生成预览命令。'}</p>`}</div>`;
+  }
   function closeDetail() {
     if (!modalEl) return;
+    detailModelPreview?.destroy();
+    detailModelPreview = null;
     modalEl.classList.remove('show');
     const el = modalEl;
     modalEl = null;
@@ -533,17 +545,42 @@
         <div class="dh-meta-row">摆放：<b>${envText}</b></div>
         <div class="dh-meta-row">分类：<b>${esc(catText)}</b></div>
         <div class="dh-meta-row">子类：<b>${esc(subText)}</b></div>
+        ${detailFactsHtml(r)}
       </div>
+      <div class="dh-group-note">${abilitiesOf(r).includes('effect') ? '特效依据来自国服模型的粒子或拖尾。' : ''}功能资料仍在补充。</div>
       ${tags.length ? `<div class="dh-sec-title">标签</div><div class="dh-tags">${tags.map(t => `<span class="dh-badge">${esc(t)}</span>`).join('')}</div>` : ''}
       <div class="dh-sec-title">来源</div>
       <div class="dh-src-list">${renderSourceBlock(r)}</div>
-      <div class="dh-detail-add-row"><button type="button" class="btn btn-primary dh-detail-add${planQtyOf(r.record_id) ? ' added' : ''}" data-add="${r.record_id}">${planAddLabel(r.record_id)}</button></div>
+      ${previewEntryHtml(r)}
+      <div class="dh-detail-add-row dh-plan-entry"><button type="button" class="btn btn-primary dh-detail-add${planQtyOf(r.record_id) ? ' added' : ''}" data-add="${r.record_id}">${planAddLabel(r.record_id)}</button>${planTargetButton(r)}</div>
     </div>`;
     modalEl.addEventListener('click', e => { if (e.target === modalEl) closeDetail(); });
     modalEl.querySelector('.dh-modal-close').onclick = closeDetail;
     // 任务书 #58-补丁：详情弹窗底部加单主按钮（行为同卡片：加入/已加入 ×N 双态，点击 qty+1）
     modalEl.querySelector('.dh-detail-add').onclick = () => planAdd(r.record_id, 'detail');
+    bindPlanTargets(modalEl, 'detail');
+    const copyPreview = modalEl.querySelector('.dh-copy-game-preview');
+    if (copyPreview) {
+      const currentModal = modalEl;
+      copyPreview.onclick = async () => {
+        const input = currentModal.querySelector('.dh-game-preview-command');
+        const note = currentModal.querySelector('.dh-game-preview-note');
+        try {
+          await navigator.clipboard.writeText(gamePreviewCommand(r));
+          note.textContent = '已复制。在游戏聊天框粘贴并按回车即可预览。';
+        } catch (_) {
+          input.hidden = false; input.focus(); input.select();
+          note.textContent = '浏览器未允许自动复制，命令已选中，请按 Ctrl+C 复制。';
+        }
+      };
+    }
     document.body.appendChild(modalEl);
+    window.DecorEngagement?.mount(modalEl, r.record_id);
+    if (window.DecorModelPreview) {
+      const previewHost = document.createElement('div');
+      modalEl.querySelector('.dh-modal-head').after(previewHost);
+      detailModelPreview = window.DecorModelPreview.mount({ host: previewHost, row: r, poster: iconSrc(r) });
+    }
     modalEl.querySelector('.dh-modal-close').focus({ preventScroll: true });
     document.addEventListener('keydown', onModalKey);
     requestAnimationFrame(() => modalEl && modalEl.classList.add('show'));
@@ -682,6 +719,7 @@
   async function planInit() {
     const owner = planOwner();
     if (planOwnerId !== owner) {
+      document.querySelector('.dh-plan-target-dialog[open]')?.close();
       planOwnerId = owner; ++planLoadEpoch; plan.loadFailed = planLoggedIn(); plan.loading = false;
       plan.items = []; plan.plans = []; plan.currentId = null; plan.notice = ''; plan.cloudName = '我的方案单';
       planRender();
@@ -714,8 +752,90 @@
     const q = planQtyOf(recordId);
     return q > 0 ? `已加入 ×${q}` : '加入方案单';
   }
+  function planTargetButton(row) {
+    return `<button type="button" class="dh-plan-target" data-plan-target="${row.record_id}" aria-haspopup="dialog" title="选择方案或新建方案"${planLoggedIn() ? '' : ' hidden'}>选方案</button>`;
+  }
+  function bindPlanTargets(root, from) {
+    root.querySelectorAll('[data-plan-target]').forEach(btn => {
+      btn.onkeydown = event => event.stopPropagation();
+      btn.onclick = event => {
+        event.stopPropagation();
+        const row = state.rows.find(r => r.record_id === +btn.dataset.planTarget);
+        if (row && planLoggedIn()) choosePlanFor(row, from);
+      };
+    });
+  }
+  function choosePlanFor(row, from) {
+    if (plan.loading || plan.loadFailed || plan.saving || planOwnerId !== planOwner()) {
+      planToast('请等待方案读取或保存完成；如读取失败，可重新进入图鉴。', true);
+      return;
+    }
+    const owner = planOwner();
+    const dialog = document.createElement('dialog');
+    dialog.className = 'dh-plan-target-dialog';
+    dialog.setAttribute('aria-labelledby', 'dhPlanTargetTitle');
+    dialog.innerHTML = `<form><h3 id="dhPlanTargetTitle">加入指定方案</h3><p>${esc(row.name)}</p>
+      <label>目标方案<select name="target"></select></label>
+      <label>新方案名称<input name="newName" autocomplete="off"></label>
+      <div class="dh-plan-target-actions"><button type="button" class="btn btn-secondary">取消</button>
+      <button type="submit" class="btn btn-primary">确认加入</button></div></form>`;
+    const form = dialog.querySelector('form');
+    const {target, newName} = form.elements;
+    for (const p of plan.plans) target.add(new Option(p.name, String(p.id), false, String(p.id) === String(plan.currentId)));
+    target.add(new Option('＋ 新建私人方案', 'new'));
+    function toggleName() {
+      const create = target.value === 'new';
+      newName.parentElement.hidden = !create;
+      newName.required = create;
+    }
+    toggleName();
+    target.onchange = () => { toggleName(); if (newName.required) newName.focus(); };
+    const confirm = form.querySelector('[type=submit]');
+    const cancel = form.querySelector('[type=button]');
+    cancel.onclick = () => dialog.close();
+    dialog.onkeydown = e => { if (e.key === 'Escape') e.stopPropagation(); };
+    dialog.oncancel = e => { if (confirm.disabled) e.preventDefault(); };
+    const leave = () => dialog.close();
+    window.addEventListener('hashchange', leave);
+    dialog.onclose = () => { window.removeEventListener('hashchange', leave); dialog.remove(); };
+    form.onsubmit = async event => {
+      event.preventDefault();
+      if (confirm.disabled) return;
+      if (owner !== planOwner() || !planLoggedIn()) { dialog.close(); return; }
+      const create = target.value === 'new';
+      const name = newName.value.trim();
+      if (create && !name) { newName.value = ''; newName.reportValidity(); return; }
+      const previousIds = new Set(plan.plans.map(p => String(p.id)));
+      let id = target.value;
+      target.disabled = newName.disabled = cancel.disabled = confirm.disabled = true;
+      confirm.textContent = '正在加入…';
+      try {
+        if (create || id !== String(plan.currentId)) {
+          planDraftSave();
+          if (create) await planBridge().createPlan(name);
+          else await planBridge().switchPlan(id);
+          if (owner !== planOwner()) return;
+          if (create) id = String(planBridge().currentPlanId());
+          await planPullCloud();
+          if (owner !== planOwner()) return;
+          if (id !== String(plan.currentId) || !plan.plans.some(p => String(p.id) === id) ||
+              (create && (previousIds.has(id) || plan.cloudName !== name))) throw new Error('无法确认目标方案，请核对方案列表。');
+          if (window.WBTrack) WBTrack.event(create ? 'decor_plan_create' : 'decor_plan_switch', create ? {} : { plan_count: plan.plans.length });
+        }
+        planAdd(row.record_id, from);
+      } catch (error) {
+        if (owner === planOwner()) {
+          await planInit(); // 写入可能已经成功。重新读出已有方案，再让作者决定是否重试。
+          planToast('家具未加入：' + (error.message || '请检查方案后重试'), true);
+        }
+      } finally { dialog.close(); }
+    };
+    document.body.append(dialog);
+    dialog.showModal();
+  }
   // 全部 [data-add] 入口（卡片 + 详情弹窗）文案/双态统一刷新——抽屉步进/移除后回到弹窗文案亦最新
   function planRefreshEntries() {
+    document.querySelectorAll('[data-plan-target]').forEach(btn => { btn.hidden = !planLoggedIn(); });
     [...document.querySelectorAll('[data-add]')].forEach(btn => {
       const rid = +btn.dataset.add;
       btn.textContent = planAddLabel(rid);
@@ -725,12 +845,19 @@
 
   // 任务书 #58-补丁：from 区分来源（card=卡片通栏按钮 / detail=详情弹窗主按钮），默认 card
   function planAdd(recordId, from) {
+    if (plan.loading || plan.loadFailed || plan.saving || planOwnerId !== planOwner()) {
+      planToast('请等待方案读取或保存完成；如读取失败，可重新进入图鉴。', true);
+      return;
+    }
     const hit = plan.items.find(it => it.record_id === recordId);
+    if (hit && hit.qty >= 99) { planToast('此家具在当前方案中已达 99 件上限', true); return; }
     if (hit) hit.qty = Math.min(99, hit.qty + 1);
     else plan.items.push({ record_id: recordId, qty: 1 });
+    if (planLoggedIn()) plan.notice = '当前方案有未保存的修改，点击保存可同步。';
     planDraftSave();
     planRender();
-    planToast('已加入方案单');
+    const itemName = state.rows.find(row => row.record_id === recordId)?.name || '家具';
+    planToast(`${itemName}已加入「${plan.cloudName}」，共 ${planQtyOf(recordId)} 件`);
     // 任务书 #56 登记事件（props ≤2KB；record_id 书载可带）
     if (window.WBTrack) WBTrack.event('decor_plan_add', { from: from || 'card', record_id: recordId });
   }
@@ -1443,6 +1570,7 @@
     } catch (e) { showError(e.message || '数据加载失败'); return; }
     buildFilterBar();
     render();
+    window.DecorEngagement?.load().catch(() => {}); // 排序异步更新，统计不可用不阻断目录。
     planInit(); // 任务书 #58-WP1：抽屉初始化（草稿/云端合并三分支）+ 入口徽标
   }
 

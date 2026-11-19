@@ -1390,7 +1390,7 @@ async function cloudCrud(dataType, operation, payload, options = {}) {
     // 2. 重新读取数据库最新状态并更新 appData
     const refreshed = await window.CloudSync.reloadData(dataType, payload);
     // 作者的原始蓝图仅用于本次编辑，单条云端回读后返回，不写进公会缓存。
-    if (dataType === 'housingBuild') return { success: true, row: refreshed };
+    if (dataType === 'housingBuild' || dataType === 'decorEngagement') return { success: true, row: refreshed };
     const typesToReload = reloadTypes || [];
     for (const t of typesToReload) {
       await window.CloudSync.reloadData(t);
@@ -9125,6 +9125,10 @@ function lootFillAssignedTo(idOrName) {
 // ==================== 初始化 ====================
 // ==================== 更新日志 ====================
 const changelogData = [
+  {id:'req209-model',version:'v3.2.0',date:'2026-11-19',type:'feature',typeLabel:'新增功能',title:'在家具详情中查看 3D 外观',summary:'首批 26 件家具可拖动旋转、缩放和复位。详情也提供可复制到游戏聊天框的预览指令。',details:[]},
+  {id:'req209-find',version:'v3.2.0',date:'2026-11-19',type:'improve',typeLabel:'功能优化',title:'按版本、热度和多个标签找家具',summary:'图鉴支持名称、加入游戏版本、点赞和浏览排序，可组合筛选家具标签与已核实的能力。',details:[]},
+  {id:'req209-upload',version:'v3.2.0',date:'2026-11-19',type:'fix',typeLabel:'修复BUG',title:'编辑作品时可直接粘贴或拖入截图',summary:'粘贴图片和拖入文件都会追加到截图预览，说明栏仍能正常粘贴文字。',details:[]},
+  {id:'req209-plans',version:'v3.2.0',date:'2026-11-19',type:'refactor',typeLabel:'模块调整',title:'加入家具时可直接选择或新建方案单',summary:'在图鉴卡片或详情中选好目标方案即可加入一件，也可以继续快捷加入当前方案。在方案单内调整数量并保存。',details:[]},
   {id:'req203-cover-dots',version:'v3.2.0',date:'2026-11-19',type:'feature',typeLabel:'新增功能',title:'点圆点直达装修截图',summary:'每张截图对应一枚圆点，可以直接选看任意一张。',details:[]},
   {id:'req203-cover-arrows',version:'v3.2.0',date:'2026-11-19',type:'improve',typeLabel:'功能优化',title:'封面箭头改为浮动白色箭头',summary:'透明热区保留翻图操作，箭头用阴影与装修画面区分。',details:[]},
   {id:'req203-cover-open',version:'v3.2.0',date:'2026-11-19',type:'fix',typeLabel:'修复BUG',title:'多图作品也能点主图进入详情',summary:'点公开封面中央即可打开作品，横向拖动仍在列表里浏览。',details:[]},

@@ -22,6 +22,12 @@
 }
 .dh-search-wrap { flex: 1 1 220px; max-width: 340px; }
 .dh-search-wrap .search-input { width: 100%; }
+.dh-sort-label, .dh-engagement { color: var(--text-secondary); font-size: 13px; }
+.dh-top-row .dh-sort { width: auto; max-width: 100%; }
+#dhSortNote:empty { display: none; }
+.dh-engagement { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin: 12px 0; }
+.dh-engagement button[aria-pressed="true"] { color: var(--gold); border-color: var(--gold); }
+.dh-game-preview-command { width: 100%; }
 .dh-count {
   color: var(--text-secondary);
   font-size: 13px;
@@ -923,3 +929,15 @@
 .dh-advanced summary:hover, #dhAdvancedSummary { color: var(--gold); }
 .dh-advanced summary:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; }
 .dh-chip:active { background: rgba(240, 192, 96, 0.18); }
+
+.dh-plan-entry { display: flex; gap: 4px; }
+.dh-plan-entry [data-add] { flex: 1; min-width: 0; }
+.dh-plan-target { flex: none; padding: 0 7px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-secondary); color: var(--text-secondary); font: inherit; font-size: 12px; cursor: pointer; }
+.dh-plan-target:hover, .dh-plan-target:focus-visible { border-color: var(--gold); color: var(--gold); }
+.dh-plan-target-dialog { margin: auto; width: min(380px, calc(100% - 32px)); padding: 20px; border: 1px solid var(--gold-dark); border-radius: 8px; background: var(--bg-secondary); color: var(--text-primary); }
+.dh-plan-target-dialog::backdrop { background: rgb(0 0 0 / 65%); }
+.dh-plan-target-dialog h3 { margin: 0 0 6px; color: var(--gold); }
+.dh-plan-target-dialog p { margin: 0 0 16px; overflow-wrap: anywhere; }
+.dh-plan-target-dialog label:not([hidden]) { display: grid; gap: 5px; margin-bottom: 12px; color: var(--text-secondary); }
+.dh-plan-target-dialog :is(input, select) { width: 100%; padding: 8px; border: 1px solid var(--border-color); border-radius: 4px; background: var(--bg-primary); color: var(--text-primary); }
+.dh-plan-target-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }

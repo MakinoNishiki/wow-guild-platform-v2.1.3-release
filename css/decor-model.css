@@ -1,0 +1,24 @@
+/* REQ-209: embedded single-model media area; no global UI overrides. */
+.dh-modal:has(.dh-model-preview) .dh-modal-head { align-items: center; }
+.dh-modal:has(.dh-model-preview) .dh-modal-icon { display: none; }
+.dh-model-preview { margin: 16px 0; border: 1px solid var(--border-color); border-radius: 6px; overflow: hidden; background: var(--bg-primary); }
+.dh-model-preview [hidden] { display: none !important; }
+.dh-model-tabs { display: flex; gap: 6px; padding: 8px; border-bottom: 1px solid var(--border-color); }
+.dh-model-preview button { color: var(--text-primary); border: 1px solid var(--border-color); background: var(--bg-tertiary); padding: 6px 10px; border-radius: 4px; font: inherit; font-size: 13px; cursor: pointer; }
+.dh-model-preview button:hover:not(:disabled) { color: var(--gold); border-color: var(--gold); }
+.dh-model-preview button:active:not(:disabled) { transform: scale(.96); }
+.dh-model-preview button:focus-visible, .dh-model-canvas canvas:focus-visible { outline: 2px solid var(--gold); outline-offset: -2px; }
+.dh-model-preview button[aria-pressed="true"] { color: var(--gold); border-color: var(--gold); background: var(--bg-secondary); }
+.dh-model-preview button:disabled { opacity: .5; cursor: not-allowed; }
+.dh-model-stage { position: relative; height: 300px; background: var(--bg-primary); }
+.dh-model-poster { display: block; width: 100%; height: 100%; object-fit: contain; padding: 18px; box-sizing: border-box; }
+.dh-model-canvas { position: absolute; inset: 0; }
+.dh-model-canvas canvas { display: block; width: 100%; height: 100%; cursor: grab; }
+.dh-model-canvas canvas:active { cursor: grabbing; }
+.dh-model-preview[data-state="loading"] .dh-model-poster { opacity: .5; }
+.dh-model-status { color: var(--text-secondary); font-size: 12px; line-height: 1.6; margin: 8px 12px; min-height: 20px; }
+.dh-model-preview[data-state="error"] .dh-model-status { color: var(--gold); }
+.dh-model-controls { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 12px 12px; }
+.dh-model-retry { margin: 0 12px 12px; }
+@media (max-width: 600px) { .dh-model-stage { height: 240px; } }
+@media (prefers-reduced-motion: reduce) { .dh-model-preview button:active:not(:disabled) { transform: none; } }

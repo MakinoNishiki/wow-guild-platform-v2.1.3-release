@@ -643,6 +643,7 @@
 
   // ---- 重新加载指定模块数据（写成功后回读数据库最新状态） ----
   async function reloadData(dataType, payload) {
+    if (dataType === 'decorEngagement') return window.DecorEngagement.request('item', payload);
     if (dataType === 'housingBuild') {
       const result = await readHousingBuilds('mine', { id: payload.id });
       const row = result.rows[0];
@@ -931,6 +932,11 @@
   }
 
   async function saveCloudData(dataType, operation, item, extra) {
+    if (dataType === 'decorEngagement') {
+      if (!['like', 'view'].includes(operation)) throw new Error('未知的家具操作');
+      await window.DecorEngagement.request(operation, item);
+      return;
+    }
     if (dataType === 'housingBuild') {
       const saved = await housingRequest('save-v2', {}, item);
       item.savedRevision = saved.revision;

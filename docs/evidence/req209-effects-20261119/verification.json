@@ -1,0 +1,33 @@
+{
+  "checked_at": "2026-11-19T15:46:52.479Z",
+  "passed": 12,
+  "checks": [
+    "All 2271 unique CN model files reparse with identical hashes, counts and classification",
+    "Published positive Set exactly matches emitter evidence; unknowns are excluded",
+    "All existing 26 previews covered; static GLBs are not used to classify emitters",
+    "Flat MD20 parses with payload-relative pointers",
+    "Truncated outer chunk is rejected",
+    "Invalid inner magic is rejected",
+    "Unsupported model version stays unknown instead of guessing offsets",
+    "Nonzero particle count with zero pointer is rejected",
+    "Particle array extending beyond its own MD21 payload is rejected",
+    "Nonfinite emitter position is rejected",
+    "Unsupported emitter type is rejected",
+    "Three raw ribbon arrays have valid records and texture/material index references"
+  ],
+  "summary": {
+    "catalog": 2335,
+    "decor": 2295,
+    "unique_assets": 2271,
+    "verified_decor": 2274,
+    "emitter_present": 513,
+    "no_embedded_emitters": 1761,
+    "unknown": 21,
+    "not_decor": 40,
+    "particle_decor": 513,
+    "ribbon_decor": 3,
+    "current_build_rows": 2274,
+    "historical_rows": 0
+  },
+  "note": "Binary/evidence verification only; this does not claim in-game effects or browser rendering of particles."
+}

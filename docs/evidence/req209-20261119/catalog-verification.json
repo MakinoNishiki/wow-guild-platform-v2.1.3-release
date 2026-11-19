@@ -1,0 +1,62 @@
+{
+  "ok": true,
+  "fixture": "synthetic edges, actual Chrome/components; game execution not tested",
+  "checks": [
+    "默认装饰在前、房型在后",
+    "来源/种族组内OR，颜色/风格跨组AND，选中态可访问",
+    "多选再次点击撤销与阵营组合",
+    "功能只读可核验证据，魔法主题不能冒充特效",
+    "既有特性同组OR",
+    "名称双向排序",
+    "实际版本/构建双向排序，未知不反转到顶部",
+    "站内赞/浏览排序、零计数与不可用区分、变更事件刷新",
+    "搜索叠加筛选、无结果重置恢复",
+    "实际点击复制itemID与无itemID预览命令，非法ID不进入命令，低于255字节",
+    "版本与构建号同时显示，房型编号碰撞不串用家具事实，复制拒绝可手动复制",
+    "名称转义，元数据/互动模块缺失不白屏",
+    "双宽截图、零JS错误、仅只读请求且目录读取item_id"
+  ],
+  "errors": [],
+  "commands": {
+    "itemCommand": "/run local h=HousingFramesUtil;if not(h and h.PreviewHousingItem and h.PreviewHousingItem(240001)) then print(\"预览暂不可用\") end",
+    "decorCommand": "/run local h=HousingFramesUtil;if not(h and h.PreviewHousingDecorID and h.PreviewHousingDecorID(1002)) then print(\"预览暂不可用\") end"
+  },
+  "requests": [
+    {
+      "method": "GET",
+      "url": "/"
+    },
+    {
+      "method": "GET",
+      "url": "/css/main.css"
+    },
+    {
+      "method": "GET",
+      "url": "/css/decor-public.css"
+    },
+    {
+      "method": "GET",
+      "url": "/js/decorDict.js"
+    },
+    {
+      "method": "GET",
+      "url": "/js/decorData.js"
+    },
+    {
+      "method": "GET",
+      "url": "/api/supabase-config"
+    },
+    {
+      "method": "GET",
+      "url": "/rest/v1/decor_catalog?select=record_id,entry_type,name,item_id,icon_file_id,quality,size,placement_cost,category_ids,subcategory_ids,tags,indoors,outdoors,can_customize,source_text,sources&order=record_id.asc&offset=0&limit=1000"
+    },
+    {
+      "method": "GET",
+      "url": "/assets/decor-icons/_placeholder.png"
+    },
+    {
+      "method": "GET",
+      "url": "/assets/decor-icons/room-previews/1.png"
+    }
+  ]
+}

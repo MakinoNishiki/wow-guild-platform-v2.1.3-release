@@ -1,0 +1,221 @@
+{
+  "browser": "157.0.8103.79",
+  "rendering": "Chrome headless / SwiftShader，非普通显卡性能基准",
+  "checks": [
+    "图鉴与图片详情默认不请求 3D 运行库和 GLB",
+    "真实家具详情：鼠标拖动、滚轮缩放、复位、键盘旋转与复位均产生可核像素变化/还原",
+    "切回图片释放 canvas；再次进入 3D、关闭详情均完成清理",
+    "26 个实际 GLB 全部装载并旋转至背面；前后角度像素不同，逐件关闭零残留 canvas",
+    "缺模型/缺图片和长名称保留图片占位及来源、加单，不提供虚假 3D 入口",
+    "模型请求失败保留图片，重新加载成功",
+    "真实 WebGL 上下文丢失后销毁并回退图片，重试恢复",
+    "加载未完成关闭后，切换另一家具不会出现旧模型/多 canvas",
+    "运行库请求失败后重试恢复，不受浏览器失败模块缓存阻断"
+  ],
+  "models": [
+    {
+      "id": 25325,
+      "name": "翠绿沼泽鳞叶",
+      "front": "33e645826a0229388dd31c0c6ba10e0a8da6751b311bb30e29983c9727b87597",
+      "back": "e7083dc0697e6a2091ea569941c42fd1eb6a7958a7baeb9fe1bed9e436b910b1"
+    },
+    {
+      "id": 26881,
+      "name": "精致的毒心仪式标记",
+      "front": "c363e4196f30d4a47d633b0173ed93536ed06b56ac37dfb20736f57c73cada75",
+      "back": "d50a2dbeee28d7a7b636b8919ddb599730f11a433f8af67832c645400f539491"
+    },
+    {
+      "id": 27220,
+      "name": "莉莉斯塔萨的毛绒幸运鸭",
+      "front": "7a126c6ae1d6293ccc8d8c847effc0c4743022d20728ff37af41ef0e8385232b",
+      "back": "5b93c6171f05e9ceb36c0d32978373d66514d8b039e82862fb9085821c280774"
+    },
+    {
+      "id": 27684,
+      "name": "堕罪堡餐桌",
+      "front": "68dc3c9ec9602decddd919541a8b5ca9bf4d3f25fd6fd6625b0f62e9e197e397",
+      "back": "20f7e8870f42ba1c3773390c286d0387855dad7476265794ad5aa339682b1899"
+    },
+    {
+      "id": 28319,
+      "name": "弧形卡拉波绿篱",
+      "front": "cb3268887da3e3822ee933a83c2819dbb3978891a66fbf2a4a89e3a7a3dcf1c2",
+      "back": "06b560e4b55031dd2779d6c10fc3a8d0218496970a28b41075dee9de82bda24d"
+    },
+    {
+      "id": 28324,
+      "name": "卡拉波毛榉树",
+      "front": "3e65e2076843a046c35ccae88619a06c3c8919aba7e75a05aadf466fab5ed490",
+      "back": "4da5604dcd1e3f3f99d8fcb19ebc1efbf0b9bc0689fd520b6cfea8ae01ce4bc4"
+    },
+    {
+      "id": 28326,
+      "name": "纳格兰苜蓿丛",
+      "front": "7239cdbea04334a2cb6278782186af2635f330138dc97fdb26a407a22853bdb1",
+      "back": "fcaad1b551b027f6a8f50f74d4d5e1ac9630f9250529052cd748999dbad2f7ee"
+    },
+    {
+      "id": 28327,
+      "name": "纳格兰野麦",
+      "front": "cc51f5ef3670939392b558b717a4488f080c0a38ce79db63a5c7ea805d99eae3",
+      "back": "9ac6b59eca9090db0911ee31660262664519814386eaebea3b218edeefbc543e"
+    },
+    {
+      "id": 28336,
+      "name": "埃布留斯荚株",
+      "front": "8b523e32b7f28d1277b5697e5898b95cb8176131abf097e89d499574f9d14269",
+      "back": "0f0a4ae1763379e4d715008d0f6229284805f21b7eca082b6a4d975c71726bf0"
+    },
+    {
+      "id": 28354,
+      "name": "仪式格里恩旗帜",
+      "front": "2b5a43015d4f66b1b65b5772e4f779ee6096c9e58ea0e5aeb9aca2eaaa3f0fc2",
+      "back": "d9cfb09f78862812a4edd334500953da575e9840124ecc4911f8e1b6d90c216e"
+    },
+    {
+      "id": 28432,
+      "name": "立式阿古尼特灯",
+      "front": "d9565818426884d9c0c011e945e37ff6f07a404f94a518a3b8fa519aada43fb9",
+      "back": "f3c2c7d89c0a7f96a83ca22533ce34739b43113fd72741ec29c0a3be4d2706f3"
+    },
+    {
+      "id": 28435,
+      "name": "阿古尼特原石补给",
+      "front": "671cd8782bc62ac72bd4a7d7e09db4de08b191ce7ce3e41bdbb43f5bac182803",
+      "back": "a907725cccd75ef6ec707949e341c9b7275055ca1503233d5d543c9f47797caa"
+    },
+    {
+      "id": 28469,
+      "name": "游牧民水葫芦",
+      "front": "2ae135b434c90343c2a97ea7d01c054e67281fefc84e5e5890ac439c9666b872",
+      "back": "aacc92e92aeb1a395ccfe72c1a769cb70f06be6c0dce5fb6ba39243b7735125b"
+    },
+    {
+      "id": 28470,
+      "name": "游牧民木制桌子",
+      "front": "3acbd50fa4a8926e75d7de6c084603eb9756348de11e58ac3a6b66fdea47b3e0",
+      "back": "8b1fbe17b1ee222c985b9422ce9daac03c87af770abe4e9092f912c0dc1caed3"
+    },
+    {
+      "id": 28471,
+      "name": "游牧民钢制灯笼",
+      "front": "ab5e6b47d952fe29924f4d2c1d2680a71380b03499dd0b0dcc9c735e389cc873",
+      "back": "b532859a8045be84ba76903e7355ebef935a36b6f023fa684c0af11310b1f858"
+    },
+    {
+      "id": 28475,
+      "name": "游牧民餐碗",
+      "front": "b2c2c0973dcc971253082ae47e87eca8a85da8fb519fb64eb0387b4bd41f5543",
+      "back": "d6f784a0052a1672ec9e9a14523cc5f0d8983eddbe33121b05268e0de900c1d9"
+    },
+    {
+      "id": 28482,
+      "name": "蓝色狐人软垫",
+      "front": "f2e1c7a1b08b615b18f7de0444b767d80fe7f512a639233b4dd6001614ad690c",
+      "back": "afcff29c2bc26147c4780deb30bfdcc810d7aa3c636e7a23469c7ca33760ceca"
+    },
+    {
+      "id": 28495,
+      "name": "伯拉勒斯劣酒瓶",
+      "front": "638279014e87ba4d0d5a39feb1b039d151801959c9f538d549131aa31b2a2f87",
+      "back": "df473f690c528b7a39057e7a1d36c6311f8d5f02b6b897d43e16cc0c926b1dea"
+    },
+    {
+      "id": 28510,
+      "name": "纳斯利亚分叉荆棘",
+      "front": "3a877f0af4a3712689acc528a2a6e1b15f02a885ee129e76edc04927623f2c3d",
+      "back": "dfc0abdb10abb654a5a86fd75eae2d93838b472a0ea51879fc94ed1ea85f80d0"
+    },
+    {
+      "id": 28512,
+      "name": "小型纳斯利亚荆棘根",
+      "front": "ed1e91f51ffa7ccf376d690ee90c0f99d171770969905c811c4a1e353482389d",
+      "back": "9a091821f8716fd37b9d751689c5ea45dce5cf140793df78726f5aa3dfc83a1f"
+    },
+    {
+      "id": 28540,
+      "name": "法夜心能壁灯",
+      "front": "517249b27aedcb996aa0ae84e50aff6c8676e195096920ad5568d86c9c0e7e31",
+      "back": "630f95d6877519a32bc0958171d856596dccc52e6c3191b880bee0d91b89eb53"
+    },
+    {
+      "id": 28547,
+      "name": "法夜灯笼花",
+      "front": "8e83f3cd08f28be5e85fa3e3f1f0a92194d64491969d686eae06a68dbb6de606",
+      "back": "7568cef88a3c676bfb3b0f3a44f2d45e8f7be775e9e758df27b7be4ac11a728c"
+    },
+    {
+      "id": 28556,
+      "name": "繁茂天界月枝",
+      "front": "9fc2d0c2237bb3c2b7180b5715a9ea916131fdcc0c51ade7ee9534e1168134a6",
+      "back": "6a76b1882e38e2b2fa379078844a5a7fe3877062f454e0d7b85e14bb20414bd2"
+    },
+    {
+      "id": 28557,
+      "name": "斜倚的天界兰花",
+      "front": "d59c360b777a10a41f706f650a3b571019bf1abad63e3f285159861291e6d12e",
+      "back": "1b68f2505f3732e5b4bfd4f2b0f085572c575eb2be1aeee9c1726746996486e2"
+    },
+    {
+      "id": 28559,
+      "name": "玛卓克萨斯心能水晶",
+      "front": "dbaa9b45c7479f385c2aad8af9d962e409e9c1e596bf137ed92f8b501ca368c3",
+      "back": "fad0039d24f4647d2d3f80f2b55fcaebff9e8e8023efacd2a89923147e4d1c28"
+    },
+    {
+      "id": 28569,
+      "name": "符文格里恩圣匣",
+      "front": "0133349e0af598ee051f76a2887b285265efe9eed04ced65d549720adf66fdee",
+      "back": "ff0843f57b99ea9b38bbacb9e84576526b3915b5f8fea711f3ea7b339a6faec1"
+    }
+  ],
+  "errors": [],
+  "requests": [
+    "/js/decorModelViewer.js?v=209",
+    "/js/vendor/three-r180/three.module.js",
+    "/js/vendor/three-r180/GLTFLoader.js",
+    "/js/vendor/three-r180/OrbitControls.js",
+    "/js/vendor/three-r180/BufferGeometryUtils.js",
+    "/js/vendor/three-r180/three.core.js",
+    "/assets/decor-models/task084/27684.glb",
+    "/assets/decor-models/task084/27684.glb",
+    "/assets/decor-models/task084/25325.glb",
+    "/assets/decor-models/task084/26881.glb",
+    "/assets/decor-models/task084/27220.glb",
+    "/assets/decor-models/task084/27684.glb",
+    "/assets/decor-models/task084/28319.glb",
+    "/assets/decor-models/task084/28324.glb",
+    "/assets/decor-models/task084/28326.glb",
+    "/assets/decor-models/task084/28327.glb",
+    "/assets/decor-models/task084/28336.glb",
+    "/assets/decor-models/task084/28354.glb",
+    "/assets/decor-models/task084/28432.glb",
+    "/assets/decor-models/task084/28435.glb",
+    "/assets/decor-models/task084/28469.glb",
+    "/assets/decor-models/task084/28470.glb",
+    "/assets/decor-models/task084/28471.glb",
+    "/assets/decor-models/task084/28475.glb",
+    "/assets/decor-models/task084/28482.glb",
+    "/assets/decor-models/task084/28495.glb",
+    "/assets/decor-models/task084/28510.glb",
+    "/assets/decor-models/task084/28512.glb",
+    "/assets/decor-models/task084/28540.glb",
+    "/assets/decor-models/task084/28547.glb",
+    "/assets/decor-models/task084/28556.glb",
+    "/assets/decor-models/task084/28557.glb",
+    "/assets/decor-models/task084/28559.glb",
+    "/assets/decor-models/task084/28569.glb",
+    "/assets/decor-models/task084/28556.glb",
+    "/assets/decor-models/task084/27684.glb",
+    "/assets/decor-models/task084/27684.glb",
+    "/assets/decor-models/task084/27220.glb",
+    "/js/decorModelViewer.js?v=209&retry=2",
+    "/js/vendor/three-r180/three.module.js",
+    "/js/vendor/three-r180/GLTFLoader.js",
+    "/js/vendor/three-r180/OrbitControls.js",
+    "/js/vendor/three-r180/BufferGeometryUtils.js",
+    "/js/vendor/three-r180/three.core.js",
+    "/assets/decor-models/task084/27684.glb"
+  ]
+}

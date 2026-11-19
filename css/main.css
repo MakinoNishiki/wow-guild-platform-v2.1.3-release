@@ -5344,3 +5344,4 @@ img.class-icon[src$=".png"] { border-radius: 3px; }
 #hbResults > button { display: inline-block; margin: 12px 8px 0 0; }
 #hbFormError { color: var(--danger); }
 #hbFormError:empty { display: none; }
+#hbPhotoZone.hb-dragging { outline: 2px dashed var(--gold); outline-offset: 4px; border-radius: 4px; }

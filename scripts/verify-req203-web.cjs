@@ -16,6 +16,7 @@ const assert = require('node:assert/strict');
 const root = path.resolve(__dirname, '..');
 const output = process.env.WB_VERIFY_OUTPUT || path.join(root, 'docs/evidence/req203-cover-20261119');
 const host = '127.0.0.1';
+const checkDecor = process.argv.includes('--decor-engagement');
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 async function port() {
   const probe = net.createServer();
@@ -63,6 +64,14 @@ async function main() {
     await db.connect();
     await db.query('create role anon; create role authenticated; create role service_role bypassrls; create schema auth; create table auth.users(id uuid primary key, raw_user_meta_data jsonb)');
     for (const { user } of sessions) await db.query('insert into auth.users values ($1,$2)', [user.id, user.user_metadata]);
+    if (checkDecor) {
+      const records = JSON.parse(fs.readFileSync(path.join(root,'data/task083/catalog-current-2335.json'),'utf8'));
+      await db.query('create table decor_catalog (record_id integer primary key)');
+      await db.query('insert into decor_catalog select unnest($1::integer[])', [records.map(r=>r.record_id)]);
+      const migration = fs.readFileSync(path.join(root, 'sql/52_req209_decor_engagement.sql'), 'utf8');
+      await db.query(migration);
+      await db.query(migration);
+    }
     const migration = fs.readFileSync(path.join(root, 'sql/49_req203_housing_builds.sql'), 'utf8');
     await db.query(migration);
     await db.query(migration);
@@ -123,12 +132,19 @@ async function main() {
       }
       if (!req.url.startsWith('/rest/v1/')) { res.writeHead(404); return res.end(); }
       if (req.url.startsWith('/rest/v1/decor_catalog?')) {
+        if (checkDecor) {
+          const records = JSON.parse(fs.readFileSync(path.join(root,'data/task083/catalog-current-2335.json'),'utf8'));
+          const at = Number(new URL(req.url,'https://localhost').searchParams.get('offset') || 0);
+          res.setHeader('Content-Type','application/json');
+          return res.end(JSON.stringify(records.slice(at, at + 1000)));
+        }
         const fixture = JSON.parse(fs.readFileSync(path.join(root, 'docs/evidence/bug127-20261118/catalog-row-126.json'), 'utf8'));
         res.setHeader('Content-Type', 'application/json'); return res.end(JSON.stringify([{ entry_type: 1,
           category_ids: [], subcategory_ids: [], tags: [], placement_cost: 1, ...fixture }]));
       }
       // Unrelated legacy modules see an empty guild and empty notifications.
-      if (!/^\/rest\/v1\/(?:housing_build|rpc\/save_housing_build)/.test(req.url)) {
+      if (!/^\/rest\/v1\/(?:housing_build|rpc\/save_housing_build)/.test(req.url) &&
+          !(checkDecor && /^\/rest\/v1\/(?:decor_item_|rpc\/(?:record_decor|set_decor))/.test(req.url))) {
         res.setHeader('Content-Type', 'application/json'); return res.end('[]');
       }
       const upstream = http.request({ hostname: host, port: restPort, path: req.url.slice(8), method: req.method, headers: req.headers }, incoming => {
@@ -170,6 +186,11 @@ async function main() {
     const author = await open(sessions[0], 1920);
     const other = await open(sessions[1], 1366);
     const guest = await open(null, 1366);
+    if (checkDecor) {
+      await require('./verify-req209-engagement.cjs')({ db, author, guest, other, base, output });
+      assert.deepEqual(errors, []);
+      return;
+    }
     let visitorCopyRequests = 0;
     guest.on('request', req => { if (req.url().includes('/housing-builds/copy-code')) visitorCopyRequests++; });
     const results = author.locator('#hbResults');

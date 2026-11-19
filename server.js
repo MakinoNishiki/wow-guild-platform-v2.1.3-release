@@ -61,6 +61,8 @@ const MIME = {
   ".css": "text/css; charset=utf-8",
   ".js": "application/javascript; charset=utf-8",
   ".json": "application/json; charset=utf-8",
+  ".glb": "model/gltf-binary",
+  ".gltf": "model/gltf+json",
   ".png": "image/png",
   ".jpg": "image/jpeg",
   ".jpeg": "image/jpeg",
@@ -1518,6 +1520,7 @@ function serveFile(res, filePath, req) {
 const handleLootObservations = require('./lib/lootObservationRoutes.cjs')({auth:verifyTokenCached,get:supabaseRestGet,write:supabaseRestWrite,body:readBody});
 const handlePeople = require('./lib/peopleRoutes.cjs')({auth:verifyTokenCached,get:supabaseRestGet,write:supabaseRestWrite,body:readBody});
 const handleHousingBuilds = require('./lib/housingBuildRoutes.cjs')({auth:verifyTokenCached,get:supabaseRestGet,write:supabaseRestWrite,body:readBody});
+const handleDecorEngagement = require('./lib/decorEngagementRoutes.cjs')({ auth: verifyTokenCached, get: supabaseRestGet, write: supabaseRestWrite, body: readBody, signingKey: getServiceRoleKey });
 const handleWclUser = require('./lib/wclUserRoutes.cjs')({
   auth: verifyTokenCached, role: getGuildRoleCached, get: supabaseRestGet,
   write: supabaseRestWrite, body: readBody,
@@ -1584,6 +1587,7 @@ const server = http.createServer(async (req, res) => {
   if (await handleLootObservations(req, res, corsHeaders, urlPath)) return;
   if (await handlePeople(req, res, corsHeaders, urlPath)) return;
   if (await handleHousingBuilds(req, res, corsHeaders, urlPath)) return;
+  if (await handleDecorEngagement(req, res, corsHeaders, urlPath)) return;
   if (await handleWclUser(req, res)) return;
 
   // API: Supabase config

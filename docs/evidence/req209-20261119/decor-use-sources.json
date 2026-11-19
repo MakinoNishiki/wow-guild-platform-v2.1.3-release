@@ -1,0 +1,62 @@
+{
+  "checked": "2026-11-19",
+  "identitySource": "data/task083/catalog-current-2335.json",
+  "scope": "国服 12.1.5 采集确定记录编号、物品编号和中文名称；摆放后功能来自逐件列出的境外玩家实测或操作演示。国服本次未做实机互动验证。烹饪只标记已报告的热源；“可互动”要求实际对装饰执行操作。",
+  "localInspection": "本机国服 zhCN gameobjectcache.wdb 只有文件头。现有国服目录未给出可用来识别每件装饰行为的交互类型字段。",
+  "records": [
+    {
+      "record_id": 1083,
+      "item_id": 245370,
+      "name": "神秘的书柜墙壁",
+      "enUS": "Secretive Bookcase Wall",
+      "abilities": [
+        "interactive"
+      ],
+      "observation": "玩家演示以书柜开闭隐藏通道，另有玩家直接关联相同装饰编号。",
+      "sources": [
+        "https://www.youtube.com/watch?v=nA5zK43khrk",
+        "https://www.reddit.com/r/WoWHousing/comments/1phrvpl/do_you_put_placeholder_content_in_parts_of_the/"
+      ]
+    },
+    {
+      "record_id": 8236,
+      "item_id": 251545,
+      "name": "烈风烹饪烤架",
+      "enUS": "Razorwind Cooking Grill",
+      "abilities": [
+        "cooking"
+      ],
+      "observation": "玩家报告在部落住宅使用这件烤架烹饪。",
+      "sources": [
+        "https://www.reddit.com/r/wow/comments/1pg1s1t/neighborhood_functionality_and_cooking_surprise/"
+      ]
+    },
+    {
+      "record_id": 9472,
+      "item_id": 253590,
+      "name": "燃煤炉灶",
+      "enUS": "Coal-Fired Stovetop",
+      "abilities": [
+        "cooking"
+      ],
+      "observation": "玩家报告此炉灶可以承担烹饪热源。",
+      "sources": [
+        "https://www.reddit.com/r/wow/comments/1pg1s1t/neighborhood_functionality_and_cooking_surprise/"
+      ]
+    },
+    {
+      "record_id": 25546,
+      "item_id": 276230,
+      "name": "佩佩",
+      "enUS": "Pepe",
+      "abilities": [
+        "interactive"
+      ],
+      "observation": "玩家在正常住宅摆放后右键点击，佩佩落到角色头上。",
+      "sources": [
+        "https://us.forums.blizzard.com/en/wow/t/i-found-pepe/2335103",
+        "https://www.wowhead.com/guide/player-housing/horde-neighborhood-plots-biomes-maps-razorwind-shores"
+      ]
+    }
+  ]
+}
