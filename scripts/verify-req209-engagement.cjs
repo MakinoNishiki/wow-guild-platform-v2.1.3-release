@@ -52,8 +52,8 @@ module.exports = async ({ db, author, guest, other, base, output }) => {
   assert.equal(counts,1);
   const data = await (await fetch(base + '/api/decor-engagement/summary')).json();
   assert.equal(data.rows.find(row => row.record_id===126).views,4);
-  assert.deepEqual(Object.keys(data.rows[0]).sort(),['likes','record_id','views']);
-  checks.push('重复浏览写入合并；列表汇总只包含家具编号、点赞数和浏览数');
+  assert.deepEqual(Object.keys(data.rows[0]).sort(),['favorites','likes','record_id','views']);
+  checks.push('重复浏览写入合并；公开列表每项只含家具编号、点赞数、收藏人数和浏览数');
   await author.locator('.dh-modal-close').click();
   await author.locator('#dhSearch').fill('');
   await author.locator('#dhSort').selectOption('views');

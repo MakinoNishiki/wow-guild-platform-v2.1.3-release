@@ -324,12 +324,32 @@
   }
 };
 
-  window.DecorDict = {
+  const BUILD_TAG_GROUPS = [
+    { key: 'style', label: '装修风格', tags: '粗犷 民间 阔绰 大胆 休闲 悠然 可爱 高雅 邪能 奢华 光明 机械 自然 海盗 浪漫 朴素 幽灵 虚空 奇异 魔法'.split(' ') },
+    { key: 'race', label: '种族风格', tags: RACE_TAGS.map(tag => tag.label) },
+    { key: 'expansion', label: '资料片主题', tags: EXPANSION_TAGS.map(tag => tag.label) },
+    { key: 'season', label: '季节节庆', tags: '节日/事件 美酒节 悼念日 万圣节 春天 夏天 秋季 冬天'.split(' ') },
+    { key: 'color', label: '配色', tags: '红色 橙色 黄色 绿色 蓝色 紫色 棕色 黑色 白色 灰色 粉色'.split(' ') },
+  ];
+  const presetWorkTags = new Set(BUILD_TAG_GROUPS.flatMap(group => group.tags));
+  function validateBuildTags(preset, custom) {
+    if (!Array.isArray(preset) || !Array.isArray(custom)) return '请检查作品标签格式。';
+    if (preset.length > 6) return '预设标签最多选 6 个。';
+    if (custom.length > 3) return '自定义标签最多添加 3 个。';
+    if (preset.some(tag => !presetWorkTags.has(tag))) return '请选择列表中的预设标签。';
+    if (custom.some(tag => typeof tag !== 'string' || !tag.trim() || tag.trim() !== tag ||
+        [...tag].length > 20 || /[\u0000-\u001f\u007f]/u.test(tag))) return '自定义标签请填写 1 至 20 个字符。';
+    if (new Set(preset).size !== preset.length || new Set(custom).size !== custom.length) return '同类标签请勿重复添加。';
+    return '';
+  }
+  const dict = {
     MODEL_ICON_OVERRIDES, ROOM_ICON_OVERRIDES,
     CURRENCY_NAMES, ITEM_NAMES, TEXTURE_CURRENCY_NAMES,
     CATEGORY_NAMES, CATEGORY_FILTER_ORDER, SUBCATEGORY_NAMES,
     PET_SUBCATEGORY_ID, SIZE_NAMES, QUALITY_NAMES,
-    SOURCE_TYPES, EXPANSION_TAGS, RACE_TAGS, COST_TIERS, ENV_OPTIONS,
+    SOURCE_TYPES, EXPANSION_TAGS, RACE_TAGS, COST_TIERS, ENV_OPTIONS, BUILD_TAG_GROUPS, validateBuildTags,
     PAGE_SIZE: 60, // ⑥ 定案：每页 60 件 + img lazy
   };
+  if (typeof window !== 'undefined') window.DecorDict = dict;
+  if (typeof module !== 'undefined' && module.exports) module.exports = dict;
 })();

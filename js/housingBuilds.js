@@ -5,6 +5,8 @@ window.HousingBuilds = (() => {
   const byId = id => document.getElementById(id);
   const userId = () => window.CloudSync?.getCachedUser()?.id || '';
   let activeRoute = '';
+  let mode = 'latest';
+  let tag = '';
   let page = 0;
   let request = 0;
   let editor = null;
@@ -170,6 +172,7 @@ window.HousingBuilds = (() => {
     byId('hbCode').required = visible;
   }
   function clearEditor() {
+    HousingBuildFurniture.clearEditor();
     editor = null;
     byId('hbForm').reset();
     byId('hbPreview').replaceChildren();
@@ -184,6 +187,8 @@ window.HousingBuilds = (() => {
     byId('hbEditorTitle').textContent = row ? '编辑作品' : '创建作品';
     byId('hbTitle').value = row?.title || '';
     byId('hbDescription').value = row?.description || '';
+    HousingBuildTags.edit(row);
+    HousingBuildFurniture.mountEditor(row);
     byId('hbCode').value = row?.blueprint_code || '';
     byId('hbCodePublic').checked = row?.code_public || false;
     byId('hbAllowCopy').checked = !!row?.allow_copy;
@@ -235,13 +240,18 @@ window.HousingBuilds = (() => {
       return;
     }
     if (!published && context.published && !confirm('撤回后，访客将无法打开此作品。确定撤回？')) return;
+    const tags = HousingBuildTags.read();
+    if (!tags) return;
+    let furniture;
+    try { furniture = HousingBuildFurniture.editorValue(); } catch(e) { error.textContent = e.message; return; }
     const payload = { id: context.id, revision: context.revision, title, description: byId('hbDescription').value.trim(),
       blueprint_code: code || null, code_public: byId('hbCodePublic').checked, allow_copy: byId('hbAllowCopy').checked,
-      screenshots: context.photos, published };
+      screenshots: context.photos, published, ...tags, furniture_items: furniture };
     saving = true;
     error.textContent = '';
     const fields = byId('hbForm').querySelectorAll('button, input, textarea');
     fields.forEach(control => { control.disabled = true; });
+    HousingBuildFurniture.setBusy(true);
     try {
       await cloudCrud('housingBuild', 'save', payload, { silentError: true });
       if (context !== editor || context.owner !== userId()) return;
@@ -255,6 +265,7 @@ window.HousingBuilds = (() => {
     } finally {
       saving = false;
       fields.forEach(control => { control.disabled = false; });
+      HousingBuildFurniture.setBusy(false);
       if (editor) setEditorControls();
     }
   }
@@ -374,6 +385,7 @@ window.HousingBuilds = (() => {
     card.append(heading);
     const byline = mine ? (row.published ? '已发布' : '私有草稿') : row.author_name;
     card.append(element('p', byline + ' · ' + new Date(row.updated_at).toLocaleDateString('zh-CN'), 'hb-byline'));
+    HousingBuildTags.append(card, row);
     if (detail && photos.length) card.append(album(row, photos));
     if (row.description) card.append(element('p', row.description, 'hb-description'));
     if (mine) {
@@ -397,6 +409,8 @@ window.HousingBuilds = (() => {
         card.append(copy);
       } else card.append(element('span', row.code_public ? '作者未开放蓝图复制' : '作者仅展示作品', 'hb-byline'));
     }
+    if (detail) HousingBuildFurniture.mountDetail(card,row);
+    if (detail && !mine) window.HousingCommunity.mount(card,row);
     return card;
   }
   async function show(route) {
@@ -405,6 +419,28 @@ window.HousingBuilds = (() => {
     const ticket = ++request;
     const mine = route === base + '/mine';
     const detail = !mine && route !== base;
+    window.HousingCommunity.adminEntry(document.querySelector('#page-community .hb-toolbar'));
+    const discover = byId('hbDiscover');
+    discover.hidden = mine || detail;
+    const modeField = byId('hbBrowseMode');
+    const tagField = byId('hbBrowseTag');
+    if (!userId() && mode === 'favorites') mode = 'latest';
+    modeField.querySelector('option[value=favorites]').hidden = !userId();
+    modeField.value = mode;
+    tagField.value = tag;
+    const options = byId('hbBrowseTags');
+    if (!options.children.length) {
+      for (const group of DecorDict.BUILD_TAG_GROUPS) for (const value of group.tags) options.append(new Option(value,value));
+    }
+    function applyFilters() {
+      mode = modeField.value; tag = tagField.value.trim();
+      page = 0; show(base);
+    }
+    modeField.onchange = applyFilters;
+    discover.onsubmit = event => { event.preventDefault(); applyFilters(); };
+    const clear = byId('hbClearFilters');
+    clear.hidden = !tag && mode === 'latest';
+    clear.onclick = () => { modeField.value = 'latest'; tagField.value = ''; applyFilters(); };
     const back = byId('hbBack');
     back.hidden = !detail;
     back.onclick = () => { location.hash = base; };
@@ -423,13 +459,22 @@ window.HousingBuilds = (() => {
     }
     target.replaceChildren(element('p', '正在读取作品…'));
     try {
-      const result = await CloudSync.readHousingBuilds(mine ? 'mine' : 'gallery', detail ? { id: route.slice(base.length + 1) } : { page });
-      if (ticket !== request || (mine && owner !== userId())) return;
+      const filtered = !detail && !mine && (mode !== 'latest' || !!tag);
+      const scope = mine ? 'mine' : filtered ? 'discover' : 'gallery';
+      const result = await CloudSync.readHousingBuilds(scope, detail ? {id:route.slice(base.length+1)} : {page,mode,tag});
+      if (ticket !== request || owner !== userId()) return;
       const grid = element('div', null, detail ? 'hb-detail' : 'hb-grid');
-      result.rows.forEach(row => grid.append(work(row, mine, detail)));
+      result.rows.forEach((row,index) => {
+        const card = work(row,mine,detail);
+        if (filtered && mode === 'hot') {
+          const rank = element('p','第 ' + (page * 24 + index + 1) + ' 名 · 近七日 ' + row.recent7d + ' 次互动','hb-hot-rank');
+          card.querySelector('h3').before(rank);
+        }
+        grid.append(card);
+      });
       target.replaceChildren(grid);
       if (!detail) {
-        if (!result.rows.length) target.append(element('p', mine ? '还没有自己的作品。' : '暂无公开作品。'));
+        if (!result.rows.length) target.append(element('p', mine ? '还没有自己的作品。' : tag ? '没有符合该标签的作品。' : mode === 'hot' ? '近七日暂无互动作品。' : mode === 'favorites' ? '还没有收藏的公开作品。' : '暂无公开作品。'));
         function move(step) { page += step; show(route); }
         if (page > 0) target.append(button('上一页', () => move(-1)));
         if (result.hasMore) target.append(button('下一页', () => move(1)));
@@ -439,12 +484,13 @@ window.HousingBuilds = (() => {
     }
   }
   function reset() {
+    HousingBuildFurniture.reset();
     ++request;
     if (editor) closeModal(modal);
     byId('hbResults').replaceChildren();
   }
   function photosChanged() {
-    return !!editor && (editor.preparing || editor.initialIds !== editor.photos.map(photo => photo.id).join(','));
+    return !!editor && (editor.preparing || editor.initialIds !== editor.photos.map(photo => photo.id).join(',') || HousingBuildFurniture.changed());
   }
   return { show, reset, clearEditor, photosChanged, isSaving: () => saving };
 })();

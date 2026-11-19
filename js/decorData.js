@@ -53,12 +53,44 @@
     state.rows = rows;
   }
 
+  // 作品附单与图鉴共用只读目录；未打开图鉴时也可加载，不触发方案单或界面挂载。
+  let catalogRead = null, catalogReady = false;
+  function readRows() {
+    if (catalogRead) return catalogRead;
+    catalogRead = (async () => {
+      const response = await fetch('/api/supabase-config');
+      if (!response.ok) throw new Error('无法获取图鉴配置，请重试');
+      const cfg = await response.json();
+      state.url = (cfg.url || cfg.supabaseUrl || '').replace(/\/+$/, '');
+      state.anon = cfg.anonKey || cfg.supabaseAnonKey || '';
+      if (!state.url || !state.anon) throw new Error('图鉴配置不完整');
+      await loadData();
+      catalogReady = true;
+      return state.rows;
+    })().catch(error => { catalogRead = null; throw error; });
+    return catalogRead;
+  }
+  let focusedRecord = null;
+  function showFocusedRecord() {
+    if (!focusedRecord || !catalogReady || !filterBar || !main || !$('dhSearch')) return;
+    const row = state.rows.find(item => item.entry_type === 1 && item.record_id === focusedRecord);
+    if (!row) { focusedRecord = null; planToast('图鉴暂未收录这件家具', true); return; }
+    focusedRecord = null;
+    resetFilters();
+    state.search = String(row.name || '').toLowerCase();
+    $('dhSearch').value = row.name;
+    $('dhSearchClear').style.display = 'block';
+    refreshChips(); render(false);
+    closeDetail();
+    openDetail(row, main.querySelector(`[data-rid="${row.record_id}"]`));
+  }
+
   // REQ-209：同组 OR、跨组 AND；仅使用目录真实标签和可核验能力。
   const FILTER_KEYS = ['category', 'source', 'expansion', 'race', 'costTier', 'env', 'color', 'style', 'faction', 'feature', 'ability'];
   const ABILITY_LABELS = { cooking: '可烹饪', interactive: '可互动', effect: '有特效' };
   const TAG_GROUP_LABELS = {
     color: ['红色', '橙色', '黄色', '绿色', '蓝色', '紫罗兰', '紫色', '棕色', '黑色', '白色', '灰色', '粉色'],
-    style: ['粗犷', '民间', '阔绰', '大胆', '休闲', '悠然', '可爱', '高雅', '邪能', '奢华', '光明', '机械', '自然', '海盗', '浪漫', '朴素', '幽灵', '虚空', '奇异', '魔法'],
+    style: window.DecorDict.BUILD_TAG_GROUPS.find(group => group.key === 'style').tags,
     faction: ['暴风城', '联盟', '部落', '温西尔', '法夜', '格里恩', '通灵领主']
   };
   let filterGroups = [];
@@ -209,7 +241,11 @@
     if ($('dhSort')) $('dhSort').value = state.sort;
   }
   window.addEventListener('decor-engagement-change', () => {
-    if (filterBar && (state.sort === 'likes' || state.sort === 'views')) { refreshCount(); render(false); }
+    if (filterBar && (state.sort === 'likes' || state.sort === 'views')) {
+      refreshCount();
+      render(false);
+    } else if (main) window.DecorEngagement?.refresh?.(main);
+    if (modalEl) window.DecorEngagement?.refresh?.(modalEl);
   });
 
   // ---- 网格渲染 ----
@@ -315,6 +351,7 @@
       <div class="dh-cat">${esc(catPathText(r))}</div>
       <div class="dh-src${src.unknown ? ' dh-src-unknown' : ''}">${esc(src.text)}</div>
       ${badges.length ? `<div class="dh-badges">${badges.join('')}</div>` : ''}
+      <div class="dh-card-metrics" data-metrics="${r.record_id}"></div>
       <div class="dh-plan-entry"><button type="button" class="dh-card-add${planQtyOf(r.record_id) ? ' added' : ''}" data-add="${r.record_id}">${planAddLabel(r.record_id)}</button>${planTargetButton(r)}</div>
     </div>`;
   }
@@ -358,15 +395,16 @@
 
     [...main.querySelectorAll('.dh-card')].forEach(card => {
       const open = () => openDetail(state.rows.find(r => r.record_id === +card.dataset.rid), card);
-      card.onclick = open;
-      card.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); } };
+      card.onclick = e => { if (!e.target.closest('button')) open(); };
+      card.onkeydown = e => { if (e.target === card && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); open(); } };
     });
     // 任务书 #58-补丁：卡片通栏「加入方案单」按钮（click/keydown 双 stopPropagation——焦点按钮 Enter/Space 只加单，不冒泡触发卡片开详情）
     [...main.querySelectorAll('[data-add]')].forEach(btn => {
-      btn.onclick = e => { e.stopPropagation(); planAdd(+btn.dataset.add); };
+      btn.onclick = e => { e.stopPropagation(); favoriteOrOpen(+btn.dataset.add, 'card'); };
       btn.onkeydown = e => e.stopPropagation();
     });
     bindPlanTargets(main, 'card');
+    window.DecorEngagement?.refresh?.(main);
     const pager = $('dhPager');
     if (pager) [...pager.querySelectorAll('button[data-pg]')].forEach(btn => btn.onclick = () => {
       if (btn.disabled) return;
@@ -499,7 +537,7 @@
   function previewEntryHtml(r) {
     const command = gamePreviewCommand(r);
     return `<div class="dh-game-preview"><div class="dh-sec-title">游戏内预览</div>${command
-      ? `<button type="button" class="btn btn-secondary dh-copy-game-preview">复制游戏内预览命令</button><p class="dh-group-note dh-game-preview-note" role="status">复制后粘贴到游戏聊天框，按回车打开官方模型预览。不会购买或摆放家具。</p><input class="form-input dh-game-preview-command" aria-label="游戏内预览命令" readonly hidden value="${esc(command)}">`
+      ? `<button type="button" class="btn btn-secondary dh-copy-game-preview">点击游戏内预览</button><p class="dh-game-preview-note" role="status"></p><input class="form-input dh-game-preview-command" aria-label="游戏内预览命令" readonly hidden value="${esc(command)}">`
       : `<p class="dh-group-note">${r.entry_type === 2 ? '房间/户型暂不提供家具模型预览命令。' : '缺少可用的家具编号，暂无法生成预览命令。'}</p>`}</div>`;
   }
   function closeDetail() {
@@ -557,7 +595,7 @@
     modalEl.addEventListener('click', e => { if (e.target === modalEl) closeDetail(); });
     modalEl.querySelector('.dh-modal-close').onclick = closeDetail;
     // 任务书 #58-补丁：详情弹窗底部加单主按钮（行为同卡片：加入/已加入 ×N 双态，点击 qty+1）
-    modalEl.querySelector('.dh-detail-add').onclick = () => planAdd(r.record_id, 'detail');
+    modalEl.querySelector('.dh-detail-add').onclick = () => favoriteOrOpen(r.record_id, 'detail');
     bindPlanTargets(modalEl, 'detail');
     const copyPreview = modalEl.querySelector('.dh-copy-game-preview');
     if (copyPreview) {
@@ -567,8 +605,11 @@
         const note = currentModal.querySelector('.dh-game-preview-note');
         try {
           await navigator.clipboard.writeText(gamePreviewCommand(r));
+          input.hidden = true;
+          note.dataset.state = 'success';
           note.textContent = '已复制。在游戏聊天框粘贴并按回车即可预览。';
         } catch (_) {
+          note.dataset.state = 'manual';
           input.hidden = false; input.focus(); input.select();
           note.textContent = '浏览器未允许自动复制，命令已选中，请按 Ctrl+C 复制。';
         }
@@ -601,9 +642,9 @@
     cloudName: '我的方案单',
     notice: '',         // 一次性提示（草稿还原）
     saving: false,
+    dirty: false,
     loadFailed: false,
     loading: false,
-    built: false,
   };
 
   function planCount() { return plan.items.reduce((s, it) => s + it.qty, 0); }
@@ -635,7 +676,7 @@
     if (planOwnerId !== planOwner()) return; // late UI work cannot write a different account's draft
     try {
       const all = planDraftReadAll();
-      if (plan.items.length) all.plans[planDraftKey()] = { items: plan.items, updatedAt: Date.now() };
+      if (plan.dirty || (!planLoggedIn() && plan.items.length)) all.plans[planDraftKey()] = { items: plan.items, updatedAt: Date.now() };
       else delete all.plans[planDraftKey()];
       if (Object.keys(all.plans).length) localStorage.setItem(planDraftStorageKey(), JSON.stringify(all));
       else localStorage.removeItem(planDraftStorageKey());
@@ -643,11 +684,10 @@
   }
   function planDraftLoad() {
     const d = planDraftReadAll().plans[planDraftKey()];
-    return (d && Array.isArray(d.items) && d.items.length) ? d : null;
+    return (d && Array.isArray(d.items)) ? d : null;
   }
   // 登录态认领 'anon' 槽（WP1 旧草稿 / 公示壳未登录组单）→ 一次性迁入当前方案槽，认领后不再回潮
   function planDraftAdoptAnon() {
-    if (planDraftKey() === 'anon') return;
     const all = planDraftReadAll();
     try {
       const old = JSON.parse(localStorage.getItem(PLAN_DRAFT_KEY) || '{"plans":{}}');
@@ -706,6 +746,7 @@
     const cloudItems = cur && Array.isArray(cur.items) && cur.items.length ? cur.items : null;
     planDraftAdoptAnon(); // 先认领 anon 遗留槽，再按三分支合并
     const draft = planDraftLoad();
+    plan.dirty = !!draft;
     if (draft) {
       plan.items = draft.items.map(it => ({ record_id: it.record_id | 0, qty: Math.max(1, it.qty | 0) }));
       plan.notice = '已还原你上次未保存的组单，保存后覆盖云端';
@@ -720,6 +761,7 @@
     const owner = planOwner();
     if (planOwnerId !== owner) {
       document.querySelector('.dh-plan-target-dialog[open]')?.close();
+      plan.dirty = false;
       planOwnerId = owner; ++planLoadEpoch; plan.loadFailed = planLoggedIn(); plan.loading = false;
       plan.items = []; plan.plans = []; plan.currentId = null; plan.notice = ''; plan.cloudName = '我的方案单';
       planRender();
@@ -738,8 +780,7 @@
       const draft = planDraftLoad();
       plan.items = draft ? draft.items.map(it => ({ record_id: it.record_id | 0, qty: Math.max(1, it.qty | 0) })) : [];
     }
-    // 目录外 record_id（数据下线等）静默剔除
-    plan.items = plan.items.filter(it => state.rows.some(r => r.record_id === it.record_id));
+
     planRender();
   }
 
@@ -750,10 +791,10 @@
   }
   function planAddLabel(recordId) {
     const q = planQtyOf(recordId);
-    return q > 0 ? `已加入 ×${q}` : '加入方案单';
+    return q > 0 ? '查看方案单' : '收藏到方案单';
   }
   function planTargetButton(row) {
-    return `<button type="button" class="dh-plan-target" data-plan-target="${row.record_id}" aria-haspopup="dialog" title="选择方案或新建方案"${planLoggedIn() ? '' : ' hidden'}>选方案</button>`;
+    return `<button type="button" class="dh-plan-target" data-plan-target="${row.record_id}" aria-haspopup="dialog" aria-label="选方案" title="选择方案或新建方案"${planLoggedIn() ? '' : ' hidden'}>选方案</button>`;
   }
   function bindPlanTargets(root, from) {
     root.querySelectorAll('[data-plan-target]').forEach(btn => {
@@ -822,7 +863,7 @@
               (create && (previousIds.has(id) || plan.cloudName !== name))) throw new Error('无法确认目标方案，请核对方案列表。');
           if (window.WBTrack) WBTrack.event(create ? 'decor_plan_create' : 'decor_plan_switch', create ? {} : { plan_count: plan.plans.length });
         }
-        planAdd(row.record_id, from);
+        await planAdd(row.record_id, from);
       } catch (error) {
         if (owner === planOwner()) {
           await planInit(); // 写入可能已经成功。重新读出已有方案，再让作者决定是否重试。
@@ -838,24 +879,57 @@
     document.querySelectorAll('[data-plan-target]').forEach(btn => { btn.hidden = !planLoggedIn(); });
     [...document.querySelectorAll('[data-add]')].forEach(btn => {
       const rid = +btn.dataset.add;
+      btn.disabled = plan.loading || plan.saving || plan.loadFailed;
       btn.textContent = planAddLabel(rid);
       btn.classList.toggle('added', planQtyOf(rid) > 0);
     });
   }
 
   // 任务书 #58-补丁：from 区分来源（card=卡片通栏按钮 / detail=详情弹窗主按钮），默认 card
-  function planAdd(recordId, from) {
+  function favoriteOrOpen(recordId, from) {
+    if (planQtyOf(recordId)) {
+      closeDetail();
+      location.hash = '#/house/plan';
+      return;
+    }
+    return planAdd(recordId, from);
+  }
+  async function planAdd(recordId, from) {
     if (plan.loading || plan.loadFailed || plan.saving || planOwnerId !== planOwner()) {
       planToast('请等待方案读取或保存完成；如读取失败，可重新进入图鉴。', true);
       return;
     }
     const hit = plan.items.find(it => it.record_id === recordId);
     if (hit && hit.qty >= 99) { planToast('此家具在当前方案中已达 99 件上限', true); return; }
-    if (hit) hit.qty = Math.min(99, hit.qty + 1);
+    const owner = planOwner();
+    const qty = hit ? hit.qty + 1 : 1;
+    if (planLoggedIn()) {
+      plan.saving = true;
+      planRender();
+      try {
+        const planId = await planBridge().favorite({id: recordId, planId: plan.currentId, qty});
+        if (owner !== planOwner()) return;
+        plan.currentId = planId;
+        planDraftAdoptAnon();
+        plan.plans = window.appData.decorPlans;
+        plan.cloudName = plan.plans.find(p => p.id === planId)?.name || '我的方案单';
+      } catch (error) {
+        planToast('收藏未确认，请重试。' + (error.message || ''), true);
+        return;
+      } finally {
+        plan.saving = false;
+        planRender();
+      }
+    }
+    if (planLoggedIn() && !plan.dirty) {
+      const saved = plan.plans.find(p => p.id === plan.currentId);
+      plan.items = saved.items.map(item => ({...item}));
+    } else if (hit) hit.qty = qty;
     else plan.items.push({ record_id: recordId, qty: 1 });
-    if (planLoggedIn()) plan.notice = '当前方案有未保存的修改，点击保存可同步。';
+    if (!hit && location.hash !== '#/house/plan') planUnread(1);
     planDraftSave();
     planRender();
+    if (planLoggedIn()) window.DecorEngagement?.load(true);
     const itemName = state.rows.find(row => row.record_id === recordId)?.name || '家具';
     planToast(`${itemName}已加入「${plan.cloudName}」，共 ${planQtyOf(recordId)} 件`);
     // 任务书 #56 登记事件（props ≤2KB；record_id 书载可带）
@@ -865,11 +939,15 @@
     const hit = plan.items.find(it => it.record_id === recordId);
     if (!hit) return;
     hit.qty = Math.max(1, Math.min(99, qty));
+    plan.dirty = true;
+    if (planLoggedIn()) plan.notice = '数量或清单已修改，保存后同步。';
     planDraftSave();
     planRender();
   }
   function planRemove(recordId) {
     plan.items = plan.items.filter(it => it.record_id !== recordId);
+    plan.dirty = true;
+    if (planLoggedIn()) plan.notice = '数量或清单已修改，保存后同步。';
     planDraftSave();
     planRender();
   }
@@ -878,12 +956,16 @@
   function planBatchRemove(recordIds) {
     const ids = new Set(recordIds.map(Number));
     plan.items = plan.items.filter(it => !ids.has(it.record_id));
+    plan.dirty = true;
+    if (planLoggedIn()) plan.notice = '数量或清单已修改，保存后同步。';
     planDraftSave();
     planRender();
   }
   function planBatchInc(recordIds) {
     const ids = new Set(recordIds.map(Number));
     plan.items.forEach(it => { if (ids.has(it.record_id)) it.qty = Math.min(99, it.qty + 1); });
+    plan.dirty = true;
+    if (planLoggedIn()) plan.notice = '数量或清单已修改，保存后同步。';
     planDraftSave();
     planRender();
   }
@@ -945,94 +1027,25 @@
     } catch (e) { planToast('删除失败：' + ((e && e.message) || '未知错误'), true); }
   }
 
-  // ---- 抽屉 DOM（fixed 挂 body，双壳自足；与 root 挂载点无关） ----
-  function planBuildDom() {
-    if (plan.built) return;
-    plan.built = true;
-    const wrap = document.createElement('div');
-    wrap.id = 'dhPlanRoot';
-    wrap.innerHTML = `
-      <button type="button" class="dh-plan-toggle" id="dhPlanToggle" aria-label="打开方案单">🧺 方案单 <span class="dh-plan-toggle-n" id="dhPlanToggleN">0</span></button>
-      <div class="dh-plan-scrim" id="dhPlanScrim"></div>
-      <aside class="dh-plan-drawer" id="dhPlanDrawer" aria-label="我的方案单">
-        <div class="dh-plan-head">
-          <span class="dh-plan-title">我的方案单</span>
-          <span class="dh-plan-count" id="dhPlanCount">0 件</span>
-          <button type="button" class="dh-plan-x" id="dhPlanClose" aria-label="收起方案单">&times;</button>
-        </div>
-        <div class="dh-plan-notice" id="dhPlanNotice" style="display:none"></div>
-        <div class="dh-plan-list" id="dhPlanList"></div>
-        <div class="dh-plan-foot">
-          <div class="dh-plan-cap" id="dhPlanCap"></div>
-          <div class="dh-plan-actions">
-            <button type="button" class="btn btn-primary" id="dhPlanSave">保存</button>
-            <button type="button" class="btn btn-secondary" id="dhPlanExport">导出文本清单</button>
-          </div>
-        </div>
-      </aside>`;
-    document.body.appendChild(wrap);
-    $doc('dhPlanToggle').onclick = () => planSetOpen(true);
-    $doc('dhPlanClose').onclick = () => planSetOpen(false);
-    $doc('dhPlanScrim').onclick = () => planSetOpen(false);
-    $doc('dhPlanSave').onclick = planSave;
-    $doc('dhPlanExport').onclick = planOpenExport;
-  }
-
-  function planSetOpen(open) {
-    planBuildDom();
-    $doc('dhPlanDrawer').classList.toggle('open', open);
-    $doc('dhPlanScrim').classList.toggle('open', open);
-  }
-
-  function planRender() {
-    planBuildDom();
-    const save = $doc('dhPlanSave');
-    if (save) { save.disabled = plan.loading || plan.loadFailed || plan.saving; save.textContent = plan.loading ? '读取中…' : '保存'; }
-    planRefreshEntries(); // 任务书 #58-补丁：加单入口双态同步（须在空清单早退前执行）
-    const n = planCount();
-    $doc('dhPlanToggleN').textContent = n;
-    $doc('dhPlanCount').textContent = `${n} 件`;
-    // 任务书 #58-WP2-1：徽标三处同源——侧栏「方案单」项徽标（应用壳独有，公示壳无此节点自动跳过）
-    const navBadge = document.getElementById('dhNavPlanBadge');
-    if (navBadge) { navBadge.textContent = n; navBadge.style.display = n > 0 ? '' : 'none'; }
-    // 独立页已挂载则同步重渲染（抽屉/卡片操作实时反映到页内表格与摘要卡）
-    if (planPageEl) planPageRender();
-    const cap = planCapacity();
-    const capEl = $doc('dhPlanCap');
-    capEl.textContent = `容量 ${cap.toLocaleString()} / ${DECOR_PLAN_CAPACITY_REF.toLocaleString()}`;
-    capEl.classList.toggle('over', cap > DECOR_PLAN_CAPACITY_REF); // 超限仅标红警示，不阻断
-    const noticeEl = $doc('dhPlanNotice');
-    if (plan.notice) { noticeEl.textContent = plan.notice; noticeEl.style.display = ''; }
-    else noticeEl.style.display = 'none';
-
-    const list = $doc('dhPlanList');
-    if (!plan.items.length) {
-      list.innerHTML = '<div class="dh-plan-empty">方案单还是空的<br><span>从左侧图鉴挑装饰加入方案单</span></div>';
-      return;
+  // 只在用户尚未查看方案单时显示新增收藏；按账号分开存放。
+  function planUnread(change = 0, clear = false) {
+    const key = 'wb_plan_unseen:' + planOwner();
+    let count = 0;
+    try {
+      count = clear ? 0 : Math.max(0, (Number(localStorage.getItem(key)) || 0) + change);
+      if (change || clear) localStorage.setItem(key, String(count));
+    } catch { /* 存储不可用时方案仍可使用 */ }
+    const badge = $doc('dhNavPlanBadge');
+    if (badge) {
+      badge.textContent = count > 99 ? '99+' : String(count);
+      badge.style.display = count ? '' : 'none';
+      badge.setAttribute('aria-label', count + ' 件新收藏');
     }
-    list.innerHTML = plan.items.map(it => {
-      const row = state.rows.find(r => r.record_id === it.record_id);
-      if (!row) return '';
-      const q = row.quality != null ? row.quality : 1;
-      return `<div class="dh-plan-row" data-rid="${it.record_id}">
-        <span class="dh-plan-icon"${window.LootTaxonomy?.itemQualityAttr(row.quality) || ''}><img src="${iconSrc(row)}" data-fallback="${iconFallback(row)}" alt="" loading="lazy" onerror="if(this.dataset.fallback){this.src=this.dataset.fallback;delete this.dataset.fallback}else{this.onerror=null;this.src='${PLACEHOLDER}'}"></span>
-        <span class="dh-plan-name dh-q${q}" title="${esc(row.name)}">${esc(row.name)}</span>
-        <span class="dh-plan-step">
-          <button type="button" class="dh-plan-step-btn" data-step="-1" ${it.qty <= 1 ? 'disabled' : ''} aria-label="减少数量">−</button>
-          <span class="dh-plan-qty">${it.qty}</span>
-          <button type="button" class="dh-plan-step-btn" data-step="1" ${it.qty >= 99 ? 'disabled' : ''} aria-label="增加数量">＋</button>
-        </span>
-        <button type="button" class="dh-plan-rm" data-rm="1" aria-label="移除">&times;</button>
-      </div>`;
-    }).join('');
-    [...list.querySelectorAll('.dh-plan-row')].forEach(rowEl => {
-      const rid = +rowEl.dataset.rid;
-      [...rowEl.querySelectorAll('[data-step]')].forEach(btn => btn.onclick = () => {
-        const cur = plan.items.find(it => it.record_id === rid);
-        if (cur) planSetQty(rid, cur.qty + (+btn.dataset.step));
-      });
-      rowEl.querySelector('[data-rm]').onclick = () => planRemove(rid);
-    });
+  }
+  function planRender() {
+    planRefreshEntries();
+    planUnread();
+    if (planPageEl) planPageRender();
   }
 
   // 迷你 toast（公开壳无 app.js showToast，双壳自足）
@@ -1062,12 +1075,13 @@
     }
     if (plan.saving) return;
     plan.saving = true;
-    const btn = $doc('dhPlanSave');
-    btn.disabled = true; btn.textContent = '保存中…';
+    const owner = planOwner();
+    planRender();
     try {
       await planBridge().save(plan.items, plan.cloudName || '我的方案单');
+      if (owner !== planOwner()) return;
       // 保存成功清当前方案草稿槽（云端为真源；#58-WP2-1 分键草稿——其他方案草稿槽不受影响）
-      plan.items = [];
+      plan.dirty = false;
       planDraftSave();
       await planPullCloud(); // 云端对齐（头名/明细以库为准）
       plan.notice = '';
@@ -1079,7 +1093,8 @@
       planToast('保存失败：' + ((e && e.message) || '未知错误'), true); // 禁止静默失败
     } finally {
       plan.saving = false;
-      btn.disabled = false; btn.textContent = '保存';
+      planRender();
+      window.DecorEngagement?.load(true);
     }
   }
 
@@ -1391,9 +1406,10 @@
 
   function mountPlanPage(el) {
     planPageEl = el;
+    planUnread(0, true);
     planPageRender();
   }
-  function activatePlanPage() { planDraftSave(); planInit().then(planPageRender); } // 重切页签刷新（方案可能在抽屉/卡片侧改过）
+  function activatePlanPage() { planUnread(0, true); planInit().then(planPageRender); } // 重切页签刷新（方案可能在抽屉/卡片侧改过）
 
   function planPageRowHtml(it) {
     const row = state.rows.find(r => r.record_id === it.record_id);
@@ -1485,7 +1501,8 @@
             <div class="dh-pp-sum-row">容量合计 <b class="${cap > DECOR_PLAN_CAPACITY_REF ? 'dh-pp-over' : ''}">${cap.toLocaleString()}</b> / ${DECOR_PLAN_CAPACITY_REF.toLocaleString()}</div>
             <div class="dh-pp-progress"><div class="dh-pp-progress-bar${cap > DECOR_PLAN_CAPACITY_REF ? ' over' : ''}" style="width:${capPct}%"></div></div>
             ${cap > DECOR_PLAN_CAPACITY_REF ? '<div class="dh-pp-over-hint">已超参考上限（游戏内预算随住宅等级变化，仅提示不阻断）</div>' : ''}
-            <button type="button" class="btn btn-primary dh-pp-export" id="dhPpExport">导出</button>
+            <button type="button" class="btn btn-primary dh-pp-export" id="dhPpSave"${plan.loading || plan.loadFailed || plan.saving ? ' disabled' : ''}>${plan.saving ? '保存中…' : '保存方案单'}</button>
+            <button type="button" class="btn btn-secondary dh-pp-export" id="dhPpExport">导出</button>
             <div class="dh-pp-sync">${logged ? (plan.loading ? '正在读取云端方案' : plan.loadFailed ? '读取失败 · 未更新云端' : plan.notice ? '有本地草稿 · 保存后同步' : '云端已读取 · 跨设备可用') : '未登录 · 草稿本地暂存，保存时跳登录'}</div>
           </div>
         </aside>
@@ -1494,9 +1511,9 @@
 
     // ---- 事件绑定 ----
     const $p = id => planPageEl.querySelector('#' + id);
-    $p('dhPpBack').onclick = () => { if (typeof switchPage === 'function') switchPage('decor'); };
+    $p('dhPpBack').onclick = () => { location.hash = '#/house/decor'; };
     const goDecor = $p('dhPpGoDecor');
-    if (goDecor) goDecor.onclick = () => { if (typeof switchPage === 'function') switchPage('decor'); };
+    if (goDecor) goDecor.onclick = () => { location.hash = '#/house/decor'; };
     if (logged) {
       const selEl = $p('dhPpPlanSel');
       selEl.dataset.current = String(plan.currentId); // 异步切换落地标记（verify/测试可观测）
@@ -1508,6 +1525,8 @@
       $p('dhPpRename').onclick = planActionRename;
       $p('dhPpDelete').onclick = planActionDelete;
     }
+    if (plan.saving) planPageEl.querySelectorAll('button,select,input').forEach(control => { control.disabled = true; });
+    $p('dhPpSave').onclick = planSave;
     $p('dhPpExport').onclick = planOpenExport;
     // 表格行交互（复用抽屉同源函数）
     [...planPageEl.querySelectorAll('tbody tr')].forEach(tr => {
@@ -1556,20 +1575,12 @@
     filterBar = $('dhFilterBar');
     main = $('dhMain');
     state.loadError = '';
-    let cfg;
     try {
-      const r = await fetch('/api/supabase-config');
-      if (!r.ok) throw new Error('HTTP ' + r.status);
-      cfg = await r.json();
-    } catch (e) { showError('无法获取服务配置，请检查网络后重试'); return; }
-    state.url = (cfg.url || cfg.supabaseUrl || '').replace(/\/+$/, '');
-    state.anon = cfg.anonKey || cfg.supabaseAnonKey || '';
-    if (!state.url || !state.anon) { showError('服务配置不完整'); return; }
-    try {
-      await loadData();
+      await readRows();
     } catch (e) { showError(e.message || '数据加载失败'); return; }
     buildFilterBar();
     render();
+    showFocusedRecord();
     window.DecorEngagement?.load().catch(() => {}); // 排序异步更新，统计不可用不阻断目录。
     planInit(); // 任务书 #58-WP1：抽屉初始化（草稿/云端合并三分支）+ 入口徽标
   }
@@ -1578,14 +1589,25 @@
   // activate()：图鉴为只读目录数据（变更只走 sql 迁移，无前端写点），无脏标记链路——重切页签零请求，仅作对称占位。
   let started = false;
   window.DecorCatalog = {
+    readRows,
+    sourceHtml: renderSourceBlock,
+    hideDetail: () => { focusedRecord = null; closeDetail(); },
+    focusRecord(id) {
+      if (!Number.isSafeInteger(id) || id <= 0) return;
+      focusedRecord = id;
+      showFocusedRecord();
+    },
     mount(el) {
       if (started) return;
       started = true;
       root = el || document;
       boot();
     },
-    activate() { planDraftSave(); planInit(); },
-    syncPersonalContext() { if (started && planOwnerId !== planOwner()) planInit(); },
+    activate() { window.DecorEngagement?.load(); planInit(); showFocusedRecord(); },
+    syncPersonalContext() {
+      planUnread();
+      if (started && planOwnerId !== planOwner()) { window.DecorEngagement?.load(); planInit(); }
+    },
     // 任务书 #58-WP2-1：方案单独立页（应用壳专用；公示壳不调用，惰性不触发）
     mountPlanPage(el) { mountPlanPage(el); },
     activatePlanPage() { activatePlanPage(); },

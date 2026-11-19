@@ -1,9 +1,13 @@
-// Public ranking is per catalog record. Only a detail read includes this account's own vote.
+// Aggregate counts are public. The current account's likes are loaded with its summary.
 window.DecorEngagement = (() => {
   const totals = new Map();
-  const empty = Object.freeze({ likes: 0, views: 0 });
+  const empty = Object.freeze({ likes: 0, views: 0, favorites: 0 });
   let ready = false;
+  let likedIds = new Set();
+  let ownerKey;
+  let epoch = 0;
   let loading;
+  const pendingLikes = new Set();
   let loadedAt = 0;
   let revision = 0;
   function counts(id) { return totals.get(id)?.counts || (ready ? empty : null); }
@@ -12,85 +16,121 @@ window.DecorEngagement = (() => {
     const currentUser = user();
     if (payload.owner !== undefined && currentUser !== payload.owner) throw new Error('登录账号已切换，请重新打开家具');
     const options = { headers: {} };
-    if (action !== 'summary' && currentUser) {
+    if (currentUser) {
       const token = await CloudSync.getAccessToken();
       if (!token || currentUser !== user()) throw new Error('登录状态已变更，请重新打开家具');
       options.headers.Authorization = 'Bearer ' + token;
     }
     let url = '/api/decor-engagement/' + action;
     if (action === 'item') url += '?id=' + encodeURIComponent(payload.id);
-    if (action === 'like' || action === 'view') {
+    if (['like','view','favorite'].includes(action)) {
       options.method = 'POST';
       options.headers['Content-Type'] = 'application/json';
-      options.body = JSON.stringify({ id: payload.id, liked: payload.liked });
+      options.body = JSON.stringify({ id: payload.id, liked: payload.liked, planId: payload.planId, qty: payload.qty });
     }
     const res = await fetch(url, options);
     const data = await res.json();
     if (!res.ok) throw new Error(data.message || '读取家具热度失败');
-    if (action !== 'summary' && currentUser !== user()) throw new Error('登录账号已切换，请重新打开家具');
+    if (currentUser !== user()) throw new Error('登录账号已切换，请重新打开家具');
     return data;
   }
-  function load() {
-    if (ready && Date.now() - loadedAt < 60000) return Promise.resolve(true);
-    if (loading) return loading;
+  const announce = () => window.dispatchEvent(new Event('decor-engagement-change'));
+  function load(force = false) {
+    const actor = user();
+    if (ownerKey !== actor) {
+      ownerKey = actor;
+      likedIds = new Set();
+      ready = false;
+      loadedAt = 0;
+      loading = null;
+      ++epoch;
+      announce();
+    }
+    if (!force && ready && Date.now() - loadedAt < 60000) return Promise.resolve(true);
+    if (!force && loading) return loading;
+    const ticket = ++epoch;
     const atStart = revision;
-    loading = request('summary').then(({rows}) => {
-      if (!Array.isArray(rows)) throw new Error('读取家具热度失败');
-      for (const [id, entry] of totals) if (entry.revision <= atStart) totals.delete(id);
-      for (const row of rows) if (!totals.has(row.record_id)) {
-        totals.set(row.record_id, { counts: { likes: row.likes, views: row.views }, revision: atStart });
+    loading = request('summary').then(data => {
+      if (ticket !== epoch || actor !== user()) return false;
+      if (!Array.isArray(data.rows)) throw new Error('统计格式错误');
+      const newer = new Set([...totals].filter(([,entry]) => entry.revision > atStart).map(([id]) => id));
+      const nextLikes = new Set(data.likedIds || []);
+      for (const id of newer) { if (likedIds.has(id)) nextLikes.add(id); else nextLikes.delete(id); }
+      likedIds = nextLikes;
+      for (const id of totals.keys()) if (!newer.has(id)) totals.delete(id);
+      for (const row of data.rows) if (!newer.has(row.record_id)) {
+        totals.set(row.record_id, { counts: row, revision: atStart });
       }
       ready = true;
       loadedAt = Date.now();
-      window.dispatchEvent(new Event('decor-engagement-change'));
+      announce();
       return true;
-    }).catch(() => false).finally(() => { loading = null; });
+    }).catch(() => false).finally(() => { if (ticket === epoch) loading = null; });
     return loading;
   }
-  function mount(modal, id) {
-    const strip = document.createElement('div');
-    strip.className = 'dh-engagement';
-    const action = document.createElement('button');
-    action.type = 'button';
-    action.className = 'btn btn-sm';
-    const status = document.createElement('span');
-    status.setAttribute('role', 'status');
-    strip.append(action, status);
-    modal.querySelector('.dh-detail-add-row').before(strip);
+  async function update(id, operation, desired) {
     const owner = user();
-    let liked = false;
-    let retry = null;
-    async function run(operation, desired) {
-      action.disabled = true;
-      status.textContent = '正在读取…';
-      try {
-        const result = await cloudCrud('decorEngagement', operation, { id, owner, liked: desired }, { silentError: true });
-        if (!result.success) throw new Error(result.error?.message || '家具热度暂时不可用');
-        const row = result.row;
-        if (owner !== user()) return;
-        totals.set(id, { counts: { likes: row.likes, views: row.views }, revision: ++revision });
-        window.dispatchEvent(new Event('decor-engagement-change'));
-        liked = row.liked;
-        retry = null;
-        status.textContent = row.likes + ' 人点赞 · ' + row.views + ' 次浏览';
-        action.textContent = liked ? '取消点赞' : '点赞';
-        action.setAttribute('aria-pressed', String(liked));
-      } catch {
-        retry = [operation, desired];
-        action.textContent = '重试';
-        action.removeAttribute('aria-pressed');
-        status.textContent = '家具热度暂时不可用';
-      } finally {
-        action.disabled = owner !== user();
+    const result = await cloudCrud('decorEngagement', operation, {id,owner,liked:desired}, {silentError:true});
+    if (!result.success || !result.row) throw new Error('家具互动暂时不可用，请重试');
+    if (owner !== user()) return;
+    const row = result.row;
+    totals.set(id, {counts:row, revision:++revision});
+    if (row.liked) likedIds.add(id); else likedIds.delete(id);
+    announce();
+  }
+  function refresh(root) {
+    if (!root) return;
+    for (const strip of root.querySelectorAll('[data-metrics]')) {
+      const id = Number(strip.dataset.metrics);
+      if (!strip.firstElementChild) {
+        strip.innerHTML = '<button type="button" class="dh-heart" aria-label="点赞"><span class="dh-heart-icon" aria-hidden="true"></span> <span data-count="likes"></span></button><span class="dh-stat" title="收藏到方案单的人数"><span aria-hidden="true">☆</span> <span data-count="favorites"></span></span><span class="dh-stat" title="有效浏览"><i class="dh-eye" aria-hidden="true"></i> <span data-count="views"></span></span>';
+        strip.querySelector('button').onclick = async event => {
+          event.stopPropagation();
+          if (!user()) return window.iaOpenAuth?.();
+          if (pendingLikes.has(id)) return;
+          if (ownerKey !== user() || !ready) {
+            if (!await load(true)) return window.showToast?.('家具统计读取失败，请重试', 'error');
+          }
+          const desired = !likedIds.has(id);
+          pendingLikes.add(id);
+          refresh(strip.parentNode);
+          try { await update(id,'like',desired); }
+          catch (error) { window.showToast?.(error.message,'error'); }
+          finally { pendingLikes.delete(id); refresh(document); }
+        };
+      }
+      const liked = ownerKey === user() && likedIds.has(id);
+      const heart = strip.querySelector('.dh-heart');
+      heart.disabled = pendingLikes.has(id);
+      heart.setAttribute('aria-label', liked ? '取消点赞' : '点赞');
+      heart.setAttribute('aria-pressed', String(liked));
+      heart.title = liked ? '取消点赞' : '点赞';
+      heart.querySelector('.dh-heart-icon').textContent = liked ? '♥' : '♡';
+      const total = counts(id);
+      for (const [key, label] of [['likes','点赞'],['favorites','收藏'],['views','浏览']]) {
+        const number = strip.querySelector('[data-count=' + key + ']');
+        number.textContent = total?.[key] ?? '—';
+        number.setAttribute('aria-label', label + ' ' + number.textContent);
       }
     }
-    action.textContent = '点赞';
-    action.onclick = () => {
-      if (retry) return run(...retry);
-      if (!user()) return window.iaOpenAuth?.();
-      return run('like', !liked);
-    };
-    run('view');
   }
-  return { counts, load, mount, request };
+  function mount(modal,id) {
+    const strip = document.createElement('div');
+    strip.className = 'dh-engagement';
+    strip.dataset.metrics = id;
+    modal.querySelector('.dh-detail-add-row').before(strip);
+    refresh(modal);
+    strip.querySelector('button').disabled = true;
+    strip.querySelector('button').removeAttribute('aria-pressed');
+    update(id,'view').then(() => refresh(modal)).catch(() => {
+      strip.querySelector('button').disabled = false;
+      const retry = document.createElement('button');
+      retry.type = 'button';
+      retry.className = 'btn btn-sm';
+      retry.textContent = '重新读取统计';
+      retry.onclick = () => { strip.remove(); mount(modal,id); };
+      strip.append(retry);
+    });
+  }
+  return {counts, load, mount, refresh, request};
 })();

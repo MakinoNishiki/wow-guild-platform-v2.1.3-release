@@ -1,0 +1,21 @@
+/* REQ-203 optional furniture list; scoped to this module. */
+.hbf-editor,.hbf-detail{margin-block:20px;padding-block:16px;border-top:1px solid var(--border-color)}
+.hbf-editor h3,.hbf-detail h3{margin:0 0 8px;font-size:16px;color:var(--text-primary)}
+.hbf-hint{margin:6px 0 12px;color:var(--text-muted);font-size:12px;line-height:1.6}
+.hbf-search-results{display:flex;flex-wrap:wrap;gap:6px;max-height:180px;overflow-y:auto;margin-block:8px}
+.hbf-table{width:100%;border-collapse:collapse;font-size:13px;table-layout:auto}
+.hbf-table th,.hbf-table td{padding:9px 8px;border-bottom:1px solid var(--border-color);text-align:left;vertical-align:middle}
+.hbf-table th{color:var(--gold);font-weight:600;white-space:nowrap}
+.hbf-table th:not(:first-child),.hbf-table td:not(:first-child){width:1%;white-space:nowrap;text-align:right}
+.hbf-table tr:hover{background:var(--bg-hover)}
+.hbf-furniture-name{color:var(--gold);text-decoration:none;overflow-wrap:anywhere}
+.hbf-furniture-name:hover{text-decoration:underline}
+.hbf-furniture-name:focus-visible{outline:2px solid var(--gold);outline-offset:3px}
+.hbf-quantity{width:90px;min-width:70px;padding:6px 8px;text-align:right}
+.hbf-source-popover{position:fixed;width:360px;max-width:calc(100vw - 16px);max-height:min(480px,calc(100vh - 16px));overflow:auto;padding:14px;background:var(--bg-secondary);color:var(--text-primary);border:1px solid var(--border-color);border-radius:6px;box-shadow:0 8px 24px #0008;font-size:13px;line-height:1.6}
+.hbf-source-popover strong{color:var(--gold)}
+.hbf-source-popover .dh-src-list{margin:0}
+.hbf-bulk{margin-top:16px;padding-top:12px;border-top:1px solid var(--border-color)}
+.hbf-bulk summary{color:var(--gold);cursor:pointer;margin-bottom:10px}
+.hbf-bulk textarea{display:block;width:100%;margin-bottom:10px;resize:vertical;font-family:inherit}
+.hbf-bulk-preview{max-height:320px;overflow:auto}

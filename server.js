@@ -668,6 +668,7 @@ async function authorizeProxyRequest(user, table, method, queryString, rawBody) 
   const rows = parseBodyRows(rawBody);
 
   if (['housing_builds', 'housing_build_gallery', 'housing_build_images'].includes(table)) return deny('家宅作品请使用专用入口');
+  if (table.startsWith('housing_community_') || ['housing_build_reactions','housing_build_comments','housing_build_community_totals'].includes(table)) return deny('社区互动请使用专用入口');
 
   if (['guild_people','guild_person_attendance'].includes(table) ||
       table==='raid_members'&&rows.some(r=>r&&Object.prototype.hasOwnProperty.call(r,'person_id')) ||
@@ -1520,6 +1521,8 @@ function serveFile(res, filePath, req) {
 const handleLootObservations = require('./lib/lootObservationRoutes.cjs')({auth:verifyTokenCached,get:supabaseRestGet,write:supabaseRestWrite,body:readBody});
 const handlePeople = require('./lib/peopleRoutes.cjs')({auth:verifyTokenCached,get:supabaseRestGet,write:supabaseRestWrite,body:readBody});
 const handleHousingBuilds = require('./lib/housingBuildRoutes.cjs')({auth:verifyTokenCached,get:supabaseRestGet,write:supabaseRestWrite,body:readBody});
+const handleHousingSupplies = require('./lib/housingSupplyRoutes.cjs')({auth:verifyTokenCached,get:supabaseRestGet,write:supabaseRestWrite,body:readBody});
+const handleHousingCommunity = require('./lib/housingCommunityRoutes.cjs')({auth:verifyTokenCached,get:supabaseRestGet,write:supabaseRestWrite,body:readBody});
 const handleDecorEngagement = require('./lib/decorEngagementRoutes.cjs')({ auth: verifyTokenCached, get: supabaseRestGet, write: supabaseRestWrite, body: readBody, signingKey: getServiceRoleKey });
 const handleWclUser = require('./lib/wclUserRoutes.cjs')({
   auth: verifyTokenCached, role: getGuildRoleCached, get: supabaseRestGet,
@@ -1587,6 +1590,8 @@ const server = http.createServer(async (req, res) => {
   if (await handleLootObservations(req, res, corsHeaders, urlPath)) return;
   if (await handlePeople(req, res, corsHeaders, urlPath)) return;
   if (await handleHousingBuilds(req, res, corsHeaders, urlPath)) return;
+  if (await handleHousingSupplies(req, res, corsHeaders, urlPath)) return;
+  if (await handleHousingCommunity(req, res, corsHeaders, urlPath)) return;
   if (await handleDecorEngagement(req, res, corsHeaders, urlPath)) return;
   if (await handleWclUser(req, res)) return;
 

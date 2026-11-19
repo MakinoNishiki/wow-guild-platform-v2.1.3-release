@@ -17,6 +17,8 @@ const root = path.resolve(__dirname, '..');
 const output = process.env.WB_VERIFY_OUTPUT || path.join(root, 'docs/evidence/req203-cover-20261119');
 const host = '127.0.0.1';
 const checkDecor = process.argv.includes('--decor-engagement');
+const suite = process.argv.find(arg => arg.startsWith('--suite='))?.slice(8);
+const withCatalog = checkDecor || !!suite;
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 async function port() {
   const probe = net.createServer();
@@ -41,10 +43,10 @@ async function main() {
     const head = encode({ alg: 'HS256', typ: 'JWT' }) + '.' + encode({ exp: Math.floor(Date.now() / 1000) + 3600, ...claims });
     return head + '.' + createHmac('sha256', signing).update(head).digest('base64url');
   };
-  const sessions = ['木匠甲', '木匠乙'].map((name, index) => {
+  const sessions = ['木匠甲', '木匠乙', '社区管理员'].map((name, index) => {
     const id = randomUUID();
     const user = { id, aud: 'authenticated', role: 'authenticated', email: 'fixture' + index + '@example.invalid',
-      user_metadata: { display_name: name }, app_metadata: {}, created_at: new Date().toISOString() };
+      user_metadata: { display_name: name }, app_metadata:index === 2 ? {role:'superadmin'} : {}, created_at: new Date().toISOString() };
     return { user, access_token: signer({ sub: id, role: 'authenticated', aud: 'authenticated' }),
       refresh_token: randomUUID(), token_type: 'bearer', expires_in: 3600, expires_at: Math.floor(Date.now() / 1000) + 3600 };
   });
@@ -62,12 +64,16 @@ async function main() {
     const uri = 'postgres://postgres:' + password + '@' + host + ':' + dbPort + '/postgres';
     db = new Client({ connectionString: uri });
     await db.connect();
-    await db.query('create role anon; create role authenticated; create role service_role bypassrls; create schema auth; create table auth.users(id uuid primary key, raw_user_meta_data jsonb)');
-    for (const { user } of sessions) await db.query('insert into auth.users values ($1,$2)', [user.id, user.user_metadata]);
-    if (checkDecor) {
+    await db.query('create role anon; create role authenticated; create role service_role bypassrls; create schema auth; create table auth.users(id uuid primary key, raw_user_meta_data jsonb,raw_app_meta_data jsonb)');
+    for (const { user } of sessions) await db.query('insert into auth.users values ($1,$2,$3)', [user.id, user.user_metadata,user.app_metadata]);
+    await db.query("create function auth.uid() returns uuid language sql stable as $$ select (nullif(current_setting('request.jwt.claims',true),'')::jsonb->>'sub')::uuid $$");
+    {
       const records = JSON.parse(fs.readFileSync(path.join(root,'data/task083/catalog-current-2335.json'),'utf8'));
-      await db.query('create table decor_catalog (record_id integer primary key)');
-      await db.query('insert into decor_catalog select unnest($1::integer[])', [records.map(r=>r.record_id)]);
+      await db.query('create table decor_catalog (record_id integer primary key,entry_type integer,name text)');
+      await db.query('insert into decor_catalog select * from unnest($1::integer[],$2::integer[],$3::text[])',[records.map(r=>r.record_id),records.map(r=>r.entry_type),records.map(r=>r.name)]);
+      await db.query(fs.readFileSync(path.join(root,'sql/35_task058_decor_plans.sql'),'utf8'));
+      await db.query('grant usage on schema auth to service_role,authenticated; grant select on decor_catalog to service_role,anon,authenticated; grant select,insert,update,delete on decor_plans,decor_plan_items to service_role,authenticated');
+
       const migration = fs.readFileSync(path.join(root, 'sql/52_req209_decor_engagement.sql'), 'utf8');
       await db.query(migration);
       await db.query(migration);
@@ -85,6 +91,14 @@ async function main() {
     const eightPhotoMigration = fs.readFileSync(path.join(root, 'sql/51_req203_eight_screenshots.sql'), 'utf8');
     await db.query(eightPhotoMigration);
     await db.query(eightPhotoMigration);
+    const numbered = ['53_req207','54_req203','55_req207','56_req203','57_req209'];
+    for (const prefix of numbered) {
+      const migrationFile = fs.readdirSync(path.join(root,'sql')).find(name => name.startsWith(prefix));
+      assert.ok(migrationFile,'缺少迁移 ' + prefix);
+      const script = fs.readFileSync(path.join(root,'sql',migrationFile),'utf8');
+      await db.query(script);
+      await db.query(script);
+    }
     for (const [index, id] of legacyIds.entries()) {
       const { rows: [previous] } = await db.query('select allow_copy,code_public from housing_builds where id=$1', [id]);
       assert.deepEqual(previous, { allow_copy: !!index, code_public: !!index });
@@ -123,7 +137,7 @@ async function main() {
     gateway = https.createServer(tlsCredential, (req, res) => {
       res.setHeader('Access-Control-Allow-Origin', base);
       res.setHeader('Access-Control-Allow-Headers', req.headers['access-control-request-headers'] || '*');
-      res.setHeader('Access-Control-Allow-Methods', 'GET,POST,HEAD,OPTIONS');
+      res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PATCH,DELETE,HEAD,OPTIONS');
       if (req.method === 'OPTIONS') { res.writeHead(204); return res.end(); }
       if (req.url === '/auth/v1/user') {
         const entry = sessions.find(s => req.headers.authorization === 'Bearer ' + s.access_token);
@@ -132,7 +146,7 @@ async function main() {
       }
       if (!req.url.startsWith('/rest/v1/')) { res.writeHead(404); return res.end(); }
       if (req.url.startsWith('/rest/v1/decor_catalog?')) {
-        if (checkDecor) {
+        if (withCatalog) {
           const records = JSON.parse(fs.readFileSync(path.join(root,'data/task083/catalog-current-2335.json'),'utf8'));
           const at = Number(new URL(req.url,'https://localhost').searchParams.get('offset') || 0);
           res.setHeader('Content-Type','application/json');
@@ -143,14 +157,20 @@ async function main() {
           category_ids: [], subcategory_ids: [], tags: [], placement_cost: 1, ...fixture }]));
       }
       // Unrelated legacy modules see an empty guild and empty notifications.
-      if (!/^\/rest\/v1\/(?:housing_build|rpc\/save_housing_build)/.test(req.url) &&
-          !(checkDecor && /^\/rest\/v1\/(?:decor_item_|rpc\/(?:record_decor|set_decor))/.test(req.url))) {
+      if (!/^\/rest\/v1\/(?:housing_|rpc\/(?:save_housing|discover_housing|[a-z_]*housing_[a-z_]*))/.test(req.url) &&
+          !(withCatalog && /^\/rest\/v1\/(?:decor_item_|decor_plan|rpc\/(?:record_decor|set_decor|favorite_decor))/.test(req.url))) {
         res.setHeader('Content-Type', 'application/json'); return res.end('[]');
       }
-      const upstream = http.request({ hostname: host, port: restPort, path: req.url.slice(8), method: req.method, headers: req.headers }, incoming => {
+      // The local TLS gateway and PostgREST have independent connection lifetimes.
+      const { host: incomingHost, connection: incomingConnection, ...forwardHeaders } = req.headers;
+      const upstream = http.request({ hostname: host, port: restPort, path: req.url.slice(8), method: req.method,
+        agent: false, headers: forwardHeaders }, incoming => {
         res.writeHead(incoming.statusCode, incoming.headers); incoming.pipe(res);
       });
-      upstream.on('error', () => { res.writeHead(502); res.end(); });
+      upstream.on('error', error => {
+        console.error('隔离数据库连接失败', error.code, req.url.split('?')[0]);
+        res.writeHead(502); res.end();
+      });
       req.pipe(upstream);
     });
     await new Promise(resolve => gateway.listen(0, host, resolve));
@@ -203,6 +223,19 @@ async function main() {
       if (data) headers['Content-Type'] = 'application/json';
       const response = await fetch(site + action, { headers, method: data ? 'POST' : 'GET', body: data ? JSON.stringify(data) : undefined });
       return { status: response.status, data: await response.json() };
+    }
+    if (suite) {
+      const admin = await open(sessions[2],1366);
+      const params = {db,author,guest,other,admin,sessions,api,base,pass,output};
+      const tests = {catalog:'verify-housing-card-actions',tags:'verify-req207-tags',
+        supplies:'verify-housing-supplies',community:'verify-housing-community',discovery:'verify-housing-discovery'};
+      for (const [key,file] of Object.entries(tests)) if (suite === 'all' || suite === key) {
+        await require('./' + file + '.cjs')(params);
+      }
+      assert.ok(suite === 'all' || Object.hasOwn(tests,suite));
+      assert.deepEqual(errors,[]);
+      fs.writeFileSync(path.join(output,suite + '-verification.json'),JSON.stringify({browser:browser.version(),checks},null,2));
+      return;
     }
     await guest.locator('#hbCreate').click();
     assert.ok(await guest.locator('#authOverlay').isVisible());

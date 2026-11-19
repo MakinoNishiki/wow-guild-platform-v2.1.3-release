@@ -1233,10 +1233,11 @@ async function deleteCharacter(characterId) {
 
 // 加载通知列表
 async function loadNotifications() {
+  const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const container = document.getElementById('notificationList');
   const badge = document.getElementById('notifBadge');
   if (!container) return;
-  
+  window.HousingCommunity?.adminEntry(container.parentElement.querySelector('.uc-header-row'));
   try {
     const notifications = await window.CloudSync.getNotifications();
     
@@ -1285,10 +1286,10 @@ async function loadNotifications() {
       return `
         <div class="uc-notification-item ${n.is_read ? 'read' : 'unread'}" onclick="markNotificationRead('${n.id}')">
           <div class="uc-notification-header">
-            <span class="uc-notification-title">${typeIcons[n.type] || '📢'} ${n.title}</span>
+            <span class="uc-notification-title">${typeIcons[n.type] || '📢'} ${escapeHtml(n.title)}</span>
             <span class="uc-notification-time">${timeStr}</span>
           </div>
-          <div class="uc-notification-message">${n.message}</div>
+          <div class="uc-notification-message">${escapeHtml(n.message)}</div>
           ${n.type === 'guild_invite' && !n.is_read ? `
             <div class="uc-notification-actions">
               <button class="uc-btn uc-btn-primary" onclick="acceptGuildInvite('${n.guild_id}', '${n.id}')">接受邀请</button>
@@ -1390,7 +1391,7 @@ async function cloudCrud(dataType, operation, payload, options = {}) {
     // 2. 重新读取数据库最新状态并更新 appData
     const refreshed = await window.CloudSync.reloadData(dataType, payload);
     // 作者的原始蓝图仅用于本次编辑，单条云端回读后返回，不写进公会缓存。
-    if (dataType === 'housingBuild' || dataType === 'decorEngagement') return { success: true, row: refreshed };
+    if (dataType === 'housingBuild' || dataType === 'housingBuildSupply' || dataType === 'decorEngagement' || dataType === 'housingCommunity') return { success: true, row: refreshed };
     const typesToReload = reloadTypes || [];
     for (const t of typesToReload) {
       await window.CloudSync.reloadData(t);
@@ -2526,6 +2527,7 @@ async function setCalendarDensity(d) {
 }
 
 function switchPage(pageName, routeHash) {
+  if (pageName !== 'decor') window.DecorCatalog?.hideDetail();
   // 切换导航激活状态
   document.querySelectorAll('.nav-item').forEach(item => {
     item.classList.toggle('active', item.dataset.page === pageName);
@@ -2599,7 +2601,7 @@ function switchPage(pageName, routeHash) {
   // team-guide 不写 hash——路由守卫落引导卡时保留用户目标 hash 不改写（如 '#/team/members'）；
   // 与 iaApplyRoute 间经 iaLastHash 防环（hash 相同则不触发二次路由）。
   if (typeof iaSetHash === 'function' && pageName !== 'team-guide') {
-    iaSetHash(pageName === 'community' && routeHash ? routeHash : iaKeyToHash(pageName));
+    iaSetHash((pageName === 'community' || pageName === 'decor') && routeHash ? routeHash : iaKeyToHash(pageName));
     iaPaintRoute(pageName, iaTabOfPage(pageName));
   }
 }
@@ -2635,6 +2637,12 @@ function ensureDecorMounted() {
       return window.appData.decorPlans || [];
     },
     currentPlanId: () => (window.appData.decorPlan && window.appData.decorPlan.id) || null,
+    favorite: async payload => {
+      const result = await cloudCrud('decorPlan', 'favorite', payload, {renderFn: () => {}, silentError: true});
+      if (!result.success || !window.appData.decorPlans?.some(p => p.id === payload.savedPlanId &&
+          p.items.some(i => i.record_id === payload.id && i.qty >= payload.qty))) throw new Error('未确认收藏，请重试');
+      return payload.savedPlanId;
+    },
     createPlan: name => cloudCrud('decorPlan', 'create', { name }, { renderFn: () => {} }),
     renamePlan: (id, name) => cloudCrud('decorPlan', 'rename', { id, name }, { renderFn: () => {} }),
     deletePlan: id => cloudCrud('decorPlan', 'delete', { id }, { renderFn: () => {} }),
@@ -2797,7 +2805,7 @@ function iaApplyRoute() {
   } else if (h === '#/house' || h === '#/house/') {
     iaLastHash = '#/house/decor'; location.replace('#/house/decor');
     page = 'decor'; tab = 'house';
-  } else if (h === '#/house/decor') {
+  } else if (h === '#/house/decor' || /^#\/house\/decor\/item\/[1-9]\d{0,9}$/.test(h)) {
     page = 'decor'; tab = 'house';
   } else if (h === '#/house/plan') {
     page = 'decor-plan'; tab = 'house';
@@ -2831,6 +2839,9 @@ function iaApplyRoute() {
 
   iaPaintRoute(page, tab, activeKey);
   switchPage(page, h);
+  if (page === 'decor' && /^#\/house\/decor\/item\/[1-9]\d{0,9}$/.test(h)) {
+    window.DecorCatalog?.focusRecord(Number(h.split('/').pop()));
+  }
 }
 
 window.addEventListener('hashchange', () => {
@@ -2944,7 +2955,7 @@ function isModalFormDirty(modalId) {
 
 // 各弹窗"有未保存内容"判定；未登记的弹窗遮罩点击/ESC 直接关闭（维持现状）
 const modalDirtyChecks = {
-  housingBuildEditor: () => isModalFormDirty('housingBuildEditor') || HousingBuilds.photosChanged(),
+  housingBuildEditor: () => isModalFormDirty('housingBuildEditor') || HousingBuilds.photosChanged() || HousingBuildTags.changed(),
   // 任务书 #58-WP1：方案单导出弹窗（decorData 双壳自足渲染，textarea 改动=未保存内容，规范 4.6 登记）
   decorPlanExport: () => !!(window.DecorCatalog && window.DecorCatalog.planExportIsDirty && window.DecorCatalog.planExportIsDirty()),
   importMembersModal: () => isModalFormDirty('importMembersModal') || importPreviewRows.length > 0,
@@ -9125,6 +9136,10 @@ function lootFillAssignedTo(idOrName) {
 // ==================== 初始化 ====================
 // ==================== 更新日志 ====================
 const changelogData = [
+  {id:'req203-community',version:'v3.2.0',date:'2026-11-20',type:'feature',typeLabel:'新增功能',title:'装修作品可附家具清单、互动和举报',summary:'作者可附上用量及作品标签。读者可核对缺件、点赞、收藏、留言，并在用户中心收到举报回执。',details:[]},
+  {id:'req203-discover',version:'v3.2.0',date:'2026-11-20',type:'improve',typeLabel:'功能优化',title:'按风格和近七日热门找装修',summary:'公开作品支持预设和自定义标签筛选，近七日热门按站内实际互动排序。',details:[]},
+  {id:'req209-preview-feedback',version:'v3.2.0',date:'2026-11-20',type:'fix',typeLabel:'修复BUG',title:'游戏内预览提示与按钮分行',summary:'点「点击游戏内预览」复制命令，绿色提示游戏内用法。浏览器拦截时可按金色提示手动复制。',details:[]},
+  {id:'req209-card-actions',version:'v3.2.0',date:'2026-11-20',type:'refactor',typeLabel:'模块调整',title:'家具收藏统一进入方案单',summary:'图鉴卡片展示点赞、收藏与浏览。新收藏在侧栏方案单标红，数量编辑、保存与导出集中在方案页。',details:[]},
   {id:'req209-model',version:'v3.2.0',date:'2026-11-19',type:'feature',typeLabel:'新增功能',title:'在家具详情中查看 3D 外观',summary:'首批 26 件家具可拖动旋转、缩放和复位。详情也提供可复制到游戏聊天框的预览指令。',details:[]},
   {id:'req209-find',version:'v3.2.0',date:'2026-11-19',type:'improve',typeLabel:'功能优化',title:'按版本、热度和多个标签找家具',summary:'图鉴支持名称、加入游戏版本、点赞和浏览排序，可组合筛选家具标签与已核实的能力。',details:[]},
   {id:'req209-upload',version:'v3.2.0',date:'2026-11-19',type:'fix',typeLabel:'修复BUG',title:'编辑作品时可直接粘贴或拖入截图',summary:'粘贴图片和拖入文件都会追加到截图预览，说明栏仍能正常粘贴文字。',details:[]},

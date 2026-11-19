@@ -176,7 +176,7 @@
     supabaseClient.auth.onAuthStateChange((event, session) => {
       console.debug(`[diag] auth event: ${event}`);
       if (event === 'SIGNED_IN' && session) {
-        if (currentUser?.id && currentUser.id !== session.user.id) window.HousingBuilds?.reset();
+        if (currentUser?.id && currentUser.id !== session.user.id) { window.HousingBuilds?.reset(); window.HousingCommunity?.reset(); }
         currentUser = session.user;
         setTimeout(() => { onUserSignedIn(); }, 0);
       } else if (event === 'SIGNED_OUT') {
@@ -401,6 +401,7 @@
   // ---- 用户登出后 ----
   function onUserSignedOut() {
     window.HousingBuilds?.reset();
+    window.HousingCommunity?.reset();
     isCloudMode = false;
     guildSelectionSequence++;
     clearPeopleContext();
@@ -643,11 +644,21 @@
 
   // ---- 重新加载指定模块数据（写成功后回读数据库最新状态） ----
   async function reloadData(dataType, payload) {
+    if (dataType === 'housingBuildSupply') {
+      const row = await window.HousingBuildFurniture.request('read', payload);
+      const same = row && Object.keys(row.available).length === Object.keys(payload.available).length && Object.entries(payload.available).every(([key,value])=>row.available[key]===value);
+      if (!same || row.revision !== payload.savedRevision) throw new Error('可用量已更新，请重新打开核对；本次输入已保留');
+      return row;
+    }
+    if (dataType === 'housingCommunity') return window.HousingCommunity.reload(payload);
     if (dataType === 'decorEngagement') return window.DecorEngagement.request('item', payload);
     if (dataType === 'housingBuild') {
       const result = await readHousingBuilds('mine', { id: payload.id });
       const row = result.rows[0];
       if (!row || row.revision !== payload.savedRevision) throw new Error('作品已更新，请重新打开核对');
+      if (payload.furniture_items && (row.furniture_items?.length !== payload.furniture_items.length || payload.furniture_items.some(item=>!row.furniture_items.some(saved=>saved.record_id===item.record_id && saved.quantity===item.quantity)))) throw new Error('家具清单尚未完整保存，请保留表单后重试');
+      if (payload.preset_tags && (JSON.stringify(payload.preset_tags) !== JSON.stringify(row.preset_tags) ||
+          JSON.stringify(payload.custom_tags) !== JSON.stringify(row.custom_tags))) throw new Error('作品标签尚未保存，请保留表单后重试');
       return row;
     }
     // BUG-029（任务书 #12 补丁）：原来是静默 return——会话/公会上下文在写流程中途
@@ -894,7 +905,7 @@
   async function housingRequest(action, query, item) {
     const owner = currentUser?.id;
     const headers = {};
-    const ownerOnly = action !== 'gallery' && action !== 'copy-code';
+    const ownerOnly = action !== 'gallery' && action !== 'copy-code' && (action !== 'discover' || query.mode === 'favorites');
     if (ownerOnly) {
       const token = await getAccessToken();
       if (!owner || !token || currentUser?.id !== owner) throw new Error('请登录后管理自己的作品');
@@ -914,7 +925,7 @@
   }
 
   function readHousingBuilds(scope, query = {}) {
-    return housingRequest(scope === 'mine' ? 'mine' : 'gallery', query);
+    return housingRequest(['mine','discover'].includes(scope) ? scope : 'gallery', query);
   }
 
   async function copyHousingCode(id) {
@@ -932,6 +943,17 @@
   }
 
   async function saveCloudData(dataType, operation, item, extra) {
+    if (dataType === 'housingBuildSupply') {
+      const result = await window.HousingBuildFurniture.request('save',item);
+      item.savedRevision = result.revision;
+      return;
+    }
+    if (dataType === 'housingCommunity') {
+      if (!['react','comment','remove-comment','report','moderate','read'].includes(operation)) throw new Error('未知的社区操作');
+      item.operation = operation;
+      item.receipt = await window.HousingCommunity.request(operation, item);
+      return;
+    }
     if (dataType === 'decorEngagement') {
       if (!['like', 'view'].includes(operation)) throw new Error('未知的家具操作');
       await window.DecorEngagement.request(operation, item);
@@ -1081,6 +1103,14 @@
   async function syncDecorPlan(operation, item) {
     if (!currentUser) throw new Error('未登录，无法保存方案单');
 
+    if (operation === 'favorite') {
+      const owner = currentUser.id;
+      const result = await window.DecorEngagement.request('favorite', {owner, ...item});
+      if (owner !== currentUser?.id) throw new Error('登录账号已切换');
+      try { localStorage.setItem(decorPlanStorageKey(), result.planId); } catch {}
+      item.savedPlanId = result.planId;
+      return;
+    }
     // switch：仅切 localStorage，不写库（reload 由 cloudCrud 统一触发）
     if (operation === 'switch') {
       try { localStorage.setItem(decorPlanStorageKey(), String(item && item.id)); } catch { /* localStorage 不可用静默 */ }
@@ -1935,6 +1965,8 @@
   // 获取通知列表
   async function getNotifications(limit = 50) {
     if (!isCloudMode || !currentUser) return [];
+    const ownerId = currentUser.id;
+    let guildRows = [];
     try {
       const { data, error } = await supabaseClient
         .from('notifications')
@@ -1943,30 +1975,35 @@
         .order('created_at', { ascending: false })
         .limit(limit);
       if (error) throw error;
-      return data || [];
+      guildRows = data || [];
     } catch (e) {
       console.error('获取通知失败:', e);
-      return [];
     }
+    const community = window.HousingCommunity ? await HousingCommunity.notifications() : { rows: [] };
+    if (currentUser?.id !== ownerId) return [];
+    return [...guildRows, ...community.rows].sort((a,b) => new Date(b.created_at)-new Date(a.created_at));
   }
 
   // 获取未读通知数量
   async function getUnreadNotificationCount() {
     if (!isCloudMode || !currentUser) return 0;
+    let guildCount = 0;
     try {
       const { data, error } = await supabaseClient
         .rpc('get_unread_notification_count', { p_user_id: currentUser.id });
       if (error) throw error;
-      return data || 0;
+      guildCount = data || 0;
     } catch (e) {
       console.error('获取未读通知数量失败:', e);
-      return 0;
     }
+    try { return guildCount + (window.HousingCommunity ? (await HousingCommunity.notifications()).unread : 0); }
+    catch (e) { console.error('获取社区未读通知失败:', e); return guildCount; }
   }
 
   // 标记通知为已读
   async function markNotificationRead(notificationId) {
     if (!isCloudMode || !currentUser) return false;
+    if (notificationId.startsWith('hc-')) { await HousingCommunity.mutate('read', { id: notificationId.slice(3) }); return true; }
     try {
       const { error } = await supabaseClient
         .from('notifications')
@@ -1984,6 +2021,7 @@
   // 标记所有通知为已读
   async function markAllNotificationsRead() {
     if (!isCloudMode || !currentUser) return false;
+    if (window.HousingCommunity) await HousingCommunity.mutate('read', {});
     try {
       const { error } = await supabaseClient
         .from('notifications')

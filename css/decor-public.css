@@ -941,3 +941,30 @@
 .dh-plan-target-dialog label:not([hidden]) { display: grid; gap: 5px; margin-bottom: 12px; color: var(--text-secondary); }
 .dh-plan-target-dialog :is(input, select) { width: 100%; padding: 8px; border: 1px solid var(--border-color); border-radius: 4px; background: var(--bg-primary); color: var(--text-primary); }
 .dh-plan-target-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+
+/* 家具来源、游戏预览、收藏分别成行 */
+.dh-game-preview { display:grid; justify-items:start; gap:8px; margin-block:14px; }
+.dh-game-preview .dh-sec-title { margin:0; }
+.dh-game-preview-note { color:#81dca2; font-size:13px; line-height:1.55; margin:0; }
+.dh-game-preview-note:empty { display:none; }
+.dh-game-preview-note[data-state="manual"] { color:var(--gold); }
+.dh-game-preview-command:not([hidden]) { width:100%; }
+.dh-card-metrics, .dh-engagement { display:flex; align-items:center; gap:14px; color:var(--text-secondary); font-size:12px; font-variant-numeric:tabular-nums; }
+.dh-card-metrics { align-self:stretch; margin-top:auto; padding-top:6px; border-top:1px solid var(--border-color); }
+.dh-heart, .dh-stat { display:inline-flex; align-items:center; gap:4px; white-space:nowrap; }
+.dh-heart { background:transparent; border:0; padding:2px 4px; color:inherit; cursor:pointer; font:inherit; min-height:28px; }
+.dh-heart-icon, .dh-stat > span[aria-hidden] { font-size:19px; line-height:1; }
+.dh-heart:hover, .dh-heart[aria-pressed="true"], .dh-engagement .dh-heart[aria-pressed="true"] { color:#ff899a; }
+.dh-eye { display:inline-grid; place-items:center; width:14px; height:10px; border:1.5px solid currentColor; border-radius:65% 25%; transform:rotate(35deg); }
+.dh-eye::after { content:""; width:4px; height:4px; background:currentColor; border-radius:50%; }
+.dh-card .dh-plan-entry { align-self:stretch; display:flex; gap:0; margin-top:5px; }
+.dh-card .dh-card-add, .dh-card .dh-plan-target { height:32px; margin:0; border:1px solid #665334; background:#302a21; color:var(--gold); }
+.dh-card .dh-card-add { border-radius:5px; }
+.dh-card .dh-card-add:has(+ .dh-plan-target:not([hidden])) { border-radius:5px 0 0 5px; }
+.dh-card .dh-plan-target { width:32px; padding:0; border-left:0; border-radius:0 5px 5px 0; font-size:0; }
+.dh-card .dh-plan-target::after { content:""; display:inline-block; width:6px; height:6px; border:solid currentColor; border-width:0 1.5px 1.5px 0; transform:translateY(-2px) rotate(45deg); }
+.dh-card .dh-plan-entry button:hover { background:#443927; }
+.dh-card .dh-card-add.added { color:#ded4bf; background:#292d30; }
+.dh-heart:focus-visible, .dh-card .dh-plan-target:focus-visible { outline:2px solid var(--gold); outline-offset:2px; }
+.dh-engagement { margin:14px 0 8px; padding-block:6px; border-top:1px solid var(--border-color); }
+#dhNavPlanBadge { background:#bb3747; color:#fff; border:0; border-radius:20px; min-width:16px; padding:1px 5px; text-align:center; font:600 11px/15px sans-serif; }

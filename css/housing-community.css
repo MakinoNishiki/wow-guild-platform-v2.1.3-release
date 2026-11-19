@@ -1,0 +1,23 @@
+/* REQ-207: scoped community controls, using the existing dark theme and buttons. */
+.hc-community { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border); }
+.hc-community h3, .hc-admin h3 { margin: 12px 0; color: var(--gold); font-size: 16px; }
+.hc-tools { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.hc-tools [aria-pressed="true"] { color: var(--gold); border-color: var(--gold); background: var(--bg-secondary); }
+.hc-form { display: grid; gap: 10px; margin: 12px 0; }
+.hc-field { display: grid; gap: 5px; color: var(--text-secondary); font-size: 13px; }
+.hc-field select, .hc-field textarea { width: 100%; background: var(--bg-primary); color: var(--text-primary); border: 1px solid var(--border); border-radius: 4px; padding: 8px 10px; font: inherit; }
+.hc-field textarea { resize: vertical; min-height: 80px; }
+.hc-form > .btn { justify-self: start; }
+.hc-hint { color: var(--text-secondary); font-size: 12px; line-height: 1.6; margin: 6px 0; }
+.hc-status { color: var(--gold); font-size: 13px; line-height: 1.6; overflow-wrap: anywhere; }
+.hc-status:empty { display: none; }
+.hc-status .btn { margin-left: 8px; }
+.hc-comment, .hc-report { padding: 14px 0; border-bottom: 1px solid var(--border); }
+.hc-comment > .btn { margin-right: 8px; }
+.hc-body { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.65; color: var(--text-primary); }
+.hc-report-form { padding: 12px; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 4px; }
+.hc-report > a { color: var(--gold); text-underline-offset: 3px; }
+.hc-admin { width: min(800px,calc(100vw - 40px)); max-width: 800px; }
+.hc-admin .modal-body { overflow-y: auto; }
+.hc-community :is(button,textarea,select):focus-visible, .hc-admin :is(button,textarea,select,summary):focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+.hc-community button:active:not(:disabled), .hc-admin button:active:not(:disabled) { filter: brightness(.85); }
