@@ -14,7 +14,7 @@ const { Client } = require('pg');
 const { chromium } = require('playwright');
 const assert = require('node:assert/strict');
 const root = path.resolve(__dirname, '..');
-const output = path.join(root, 'docs/evidence/req203-gallery-20261119');
+const output = process.env.WB_VERIFY_OUTPUT || path.join(root, 'docs/evidence/req203-cover-20261119');
 const host = '127.0.0.1';
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 async function port() {
@@ -311,9 +311,11 @@ async function main() {
     await guest.screenshot({ path: path.join(output, 'web-gallery-1366.png') });
     const card = guest.locator('.hb-work').filter({ has: guest.getByRole('link', { name: title, exact: true }) });
     const album = card.locator('.hb-card-album');
-    const count = album.locator('.hb-card-count');
+    const dots = album.locator('.hb-card-dots button');
+    const currentPhoto = () => dots.evaluateAll(buttons => buttons.findIndex(b => b.getAttribute('aria-current') === 'true') + 1);
+    assert.equal(await dots.count(), 2);
     await album.getByRole('button', { name: '下一张截图' }).click();
-    assert.equal(await count.textContent(), '2 / 2');
+    assert.equal(await currentPhoto(), 2);
     const box = await album.boundingBox();
     const py = box.y + box.height * 0.55;
     // Rightward drag returns to the cover. Pointer release must not also advance once as a click.
@@ -321,15 +323,16 @@ async function main() {
     await guest.mouse.down();
     await guest.mouse.move(box.x + box.width * 0.75, py, { steps: 10 });
     await guest.mouse.up();
-    assert.equal(await count.textContent(), '1 / 2');
-    await guest.mouse.click(box.x + box.width * 0.75, py);
-    assert.equal(await count.textContent(), '2 / 2');
+    assert.equal(await currentPhoto(), 1);
+    await dots.nth(1).press('Enter');
+    assert.equal(await currentPhoto(), 2);
     assert.ok(guest.url().endsWith('#/house/community'));
     await guest.reload();
-    await card.getByText('1 / 2', { exact: true }).waitFor();
-    pass('卡片箭头、点图与横拖逐张切换，停留列表；刷新恢复作者封面，标题仍可打开详情');
+    await dots.first().waitFor();
+    assert.equal(await currentPhoto(), 1);
+    pass('卡片箭头、键盘选点与横拖切图均留在列表，刷新后复位到作者封面');
     assert.ok(await guest.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth));
-    await guest.getByRole('link', { name: title, exact: true }).click();
+    await album.locator('a').click();
     await guest.getByRole('heading', { name: title }).waitFor();
     pass('作者开放蓝图并更新说明，访客从公开列表进详情、复制成功，旧版修改不覆盖新数据');
     await results.getByText('编辑作品').click();

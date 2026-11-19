@@ -246,47 +246,80 @@ window.HousingBuilds = (() => {
     const cover = element('div', null, 'hb-cover hb-card-album');
     cover.setAttribute('role', 'group');
     cover.setAttribute('aria-label', row.title + '的装修截图');
-    let index = 0;
+    const canOpen = !mine || row.published;
+    const stage = canOpen ? link('', base + '/' + row.id) : element('div');
+    stage.className = 'hb-card-stage';
+    if (canOpen) {
+      stage.draggable = false;
+      stage.setAttribute('aria-label', '查看作品详情：' + row.title);
+    }
+    const dots = element('div', null, 'hb-card-dots');
+    dots.setAttribute('role', 'group');
+    dots.setAttribute('aria-label', '选择截图');
+    const status = element('span', null, 'hb-card-position');
+    status.setAttribute('role', 'status');
+    let index = -1;
     let start = null;
     let dragged = false;
-    const count = element('span', '1 / ' + ids.length, 'hb-card-count');
-    count.setAttribute('aria-live', 'polite');
-    function cardPhoto() {
-      const image = photoImage({ id: ids[index] }, row.title + '，截图 ' + (index + 1), mine);
+    function select(nextIndex) {
+      if (nextIndex === index) return;
+      index = nextIndex;
+      const position = '第 ' + (index + 1) + ' 张截图，共 ' + ids.length + ' 张';
+      const image = photoImage({ id: ids[index] }, row.title + '，' + position, mine);
       image.draggable = false;
-      return image;
+      stage.replaceChildren(image);
+      Array.from(dots.children).forEach((dot, i) => {
+        if (i === index) dot.setAttribute('aria-current', 'true');
+        else dot.removeAttribute('aria-current');
+      });
+      status.textContent = position;
     }
     function move(step) {
-      index = (index + step + ids.length) % ids.length;
-      cover.firstElementChild.replaceWith(cardPhoto());
-      count.textContent = (index + 1) + ' / ' + ids.length;
+      select((index + step + ids.length) % ids.length);
     }
-    cover.append(cardPhoto());
-    for (const [step, name, arrow] of [[-1, '上一张截图', '‹'], [1, '下一张截图', '›']]) {
-      const turn = button('', event => {
-        if (!event.detail || !dragged) move(step);
-      });
+    cover.append(stage);
+    for (const [step, name] of [[-1, '上一张截图'], [1, '下一张截图']]) {
+      const turn = button('', () => move(step));
       turn.className = step === -1 ? 'hb-prev-photo' : 'hb-next-photo';
       turn.setAttribute('aria-label', name);
-      turn.append(element('span', arrow));
       cover.append(turn);
     }
-    cover.append(count);
+    ids.forEach((_, i) => {
+      const dot = button('', () => select(i));
+      dot.className = 'hb-card-dot';
+      dot.setAttribute('aria-label', '查看第 ' + (i + 1) + ' 张截图');
+      dots.append(dot);
+    });
+    cover.append(dots, status);
+    select(0);
     cover.onpointerdown = event => {
       if (!event.isPrimary || event.button !== 0) return;
       dragged = false;
       start = { id: event.pointerId, x: event.clientX, y: event.clientY };
-      event.target.setPointerCapture(event.pointerId);
+      const target = event.target.closest('button, a') || stage;
+      target.setPointerCapture(event.pointerId);
+    };
+    cover.onpointermove = event => {
+      if (start?.id === event.pointerId && Math.max(Math.abs(event.clientX - start.x), Math.abs(event.clientY - start.y)) > 10) dragged = true;
     };
     cover.onpointerup = event => {
       if (start?.id !== event.pointerId) return;
       const dx = event.clientX - start.x;
       const dy = event.clientY - start.y;
       start = null;
-      dragged = Math.max(Math.abs(dx), Math.abs(dy)) > 10;
+      dragged ||= Math.max(Math.abs(dx), Math.abs(dy)) > 10;
       if (Math.abs(dx) >= 35 && Math.abs(dx) > Math.abs(dy) * 1.3) move(dx < 0 ? 1 : -1);
     };
-    cover.onpointercancel = cover.onlostpointercapture = () => { start = null; };
+    cover.onpointercancel = cover.onlostpointercapture = event => {
+      if (start?.id === event.pointerId) { dragged = true; start = null; }
+    };
+    // 指针滑动结束后浏览器仍会派发 click。键盘激活的 detail 为零，可正常访问链接和按钮。
+    cover.addEventListener('click', event => {
+      if (dragged && event.detail > 0) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+    }, true);
     return cover;
   }
   function work(row, mine, detail) {
@@ -294,7 +327,7 @@ window.HousingBuilds = (() => {
     const photos = row.image_ids || [];
     if (!detail && photos.length > 1) card.append(cardAlbum(row, photos, mine));
     else if (!detail && photos.length) {
-      const cover = mine ? element('div') : link('', base + '/' + row.id);
+      const cover = mine && !row.published ? element('div') : link('', base + '/' + row.id);
       cover.className = 'hb-cover';
       cover.append(photoImage({ id: photos[0] }, row.title + '的封面', mine));
       card.append(cover);

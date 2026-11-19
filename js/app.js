@@ -9125,6 +9125,10 @@ function lootFillAssignedTo(idOrName) {
 // ==================== 初始化 ====================
 // ==================== 更新日志 ====================
 const changelogData = [
+  {id:'req203-cover-dots',version:'v3.2.0',date:'2026-11-19',type:'feature',typeLabel:'新增功能',title:'点圆点直达装修截图',summary:'每张截图对应一枚圆点，可以直接选看任意一张。',details:[]},
+  {id:'req203-cover-arrows',version:'v3.2.0',date:'2026-11-19',type:'improve',typeLabel:'功能优化',title:'封面箭头改为浮动白色箭头',summary:'透明热区保留翻图操作，箭头用阴影与装修画面区分。',details:[]},
+  {id:'req203-cover-open',version:'v3.2.0',date:'2026-11-19',type:'fix',typeLabel:'修复BUG',title:'多图作品也能点主图进入详情',summary:'点公开封面中央即可打开作品，横向拖动仍在列表里浏览。',details:[]},
+  {id:'req203-cover-workshop',version:'v3.2.0',date:'2026-11-19',type:'refactor',typeLabel:'模块调整',title:'作者可从已发布作品的封面打开公开页',summary:'「我的作品」里的已发布作品可直接点封面访问，草稿在作者区预览。',details:[]},
   {id:'req208-icons',version:'v3.2.0',date:'2026-11-19',type:'feature',typeLabel:'新增功能',title:'家宅分享入口新增炉石屋徽',summary:'家宅侧栏以屋顶、烟囱和炉石回纹标记装修作品入口。',details:[]},
   {id:'req208-nav',version:'v3.2.0',date:'2026-11-19',type:'improve',typeLabel:'功能优化',title:'团队、家宅和用户中心统一导航图标',summary:'16 个入口采用暗铁金边图标，文字与图标对齐，悬浮和选中时提亮。',details:[]},
   {id:'req208-align',version:'v3.2.0',date:'2026-11-19',type:'fix',typeLabel:'修复BUG',title:'家宅分享文字与同栏入口对齐',summary:'补齐家宅分享缺失的图位后，三个家宅入口的名称从同一位置开始。',details:[]},
