@@ -83,7 +83,7 @@ async function openLocal() {
   global.BUILD_RELEASE = true;
   const core = { events: new EventEmitter(), view: { config: { cacheExpiry: 0 }, cacheSize: 0, casc: null, $watch: (name, cb, options) => { if (options?.immediate) cb(0x40); } }, progressLoadingScreen: async s => console.log('[stage]', s), showLoadingScreen() {}, hideLoadingScreen() {}, setToast() {}, create_busy_lock: () => ({}) };
   stub('core.js', core);
-  stub('casc/listfile.js', { getByID() {}, getByFilename() {} });
+  stub('casc/listfile.js', { getByID() {}, getByFilename() {}, getByIDOrUnknown: (id, ext) => id + ext, formatUnknownFile: (id, ext) => id + ext });
   stub('mmap.js', { create_virtual_file() { throw new Error('mmap_not_available'); }, release_virtual_files() {} });
   const Cache = class { async init() {} async getFile() { return null; } async storeFile() {} };
   stub('casc/build-cache.js', Cache);
@@ -145,5 +145,5 @@ async function main() {
   console.log(JSON.stringify(summary));
 }
 
-module.exports = { inspectM2 };
+module.exports = { inspectM2, openLocal };
 if (require.main === module) main().catch(e => { console.error(e.stack); process.exitCode = 1; });

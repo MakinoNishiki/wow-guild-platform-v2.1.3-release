@@ -1,0 +1,32 @@
+{
+  "release": "12d707a9c709a58f92ea5096821547cb85dd7a60",
+  "origin": "https://wow.ddctl.com",
+  "checks": [
+    "正式站公开作品、近七日热门和留言列表可读；普通账号无权进入举报后台",
+    "作者保存带两类标签及三件卷轴的私有草稿，刷新再编辑并回读一致；游客无法读取该草稿",
+    "图鉴卡片点赞及撤销成功；收藏写入方案，侧栏标出 1，打开后清零，方案可保存",
+    "正式站点击游戏内预览写入剪贴板，按钮下方显示绿色的原提示"
+  ],
+  "browser": "157.0.8103.79",
+  "rollbackChecks": {
+    "received": true,
+    "ticket": true,
+    "supply": true,
+    "discovery": true
+  },
+  "gamePreview": {
+    "status": "运营国服真机验收通过",
+    "date": "2026-11-20",
+    "source": "运营在对话中确认复制命令后可以在游戏内预览"
+  },
+  "completed": "2026-11-19T18:15:31.638358+00:00",
+  "cleanupRemaining": {
+    "account": 0,
+    "drafts": 0,
+    "plans": 0,
+    "views": 0,
+    "likes": 0,
+    "reports": 0,
+    "receipts": 0
+  }
+}

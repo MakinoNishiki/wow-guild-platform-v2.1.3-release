@@ -955,8 +955,7 @@
 .dh-heart { background:transparent; border:0; padding:2px 4px; color:inherit; cursor:pointer; font:inherit; min-height:28px; }
 .dh-heart-icon, .dh-stat > span[aria-hidden] { font-size:19px; line-height:1; }
 .dh-heart:hover, .dh-heart[aria-pressed="true"], .dh-engagement .dh-heart[aria-pressed="true"] { color:#ff899a; }
-.dh-eye { display:inline-grid; place-items:center; width:14px; height:10px; border:1.5px solid currentColor; border-radius:65% 25%; transform:rotate(35deg); }
-.dh-eye::after { content:""; width:4px; height:4px; background:currentColor; border-radius:50%; }
+.dh-eye { display:block; flex:none; width:16px; height:16px; fill:none; stroke:currentColor; stroke-width:1.4; stroke-linejoin:round; }
 .dh-card .dh-plan-entry { align-self:stretch; display:flex; gap:0; margin-top:5px; }
 .dh-card .dh-card-add, .dh-card .dh-plan-target { height:32px; margin:0; border:1px solid #665334; background:#302a21; color:var(--gold); }
 .dh-card .dh-card-add { border-radius:5px; }

@@ -83,7 +83,7 @@ window.DecorEngagement = (() => {
     for (const strip of root.querySelectorAll('[data-metrics]')) {
       const id = Number(strip.dataset.metrics);
       if (!strip.firstElementChild) {
-        strip.innerHTML = '<button type="button" class="dh-heart" aria-label="点赞"><span class="dh-heart-icon" aria-hidden="true"></span> <span data-count="likes"></span></button><span class="dh-stat" title="收藏到方案单的人数"><span aria-hidden="true">☆</span> <span data-count="favorites"></span></span><span class="dh-stat" title="有效浏览"><i class="dh-eye" aria-hidden="true"></i> <span data-count="views"></span></span>';
+        strip.innerHTML = '<button type="button" class="dh-heart" aria-label="点赞"><span class="dh-heart-icon" aria-hidden="true"></span> <span data-count="likes"></span></button><span class="dh-stat" title="收藏到方案单的人数"><span aria-hidden="true">☆</span> <span data-count="favorites"></span></span><span class="dh-stat" title="有效浏览"><svg class="dh-eye" viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path d="M1.5 10Q5.2 4.5 10 4.5T18.5 10Q14.8 15.5 10 15.5T1.5 10Z"/><circle cx="10" cy="10" r="2.2"/></svg> <span data-count="views"></span></span>';
         strip.querySelector('button').onclick = async event => {
           event.stopPropagation();
           if (!user()) return window.iaOpenAuth?.();

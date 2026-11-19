@@ -9136,6 +9136,10 @@ function lootFillAssignedTo(idOrName) {
 // ==================== 初始化 ====================
 // ==================== 更新日志 ====================
 const changelogData = [
+  {id:'req209-structural-models',version:'v3.2.0',date:'2026-11-20',type:'feature',typeLabel:'新增功能',title:'可旋转查看室内建筑构件',summary:'图鉴已接入 21 件室内墙体、门廊与立柱的游戏建筑模型。',details:[]},
+  {id:'req209-catalog-models',version:'v3.2.0',date:'2026-11-20',type:'improve',typeLabel:'功能优化',title:'图鉴家具均可旋转查看',summary:'2,295 件家具支持在详情中查看静态 3D 外观，包括壁炉、室内墙体、门廊和立柱。打开详情后点击「3D 预览」即可拖动旋转和缩放。',details:[]},
+  {id:'bug128-decor-eye',version:'v3.2.0',date:'2026-11-20',type:'fix',typeLabel:'修复BUG',title:'校正家具浏览量图标',summary:'卡片和详情使用水平对称的眼形，瞳孔居中，与浏览次数对齐。',details:[]},
+  {id:'req209-packed-models',version:'v3.2.0',date:'2026-11-20',type:'refactor',typeLabel:'模块调整',title:'统一家具预览与筛选目录',summary:'「可看 3D」筛选与详情按钮使用同一份家具模型目录，共用同一外观的家具复用下载文件。',details:[]},
   {id:'req203-community',version:'v3.2.0',date:'2026-11-20',type:'feature',typeLabel:'新增功能',title:'装修作品可附家具清单、互动和举报',summary:'作者可附上用量及作品标签。读者可核对缺件、点赞、收藏、留言，并在用户中心收到举报回执。',details:[]},
   {id:'req203-discover',version:'v3.2.0',date:'2026-11-20',type:'improve',typeLabel:'功能优化',title:'按风格和近七日热门找装修',summary:'公开作品支持预设和自定义标签筛选，近七日热门按站内实际互动排序。',details:[]},
   {id:'req209-preview-feedback',version:'v3.2.0',date:'2026-11-20',type:'fix',typeLabel:'修复BUG',title:'游戏内预览提示与按钮分行',summary:'点「点击游戏内预览」复制命令，绿色提示游戏内用法。浏览器拦截时可按金色提示手动复制。',details:[]},

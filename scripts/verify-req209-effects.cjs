@@ -38,7 +38,9 @@ check('Published positive Set exactly matches emitter evidence; unknowns are exc
 check('All existing 26 previews covered; static GLBs are not used to classify emitters', () => {
   const models = { window: {}, Object };
   vm.runInNewContext(fs.readFileSync(path.join(root, 'js/decorModelManifest.js'), 'utf8'), models);
-  for (const key of Object.keys(models.window.DecorModelManifest)) assert(context.window.DecorEffectCheckedIds.has(Number(key)));
+  const pilot = Object.entries(models.window.DecorModelManifest).filter(([, model]) => model.blendModes);
+  assert.equal(pilot.length, 26);
+  for (const [key] of pilot) assert(context.window.DecorEffectCheckedIds.has(Number(key)));
   assert(context.window.DecorEffectIds.has(26881));
 });
 check('Flat MD20 parses with payload-relative pointers', () => {

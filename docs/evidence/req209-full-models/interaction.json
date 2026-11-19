@@ -1,0 +1,29 @@
+{
+  "browser": "157.0.8103.79",
+  "checks": [
+    {
+      "width": 1366,
+      "id": 80,
+      "dragAndReset": true,
+      "eye": "horizontal"
+    },
+    {
+      "width": 1366,
+      "id": 523,
+      "dragAndReset": true,
+      "eye": "horizontal"
+    },
+    {
+      "width": 1920,
+      "id": 80,
+      "dragAndReset": true,
+      "eye": "horizontal"
+    },
+    {
+      "width": 1920,
+      "id": 523,
+      "dragAndReset": true,
+      "eye": "horizontal"
+    }
+  ]
+}

@@ -54,6 +54,10 @@ export async function createViewer({ host, url, recordId, metadata, signal, onEr
     // TASK-084 static material policy. Omit untextured/effect-only surfaces, not solid furniture.
     model.traverse(o => {
       if (!o.isMesh) return;
+      if (!metadata.blendModes) {
+        if (!o.material?.map) throw new Error('家具贴图未成功读取');
+        return;
+      }
       const index = gltf.parser.associations.get(o)?.meshes;
       const blend = metadata.blendModes[index];
       if ((String(recordId) === '28559' && blend === 4) || (blend >= 2 && o.geometry.index?.count <= 6)) o.visible = false;

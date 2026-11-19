@@ -16,7 +16,7 @@
     return runtimePromise;
   }
   function mount({ host, row, poster }) {
-    const metadata = window.DecorModelManifest?.[row.record_id];
+    const metadata = row.entry_type === 1 && window.DecorModelManifest?.[row.record_id];
     const section = document.createElement('section');
     section.className = 'dh-model-preview';
     section.setAttribute('aria-label', '家具外观');
@@ -53,7 +53,8 @@
         const { createViewer } = await loadRuntime();
         if (destroyed || current !== epoch) return;
         canvasHost.hidden = false;
-        const loaded = await createViewer({ host: canvasHost, url: new URL(`../assets/decor-models/task084/${row.record_id}.glb`, scriptUrl).href, recordId: row.record_id, metadata, signal, onError: message => { if (current === epoch) failure(message); } });
+        const file = metadata.blendModes ? 'task084/' + row.record_id : 'catalog/' + metadata.assetId;
+        const loaded = await createViewer({ host: canvasHost, url: new URL('../assets/decor-models/' + file + '.glb', scriptUrl).href, recordId: row.record_id, metadata: { ...metadata, name: row.name }, signal, onError: message => { if (current === epoch) failure(message); } });
         if (destroyed || current !== epoch) { loaded.destroy(); return; }
         clearTimeout(timeout); viewer = loaded; image.hidden = true; controls.hidden = false; section.dataset.state = 'ready';
         status.textContent = '拖动旋转 · 滚轮缩放 · 可用下方按钮调整。静态外观，不含动态特效。';
