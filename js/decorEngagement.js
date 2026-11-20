@@ -78,12 +78,18 @@ window.DecorEngagement = (() => {
     if (row.liked) likedIds.add(id); else likedIds.delete(id);
     announce();
   }
+  const iconFile = 'assets/icons/decor-interactions.svg';
+  function metricIcon(symbol, className) {
+    return `<svg class="dh-metric-icon ${className}" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="${iconFile}#metric-${symbol}"></use></svg>`;
+  }
   function refresh(root) {
     if (!root) return;
     for (const strip of root.querySelectorAll('[data-metrics]')) {
       const id = Number(strip.dataset.metrics);
       if (!strip.firstElementChild) {
-        strip.innerHTML = '<button type="button" class="dh-heart" aria-label="点赞"><span class="dh-heart-icon" aria-hidden="true"></span> <span data-count="likes"></span></button><span class="dh-stat" title="收藏到方案单的人数"><span aria-hidden="true">☆</span> <span data-count="favorites"></span></span><span class="dh-stat" title="有效浏览"><svg class="dh-eye" viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path d="M1.5 10Q5.2 4.5 10 4.5T18.5 10Q14.8 15.5 10 15.5T1.5 10Z"/><circle cx="10" cy="10" r="2.2"/></svg> <span data-count="views"></span></span>';
+        strip.innerHTML = `<button type="button" class="dh-heart" aria-label="点赞">${metricIcon('like', 'dh-heart-icon')} <span data-count="likes"></span></button>
+          <span class="dh-stat" title="收藏到方案单的人数">${metricIcon('favorite', 'dh-star')} <span data-count="favorites"></span></span>
+          <span class="dh-stat" title="有效浏览">${metricIcon('views', 'dh-eye')} <span data-count="views"></span></span>`;
         strip.querySelector('button').onclick = async event => {
           event.stopPropagation();
           if (!user()) return window.iaOpenAuth?.();
@@ -105,7 +111,9 @@ window.DecorEngagement = (() => {
       heart.setAttribute('aria-label', liked ? '取消点赞' : '点赞');
       heart.setAttribute('aria-pressed', String(liked));
       heart.title = liked ? '取消点赞' : '点赞';
-      heart.querySelector('.dh-heart-icon').textContent = liked ? '♥' : '♡';
+      const heartShape = heart.querySelector('use');
+      const symbol = iconFile + (liked ? '#metric-liked' : '#metric-like');
+      if (heartShape.getAttribute('href') !== symbol) heartShape.setAttribute('href', symbol);
       const total = counts(id);
       for (const [key, label] of [['likes','点赞'],['favorites','收藏'],['views','浏览']]) {
         const number = strip.querySelector('[data-count=' + key + ']');

@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="metric-brass" x1="15%" y1="0%" x2="78%" y2="100%">
+      <stop stop-color="#ffde8f"/><stop offset=".44" stop-color="#edbe64"/><stop offset="1" stop-color="#a87539"/>
+    </linearGradient>
+    <linearGradient id="metric-steel" x1="0%" y1="0%" x2="80%" y2="100%">
+      <stop stop-color="#7f8a91"/><stop offset=".5" stop-color="#46535e"/><stop offset="1" stop-color="#26313c"/>
+    </linearGradient>
+    <linearGradient id="metric-ruby" x1="10%" y1="0%" x2="75%" y2="100%">
+      <stop stop-color="#fa7771"/><stop offset=".45" stop-color="#b63243"/><stop offset="1" stop-color="#6d2032"/>
+    </linearGradient>
+    <path id="metric-heart-edge" d="M12 21 3.6 13.1C.3 9.8 1.4 4.5 5.7 3.5 8.1 2.9 10.2 3.8 12 5.7c1.8-1.9 3.9-2.8 6.3-2.2 4.3 1 5.4 6.3 2.1 9.6Z"/>
+  </defs>
+  <symbol id="metric-like" viewBox="0 0 24 24">
+    <use href="#metric-heart-edge" fill="none" stroke="#29333c" stroke-width="3.4" stroke-linejoin="round"/>
+    <use href="#metric-heart-edge" fill="none" stroke="url(#metric-brass)" stroke-width="1.85" stroke-linejoin="round"/>
+    <path d="M3.5 9.3c-.2-2.7 1.9-4.7 4.4-4.4" fill="none" stroke="#fff0bd" stroke-width=".9" stroke-linecap="round"/>
+  </symbol>
+  <symbol id="metric-liked" viewBox="0 0 24 24">
+    <use href="#metric-heart-edge" fill="url(#metric-ruby)" stroke="#29333c" stroke-width="3.4" stroke-linejoin="round"/>
+    <path d="M3.4 9.7 7 4.6 11.9 7.4 8.3 10.8Z" fill="#f58b80"/>
+    <path d="m3.4 9.7 4.9 1.1L12 19.8Z" fill="#cf4752"/>
+    <path d="m8.3 10.8 7.5-.9-3.8 9.9Z" fill="#ab2e41"/>
+    <path d="m15.8 9.9 4.7-2.5-.5 5-8 7.4Z" fill="#802337"/>
+    <use href="#metric-heart-edge" fill="none" stroke="url(#metric-brass)" stroke-width="1.85" stroke-linejoin="round"/>
+  </symbol>
+  <symbol id="metric-favorite" viewBox="0 0 24 24">
+    <path d="m12 2.1 3 6.2 6.8 1-4.9 4.8 1.2 6.9-6.1-3.2L5.9 21l1.2-6.9-4.9-4.8 6.8-1Z" fill="url(#metric-steel)" stroke="url(#metric-brass)" stroke-width="1.65" stroke-linejoin="round"/>
+    <path d="m12 4.9.1 7.5-3-3.2 1.1-.2Z" fill="#e3c389"/>
+    <path d="m12.1 12.4 7.1-2.2-3.7 3.7.8 4.6Z" fill="#293641"/>
+    <path d="M6.5 19.7 12.1 12.4" stroke="#bba27b" stroke-width=".85"/>
+  </symbol>
+  <symbol id="metric-views" viewBox="0 0 24 24">
+    <path d="M1.4 12C4.5 7.5 7.7 5.2 12 5.2S19.5 7.5 22.6 12c-3.1 4.5-6.3 6.8-10.6 6.8S4.5 16.5 1.4 12Z" fill="url(#metric-steel)" stroke="url(#metric-brass)" stroke-width="1.7" stroke-linejoin="round"/>
+    <circle cx="12" cy="12" r="3.75" fill="url(#metric-brass)"/>
+    <circle cx="12" cy="12" r="2" fill="#222b33"/>
+    <circle cx="11.4" cy="11.3" r=".65" fill="#ffde8f"/>
+  </symbol>
+</svg>

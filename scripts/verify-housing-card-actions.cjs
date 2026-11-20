@@ -7,8 +7,21 @@ module.exports = async ({author,guest,db,sessions,base,pass,output}) => {
   const stat = key => card.locator('[data-count=' + key + ']');
   await author.goto(base + '/#/house/decor');
   await author.locator('#dhSearch').fill('卷起来的卷轴');
+  async function verifyIcons(strip, liked) {
+    const icons = strip.locator('.dh-metric-icon');
+    await icons.last().waitFor();
+    await (await icons.first().elementHandle()).waitForElementState('stable');
+    assert.deepEqual(await icons.evaluateAll(nodes => nodes.map(el => {
+      const box = el.getBoundingClientRect();
+      return [el.querySelector('use').getAttribute('href').split('#')[1], box.width, box.height];
+    })), [[liked ? 'metric-liked' : 'metric-like',16,16],['metric-favorite',16,16],['metric-views',16,16]]);
+  }
+  await verifyIcons(card, false);
+  await card.screenshot({path:path.join(output,'icons-not-liked.png')});
   await card.getByRole('button',{name:'点赞',exact:true}).click();
   await card.locator('.dh-heart[aria-pressed=true]').waitFor();
+  await verifyIcons(card, true);
+  await card.screenshot({path:path.join(output,'icons-liked.png')});
   assert.equal(await stat('likes').innerText(),'1');
   assert.equal(await stat('views').innerText(),'0');
   await author.reload();
@@ -42,6 +55,14 @@ module.exports = async ({author,guest,db,sessions,base,pass,output}) => {
   pass('家具收藏即时存入方案单、侧栏红点查看后消失、已有方案打开、选新方案、一个账号多个方案收藏仅计一人');
   await card.locator('.dh-name').click();
   const dialog = author.locator('.dh-modal');
+  const metrics = dialog.locator('.dh-engagement');
+  await verifyIcons(metrics, false);
+  await metrics.getByRole('button',{name:'点赞',exact:true}).click();
+  await metrics.locator('[aria-pressed=true]').waitFor();
+  await verifyIcons(metrics, true);
+  await metrics.screenshot({path:path.join(output,'icons-detail-liked.png')});
+  await metrics.getByRole('button',{name:'取消点赞'}).click();
+  await metrics.locator('[aria-pressed=false]').waitFor();
   const preview = dialog.getByRole('button',{name:'点击游戏内预览'});
   const note = dialog.locator('.dh-game-preview-note');
   assert.equal(await note.innerText(),'');

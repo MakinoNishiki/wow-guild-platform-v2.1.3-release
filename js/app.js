@@ -9136,6 +9136,7 @@ function lootFillAssignedTo(idOrName) {
 // ==================== 初始化 ====================
 // ==================== 更新日志 ====================
 const changelogData = [
+  {id:'req209-metric-icons',version:'v3.2.0',date:'2026-11-20',type:'improve',typeLabel:'功能优化',title:'统一家具互动图标',summary:'家具卡片与详情采用 16px 暗铁金边图标。空心爱心在点赞后变为红色实心，星标显示收藏人数，眼形显示浏览次数。',details:[]},
   {id:'req209-structural-models',version:'v3.2.0',date:'2026-11-20',type:'feature',typeLabel:'新增功能',title:'可旋转查看室内建筑构件',summary:'图鉴已接入 21 件室内墙体、门廊与立柱的游戏建筑模型。',details:[]},
   {id:'req209-catalog-models',version:'v3.2.0',date:'2026-11-20',type:'improve',typeLabel:'功能优化',title:'图鉴家具均可旋转查看',summary:'2,295 件家具支持在详情中查看静态 3D 外观，包括壁炉、室内墙体、门廊和立柱。打开详情后点击「3D 预览」即可拖动旋转和缩放。',details:[]},
   {id:'bug128-decor-eye',version:'v3.2.0',date:'2026-11-20',type:'fix',typeLabel:'修复BUG',title:'校正家具浏览量图标',summary:'卡片和详情使用水平对称的眼形，瞳孔居中，与浏览次数对齐。',details:[]},

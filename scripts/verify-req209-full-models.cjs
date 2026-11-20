@@ -6,7 +6,7 @@ const http = require('node:http');
 const { chromium } = require('playwright');
 const root = path.resolve(__dirname, '..');
 const catalog = require('../data/task083/catalog-current-2335.json');
-const evidence = path.join(root, 'docs/evidence/req209-full-models');
+const evidence = process.env.WB_VERIFY_OUTPUT || path.join(root, 'docs/evidence/req209-full-models');
 const fixtures = { likes: 0, favorites: 1, views: 2 };
 const mimes = { '.html': 'text/html;charset=utf-8', '.js': 'application/javascript', '.css': 'text/css', '.glb': 'model/gltf-binary', '.png': 'image/png', '.svg': 'image/svg+xml' };
 const server = http.createServer((req, res) => {
@@ -70,11 +70,11 @@ async function checkUi(context, base) {
       await eye.waitFor();
       assert.equal(await eye.evaluate(el => getComputedStyle(el).transform), 'none');
       assert.ok(await eye.evaluate(el => {
-        const bounds = el.querySelector('path').getBBox();
-        const pupil = el.querySelector('circle');
+        const shape = el.querySelector('use');
+        const bounds = shape.getBBox();
         const centerY = node => { const r = node.getBoundingClientRect(); return r.top + r.height / 2; };
-        return bounds.x + bounds.width / 2 === pupil.cx.baseVal.value &&
-          bounds.y + bounds.height / 2 === pupil.cy.baseVal.value &&
+        return shape.getAttribute('href').endsWith('#metric-views') && bounds.width > bounds.height &&
+          Math.abs(bounds.x + bounds.width / 2 - 12) < .01 && Math.abs(bounds.y + bounds.height / 2 - 12) < .01 &&
           Math.abs(centerY(el) - centerY(el.parentElement.querySelector('[data-count=views]'))) <= 1;
       }));
       if (id === 80) await card.screenshot({ path: path.join(evidence, 'card-' + width + '.png') });
