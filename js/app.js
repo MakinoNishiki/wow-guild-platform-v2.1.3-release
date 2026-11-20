@@ -9144,6 +9144,10 @@ function lootFillAssignedTo(idOrName) {
 // ==================== 初始化 ====================
 // ==================== 更新日志 ====================
 const changelogData = [
+  {id:'req176-floor-preview',version:'v3.2.0',date:'2026-11-21',type:'feature',typeLabel:'新增功能',title:'多一个房型可以看清地板轮廓',summary:'在家宅图鉴查看 Full_Layout_Rugged_Prn，可以看到从游戏地板模型生成的俯视图。',details:[]},
+  {id:'req172-decor-acquisition',version:'v3.2.0',date:'2026-11-21',type:'improve',typeLabel:'功能优化',title:'找佩佩、开宝箱和买画都有了具体线索',summary:'图鉴补上两处公告板的佩佩坐标、六件阿曼尼装饰与艾瑞达斯工作台的开箱地点，以及“舒哈鲁视角”画作的塔罗牌折扣条件。',details:[]},
+  {id:'req176-room-merchants',version:'v3.2.0',date:'2026-11-21',type:'fix',typeLabel:'修复BUG',title:'修正 18 张房间设计图的购买地点',summary:'按目标房型列出两个住宅区的实际商人，可直接搜索商人姓名查找房型。',details:[]},
+  {id:'req176-room-voucher-reference',version:'v3.2.0',date:'2026-11-21',type:'refactor',typeLabel:'模块调整',title:'房间图纸的礼券参考价注明出处',summary:'图纸详情标明参考价来自国服发布公告还是外服商人记录。当前国服报价待核，参考价仅供查看。',details:[]},
   {id:'req202-source-search',version:'v3.2.0',date:'2026-11-21',type:'feature',typeLabel:'新增功能',title:'知道商人或地区，也能找到家具',summary:'在家宅图鉴搜索商人、地区、任务、成就、声望条件或购买货币，即可查到对应家具。搜索可与现有筛选一起使用。',details:[]},
   {id:'req202-source-card',version:'v3.2.0',date:'2026-11-21',type:'improve',typeLabel:'功能优化',title:'在家具卡片上看见匹配的获取途径',summary:'一件家具可由多个商人出售。搜到其中一位时，卡片直接显示那位商人并标出关键词，点开详情可查看全部途径。',details:[]},
   {id:'bug129-loot-receipt',version:'v3.2.0',date:'2026-11-21',type:'fix',typeLabel:'修复BUG',title:'修复拾取已保存、网页仍提示未确认的问题',summary:'恢复旧缓存后，导入页会逐条核对最新的拾取记录。确实缺少回执时保留原文，可再次提交。',details:[]},

@@ -279,9 +279,16 @@
     const id = r.icon_file_id != null ? r.icon_file_id : model && model.fallbackIconId;
     return id != null ? `assets/decor-icons/${id}.png` : PLACEHOLDER;
   }
+  function roomFloorPreview(r) {
+    if (r.entry_type === 2 && r.icon_file_id == null && !D.ROOM_ICON_OVERRIDES?.[r.record_id]) {
+      return D.ROOM_FLOOR_PREVIEWS?.[r.record_id];
+    }
+  }
   function iconSrc(r) {
     const room = r.entry_type === 2 && D.ROOM_ICON_OVERRIDES && D.ROOM_ICON_OVERRIDES[r.record_id];
     if (room && r.icon_file_id == null) return room;
+    const floor = roomFloorPreview(r);
+    if (floor) return floor;
     const model = D.MODEL_ICON_OVERRIDES && D.MODEL_ICON_OVERRIDES[r.record_id];
     // 官方目录新增真实图标时自动优先；网站旧物品图映射不冒充目录官方图。
     if (model && (r.icon_file_id == null || Number(r.icon_file_id) === model.fallbackIconId)) return model.src;
@@ -289,6 +296,11 @@
   }
   function iconFallback(r) {
     return iconSrc(r) !== legacyIconSrc(r) ? legacyIconSrc(r) : PLACEHOLDER;
+  }
+  function catalogIconHtml(r, lazy = false) {
+    const floor = roomFloorPreview(r);
+    const onError = floor ? "this.alt='';this.closest('.dh-card,.dh-modal-head')?.querySelector('[data-floor-caption]')?.remove();" : '';
+    return `<img src="${iconSrc(r)}" data-fallback="${iconFallback(r)}" alt="${floor ? '地板俯视图' : ''}" ${lazy ? 'loading="lazy"' : ''} onerror="${onError}if(this.dataset.fallback){this.src=this.dataset.fallback;delete this.dataset.fallback}else{this.onerror=null;this.src='${PLACEHOLDER}'}">`;
   }
 
   // ---- 每页件数动态化（任务书 #51-补丁3 第一节：PAGE_SIZE 常量 60 → 实测列数 × 8 行） ----
@@ -363,7 +375,11 @@
   function cardHtml(r) {
     const q = r.quality != null ? r.quality : 1;
     const badges = [];
-    if (r.entry_type === 2) badges.push('<span class="dh-badge dh-badge-room">房间</span>');
+    if (r.entry_type === 2) {
+      badges.push(roomFloorPreview(r)
+        ? '<span class="dh-badge dh-badge-room" data-floor-caption>地板俯视图</span>'
+        : '<span class="dh-badge dh-badge-room">房间</span>');
+    }
     if (Array.isArray(r.subcategory_ids) && r.subcategory_ids.includes(D.PET_SUBCATEGORY_ID)) badges.push('<span class="dh-badge dh-badge-pet">可放宠物</span>');
     // 任务书 #51-补丁3 第二节：容量徽标挪图标右上角角标（.dh-cost-badge 绝对定位），原底部容量行删除；
     // 无房间/宠物徽标时整行省略（净空高，抵来源一行变两行）
@@ -374,7 +390,7 @@
     const snippet = start ? '…' + matched.slice(start) : src.text;
     // 任务书 #58-补丁：角标 ＋ 退役 → 卡片底部通栏按钮「加入方案单 / 已加入 ×N」双态
     return `<div class="dh-card" data-rid="${r.record_id}" tabindex="0" role="button" aria-label="${esc(r.name)}">
-      <div class="dh-icon-wrap"${window.LootTaxonomy?.itemQualityAttr(r.quality) || ''}><img src="${iconSrc(r)}" data-fallback="${iconFallback(r)}" alt="" loading="lazy" onerror="if(this.dataset.fallback){this.src=this.dataset.fallback;delete this.dataset.fallback}else{this.onerror=null;this.src='${PLACEHOLDER}'}">${cost}</div>
+      <div class="dh-icon-wrap"${window.LootTaxonomy?.itemQualityAttr(r.quality) || ''}>${catalogIconHtml(r, true)}${cost}</div>
       <div class="dh-name dh-q${q}">${highlightSearch(r.name)}</div>
       <div class="dh-cat">${esc(catPathText(r))}</div>
       <div class="dh-src${src.unknown ? ' dh-src-unknown' : ''}"${matched ? ' title="' + esc(matched) + '"' : ''}>${matched ? highlightSearch(snippet) : esc(snippet)}</div>
@@ -598,10 +614,10 @@
     modalEl.className = 'dh-modal-overlay';
     modalEl.innerHTML = `<div class="dh-modal" role="dialog" aria-label="${esc(r.name)}">
       <div class="dh-modal-head">
-        <div class="dh-modal-icon"${window.LootTaxonomy?.itemQualityAttr(r.quality) || ''}><img src="${iconSrc(r)}" data-fallback="${iconFallback(r)}" alt="" onerror="if(this.dataset.fallback){this.src=this.dataset.fallback;delete this.dataset.fallback}else{this.onerror=null;this.src='${PLACEHOLDER}'}"></div>
+        <div class="dh-modal-icon"${window.LootTaxonomy?.itemQualityAttr(r.quality) || ''}>${catalogIconHtml(r)}</div>
         <div>
           <div class="dh-modal-title dh-q${q}">${esc(r.name)}</div>
-          <div class="dh-modal-sub">${esc(D.QUALITY_NAMES[q] || '')}${r.entry_type === 2 ? ' · 房间/户型' : ''}</div>
+          <div class="dh-modal-sub">${esc(D.QUALITY_NAMES[q] || '')}${r.entry_type === 2 ? ' · 房间/户型' : ''}${roomFloorPreview(r) ? '<span data-floor-caption> · 地板俯视图</span>' : ''}</div>
         </div>
         <button type="button" class="dh-modal-close" aria-label="关闭">&times;</button>
       </div>

@@ -220,6 +220,9 @@
   "287": "assets/decor-icons/room-previews/287.png"
 };
 
+  // 房间地板组件的正交俯视渲染，与游戏原生户型图分开维护。
+  const ROOM_FLOOR_PREVIEWS = { 291: 'assets/decor-icons/room-previews/291-floor.png' };
+
   const MODEL_ICON_OVERRIDES = {
     "28559": { "src": "assets/decor-icons/model-previews/28559.png", "fallbackIconId": 8179967 },
   "27684": {
@@ -343,7 +346,7 @@
     return '';
   }
   const dict = {
-    MODEL_ICON_OVERRIDES, ROOM_ICON_OVERRIDES,
+    MODEL_ICON_OVERRIDES, ROOM_ICON_OVERRIDES, ROOM_FLOOR_PREVIEWS,
     CURRENCY_NAMES, ITEM_NAMES, TEXTURE_CURRENCY_NAMES,
     CATEGORY_NAMES, CATEGORY_FILTER_ORDER, SUBCATEGORY_NAMES,
     PET_SUBCATEGORY_ID, SIZE_NAMES, QUALITY_NAMES,

@@ -7,8 +7,11 @@ const catalog=read('data/task083/catalog-current-2335.json');
 const bySource=new Map(sources.ready.map(r=>[r.record_id,r.sources]));
 const rows=catalog.filter(r=>r.entry_type===2).map(r=>({...r,sources:bySource.get(r.record_id)||[]}));
 const iconById=new Map(icons.files.map(r=>[r.record_id,r]));
+const floorPreview={record_id:291,src:'assets/decor-icons/room-previews/291-floor.png',dimensions:[480,480]};
+assert.equal(iconById.size,36);
+assert(!iconById.has(floorPreview.record_id));
 let fail=false,browser;
-const html='<!doctype html><meta charset="utf-8"><link rel="stylesheet" href="/css/main.css"><link rel="stylesheet" href="/css/decor-public.css"><body class="data-decor-body"><div id="page-decor"><div class="dh-filterbar" id="dhFilterBar"></div><main class="dh-main" id="dhMain"></main></div><script src="/js/decorDict.js"></script><script src="/js/decorData.js"></script>';
+const html='<!doctype html><meta charset="utf-8"><link rel="stylesheet" href="/css/main.css"><link rel="stylesheet" href="/css/decor-public.css"><body class="data-decor-body"><div id="page-decor"><div class="dh-filterbar" id="dhFilterBar"></div><main class="dh-main" id="dhMain"></main></div><script src="/js/decorDict.js"></script><script src="/js/decorModelPreview.js"></script><script src="/js/decorData.js"></script>';
 const server=http.createServer((req,res)=>{
  const u=new URL(req.url,'http://local');
  if(u.pathname==='/fixture'){res.setHeader('Content-Type','text/html; charset=utf-8');return res.end(html);}
@@ -22,7 +25,7 @@ const server=http.createServer((req,res)=>{
  await new Promise(r=>server.listen(0,'127.0.0.1',r));
  browser=await chromium.launch({executablePath:'C:/Program Files/Google/Chrome/Application/chrome.exe',headless:true});
  const page=await browser.newPage(),errors=[],results=[];page.on('pageerror',e=>errors.push(e.message));
- const out=path.join(root,'docs/evidence/req176-20261103');fs.mkdirSync(out,{recursive:true});
+ const out=process.env.WB_ROOM_TEST_OUTPUT || path.join(require('os').tmpdir(),'wb-room-catalog-verification');fs.mkdirSync(out,{recursive:true});
  for(const [width,height] of [[1366,768],[1920,1080]]){
   await page.setViewportSize({width,height});await page.goto(`http://127.0.0.1:${server.address().port}/fixture`);await page.waitForSelector('#dhSearch');
   // fullPage截图前触发并解码屏外lazy图片，避免把尚未加载误当缺图。
@@ -35,11 +38,16 @@ const server=http.createServer((req,res)=>{
    await page.locator('#dhSrcChips button').first().click();await page.locator('#dhSearch').fill(row.name);
    const card=page.locator(`.dh-card[data-rid="${row.record_id}"]`);await card.waitFor();
    const img=card.locator('img');await img.scrollIntoViewIfNeeded();await img.evaluate(e=>e.decode());
-   const expected=iconById.get(row.record_id);const src=await img.getAttribute('src');
+   const floor=row.record_id===floorPreview.record_id;
+   const expected=floor?floorPreview:iconById.get(row.record_id);const src=await img.getAttribute('src');
    assert.equal(src,expected?expected.src:'assets/decor-icons/_placeholder.png');
    if(expected)assert.deepEqual(await img.evaluate(e=>[e.naturalWidth,e.naturalHeight]),expected.dimensions);
+   assert.equal(await card.getByText('地板俯视图',{exact:true}).count(),floor?1:0);
    await card.click();await page.waitForFunction(()=>{const e=document.querySelector('.dh-modal-overlay.show');return e&&getComputedStyle(e).opacity==='1';});
    assert.equal(await page.locator('.dh-modal-icon img').getAttribute('src'),src);
+   assert.equal(await page.locator('.dh-model-poster').getAttribute('src'),src);
+   assert(await page.locator('.dh-model-preview [data-view="model"]').isDisabled());
+   assert.equal((await page.locator('.dh-modal-sub').innerText()).includes('地板俯视图'),floor);
    const text=await page.locator('.dh-src-list').innerText();
    if(row.record_id===223)assert(text.includes('住宅等级 3 解锁'));
    if(row.record_id===233)assert(text.includes('住宅等级 5 解锁'));
@@ -50,7 +58,7 @@ const server=http.createServer((req,res)=>{
    }
    if(!row.sources.length)assert.equal(text,'来源未知');
    assert.equal(await page.locator('.dh-src-list').evaluate(e=>e.scrollWidth>e.clientWidth+1),false);
-   if([1,439,223,400].includes(row.record_id))await page.screenshot({path:path.join(out,`room-${row.record_id}-${width}.png`)});
+   if([1,439,223,291,400].includes(row.record_id))await page.screenshot({path:path.join(out,`room-${row.record_id}-${width}.png`)});
    results.push({width,id:row.record_id,src,text});
    await page.keyboard.press('Escape');await page.waitForSelector('.dh-modal-overlay',{state:'detached'});
    for(const type of new Set(row.sources.map(s=>s.type))){
@@ -77,8 +85,18 @@ const server=http.createServer((req,res)=>{
  const row=rows.find(r=>r.record_id===1);row.icon_file_id=catalog.find(r=>r.record_id===28350).icon_file_id;
  await page.reload();await page.waitForSelector('#dhSearch');await page.locator('#dhSearch').fill(row.name);
  assert.equal(await page.locator('.dh-card[data-rid="1"] img').getAttribute('src'),`assets/decor-icons/${row.icon_file_id}.png`);
+ await page.route('**/'+floorPreview.src,route=>route.abort());
+ const floorRow=rows.find(r=>r.record_id===floorPreview.record_id),floorCard=page.locator('.dh-card[data-rid="291"]');
+ await page.locator('#dhSearch').fill(floorRow.name);
+ await page.waitForFunction(()=>document.querySelector('.dh-card[data-rid="291"] img')?.src.endsWith('/_placeholder.png'));
+ assert.equal(await floorCard.locator('[data-floor-caption]').count(),0);
+ assert.equal(await floorCard.locator('img').getAttribute('alt'),'');
+ floorRow.icon_file_id=row.icon_file_id;
+ await page.reload();await page.waitForSelector('#dhSearch');await page.locator('#dhSearch').fill(floorRow.name);
+ assert.equal(await floorCard.locator('img').getAttribute('src'),`assets/decor-icons/${row.icon_file_id}.png`);
+ assert.equal(await floorCard.locator('[data-floor-caption]').count(),0);
  fail=true;await page.reload();await page.waitForSelector('#dhRetry');fail=false;await page.locator('#dhRetry').click();await page.waitForSelector('#dhSearch');
  assert.deepEqual(errors,[]);
- fs.writeFileSync(path.join(out,'verification.json'),JSON.stringify({source:'offline Chrome real renderer; 40 frozen room rows, 21 candidate sources',results,errors,nativeImages:36,placeholderRooms:4,legacyModelRegression:models.length,imageFallback:true,officialPriority:true,networkRetry:true},null,2));
- console.log('PASS: 80 room card/detail + 26 model regression cases, 36 native images, unlock/vendor/shop filters, 4 honest fallbacks, priority/retry, 0 pageerror');
+ fs.writeFileSync(path.join(out,'verification.json'),JSON.stringify({source:'offline Chrome real renderer; 40 frozen room rows, 21 historical source rows',results,errors,nativeImages:36,floorPreviews:1,placeholderRooms:3,legacyModelRegression:models.length,imageFallback:true,officialPriority:true,networkRetry:true},null,2));
+ console.log('PASS: 80 room card/detail checks, 26 model regressions, 36 native images, 1 labeled floor preview, 3 fallbacks, source filters, priority/retry, 0 pageerror');
 })().catch(e=>{console.error(e);process.exitCode=1;}).finally(async()=>{await browser?.close();server.close();});
