@@ -1,7 +1,11 @@
 -- REQ-192/199. Loot history and local-participant trade evidence, never automatic allocation.
 local API = WBC_Collector
-local settings = WoWButlerCollectorSettings
-settings.evidence = settings.evidence or {}
+-- SavedVariables can replace the table created while the addon files were loading.
+local function evidenceSettings()
+  local settings = WoWButlerCollectorSettings
+  settings.evidence = settings.evidence or {}
+  return settings
+end
 local contexts, seen, trade, tradeSerial = {}, {}, nil, 0
 local function safe(fn, ...)
   if type(fn) ~= 'function' then return nil end
@@ -10,11 +14,9 @@ local function safe(fn, ...)
 end
 local function clean(link) return type(link)=='string' and link:match('(|Hitem:[^|]+|h.-|h)') or nil end
 local function emit(row)
-  if not settings.collectorSourceID then settings.collectorSourceID=tostring(time())..'-'..tostring(math.random(1,999999999))..'-'..tostring(math.random(1,999999999)) end
-  settings.eventSequence=(tonumber(settings.eventSequence) or 0)+1
-  row.collectorSourceID=settings.collectorSourceID
-  row.sourceEventID='e'..settings.eventSequence
-  row.sequence=settings.eventSequence
+  local settings = evidenceSettings()
+  row.collectorSourceID, row.sequence = API.NextEventIdentity()
+  row.sourceEventID = 'e'..row.sequence
   row.captureVersion=API.version
   row.timestamp=time()
   table.insert(settings.evidence,row)
@@ -22,7 +24,7 @@ local function emit(row)
   if API.RefreshUI then API.RefreshUI() end
 end
 local function captureHistory(encounterID)
-  if settings.enabled==false then return end
+  if evidenceSettings().enabled==false then return end
   local ctx=contexts[encounterID]
   if not ctx or not C_LootHistory then return end
   local drops=safe(C_LootHistory.GetSortedDropsForEncounter,encounterID)
@@ -50,7 +52,7 @@ local function captureHistory(encounterID)
 end
 function API.MatchEncounter(link,name,server,instance,difficulty)
   local latest={}
-  for _,e in ipairs(settings.evidence) do if e.kind=='drop' then latest[e.observationKey]=e end end
+  for _,e in ipairs(evidenceSettings().evidence) do if e.kind=='drop' then latest[e.observationKey]=e end end
   local candidates={}
   for _,e in pairs(latest) do
     if e.itemLink==link and e.bindingStatus=='ordinary' and e.instanceName==instance and e.difficultyID==difficulty
@@ -72,12 +74,15 @@ function API.MatchEncounter(link,name,server,instance,difficulty)
 end
 function API.ExportPayload(rows)
   local evidence,latest={},{}
-  for _,e in ipairs(settings.evidence) do latest[e.observationKey]=e end
+  for _,e in ipairs(evidenceSettings().evidence) do latest[e.observationKey]=e end
   for _,e in pairs(latest) do table.insert(evidence,e) end
   table.sort(evidence,function(a,b)return a.sequence<b.sequence end)
   return {schemaVersion=2,rows=rows,evidence=evidence}
 end
-function API.ClearEvidence() wipe(settings.evidence);wipe(contexts);wipe(seen);trade=nil;settings.evidenceTrimmed=nil end
+function API.ClearEvidence()
+  local settings = evidenceSettings()
+  wipe(settings.evidence);wipe(contexts);wipe(seen);trade=nil;settings.evidenceTrimmed=nil
+end
 local function identity(unit)
   local name,realm=UnitFullName(unit)
   return name,realm and realm~='' and realm or safe(GetRealmName)
@@ -119,6 +124,7 @@ for _,ev in ipairs({'ENCOUNTER_END','LOOT_HISTORY_UPDATE_ENCOUNTER','LOOT_HISTOR
   pcall(f.RegisterEvent,f,ev)
 end
 local function onEvent(_,ev,...)
+  local settings = evidenceSettings()
   if settings.enabled==false then trade=nil;return end
   if ev=='ENCOUNTER_END' then
     local id,name,difficulty,_,success=...

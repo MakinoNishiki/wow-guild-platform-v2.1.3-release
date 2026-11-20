@@ -2,6 +2,7 @@
 from pathlib import Path
 import importlib.util
 import json
+import os
 spec = importlib.util.spec_from_file_location('collector_base', Path(__file__).with_name('verify-collector-runtime.py'))
 base = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(base)
@@ -32,6 +33,15 @@ function trades() local t={} for _,r in ipairs(WoWButlerCollectorSettings.eviden
 ''')
     return lua
 cases = {
+ 'restored settings own both pickup and evidence sequence': """
+WoWButlerCollectorSettings={collectorSourceID='persisted-source',eventSequence=20,enabled=true}
+kill();loot(1)
+local rows=WoWButlerCollectorDB;local evidence=WBC_Collector.ExportPayload(rows).evidence
+assert(#rows==1 and #evidence==4)
+for _,e in ipairs(evidence) do assert(e.collectorSourceID==rows[1].collectorSourceID and e.sequence>20) end
+assert(rows[1].sourceEventID=='25' and #WoWButlerCollectorSettings.evidence==4)
+WBC_Collector.SetEnabled(false);kill(2);assert(#WoWButlerCollectorSettings.evidence==4)
+""",
  'observed list remains separate from actual pickups': "kill();assert(#WoWButlerCollectorSettings.evidence==4 and #WoWButlerCollectorDB==0);loot(1);assert(#WoWButlerCollectorDB==1);assert(#WBC_Collector.ExportPayload(WoWButlerCollectorDB).evidence==4)",
  'same observation refresh does not multiply counts': "kill();fire('LOOT_HISTORY_UPDATE_DROP',1,1);assert(#WoWButlerCollectorSettings.evidence==4)",
  'delayed pickup beyond old 180s retains unique original encounter': "kill();now=now+1800;loot(1);local r=WoWButlerCollectorDB[1];assert(r.encounterID==1 and r.bossSource=='observed_history' and r.encounterAt==1800000000)",
@@ -51,7 +61,7 @@ results=[]
 for name,script in cases.items():
     runtime().execute(script)
     results.append({'name':name,'ok':True})
-out=base.ROOT/'docs/evidence/req199-20261117'
+out=Path(os.environ.get('WB_VERIFY_OUTPUT',base.ROOT/'docs/evidence/req199-20261117'))
 out.mkdir(parents=True,exist_ok=True)
 (out/'collector-runtime.json').write_text(json.dumps({'environment':'Lua 5.1 with mocked game APIs, not live CN','checks':results},ensure_ascii=False,indent=2),encoding='utf-8')
 # Exercise the actual nested JSON encoder and settings controls, not a replacement serializer.

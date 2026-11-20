@@ -525,7 +525,10 @@ function loadData() {
   try {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved) {
-      appData = JSON.parse(saved);
+      const cached = JSON.parse(saved);
+      if (!cached || typeof cached !== 'object' || Array.isArray(cached)) return;
+      // cloud.js publishes the database readback on window.appData.
+      window.appData = appData = cached;
       // 确保loots字段存在
       if (!appData.loots) appData.loots = [];
       // 确保wishlist字段存在
@@ -1445,8 +1448,13 @@ function cloudCrudSentinelCheck(dataType, operation, payload) {
     : (dataType === 'wishlist' || dataType === 'wishlists') ? appData.wishlist
     : dataType === 'activities' ? appData.activities
     : dataType === 'lootDrops' ? appData.lootDrops : null;
+  if (dataType === 'lootDrops' && operation === 'submit') {
+    const ids = payload.result?.ids;
+    if (!Array.isArray(coll) || !Array.isArray(ids) || ids.length !== payload.rows.length) return false;
+    const visible = new Set(coll.map(row => row.id));
+    return ids.every(id => typeof id === 'string' && visible.has(id));
+  }
   if (!Array.isArray(coll)) return true;
-  if(dataType==='lootDrops'&&operation==='submit')return Array.isArray(payload.result?.ids)&&payload.result.ids.every(id=>coll.some(r=>r.id===id));
   const id = payload && payload.id;
   if (!id) return true;
   const row = coll.find(r => r.id === id);
@@ -7538,7 +7546,7 @@ async function lootDropImportConfirm() {
       btn.textContent=`匹配中 ${offset}/${rows.length}…`;
       const payload={activityId,rows:rows.slice(offset,offset+200),...(lootDropEvidence.length?{evidence:lootDropEvidence}:{})};
       await cloudCrud('lootDrops','submit',payload,{silentError:true});
-      if(!cloudCrudSentinelCheck('lootDrops','submit',payload))throw new Error('写入后回读未确认，请保留原文重试');
+      if(!cloudCrudSentinelCheck('lootDrops','submit',payload))throw new Error('拾取列表暂未读到完整的提交结果');
       for(const key of Object.keys(totals))totals[key]+=payload.result[key]||0;
     }
     lootDropsLoadedFor=guildId;lootDropImportRows=[];closeModal('lootDropImportModal');
@@ -9136,6 +9144,10 @@ function lootFillAssignedTo(idOrName) {
 // ==================== 初始化 ====================
 // ==================== 更新日志 ====================
 const changelogData = [
+  {id:'req202-source-search',version:'v3.2.0',date:'2026-11-21',type:'feature',typeLabel:'新增功能',title:'知道商人或地区，也能找到家具',summary:'在家宅图鉴搜索商人、地区、任务、成就、声望条件或购买货币，即可查到对应家具。搜索可与现有筛选一起使用。',details:[]},
+  {id:'req202-source-card',version:'v3.2.0',date:'2026-11-21',type:'improve',typeLabel:'功能优化',title:'在家具卡片上看见匹配的获取途径',summary:'一件家具可由多个商人出售。搜到其中一位时，卡片直接显示那位商人并标出关键词，点开详情可查看全部途径。',details:[]},
+  {id:'bug129-loot-receipt',version:'v3.2.0',date:'2026-11-21',type:'fix',typeLabel:'修复BUG',title:'修复拾取已保存、网页仍提示未确认的问题',summary:'恢复旧缓存后，导入页会逐条核对最新的拾取记录。确实缺少回执时保留原文，可再次提交。',details:[]},
+  {id:'bug130-collector-identity',version:'v3.2.0',date:'2026-11-21',type:'refactor',typeLabel:'模块调整',title:'掉落观察与实际拾取沿用同一采集编号',summary:'拾取插件 1.1.1 在重载后继续使用存档中的编号，让同一台电脑记录的掉落与拾取可以互相核对。',details:[]},
   {id:'req209-metric-icons',version:'v3.2.0',date:'2026-11-20',type:'improve',typeLabel:'功能优化',title:'统一家具互动图标',summary:'家具卡片与详情采用 16px 暗铁金边图标。空心爱心在点赞后变为红色实心，星标显示收藏人数，眼形显示浏览次数。',details:[]},
   {id:'req209-structural-models',version:'v3.2.0',date:'2026-11-20',type:'feature',typeLabel:'新增功能',title:'可旋转查看室内建筑构件',summary:'图鉴已接入 21 件室内墙体、门廊与立柱的游戏建筑模型。',details:[]},
   {id:'req209-catalog-models',version:'v3.2.0',date:'2026-11-20',type:'improve',typeLabel:'功能优化',title:'图鉴家具均可旋转查看',summary:'2,295 件家具支持在详情中查看静态 3D 外观，包括壁炉、室内墙体、门廊和立柱。打开详情后点击「3D 预览」即可拖动旋转和缩放。',details:[]},

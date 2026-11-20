@@ -23,7 +23,7 @@
   const state = {
     url: '', anon: '',
     rows: [],            // 全量 2062 件（内存索引）
-    search: '',
+    search: null,
     category: [], source: [], expansion: [], race: [], costTier: [], env: [],
     color: [], style: [], faction: [], feature: [], ability: [],
     sort: 'default',     // 资料片主题标签与实际加入版本严格分离
@@ -77,7 +77,7 @@
     if (!row) { focusedRecord = null; planToast('图鉴暂未收录这件家具', true); return; }
     focusedRecord = null;
     resetFilters();
-    state.search = String(row.name || '').toLowerCase();
+    state.search = searchPattern(row.name);
     $('dhSearch').value = row.name;
     $('dhSearchClear').style.display = 'block';
     refreshChips(); render(false);
@@ -135,9 +135,34 @@
     }
     return diff || Number(a.record_id) - Number(b.record_id);
   }
+  function searchPattern(value) {
+    const query = String(value || '').trim();
+    if (!query) return null;
+    const literal = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return new RegExp('(' + literal + ')', 'iu');
+  }
+
+  const sourceLinesByRow = new WeakMap();
+  function matchingSource(row) {
+    if (!state.search) return;
+    if (!sourceLinesByRow.has(row)) {
+      const structured = knownSourceLines(row);
+      const lines = structured.length ? structured : rawSourceLines(row);
+      sourceLinesByRow.set(row, lines.filter(line => line && line !== '来源未知'));
+    }
+    return sourceLinesByRow.get(row).find(line => state.search.test(line));
+  }
+
+  function highlightSearch(text) {
+    if (!state.search) return esc(text);
+    return String(text || '').split(state.search).map((part, i) =>
+      i % 2 ? '<mark class="dh-search-hit">' + esc(part) + '</mark>' : esc(part)
+    ).join('');
+  }
+
   function filteredRows() {
     return state.rows.filter(r => {
-      if (state.search && !String(r.name || '').toLowerCase().includes(state.search)) return false;
+      if (state.search && !state.search.test(r.name || '') && !matchingSource(r)) return false;
       return filterGroups.every(group => !state[group.key].length ||
         group.options.some(option => state[group.key].includes(option.key) && option.match(r)));
     }).sort(compareRows);
@@ -179,7 +204,7 @@
     const groupHtml = group => `<div class="dh-group"><div class="dh-group-head">${esc(group.label)}<span class="dh-chip-n">（多选）</span></div>${group.note ? `<div class="dh-group-note">${esc(group.note)}</div>` : ''}<div class="dh-chips" id="${group.id}"></div></div>`;
     filterBar.innerHTML = `
       <div class="dh-top-row">
-        <div class="uc-input-wrap dh-search-wrap"><input type="text" id="dhSearch" class="search-input" placeholder="搜索装饰名…" aria-label="搜索装饰名称"><button type="button" id="dhSearchClear" class="uc-clear-btn" aria-label="清除搜索" title="清空" style="display:none">&times;</button></div>
+        <div class="uc-input-wrap dh-search-wrap"><input type="text" id="dhSearch" class="search-input" placeholder="搜索家具名称、商人、地区、任务等" aria-label="搜索家具名称或获取来源"><button type="button" id="dhSearchClear" class="uc-clear-btn" aria-label="清除搜索" title="清空" style="display:none">&times;</button></div>
         <label class="dh-sort-label" for="dhSort">排序</label>
         <select id="dhSort" class="form-select dh-sort"><option value="default">默认排序</option><option value="name-asc">名称升序</option><option value="name-desc">名称降序</option><option value="introduced-new">加入版本：新到旧</option><option value="introduced-old">加入版本：旧到新</option><option value="likes">站内点赞最多</option><option value="views">站内浏览最多</option></select>
         <button type="button" id="dhResetFilters" class="btn btn-secondary">重置筛选</button>
@@ -207,8 +232,8 @@
     $('dhSort').onchange = e => { state.sort = e.target.value; state.page = 1; refreshCount(); render(true); };
     const searchInput = $('dhSearch'), searchClear = $('dhSearchClear');
     const syncClear = () => { searchClear.style.display = searchInput.value ? 'block' : 'none'; };
-    const clearSearch = () => { searchInput.value = ''; state.search = ''; state.page = 1; syncClear(); searchInput.focus(); refreshCount(); render(true); };
-    searchInput.oninput = e => { state.search = e.target.value.trim().toLowerCase(); state.page = 1; syncClear(); refreshCount(); render(true); };
+    const clearSearch = () => { searchInput.value = ''; state.search = null; state.page = 1; syncClear(); searchInput.focus(); refreshCount(); render(true); };
+    searchInput.oninput = e => { state.search = searchPattern(e.target.value); state.page = 1; syncClear(); refreshCount(); render(true); };
     searchInput.onkeydown = e => { if (e.key === 'Escape' && searchInput.value) clearSearch(); };
     searchClear.onclick = clearSearch;
     $('dhResetFilters').onclick = () => { resetFilters(); refreshChips(); render(true); };
@@ -236,7 +261,7 @@
   }
   function resetFilters() {
     FILTER_KEYS.forEach(key => { state[key] = []; });
-    Object.assign(state, { search: '', sort: 'default', page: 1 });
+    Object.assign(state, { search: null, sort: 'default', page: 1 });
     const si = $('dhSearch'); if (si) { si.value = ''; $('dhSearchClear').style.display = 'none'; }
     if ($('dhSort')) $('dhSort').value = state.sort;
   }
@@ -343,13 +368,16 @@
     // 任务书 #51-补丁3 第二节：容量徽标挪图标右上角角标（.dh-cost-badge 绝对定位），原底部容量行删除；
     // 无房间/宠物徽标时整行省略（净空高，抵来源一行变两行）
     const cost = r.placement_cost != null ? `<span class="dh-badge dh-cost-badge">容量 ${r.placement_cost}</span>` : '';
-    const src = srcSummaryText(r);
+    const matched = matchingSource(r);
+    const src = matched ? { text: matched, unknown: false } : srcSummaryText(r);
+    const start = matched ? Math.max(0, matched.search(state.search) - 8) : 0;
+    const snippet = start ? '…' + matched.slice(start) : src.text;
     // 任务书 #58-补丁：角标 ＋ 退役 → 卡片底部通栏按钮「加入方案单 / 已加入 ×N」双态
     return `<div class="dh-card" data-rid="${r.record_id}" tabindex="0" role="button" aria-label="${esc(r.name)}">
       <div class="dh-icon-wrap"${window.LootTaxonomy?.itemQualityAttr(r.quality) || ''}><img src="${iconSrc(r)}" data-fallback="${iconFallback(r)}" alt="" loading="lazy" onerror="if(this.dataset.fallback){this.src=this.dataset.fallback;delete this.dataset.fallback}else{this.onerror=null;this.src='${PLACEHOLDER}'}">${cost}</div>
-      <div class="dh-name dh-q${q}">${esc(r.name)}</div>
+      <div class="dh-name dh-q${q}">${highlightSearch(r.name)}</div>
       <div class="dh-cat">${esc(catPathText(r))}</div>
-      <div class="dh-src${src.unknown ? ' dh-src-unknown' : ''}">${esc(src.text)}</div>
+      <div class="dh-src${src.unknown ? ' dh-src-unknown' : ''}"${matched ? ' title="' + esc(matched) + '"' : ''}>${matched ? highlightSearch(snippet) : esc(snippet)}</div>
       ${badges.length ? `<div class="dh-badges">${badges.join('')}</div>` : ''}
       <div class="dh-card-metrics" data-metrics="${r.record_id}"></div>
       <div class="dh-plan-entry"><button type="button" class="dh-card-add${planQtyOf(r.record_id) ? ' added' : ''}" data-add="${r.record_id}">${planAddLabel(r.record_id)}</button>${planTargetButton(r)}</div>

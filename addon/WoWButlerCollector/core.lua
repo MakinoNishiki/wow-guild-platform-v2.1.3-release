@@ -28,7 +28,16 @@ WoWButlerCollectorSettings = WoWButlerCollectorSettings or {}
 if WoWButlerCollectorSettings.enabled == nil then WoWButlerCollectorSettings.enabled = true end
 WBC_Collector = {} -- ui.lua 只消费状态与动作，采集/导出保持一个实现
 local API = WBC_Collector
-API.version = "1.1.0"
+API.version = "1.1.1"
+
+function API.NextEventIdentity()
+  local settings = WoWButlerCollectorSettings
+  if not settings.collectorSourceID then
+    settings.collectorSourceID = tostring(time()).."-"..tostring(math.random(1,999999999)).."-"..tostring(math.random(1,999999999))
+  end
+  settings.eventSequence = (tonumber(settings.eventSequence) or 0) + 1
+  return settings.collectorSourceID, settings.eventSequence
+end
 
 local MAX_ENTRIES = 2000      -- 容量护栏：超出丢弃最旧（SavedVariables 体积保护）
 local CAP_WARN_AT = 1000      -- 达到即每次上线提醒导出
@@ -88,7 +97,7 @@ end
 
 -- 旧记录没有原始链接，无法核实绑定/真实装等：保留原样，但不再混入正常导出。
 local function isExportable(row)
-  return (row.captureVersion == "1.0.4" or row.captureVersion == "1.0.5" or row.captureVersion == "1.0.6" or row.captureVersion == "1.1.0") and row.itemLink and not row.reviewReason
+  return (row.captureVersion == "1.0.4" or row.captureVersion == "1.0.5" or row.captureVersion == "1.0.6" or row.captureVersion == "1.1.0" or row.captureVersion == API.version) and row.itemLink and not row.reviewReason
     and type(row.ilvl) == "number" and row.ilvl > 0 and row.bindingStatus == "ordinary"
 end
 
@@ -213,10 +222,7 @@ local function recordLoot(itemID, itemLink, looterName, looterServer, quantity)
   local observed = API.MatchEncounter and API.MatchEncounter(itemLink, looterName, looterServer, instName, difficultyID)
   if observed then bossName, encounterID, encounterAt = observed.bossName, observed.encounterID, observed.encounterAt
   elseif observed==false then bossName,encounterID,encounterAt=nil,nil,nil end
-  local settings = WoWButlerCollectorSettings
-  if not settings.collectorSourceID then settings.collectorSourceID=tostring(time()).."-"..tostring(math.random(1,999999999)).."-"..tostring(math.random(1,999999999)) end
-  settings.eventSequence=(tonumber(settings.eventSequence) or 0)+1
-  local sourceID, eventID = settings.collectorSourceID, tostring(settings.eventSequence)
+  local sourceID, sequence = API.NextEventIdentity()
   local region = safeCall(GetCurrentRegion)
   region = region and tostring(region) or nil
   local getInfo = (C_Item and C_Item.GetItemInfo) or GetItemInfo
@@ -260,7 +266,7 @@ local function recordLoot(itemID, itemLink, looterName, looterServer, quantity)
     local reviewReason = not binding and "绑定信息未确认" or (not ilvl and "实际装等未确认" or nil)
     table.insert(WoWButlerCollectorDB, {
     collectorSourceID = sourceID,
-    sourceEventID = eventID,
+    sourceEventID = tostring(sequence),
     playerServer = looterServer,
     playerRegion = region,
     quantity = quantity or 1,

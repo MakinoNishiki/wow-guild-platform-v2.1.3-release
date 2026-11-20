@@ -151,6 +151,7 @@
   word-break: break-all;
 }
 .dh-src-unknown { color: var(--text-muted); font-style: italic; white-space: nowrap; }
+.dh-card .dh-search-hit { color: var(--gold-light, #ffda84); background: rgba(206, 157, 54, .18); border-radius: 2px; }
 /* 品质色（WoW 官方配色：0 灰 1 白 2 绿 3 蓝 4 紫 5 橙） */
 .dh-q0 { color: var(--item-quality-0); }
 .dh-q1 { color: var(--item-quality-1); }

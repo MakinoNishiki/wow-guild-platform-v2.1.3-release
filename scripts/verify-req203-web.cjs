@@ -17,6 +17,7 @@ const root = path.resolve(__dirname, '..');
 const output = process.env.WB_VERIFY_OUTPUT || path.join(root, 'docs/evidence/req203-cover-20261119');
 const host = '127.0.0.1';
 const checkDecor = process.argv.includes('--decor-engagement');
+const lootReadback = process.argv.includes('--loot-readback') && require('./verify-loot-import-readback.cjs');
 const suite = process.argv.find(arg => arg.startsWith('--suite='))?.slice(8);
 const withCatalog = checkDecor || !!suite;
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
@@ -67,6 +68,7 @@ async function main() {
     await db.query('create role anon; create role authenticated; create role service_role bypassrls; create schema auth; create table auth.users(id uuid primary key, raw_user_meta_data jsonb,raw_app_meta_data jsonb)');
     for (const { user } of sessions) await db.query('insert into auth.users values ($1,$2,$3)', [user.id, user.user_metadata,user.app_metadata]);
     await db.query("create function auth.uid() returns uuid language sql stable as $$ select (nullif(current_setting('request.jwt.claims',true),'')::jsonb->>'sub')::uuid $$");
+    if (lootReadback) await lootReadback.setup(db, sessions[0].user.id);
     {
       const records = JSON.parse(fs.readFileSync(path.join(root,'data/task083/catalog-current-2335.json'),'utf8'));
       await db.query('create table decor_catalog (record_id integer primary key,entry_type integer,name text)');
@@ -158,6 +160,7 @@ async function main() {
       }
       // Unrelated legacy modules see an empty guild and empty notifications.
       if (!/^\/rest\/v1\/(?:housing_|rpc\/(?:save_housing|discover_housing|[a-z_]*housing_[a-z_]*))/.test(req.url) &&
+          !(lootReadback && /^\/rest\/v1\/(?:guild_members|guilds|loot_drops|rpc\/req19[19]_submit_loot)(?:\?|$)/.test(req.url)) &&
           !(withCatalog && /^\/rest\/v1\/(?:decor_item_|decor_plan|rpc\/(?:record_decor|set_decor|favorite_decor))/.test(req.url))) {
         res.setHeader('Content-Type', 'application/json'); return res.end('[]');
       }
@@ -204,6 +207,12 @@ async function main() {
       return page;
     }
     const author = await open(sessions[0], 1920);
+    if (lootReadback) {
+      await lootReadback.verify(author, db, base, pass);
+      assert.deepEqual(errors, []);
+      fs.writeFileSync(path.join(output, 'loot-readback.json'), JSON.stringify({browser:browser.version(), checks}, null, 2));
+      return;
+    }
     const other = await open(sessions[1], 1366);
     const guest = await open(null, 1366);
     if (checkDecor) {

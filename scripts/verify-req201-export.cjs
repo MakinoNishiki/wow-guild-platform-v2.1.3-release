@@ -5,8 +5,9 @@ const http = require('node:http');
 const assert = require('node:assert/strict');
 const { chromium } = require('playwright');
 const root = path.resolve(__dirname, '..');
-const output = path.join(root, 'docs/evidence/bug127-20261118');
-const scroll = JSON.parse(fs.readFileSync(path.join(output, 'catalog-row-126.json'), 'utf8'));
+const fixtures = path.join(root, 'docs/evidence/bug127-20261118');
+const output = process.env.WB_VERIFY_OUTPUT || fixtures;
+const scroll = JSON.parse(fs.readFileSync(path.join(fixtures, 'catalog-row-126.json'), 'utf8'));
 const vendor = { type: 'vendor', vendor: '测试商人', zones: ['测试地区'], price: [{ gold: 12 }], reputation: '声望尊敬', context: [{ label: '前置', value: '完成测试任务' }] };
 const rows = [
   scroll,
@@ -55,6 +56,9 @@ const server = http.createServer((req, res) => {
     page.on('pageerror', error => errors.push(error.message));
     await page.goto(base);
     await page.locator('[data-add="20101"]').first().waitFor();
+    if (process.argv.includes('--source-search')) {
+      await require('./verify-req202-source-search.cjs')(page, requests, output, passed);
+    }
     for (const row of rows) await page.locator(`[data-add="${row.record_id}"]`).first().click();
     await page.locator('#plan tr[data-rid="20101"] [data-step="1"]').click();
     assert.equal(await page.locator('#dhPpTotal').innerText(), '6');
@@ -154,12 +158,11 @@ const server = http.createServer((req, res) => {
     page.once('dialog', d => d.accept());
     await page.locator('.dh-plan-export .dh-modal-close').click();
     await page.locator('.dh-plan-export-overlay').waitFor({ state: 'detached' });
-    // Drawer is the second real entry into the same exporter.
-    await page.locator('#dhPlanToggle').click();
-    await page.locator('#dhPlanExport').click();
+    // REQ-209 consolidated plan actions on the dedicated plan page.
+    await page.locator('#dhPpExport').click();
     assert.equal(await choice.isChecked(), true);
     assert.equal(await text.inputValue(), full);
-    passed('图鉴抽屉导出共用同一清单，重新打开复位临时编辑');
+    passed('从方案页再次导出同一清单，复位临时编辑');
     assert.equal(await page.evaluate(() => JSON.stringify(Object.entries(localStorage))), draftBefore);
     assert.ok(requests.every(r => r.method === 'GET'));
     assert.deepEqual(errors, []);
