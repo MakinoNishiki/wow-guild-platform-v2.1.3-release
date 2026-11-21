@@ -1,0 +1,75 @@
+{
+  "date": "2026-11-21",
+  "deployedAssets": {
+    "sourceCommit": "c4ab3d1103e239d7188c7c0bfc22cbc3c3a9200c",
+    "version": "20261121.157",
+    "base": "https://wow.ddctl.com/",
+    "matched": [
+      "index.html",
+      "js/decorData.js",
+      "js/decorDict.js",
+      "js/app.js",
+      "assets/decor-icons/room-previews/291-floor.png"
+    ]
+  },
+  "publicBrowser": {
+    "entry": "/#/house/decor",
+    "checks": [
+      [
+        1366,
+        291
+      ],
+      [
+        1366,
+        400
+      ],
+      [
+        1366,
+        297
+      ],
+      [
+        1366,
+        113
+      ],
+      [
+        1366,
+        296
+      ],
+      [
+        1920,
+        291
+      ],
+      [
+        1920,
+        400
+      ],
+      [
+        1920,
+        297
+      ],
+      [
+        1920,
+        113
+      ],
+      [
+        1920,
+        296
+      ]
+    ],
+    "pageErrors": []
+  },
+  "isolatedLoot": {
+    "browser": "157.0.8103.79",
+    "november15": [
+      "先提交击杀时的3条，数据库为3条",
+      "补入约25分钟后另一人拾取的同名腰带，仅增加1条，原始首领留空",
+      "再次导入4条，已有两条腰带仍分别归属不同拾取人"
+    ],
+    "november20": [
+      "国服11月20日单机真实样本，脱敏后网页导入10条，逐件核对拾取人、装备、装等、难度和首领",
+      "同一份真实数据再次解析，保存行数仍为10，两组同名双掉落各保留两位拾取人"
+    ],
+    "newCollectorRaidSamples": 0,
+    "productionGuildWrites": 0
+  }
+}

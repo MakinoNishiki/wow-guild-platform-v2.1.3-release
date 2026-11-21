@@ -1,7 +1,7 @@
-## Interface: 120000
+## Interface: 120105
 ## Title: WoW Butler Decor
 ## Title-zhCN: 魔兽管家-家宅装饰
-## Notes: 魔兽管家家宅装饰数据采集（v0.2 全量落盘）
-## Version: 0.2.1
+## Notes: 采集家宅装饰目录，在住宅区图纸商店自动记录房型售价。
+## Version: 0.2.2
 ## SavedVariables: WoWButlerDecorDB
 WoWButlerDecor.lua

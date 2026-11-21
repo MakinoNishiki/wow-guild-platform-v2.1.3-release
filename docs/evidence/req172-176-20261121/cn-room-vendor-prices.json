@@ -1,0 +1,278 @@
+{
+  "source": "WoWButlerDecorDB.roomVendors",
+  "save_time": "2026-11-21T23:11:20+08:00",
+  "merchants": [
+    {
+      "npc_id": 255104,
+      "name": "乔万·朗摩尔",
+      "region": 5,
+      "locale": "zhCN",
+      "version": "12.1.5",
+      "build": "70961",
+      "offers": [
+        {
+          "record_id": 273,
+          "item_id": 272997,
+          "name": "暴风城军械库设计图",
+          "stack_count": 1,
+          "copper": 0,
+          "cost": {
+            "id": 3363,
+            "kind": "currency",
+            "name": "社区礼券",
+            "amount": 50
+          },
+          "observed_at": "2026-11-21T23:08:34+08:00"
+        },
+        {
+          "record_id": 282,
+          "item_id": 274665,
+          "name": "暴风城大厅设计图",
+          "stack_count": 1,
+          "copper": 0,
+          "cost": {
+            "id": 3363,
+            "kind": "currency",
+            "name": "社区礼券",
+            "amount": 50
+          },
+          "observed_at": "2026-11-21T23:08:34+08:00"
+        },
+        {
+          "record_id": 281,
+          "item_id": 274666,
+          "name": "暴风城陈列室设计图",
+          "stack_count": 1,
+          "copper": 0,
+          "cost": {
+            "id": 3363,
+            "kind": "currency",
+            "name": "社区礼券",
+            "amount": 50
+          },
+          "observed_at": "2026-11-21T23:08:34+08:00"
+        },
+        {
+          "record_id": 277,
+          "item_id": 274667,
+          "name": "暴风城厨房设计图",
+          "stack_count": 1,
+          "copper": 0,
+          "cost": {
+            "id": 3363,
+            "kind": "currency",
+            "name": "社区礼券",
+            "amount": 50
+          },
+          "observed_at": "2026-11-21T23:08:34+08:00"
+        },
+        {
+          "record_id": 288,
+          "item_id": 274668,
+          "name": "贝拉梅斯会议室设计图",
+          "stack_count": 1,
+          "copper": 0,
+          "cost": {
+            "id": 3363,
+            "kind": "currency",
+            "name": "社区礼券",
+            "amount": 50
+          },
+          "observed_at": "2026-11-21T23:08:34+08:00"
+        },
+        {
+          "record_id": 289,
+          "item_id": 274669,
+          "name": "贝拉梅斯剧院设计图",
+          "stack_count": 1,
+          "copper": 0,
+          "cost": {
+            "id": 3363,
+            "kind": "currency",
+            "name": "社区礼券",
+            "amount": 50
+          },
+          "observed_at": "2026-11-21T23:08:34+08:00"
+        },
+        {
+          "record_id": 287,
+          "item_id": 274670,
+          "name": "贝拉梅斯神殿室设计图",
+          "stack_count": 1,
+          "copper": 0,
+          "cost": {
+            "id": 3363,
+            "kind": "currency",
+            "name": "社区礼券",
+            "amount": 50
+          },
+          "observed_at": "2026-11-21T23:08:34+08:00"
+        },
+        {
+          "record_id": 290,
+          "item_id": 274671,
+          "name": "贝拉梅斯隐秘卧室设计图",
+          "stack_count": 1,
+          "copper": 0,
+          "cost": {
+            "id": 3363,
+            "kind": "currency",
+            "name": "社区礼券",
+            "amount": 50
+          },
+          "observed_at": "2026-11-21T23:08:34+08:00"
+        },
+        {
+          "record_id": 400,
+          "item_id": 276243,
+          "name": "秋日西部荒野谷仓设计图",
+          "stack_count": 1,
+          "copper": 0,
+          "cost": {
+            "id": 3363,
+            "kind": "currency",
+            "name": "社区礼券",
+            "amount": 75
+          },
+          "observed_at": "2026-11-21T23:09:05+08:00"
+        },
+        {
+          "record_id": 401,
+          "item_id": 276244,
+          "name": "春日西部荒野谷仓设计图",
+          "stack_count": 1,
+          "copper": 0,
+          "cost": {
+            "id": 3363,
+            "kind": "currency",
+            "name": "社区礼券",
+            "amount": 75
+          },
+          "observed_at": "2026-11-21T23:09:05+08:00"
+        }
+      ]
+    },
+    {
+      "npc_id": 257297,
+      "name": "“芬恩”拉克特",
+      "region": 5,
+      "locale": "zhCN",
+      "version": "12.1.5",
+      "build": "70961",
+      "offers": [
+        {
+          "record_id": 286,
+          "item_id": 274661,
+          "name": "银月城陈列室设计图",
+          "stack_count": 1,
+          "copper": 0,
+          "cost": {
+            "id": 3363,
+            "kind": "currency",
+            "name": "社区礼券",
+            "amount": 50
+          },
+          "observed_at": "2026-11-21T23:11:15+08:00"
+        },
+        {
+          "record_id": 307,
+          "item_id": 274662,
+          "name": "银月城小型书房设计图",
+          "stack_count": 1,
+          "copper": 0,
+          "cost": {
+            "id": 3363,
+            "kind": "currency",
+            "name": "社区礼券",
+            "amount": 50
+          },
+          "observed_at": "2026-11-21T23:11:15+08:00"
+        },
+        {
+          "record_id": 283,
+          "item_id": 274663,
+          "name": "银月城军械库设计图",
+          "stack_count": 1,
+          "copper": 0,
+          "cost": {
+            "id": 3363,
+            "kind": "currency",
+            "name": "社区礼券",
+            "amount": 50
+          },
+          "observed_at": "2026-11-21T23:11:15+08:00"
+        },
+        {
+          "record_id": 285,
+          "item_id": 274664,
+          "name": "银月城高层书房设计图",
+          "stack_count": 1,
+          "copper": 0,
+          "cost": {
+            "id": 3363,
+            "kind": "currency",
+            "name": "社区礼券",
+            "amount": 50
+          },
+          "observed_at": "2026-11-21T23:11:15+08:00"
+        },
+        {
+          "record_id": 132,
+          "item_id": 274673,
+          "name": "奥格瑞玛议事厅设计图",
+          "stack_count": 1,
+          "copper": 0,
+          "cost": {
+            "id": 3363,
+            "kind": "currency",
+            "name": "社区礼券",
+            "amount": 50
+          },
+          "observed_at": "2026-11-21T23:11:15+08:00"
+        },
+        {
+          "record_id": 292,
+          "item_id": 274674,
+          "name": "奥格瑞玛剧院设计图",
+          "stack_count": 1,
+          "copper": 0,
+          "cost": {
+            "id": 3363,
+            "kind": "currency",
+            "name": "社区礼券",
+            "amount": 50
+          },
+          "observed_at": "2026-11-21T23:11:15+08:00"
+        },
+        {
+          "record_id": 151,
+          "item_id": 274675,
+          "name": "奥格瑞玛石坑室设计图",
+          "stack_count": 1,
+          "copper": 0,
+          "cost": {
+            "id": 3363,
+            "kind": "currency",
+            "name": "社区礼券",
+            "amount": 50
+          },
+          "observed_at": "2026-11-21T23:11:15+08:00"
+        },
+        {
+          "record_id": 294,
+          "item_id": 274676,
+          "name": "奥格瑞玛陈列室设计图",
+          "stack_count": 1,
+          "copper": 0,
+          "cost": {
+            "id": 3363,
+            "kind": "currency",
+            "name": "社区礼券",
+            "amount": 50
+          },
+          "observed_at": "2026-11-21T23:11:15+08:00"
+        }
+      ]
+    }
+  ]
+}

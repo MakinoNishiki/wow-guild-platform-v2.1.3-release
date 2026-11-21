@@ -3,6 +3,7 @@
 -- 纯只读探针：只调 Get/Search/Create 类查询 API，零写入、不访问网络、不碰账号数据
 -- 导出目标：SavedVariables 全局表 WoWButlerDecorDB（/reload 或退出游戏后写盘）
 -- 命令：/wbd scan
+-- v0.2.2：打开住宅区图纸商店时自动保存当前报价，不用运行目录扫描。
 -- v0.2（任务书 #49 WP1）：scan 追加全量落盘——每件装饰的目录字段白名单拷贝进
 --   WoWButlerDecorDB.items（玩家态字段剔除），runMeta.dataset="full"；
 --   枚举/容错/diag/stats/samples 逻辑与 v0.1.1 完全一致，只调用不改写
@@ -22,7 +23,7 @@
 --   ②国服客户端 API 可用性——若国服阉割，第一次真机跑即暴露（failCount=总数 或 枚举 0 结果）。
 -- ============================================================
 
-local ADDON_VERSION = "0.2.1"
+local ADDON_VERSION = "0.2.2"
 
 -- #84：仅采集 Patch1 26 件的静态图标诊断；缺失项也显式保留 found=false。
 local ICON_TARGET_IDS = {28569,28559,28557,28556,28547,28540,28512,28510,
@@ -125,7 +126,8 @@ local function toEntryID(e)
 end
 
 local function saveFailure(diag, reason)
-  WoWButlerDecorDB = { runMeta = buildMeta(), totalCount = 0, failCount = 0,
+  WoWButlerDecorDB = { roomVendors = WoWButlerDecorDB and WoWButlerDecorDB.roomVendors,
+                       runMeta = buildMeta(), totalCount = 0, failCount = 0,
                        stats = {}, samples = {}, diag = diag }
   err(reason .. "（诊断信息已写入 SavedVariables，/reload 后可取文件）")
 end
@@ -266,7 +268,8 @@ local function collectAndSave(results, diag, t0)
   diag.steps[#diag.steps + 1] = string.format("逐条取字段 %d 件（失败 %d）耗时 %.2fs", total, fail, tEnd - tEnum)
   diag.totalElapsedSec = tonumber(string.format("%.2f", tEnd - t0))
 
-  WoWButlerDecorDB = { runMeta = buildMeta(), totalCount = total, failCount = fail,
+  WoWButlerDecorDB = { roomVendors = WoWButlerDecorDB and WoWButlerDecorDB.roomVendors,
+                       runMeta = buildMeta(), totalCount = total, failCount = fail,
                        stats = stats, samples = samples, items = items, diag = diag }
 
   msg(string.format("扫描完成：总数 %d；sourceText 非空 %d / 空 %d；取字段失败 %d 件",
@@ -358,12 +361,117 @@ local function doScan()
   C_Timer.After(0.5, retry)
 end
 
+-- REQ-176: record only native offers actually visible at the four housing merchants.
+local roomMerchants = { [255104]=true, [254687]=true, [257295]=true, [257297]=true }
+local roomPlans = {}
+for _, id in ipairs({274673,274675,272997,274667,274666,274665,274663,274664,274661,
+                     274670,274668,274669,274671,274674,274676,274662,276243,276244}) do
+  roomPlans[id] = true
+end
+
+local function readOffer(index)
+  local info = C_MerchantFrame.GetItemInfo(index)
+  if not info or type(info.price) ~= "number" or not info.name or not info.stackCount or info.stackCount < 1 then return end
+  local count = GetMerchantItemCostInfo(index)
+  if not count or (count == 0 and (info.hasExtendedCost or info.price == 0)) then return end
+  local costs = {}
+  for i = 1, count do
+    local _, amount, link, currencyName = GetMerchantItemCostItem(index, i)
+    local kind, id
+    if link then kind, id = link:match("|H(%a+):(%d+)") end
+    if not amount or amount <= 0 or (kind ~= "item" and kind ~= "currency" and not currencyName) then return end
+    costs[i] = { kind = kind or "currency", id = tonumber(id), name = currencyName, amount = amount }
+  end
+  return { name = info.name, stackCount = info.stackCount, copper = info.price, costs = costs }
+end
+
+local visit, generation = nil, 0
+local function currentMerchantID()
+  local guid = UnitGUID("npc")
+  if not (issecretvalue and issecretvalue(guid)) and guid then
+    local id = guid:match("^Creature%-%d+%-%d+%-%d+%-%d+%-(%d+)%-")
+    return tonumber(id)
+  end
+end
+local function scanMerchant()
+  if not visit then return end
+  local id = currentMerchantID()
+  if not id then return end
+  if not roomMerchants[id] then return true end
+  local total = GetMerchantNumItems() or 0
+  local offers, found, ready = {}, 0, total > 0
+  for i = 1, total do
+    local itemID = GetMerchantItemID(i)
+    if not itemID or itemID == 0 then
+      ready = false
+    elseif roomPlans[itemID] then
+      local offer = readOffer(i)
+      if offer then
+        offers[itemID] = offer
+        found = found + 1
+      else
+        ready = false
+      end
+    end
+  end
+  if found > 0 then
+    local version, build = GetBuildInfo()
+    WoWButlerDecorDB = WoWButlerDecorDB or {}
+    WoWButlerDecorDB.roomVendors = WoWButlerDecorDB.roomVendors or {}
+    local vendors = WoWButlerDecorDB.roomVendors
+    local region, locale = GetCurrentRegion(), GetLocale()
+    local slot = vendors[id]
+    if not slot or slot.build ~= build or slot.region ~= region or slot.locale ~= locale then
+      slot = { npcName = UnitName("npc"), version = version, build = build, region = region, locale = locale, offers = {} }
+      vendors[id] = slot
+    end
+    for itemID, offer in pairs(offers) do
+      offer.at = time()
+      slot.offers[itemID] = offer
+    end
+    if visit.found ~= found then
+      msg(string.format("已记录%s的 %d 张房间图纸报价。看完商人后输入 /reload 保存。", UnitName("npc") or "商人", found))
+      visit.found = found
+    end
+    return ready
+  end
+end
+
+local function scheduleScan()
+  generation = generation + 1
+  local token = generation
+  local function attempt(n)
+    if token ~= generation or not visit then return end
+    if scanMerchant() then return end
+    if n < 5 then
+      C_Timer.After(0.5, function() attempt(n+1) end)
+    elseif not visit.found and roomMerchants[currentMerchantID() or 0] then
+      msg("还未读到房间图纸报价，请将商店筛选切换为全部后重新打开商店。")
+    end
+  end
+  C_Timer.After(0, function() attempt(1) end)
+end
+
+local merchantWatcher = CreateFrame("Frame")
+for _, event in ipairs({"MERCHANT_SHOW", "MERCHANT_UPDATE", "MERCHANT_CLOSED"}) do
+  merchantWatcher:RegisterEvent(event)
+end
+merchantWatcher:SetScript("OnEvent", function(_, event)
+  if event == "MERCHANT_CLOSED" then
+    visit = nil
+    generation = generation + 1
+  else
+    if event == "MERCHANT_SHOW" then visit = {} end
+    if visit then scheduleScan() end
+  end
+end)
+
 SLASH_WBD1 = "/wbd"
 SlashCmdList["WBD"] = function(input)
   local cmd = (input or ""):gsub("^%s+", ""):gsub("%s+$", ""):lower()
   if cmd == "scan" then
     doScan()
   else
-    msg("用法：/wbd scan（扫描家宅装饰目录，写入 SavedVariables WoWButlerDecorDB）")
+    msg("图纸核价：打开住宅区总承包商或私运者的商店，看到已记录后输入 /reload 保存。/wbd scan 扫描家宅装饰目录。")
   end
 end
