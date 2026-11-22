@@ -2536,7 +2536,7 @@ async function setCalendarDensity(d) {
 
 function switchPage(pageName, routeHash) {
   if (pageName !== 'decor') window.DecorCatalog?.hideDetail();
-  window.WowToken?.setActive(pageName === 'home');
+  window.WowToken?.pageChanged();
   // 切换导航激活状态
   document.querySelectorAll('.nav-item').forEach(item => {
     item.classList.toggle('active', item.dataset.page === pageName);
@@ -9145,6 +9145,7 @@ function lootFillAssignedTo(idOrName) {
 // ==================== 初始化 ====================
 // ==================== 更新日志 ====================
 const changelogData = [
+  {id:'req210-token-topbar',version:'v3.2.0',date:'2026-11-23',type:'improve',typeLabel:'功能优化',title:'切页也能查看时光徽章',summary:'主导航右侧可查国服正式服徽章现价。点开可查看近 1、6、24 小时的走势、高低价与逐次采样报价。',details:[]},
   {id:'req210-cn-token',version:'v3.2.0',date:'2026-11-22',type:'feature',typeLabel:'新增功能',title:'首页可查国服时光徽章金币价',summary:'打开首页即可查看国服正式服每枚时光徽章的金币价、本站读取时间和近期采样走势。价格由网站自动查询，无需登录或进游戏扫描。',details:[]},
   {id:'req176-room-prices-cn',version:'v3.2.0',date:'2026-11-22',type:'improve',typeLabel:'功能优化',title:'在图鉴和方案单查看创始者之角的图纸实价',summary:'乔万·朗摩尔和“芬恩”拉克特出售的 18 张室内图纸已在国服逐张核价。春日、秋日西部荒野谷仓各需 75 社区礼券，其余各需 50 礼券。烈风海岸的售价仍标为参考价。',details:[]},
   {id:'req176-floor-preview',version:'v3.2.0',date:'2026-11-21',type:'feature',typeLabel:'新增功能',title:'多一个房型可以看清地板轮廓',summary:'在家宅图鉴查看 Full_Layout_Rugged_Prn，可以看到从游戏地板模型生成的俯视图。',details:[]},

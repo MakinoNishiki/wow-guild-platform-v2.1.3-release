@@ -3,26 +3,34 @@
 
   const minute = 60_000;
   const day = 24 * 60 * minute;
-  const panel = document.querySelector('.home-token');
-  if (!panel) return;
-  const element = id => panel.querySelector('#homeToken' + id);
-  const price = element('Price');
-  const unit = element('Unit');
-  const status = element('Status');
-  const range = element('Range');
-  const chart = element('Chart');
-  const note = element('TrendNote');
+  const home = document.querySelector('#page-home .home-token');
+  const menu = document.getElementById('tokenMenu');
+  if (!home || !menu) return;
+  const summary = menu.querySelector('summary');
+  const menuPrice = document.getElementById('tokenMenuPrice');
+  // Both views use the same card markup. Give the second copy its own accessible heading and IDs.
+  const detail = home.cloneNode(true);
+  detail.querySelectorAll('[id]').forEach(node => { node.id = node.id.replace('homeToken', 'topToken'); });
+  detail.setAttribute('aria-labelledby', 'topTokenTitle');
+  detail.querySelector('.home-token-trend').replaceWith(document.getElementById('tokenTrendTemplate').content.cloneNode(true));
+  menu.querySelector('.token-menu-body').append(detail);
+  const views = ['homeToken', 'topToken'].map(prefix => {
+    const field = name => document.getElementById(prefix + name);
+    return { price: field('Price'), unit: field('Unit'), status: field('Status'), range: field('Range'), chart: field('Chart'), note: field('TrendNote') };
+  });
   const formatGold = new Intl.NumberFormat('zh-CN');
   const formatReadTime = new Intl.DateTimeFormat('zh-CN', {
     timeZone: 'Asia/Shanghai', month: '2-digit', day: '2-digit',
     hour: '2-digit', minute: '2-digit', hourCycle: 'h23'
   });
-  let active = false;
+  let started = false;
   let timer;
   let loading = false;
   let lastQuote;
+  const updateDetailedTrend = window.mountWowTokenTrend(detail.querySelector('.token-trend'), formatGold, formatReadTime);
+  updateDetailedTrend([], Date.now());
 
-  function drawTrend(samples) {
+  function drawTrend(samples, { range, chart, note }) {
     chart.toggleAttribute('hidden', samples.length < 2);
     note.hidden = samples.length > 1;
     range.textContent = '';
@@ -49,17 +57,24 @@
   function render(quote, failed) {
     const usable = quote && Date.now() - quote.readAt < day;
     const stale = !usable || quote.stale || failed;
-    price.textContent = usable ? formatGold.format(quote.gold) : '—';
-    unit.hidden = !usable;
-    status.dataset.stale = String(stale);
-    status.textContent = usable
+    const amount = usable ? formatGold.format(quote.gold) : '—';
+    menuPrice.textContent = usable ? (stale ? '上次 ' : '') + amount + ' 金' : '暂无报价';
+    const message = usable
       ? (stale ? '更新暂缓，上次读取 ' : '本站读取 ') + formatReadTime.format(quote.readAt) + '（北京时间）'
       : '暂时无法取得报价，稍后自动重试';
-    drawTrend(usable ? quote.samples : []);
+    for (const view of views) {
+      view.price.textContent = amount;
+      view.unit.hidden = !usable;
+      view.status.dataset.stale = String(stale);
+      view.status.textContent = message;
+    }
+    const history = usable ? quote.samples : [];
+    drawTrend(history, views[0]);
+    updateDetailedTrend(history, usable && !stale ? quote.readAt : Date.now());
   }
 
   async function refresh() {
-    if (loading || !active || document.hidden) return;
+    if (loading || document.hidden || !menu.getClientRects().length) return;
     loading = true;
     try {
       const response = await fetch('/api/wow-token/cn', { cache: 'no-store', signal: AbortSignal.timeout(12_000) });
@@ -79,16 +94,30 @@
 
   function schedule() {
     clearInterval(timer);
-    if (!active || document.hidden) return;
+    if (!started || document.hidden) return;
     void refresh();
     timer = setInterval(refresh, minute);
   }
 
   document.addEventListener('visibilitychange', schedule);
+  document.addEventListener('click', event => {
+    if (menu.open && !menu.contains(event.target)) menu.open = false;
+  });
+  menu.addEventListener('focusout', event => {
+    if (event.relatedTarget && !menu.contains(event.relatedTarget)) menu.open = false;
+  });
+  menu.addEventListener('keydown', event => {
+    if (event.key === 'Escape' && menu.open) {
+      event.stopPropagation();
+      menu.open = false;
+      summary.focus();
+    }
+  });
   window.WowToken = {
-    setActive(value) {
-      if (active === value) return;
-      active = value;
+    pageChanged() {
+      menu.open = false;
+      if (started) return;
+      started = true;
       schedule();
     }
   };

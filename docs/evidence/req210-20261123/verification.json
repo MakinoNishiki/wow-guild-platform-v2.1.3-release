@@ -1,0 +1,25 @@
+{
+  "liveGold": 679901,
+  "readAt": "2026-11-22T17:23:20.964Z",
+  "source": "https://wowdata.top/wowtoken_retail",
+  "liveChecks": [
+    "guest deep link",
+    "source attribution",
+    "20px local icon",
+    "1366/1920 header",
+    "keyboard dismissal",
+    "outside dismissal"
+  ],
+  "simulatedChecks": [
+    "house/team/home navigation",
+    "single shared poll",
+    "1/6/24h change and extremes",
+    "pointer in sampling gap",
+    "accessible keyboard quotation",
+    "time range without navigation or new request",
+    "last known price",
+    "cold failure",
+    "recovery",
+    "hidden tab pause/resume"
+  ]
+}

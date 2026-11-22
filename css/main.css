@@ -4744,7 +4744,7 @@ img.class-icon[src$=".png"] { border-radius: 3px; }
 }
 .ia-tab:hover { color: var(--text-primary); }
 .ia-tab.active { color: var(--gold); border-bottom-color: var(--gold); }
-.ia-top-right { margin-left: auto; display: flex; align-items: center; }
+.ia-top-right { margin-left: auto; display: flex; align-items: center; gap: 12px; }
 .ia-login-btn { padding: 5px 14px; font-size: 13px; }
 
 /* 二级导航（pill 条；放不下时换行，wrap 允许两行） */
@@ -4865,9 +4865,55 @@ img.class-icon[src$=".png"] { border-radius: 3px; }
 .home-token-meta a:hover, .home-token-meta a:focus-visible, .home-token [data-stale="true"] { color: var(--gold); }
 .home-token-trend { min-width: 180px; }
 .home-token-trend-title { margin-bottom: 4px; color: var(--text-primary); }
-#homeTokenRange { margin-left: 4px; font-variant-numeric: tabular-nums; color: var(--text-secondary); }
-#homeTokenChart { display: block; color: var(--gold); }
+.home-token-trend-title span { margin-left: 4px; font-variant-numeric: tabular-nums; color: var(--text-secondary); }
+.home-token-trend svg { display: block; color: var(--gold); }
 .home-token [hidden] { display: none !important; }
+.token-menu { position: relative; }
+.token-menu[open] { z-index: 55; }
+.token-menu summary {
+  display: flex; align-items: center; gap: 6px; padding: 4px 8px; cursor: pointer;
+  border-radius: 6px; border: 1px solid var(--border-color);
+  color: var(--text-secondary); font-size: 12px; white-space: nowrap; list-style: none;
+}
+.token-menu summary::-webkit-details-marker { display: none; }
+.token-menu summary::after {
+  content: ''; width: 5px; height: 5px; margin: -2px 2px 0 2px;
+  border: solid currentColor; border-width: 0 1px 1px 0; transform: rotate(45deg);
+}
+.token-menu[open] summary::after { transform: rotate(225deg); margin-top: 3px; }
+.token-menu summary strong { color: var(--gold); font-variant-numeric: tabular-nums; }
+.token-menu[open] summary, .token-menu summary:hover { border-color: var(--gold); color: var(--text-primary); }
+.token-menu summary:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+.token-menu summary:active { background: var(--bg-tertiary); }
+.token-menu-body { position: absolute; top: calc(100% + 8px); right: 0; width: 456px; max-width: calc(100vw - 16px); }
+.token-menu .home-token { display: grid; grid-template-columns: minmax(0,1fr); gap: 14px; margin: 0; padding: 16px; box-shadow: 0 6px 22px rgba(0,0,0,.35); max-height: calc(100vh - 56px); overflow: auto; }
+.token-trend { border-top: 1px solid var(--border-color); padding-top: 12px; font-size: 12px; font-variant-numeric: tabular-nums; }
+.token-trend-heading, .token-periods { display: flex; align-items: center; }
+.token-trend-heading { justify-content: space-between; gap: 8px; }
+.token-trend-heading strong { font-size: 14px; }
+.token-periods { gap: 2px; background: var(--bg-primary); padding: 2px; border-radius: 6px; }
+.token-periods button { padding: 4px 8px; font: inherit; background: transparent; color: var(--text-secondary); border: 1px solid transparent; border-radius: 4px; cursor: pointer; }
+.token-periods button:hover, .token-periods button[aria-pressed=true] { color: var(--gold); }
+.token-periods button[aria-pressed=true] { border-color: var(--border-color); background: var(--bg-card); }
+.token-periods button:focus-visible, .token-trend svg:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+.token-metrics { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); margin: 12px 0 8px; gap: 8px; }
+.token-metrics dt, .token-metrics dd:last-child, .token-coverage { color: var(--text-secondary); }
+.token-metrics dd { margin: 2px 0 0; }
+.token-metrics dd:first-of-type { font-size: 15px; font-weight: 600; }
+.token-trend svg { display: block; width: 100%; height: 150px; cursor: crosshair; }
+.token-trend svg text { fill: var(--text-secondary); font-family: inherit; font-size: 11px; }
+.token-grid { stroke: var(--border-color); stroke-width: 1; }
+.token-line, .token-guide { fill: none; stroke: var(--gold); }
+.token-line { stroke-width: 2; stroke-linejoin: round; }
+.token-guide { stroke-dasharray: 3 3; opacity: .7; }
+.token-dot, .token-selected { fill: var(--gold); }
+.token-selected { stroke: var(--bg-primary); stroke-width: 1.5; }
+.token-readout { margin: 4px 0 8px; color: var(--text-primary); }
+.token-coverage { padding-top: 8px; border-top: 1px solid var(--border-color); }
+@media (max-width: 768px) {
+  .token-menu-name { position: absolute; clip-path: inset(50%); width: 1px; height: 1px; overflow: hidden; }
+  .token-menu-body { position: fixed; inset: auto 8px auto auto; margin-top: 8px; }
+}
 .home-quick-link {
   color: var(--blue-highlight);
   background: none;
