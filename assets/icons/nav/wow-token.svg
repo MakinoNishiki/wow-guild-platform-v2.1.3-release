@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
+  <title>时光徽章 · 暗铁金边</title>
+  <defs>
+    <linearGradient id="steel" x2=".72" y2="1"><stop stop-color="#7f8a91"/><stop offset=".45" stop-color="#58636e"/><stop offset="1" stop-color="#26313c"/></linearGradient>
+    <linearGradient id="brass" x2=".65" y2="1"><stop stop-color="#ffde8f"/><stop offset=".42" stop-color="#edbe64"/><stop offset="1" stop-color="#a87539"/></linearGradient>
+  </defs>
+  <path d="M8 2h8l5 5v10l-5 5H8l-5-5V7Z" fill="url(#steel)" stroke="url(#brass)" stroke-width="1.6"/>
+  <path d="m8 4-3 4v7m14 1-4 4" fill="none" stroke="#85909c" stroke-width=".8"/>
+  <path d="M8.6 6.6h6.8c0 2.8-1.2 4-3.4 5.4 2.2 1.4 3.4 2.6 3.4 5.4H8.6c0-2.8 1.2-4 3.4-5.4-2.2-1.4-3.4-2.6-3.4-5.4Z" fill="#1d2831" stroke="url(#brass)" stroke-width="1.25"/>
+  <path d="m10 8.5 2 2 2-2Zm-.3 7.9 2.3-2 2.3 2Z" fill="#ffd583"/>
+</svg>

@@ -4851,6 +4851,23 @@ img.class-icon[src$=".png"] { border-radius: 3px; }
 .home-entry-title { font-size: 17px; font-weight: 600; color: var(--gold); }
 .home-entry-desc { margin-top: 8px; font-size: 13px; color: var(--text-secondary); line-height: 1.6; }
 .home-quick { margin-top: 36px; text-align: center; font-size: 13px; color: var(--text-muted); }
+.home-token {
+  max-width: 960px; margin: 16px auto 0; padding: 16px 24px;
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px;
+  background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px;
+}
+.home-token h2 { margin: 0; display: flex; gap: 8px; align-items: center; font-size: 16px; color: var(--text-primary); }
+.home-token h2 small, .home-token-meta, .home-token-trend { font-size: 12px; font-weight: 400; color: var(--text-secondary); }
+.home-token-price { margin: 4px 0; color: var(--text-secondary); font-size: 13px; }
+.home-token-price strong { margin-right: 4px; color: var(--gold); font-size: 26px; font-variant-numeric: tabular-nums; }
+.home-token-meta { display: flex; flex-wrap: wrap; gap: 4px 14px; }
+.home-token-meta a { color: inherit; text-underline-offset: 3px; }
+.home-token-meta a:hover, .home-token-meta a:focus-visible, .home-token [data-stale="true"] { color: var(--gold); }
+.home-token-trend { min-width: 180px; }
+.home-token-trend-title { margin-bottom: 4px; color: var(--text-primary); }
+#homeTokenRange { margin-left: 4px; font-variant-numeric: tabular-nums; color: var(--text-secondary); }
+#homeTokenChart { display: block; color: var(--gold); }
+.home-token [hidden] { display: none !important; }
 .home-quick-link {
   color: var(--blue-highlight);
   background: none;

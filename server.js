@@ -7,6 +7,8 @@ const path = require("path");
 const { execSync } = require("child_process");
 
 const ROOT = __dirname;
+const { createTokenMarket } = require("./lib/wowToken.cjs");
+const tokenMarket = createTokenMarket();
 // 任务书 #23 WP2：data.html 数据公示页（免登录公开页，与 index.html 同级放行）；
 // 任务书 #51 WP2：decor.html 家宅图鉴公示页同级放行（免登录，anon 只读）
 const PUBLIC_STATIC_FILES = new Set([path.join(ROOT, "index.html"), path.join(ROOT, "data.html"), path.join(ROOT, "decor.html")]);
@@ -1586,6 +1588,17 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  if (urlPath === "/api/wow-token/cn") {
+    if (req.method !== "GET") {
+      res.writeHead(405, { Allow: "GET", ...corsHeaders });
+      res.end();
+      return;
+    }
+    const quote = await tokenMarket.read();
+    res.writeHead(quote ? 200 : 503, { "Content-Type": "application/json", ...corsHeaders });
+    res.end(JSON.stringify(quote || { message: "暂时无法取得国服正式服报价" }));
+    return;
+  }
   // REQ-185: authenticated account linking and confirmed batch claims.
   if (await handleLootObservations(req, res, corsHeaders, urlPath)) return;
   if (await handlePeople(req, res, corsHeaders, urlPath)) return;
@@ -1984,6 +1997,11 @@ const server = http.createServer(async (req, res) => {
 
 function startServer() {
   return server.listen(PORT, HOST, () => {
+    // Collect even when nobody is viewing the homepage. Requests share the same refresh.
+    void tokenMarket.read();
+    const tokenTimer = setInterval(() => { void tokenMarket.read(); }, 60_000);
+    tokenTimer.unref();
+    server.once("close", () => clearInterval(tokenTimer));
     process.stderr.write(`Server listening on ${HOST}:${PORT}\n`);
     scheduleAnalyticsPurge(); // 任务书 #55 WP1：90 天滚动清理（10 分钟首跑 + 每 24h）
   });
