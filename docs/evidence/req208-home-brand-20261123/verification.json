@@ -1,0 +1,118 @@
+{
+  "browser": "Chrome",
+  "session": "本机游客；行情和图鉴接口使用测试数据",
+  "checks": [
+    {
+      "width": 1920,
+      "height": 915,
+      "sources": [
+        [
+          "decor.svg",
+          true,
+          20,
+          20
+        ],
+        [
+          "lootdrop.svg",
+          true,
+          20,
+          20
+        ],
+        [
+          "community.svg",
+          true,
+          20,
+          20
+        ]
+      ],
+      "signature": {
+        "x": 89.265625,
+        "y": 622.75,
+        "width": 252,
+        "height": 217.9375
+      },
+      "alpha": {
+        "corner": 0,
+        "center": true
+      },
+      "routes": [
+        "#/house/decor",
+        "#/lootdrop",
+        "#/house/community"
+      ]
+    },
+    {
+      "width": 1366,
+      "height": 768,
+      "sources": [
+        [
+          "decor.svg",
+          true,
+          20,
+          20
+        ],
+        [
+          "lootdrop.svg",
+          true,
+          20,
+          20
+        ],
+        [
+          "community.svg",
+          true,
+          20,
+          20
+        ]
+      ],
+      "signature": {
+        "x": 86.4375,
+        "y": 630.8125,
+        "width": 100.546875,
+        "height": 86.953125
+      },
+      "alpha": {
+        "corner": 0,
+        "center": true
+      },
+      "routes": [
+        "#/house/decor",
+        "#/lootdrop",
+        "#/house/community"
+      ]
+    },
+    {
+      "width": 390,
+      "height": 844,
+      "sources": [
+        [
+          "decor.svg",
+          true,
+          20,
+          20
+        ],
+        [
+          "lootdrop.svg",
+          true,
+          20,
+          20
+        ],
+        [
+          "community.svg",
+          true,
+          20,
+          20
+        ]
+      ],
+      "signature": "hidden",
+      "alpha": {
+        "corner": 0,
+        "center": true
+      },
+      "routes": [
+        "#/house/decor",
+        "#/lootdrop",
+        "#/house/community"
+      ]
+    }
+  ]
+}

@@ -9158,6 +9158,10 @@ function lootFillAssignedTo(idOrName) {
 // ==================== 初始化 ====================
 // ==================== 更新日志 ====================
 const changelogData = [
+  {id:'req208-home-signature',version:'v3.2.0',date:'2026-11-23',type:'feature',typeLabel:'新增功能',title:'桌面首页添上 WB 字标',summary:'首页左下角印上取自魔兽管家盾徽的 WB 连写字样，窄屏收起。',details:[]},
+  {id:'req208-home-entries',version:'v3.2.0',date:'2026-11-23',type:'improve',typeLabel:'功能优化',title:'首页图鉴与掉落入口换上暗铁金边图标',summary:'从图鉴书、战利品宝箱和炉石屋徽，可以辨认家宅图鉴、副本掉落和家宅分享。',details:[]},
+  {id:'req208-nav-shield',version:'v3.2.0',date:'2026-11-23',type:'fix',typeLabel:'修复BUG',title:'修正导航盾徽周围的深色方块',summary:'金色盾徽现在直接透出导航栏底色。',details:[]},
+  {id:'req208-brand-reuse',version:'v3.2.0',date:'2026-11-23',type:'refactor',typeLabel:'模块调整',title:'公会公开战报沿用主站盾徽',summary:'主站与公开战报页使用同一枚透明品牌标志。',details:[]},
   {id:'req190-fight-honors',version:'v3.2.0',date:'2026-11-23',type:'feature',typeLabel:'新增功能',title:'把开荒录像和成就留在那一次击杀上',summary:'会长和公会编辑可以在战报中添加 B 站视角、登记有凭据的成就。访客能在公会里程碑观看录像，在赛季荣誉查看获得者和对应战斗。',details:[]},
   {id:'req190-guild-battle',version:'v3.2.0',date:'2026-11-23',type:'feature',typeLabel:'新增功能',title:'团长可以发布公会战报',summary:'在活动详情打开「战斗日志 → 公会战报」，核对首领击杀、填写团长寄语后保存草稿或发布。发布后可复制链接，也可撤回。',details:[]},
   {id:'req190-public-home',version:'v3.2.0',date:'2026-11-23',type:'improve',typeLabel:'功能优化',title:'从仪表盘进入公会公开主页',summary:'最近活动卡片提供公会主页入口，访客可查看已发布的战报和里程碑。',details:[]},

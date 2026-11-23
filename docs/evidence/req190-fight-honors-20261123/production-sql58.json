@@ -1,0 +1,31 @@
+{
+  "release": "b0bfa38e2d662100005789bc13e98a5b31f3d078",
+  "site": "https://wow.ddctl.com",
+  "migration": "sql/58_req190_guild_reports.sql",
+  "migrationSha256": "cc3cc1e15f0c8dd0437a64c52f7e527ac3f03308a332def225e3b386eca386e7",
+  "before": {
+    "publicHttpStatus": 503,
+    "restCode": "PGRST205",
+    "missing": ["guild_battle_reports", "guild_battle_report_read", "req190_save_report"]
+  },
+  "backup": {
+    "reference": "req190-20261123T155516Z/before.dump",
+    "schemas": ["public", "auth"],
+    "bytes": 1517173,
+    "sha256": "ec2e7fdf53e87bb8ce72c951b5b936aa6932769ed2a8c826e8e6a3229b550d37",
+    "restoreStreamReadable": true
+  },
+  "after": {
+    "rowLevelSecurity": true,
+    "directAnonymousTableRead": false,
+    "directAuthenticatedViewRead": false,
+    "directAuthenticatedSave": false,
+    "serviceViewRead": true,
+    "serviceSaveFunction": true,
+    "emptyPublicGuildHttpStatus": 200,
+    "unpublishedReportHttpStatus": 404,
+    "anonymousManagementReadHttpStatus": 401,
+    "publicBrowserText": "这个公会还没有公开战报。"
+  },
+  "verificationScope": "正式站只读回查；会长保存、发布、撤回与普通成员权限在本地独立数据库和 Chrome 验证。"
+}
