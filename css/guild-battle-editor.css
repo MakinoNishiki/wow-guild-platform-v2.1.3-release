@@ -1,0 +1,32 @@
+#guildBattleModal [hidden], #guildBattleHome[hidden] { display: none; }
+#guildBattleHome, #guildBattleLink { text-decoration: none; }
+#guildBattleModal .modal { max-width: 680px; }
+#guildBattleModal button.modal-close { border: 0; background: transparent; }
+#guildBattleModal button.modal-close:hover { background: var(--bg-primary); color: var(--text-primary); }
+#guildBattleModal .modal-body { overflow-wrap: anywhere; }
+#guildBattleModal .modal-title, #guildBattleModal .card-title { margin: 0; }
+#guildBattleModal .card-subtitle { margin: 4px 0 0; }
+#guildBattleModal .battle-preview-head, #guildBattleSharing {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+#guildBattleModal .battle-preview-head { justify-content: space-between; margin: 0 0 8px; }
+#guildBattleFeedback { color: var(--text-secondary); line-height: 1.6; }
+#guildBattleFeedback:not(:empty), #guildBattleReload, #guildBattleEvidence { margin-bottom: 16px; }
+#guildBattleFeedback.battle-error { color: var(--warning); }
+#guildBattleEvidence { color: var(--text-secondary); }
+#guildBattleEvidence p { margin: 4px 0 8px; }
+#guildBattleEvidence table { width: 100%; border-collapse: collapse; font-size: 13px; }
+#guildBattleEvidence th, #guildBattleEvidence td { padding: 7px 8px; text-align: left; border-bottom: 1px solid var(--border-color); }
+#guildBattleEvidence th { font-weight: 500; }
+#guildBattleEvidence td { color: var(--text-primary); }
+#guildBattleEvidence a { color: var(--gold); }
+#guildBattleModal .form-group { margin-bottom: 0; }
+#guildBattleSharing { margin-top: 16px; }
+#guildBattleWithdraw { margin-right: auto; }
+#guildBattleModal :focus-visible, #guildBattleHome:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+}

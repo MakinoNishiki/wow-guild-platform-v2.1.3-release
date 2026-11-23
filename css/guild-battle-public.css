@@ -1,0 +1,22 @@
+.battle-public { line-height: 1.55; }
+.battle-top { background: var(--bg-secondary); border-bottom: 1px solid var(--border-color); }
+.battle-top > div, #battleContent { max-width: 1000px; margin-inline: auto; padding-inline: clamp(16px, 4vw, 40px); }
+.battle-top > div { display: flex; align-items: center; justify-content: space-between; min-height: 56px; color: var(--text-secondary); }
+.battle-top a { display: inline-flex; align-items: center; gap: 10px; color: var(--gold); font-weight: 700; text-decoration: none; }
+#battleContent { padding-block: 32px 64px; }
+.battle-public h1 { font-size: clamp(26px, 4vw, 36px); line-height: 1.22; margin: 12px 0; overflow-wrap: anywhere; }
+.battle-public h2 { font-size: 18px; margin: 0 0 12px; }
+.battle-public h3 { font-size: 16px; }
+.battle-public section { margin-top: 28px; }
+.battle-public .battle-meta { color: var(--text-secondary); font-size: 14px; }
+.battle-filters { display: flex; flex-wrap: wrap; gap: 8px 16px; margin-top: 20px; }
+.battle-filters label { display: grid; gap: 4px; font-size: 13px; color: var(--text-secondary); }
+.battle-filters select { max-width: 100%; min-width: 112px; }
+.battle-grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(min(100%,260px),1fr)); gap: 10px; }
+.battle-panel { padding: 16px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px; }
+.battle-total { font-size: 21px; color: var(--gold); font-variant-numeric: tabular-nums; }
+.battle-list { list-style: none; padding: 0; }
+.battle-list li { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 4px 16px; padding: 10px 0; border-bottom: 1px solid var(--border-color); overflow-wrap: anywhere; }
+.battle-public .battle-link { color: var(--gold); text-underline-offset: 3px; }
+.battle-public .battle-message { white-space: pre-wrap; overflow-wrap: anywhere; border-left: 3px solid var(--gold-dark); padding: 10px 16px; margin: 16px 0; background: var(--bg-secondary); }
+.battle-public :focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }

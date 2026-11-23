@@ -1393,6 +1393,8 @@ async function cloudCrud(dataType, operation, payload, options = {}) {
 
     // 2. 重新读取数据库最新状态并更新 appData
     const refreshed = await window.CloudSync.reloadData(dataType, payload);
+    // 战报由管理端逐条回读核对，不缓存私有草稿或预览凭据。
+    if (dataType === 'guildBattleReport') return { success: true, row: refreshed };
     // 作者的原始蓝图仅用于本次编辑，单条云端回读后返回，不写进公会缓存。
     if (dataType === 'housingBuild' || dataType === 'housingBuildSupply' || dataType === 'decorEngagement' || dataType === 'housingCommunity') return { success: true, row: refreshed };
     const typesToReload = reloadTypes || [];
@@ -2190,6 +2192,7 @@ function showAppView() {
 // BUG-012：viewer 权限门。viewer 登录后隐藏/禁用全部写入口（界面收口，
 // 真正防线在 server.js 代理鉴权）。切换公会/登录/登出后都需调用。
 function updatePermissionUI() {
+  window.GuildBattleEditor?.syncContext();
   const isViewer = !!(window.CloudSync && window.CloudSync.isCloudMode() && !window.CloudSync.canEdit());
   document.body.classList.toggle('viewer-mode', isViewer);
 }
@@ -2912,6 +2915,7 @@ function iaAuthWakeCheck() {
 // 登出落地（cloud.js onUserSignedOut 与 app.js handleSignOut 双出口汇聚于此，幂等）：
 // 不盖登录遮罩——转游客壳落 #/home（门户化后浏览边界零登录墙）
 function iaOnSignedOut() {
+  window.GuildBattleEditor?.syncContext();
   window.DecorCatalog?.syncPersonalContext?.();
   window.__wbUid = null; // REQ-141 授权行②同口径：登出清空埋点 uid
   iaEnterShell();
@@ -2964,6 +2968,7 @@ function isModalFormDirty(modalId) {
 
 // 各弹窗"有未保存内容"判定；未登记的弹窗遮罩点击/ESC 直接关闭（维持现状）
 const modalDirtyChecks = {
+  guildBattleModal: () => GuildBattleEditor.isDirty(),
   housingBuildEditor: () => isModalFormDirty('housingBuildEditor') || HousingBuilds.photosChanged() || HousingBuildTags.changed(),
   // 任务书 #58-WP1：方案单导出弹窗（decorData 双壳自足渲染，textarea 改动=未保存内容，规范 4.6 登记）
   decorPlanExport: () => !!(window.DecorCatalog && window.DecorCatalog.planExportIsDirty && window.DecorCatalog.planExportIsDirty()),
@@ -3003,6 +3008,7 @@ const modalDirtyChecks = {
 
 // 遮罩点击/ESC 的统一关闭入口：有未保存内容时二次确认
 function requestCloseModal(id) {
+  if (id === 'guildBattleModal' && GuildBattleEditor.isSaving()) return;
   if (id === 'housingBuildEditor' && HousingBuilds.isSaving()) return;
   if(id==='lootBatchModal'&&window.LootWorkflow?.isBusy()){showToast('正在保存本批分配，请稍候','warning');return;}
   if(id==='lootDropImportModal'&&lootDropImportSaving){showToast('正在提交，请等待结果后关闭','warning');return;}
@@ -3025,6 +3031,10 @@ function openModal(id) {
 }
 
 function closeModal(id) {
+  if (id === 'guildBattleModal') {
+    GuildBattleEditor.clear();
+    delete modalFormSnapshots[id];
+  }
   if (id === 'housingBuildEditor') {
     HousingBuilds.clearEditor();
     delete modalFormSnapshots[id];
@@ -3070,6 +3080,7 @@ document.addEventListener('click', (e) => {
 
 // ==================== 仪表盘 ====================
 function renderDashboard() {
+  window.GuildBattleEditor?.syncContext();
   personStatsControl('page-dashboard');
   const members = appData.members.filter(m => m.status !== '离队');
   const activities = appData.activities.filter(a=>(a.attendance_mode==='person')===(personMode()==='person'));
@@ -5201,7 +5212,9 @@ function renderAttendanceReportActions(activity) {
   const editReport = document.getElementById('attendanceWclEditBtn');
   editReport.hidden = activity.status === 'cancelled';
   editReport.textContent = hasReport ? '编辑活动与链接' : '添加 WCL 链接';
-  reportActions.hidden = !report?.code && (!window.CloudSync.canEdit() || activity.status === 'cancelled');
+  const battleButton = document.getElementById('guildBattleOpen');
+  battleButton.hidden = !activity.id || !window.CloudSync.getCurrentGuild() || !window.CloudSync.canEdit();
+  reportActions.hidden = !report?.code && battleButton.hidden && (editReport.hidden || !window.CloudSync.canEdit());
 }
 
 function openAttendanceDetail(activityId) {
@@ -9145,6 +9158,10 @@ function lootFillAssignedTo(idOrName) {
 // ==================== 初始化 ====================
 // ==================== 更新日志 ====================
 const changelogData = [
+  {id:'req190-guild-battle',version:'v3.2.0',date:'2026-11-23',type:'feature',typeLabel:'新增功能',title:'团长可以发布公会战报',summary:'在活动详情打开「战斗日志 → 公会战报」，核对首领击杀、填写团长寄语后保存草稿或发布。发布后可复制链接，也可撤回。',details:[]},
+  {id:'req190-public-home',version:'v3.2.0',date:'2026-11-23',type:'improve',typeLabel:'功能优化',title:'从仪表盘进入公会公开主页',summary:'最近活动卡片提供公会主页入口，访客可查看已发布的战报和里程碑。',details:[]},
+  {id:'req190-battle-edits',version:'v3.2.0',date:'2026-11-23',type:'fix',typeLabel:'修复BUG',title:'战报校对提示多人修改冲突',summary:'另一位管理者已经保存时，编辑面板提示重新读取，保留当前输入供核对。',details:[]},
+  {id:'req190-battle-privacy',version:'v3.2.0',date:'2026-11-23',type:'refactor',typeLabel:'模块调整',title:'战报与内部考勤分开保存',summary:'公开页展示已发布的战绩与寄语。管理员可在独立面板校对日志，回到活动详情继续填写考勤。',details:[]},
   {id:'req210-token-topbar',version:'v3.2.0',date:'2026-11-23',type:'improve',typeLabel:'功能优化',title:'切页也能查看时光徽章',summary:'主导航右侧可查国服正式服徽章现价。点开可查看近 1、6、24 小时的走势、高低价与逐次采样报价。',details:[]},
   {id:'req210-cn-token',version:'v3.2.0',date:'2026-11-22',type:'feature',typeLabel:'新增功能',title:'首页可查国服时光徽章金币价',summary:'打开首页即可查看国服正式服每枚时光徽章的金币价、本站读取时间和近期采样走势。价格由网站自动查询，无需登录或进游戏扫描。',details:[]},
   {id:'req176-room-prices-cn',version:'v3.2.0',date:'2026-11-22',type:'improve',typeLabel:'功能优化',title:'在图鉴和方案单查看创始者之角的图纸实价',summary:'乔万·朗摩尔和“芬恩”拉克特出售的 18 张室内图纸已在国服逐张核价。春日、秋日西部荒野谷仓各需 75 社区礼券，其余各需 50 礼券。烈风海岸的售价仍标为参考价。',details:[]},

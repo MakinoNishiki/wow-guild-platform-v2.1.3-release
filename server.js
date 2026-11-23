@@ -11,7 +11,7 @@ const { createTokenMarket } = require("./lib/wowToken.cjs");
 const tokenMarket = createTokenMarket();
 // 任务书 #23 WP2：data.html 数据公示页（免登录公开页，与 index.html 同级放行）；
 // 任务书 #51 WP2：decor.html 家宅图鉴公示页同级放行（免登录，anon 只读）
-const PUBLIC_STATIC_FILES = new Set([path.join(ROOT, "index.html"), path.join(ROOT, "data.html"), path.join(ROOT, "decor.html")]);
+const PUBLIC_STATIC_FILES = new Set([path.join(ROOT, "index.html"), path.join(ROOT, "data.html"), path.join(ROOT, "decor.html"), path.join(ROOT, "guild-report.html")]);
 const PUBLIC_STATIC_ROOTS = ["assets", "css", "js"].map(
   (dir) => `${path.join(ROOT, dir)}${path.sep}`
 );
@@ -1196,13 +1196,13 @@ function supabaseRestWrite(method, restPath, bodyObj) {
 }
 
 // WCL 公开 API（/api/v2/client，client_credentials）通用 GraphQL 查询，错误映射与 fetchWclReportSummary 同口径
-async function wclClientQuery(query, variables) {
+async function wclClientQuery(query, variables, localized = false) {
   const token = await getWclAccessToken();
   let res;
   try {
     res = await wclHttpsRequest(
       {
-        hostname: "www.warcraftlogs.com",
+        hostname: localized ? "cn.warcraftlogs.com" : "www.warcraftlogs.com",
         path: "/api/v2/client",
         method: "POST",
         headers: {
@@ -1227,6 +1227,9 @@ async function wclClientQuery(query, variables) {
     throw wclError(502, "WCL 服务暂时不可用，请稍后再试");
   }
   if (res.status !== 200 || hasGraphqlErrors) {
+    if (localized && isMissingWclReport(res.status, json)) {
+      throw Object.assign(wclError(422, "WCL 已确认该报告不存在。"), { wclReportMissing: true });
+    }
     throw wclError(502, "WCL 查询失败，请稍后再试");
   }
   return json.data;
@@ -1520,7 +1523,16 @@ function serveFile(res, filePath, req) {
   });
 }
 
+const { createBattleEvidenceReader, isMissingWclReport } = require('./lib/guildBattleEvidence.cjs');
+const readBattleEvidence = createBattleEvidenceReader({
+  get: supabaseRestGet,
+  query: (query, variables) => wclClientQuery(query, variables, true),
+});
 const handleLootObservations = require('./lib/lootObservationRoutes.cjs')({auth:verifyTokenCached,get:supabaseRestGet,write:supabaseRestWrite,body:readBody});
+const handleGuildBattleReports = require('./lib/guildBattleReportRoutes.cjs')({
+  auth:verifyTokenCached, get:supabaseRestGet, write:supabaseRestWrite, body:readBody,
+  readBattleEvidence
+});
 const handlePeople = require('./lib/peopleRoutes.cjs')({auth:verifyTokenCached,get:supabaseRestGet,write:supabaseRestWrite,body:readBody});
 const handleHousingBuilds = require('./lib/housingBuildRoutes.cjs')({auth:verifyTokenCached,get:supabaseRestGet,write:supabaseRestWrite,body:readBody});
 const handleHousingSupplies = require('./lib/housingSupplyRoutes.cjs')({auth:verifyTokenCached,get:supabaseRestGet,write:supabaseRestWrite,body:readBody});
@@ -1601,6 +1613,7 @@ const server = http.createServer(async (req, res) => {
   }
   // REQ-185: authenticated account linking and confirmed batch claims.
   if (await handleLootObservations(req, res, corsHeaders, urlPath)) return;
+  if (await handleGuildBattleReports(req, res, corsHeaders, urlPath)) return;
   if (await handlePeople(req, res, corsHeaders, urlPath)) return;
   if (await handleHousingBuilds(req, res, corsHeaders, urlPath)) return;
   if (await handleHousingSupplies(req, res, corsHeaders, urlPath)) return;

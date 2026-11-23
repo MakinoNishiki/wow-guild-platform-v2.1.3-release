@@ -355,6 +355,7 @@
   function clearCurrentGuild() {
     currentGuild = null;
     currentMembership = null;
+    window.GuildBattleEditor?.syncContext();
     localStorage.removeItem(lastGuildStorageKey());
     localStorage.removeItem('wow_raid_last_guild'); // 旧全局键废弃清理（BUG-078）
   }
@@ -461,6 +462,7 @@
 
     clearPeopleContext();
     currentGuild = guildData;
+    window.GuildBattleEditor?.syncContext();
 
     const { data: memberData, error: memberError } = await supabaseClient
       .from('guild_members')
@@ -644,6 +646,7 @@
 
   // ---- 重新加载指定模块数据（写成功后回读数据库最新状态） ----
   async function reloadData(dataType, payload) {
+    if (dataType === 'guildBattleReport') return window.GuildBattleEditor.readBack(payload);
     if (dataType === 'housingBuildSupply') {
       const row = await window.HousingBuildFurniture.request('read', payload);
       const same = row && Object.keys(row.available).length === Object.keys(payload.available).length && Object.entries(payload.available).every(([key,value])=>row.available[key]===value);
@@ -943,6 +946,10 @@
   }
 
   async function saveCloudData(dataType, operation, item, extra) {
+    if (dataType === 'guildBattleReport') {
+      item.receipt = await window.GuildBattleEditor.write(operation, item);
+      return;
+    }
     if (dataType === 'housingBuildSupply') {
       const result = await window.HousingBuildFurniture.request('save',item);
       item.savedRevision = result.revision;

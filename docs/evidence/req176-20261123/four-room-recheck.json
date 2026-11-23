@@ -1,0 +1,148 @@
+{
+  "checkedOn": "2026-11-23",
+  "locale": "zhCN",
+  "clientBuild": "12.1.5.70961",
+  "rooms": [
+    {
+      "id": 113,
+      "clientName": "Full_Layout_Prefab_S",
+      "roomItemID": 274672,
+      "roomModelRecord": 187,
+      "atlasElement": 0,
+      "roomSpellEffect349": [
+        {
+          "spellID": 1269117,
+          "linkedItemIDs": [
+            262641
+          ]
+        },
+        {
+          "spellID": 1294710,
+          "linkedItemIDs": []
+        }
+      ]
+    },
+    {
+      "id": 291,
+      "clientName": "Full_Layout_Rugged_Prn",
+      "roomItemID": 274656,
+      "roomModelRecord": 351,
+      "atlasElement": 0,
+      "roomSpellEffect349": [
+        {
+          "spellID": 1294676,
+          "linkedItemIDs": []
+        }
+      ]
+    },
+    {
+      "id": 296,
+      "clientName": "天蓝河畔室",
+      "roomItemID": 274677,
+      "roomModelRecord": 0,
+      "atlasElement": 0,
+      "roomSpellEffect349": []
+    },
+    {
+      "id": 297,
+      "clientName": "翠绿河畔室",
+      "roomItemID": 274678,
+      "roomModelRecord": 0,
+      "atlasElement": 0,
+      "roomSpellEffect349": []
+    }
+  ],
+  "catalogPreviews": {
+    "catalogRooms": 40,
+    "verifiedNativeFiles": 36,
+    "floorOnly": {
+      "roomID": 291,
+      "sha256": "1ec24909c8d93d900daf9ee83d3ba9d29aff0a5ef945d53108f178570a4733fa"
+    },
+    "missingRoomIDs": [
+      113,
+      296,
+      297
+    ]
+  },
+  "floorModelRead": {
+    "113": {
+      "floorComponent": 253,
+      "option": 876,
+      "fileID": 6914359,
+      "standardRead": "Missing decryption key"
+    },
+    "291": {
+      "floorComponent": 506,
+      "option": 1049,
+      "fileID": 7284253,
+      "readableGroupID": 7447282
+    }
+  },
+  "atlasSearch": {
+    "readableElements": 19680,
+    "readableMembers": 17513,
+    "sections": {
+      "HouseRoom": {
+        "readable": 3,
+        "opaque": 0
+      },
+      "UiTextureAtlasElement": {
+        "readable": 3,
+        "opaque": 2
+      },
+      "UiTextureAtlasMember": {
+        "readable": 3,
+        "opaque": 1
+      }
+    }
+  },
+  "knownVendorPlans": [
+    {
+      "roomID": 273,
+      "roomSpellEffect349": [
+        {
+          "spellID": 1291546,
+          "linkedItemIDs": []
+        },
+        {
+          "spellID": 1294705,
+          "linkedItemIDs": [
+            272997
+          ]
+        }
+      ]
+    },
+    {
+      "roomID": 292,
+      "roomSpellEffect349": [
+        {
+          "spellID": 1294713,
+          "linkedItemIDs": [
+            274674
+          ]
+        }
+      ]
+    },
+    {
+      "roomID": 401,
+      "roomSpellEffect349": [
+        {
+          "spellID": 1299151,
+          "linkedItemIDs": [
+            276244
+          ]
+        }
+      ]
+    }
+  ],
+  "localHotfixCache": {
+    "version": 9,
+    "build": 70961,
+    "sha256": "321dccc57691c3b83cf28e565a26513963f2fd7b95d1be822e444b6492b6ffe3",
+    "recordCount": 7030,
+    "houseRoomOverrides": 0,
+    "targetItemOrItemSparseOverrides": 0
+  },
+  "publicAcquisitionSourcesConfirmed": []
+}

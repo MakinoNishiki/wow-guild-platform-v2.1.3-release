@@ -14,10 +14,11 @@ const { Client } = require('pg');
 const { chromium } = require('playwright');
 const assert = require('node:assert/strict');
 const root = path.resolve(__dirname, '..');
-const output = process.env.WB_VERIFY_OUTPUT || path.join(root, 'docs/evidence/req203-cover-20261119');
+const output = process.env.WB_VERIFY_OUTPUT || path.join(root, process.argv.includes('--guild-battles') ? 'docs/evidence/req190-20261123' : 'docs/evidence/req203-cover-20261119');
 const host = '127.0.0.1';
 const checkDecor = process.argv.includes('--decor-engagement');
 const lootReadback = process.argv.includes('--loot-readback') && require('./verify-loot-import-readback.cjs');
+const battleReports = process.argv.includes('--guild-battles') && require('./verify-req190-battles.cjs');
 const suite = process.argv.find(arg => arg.startsWith('--suite='))?.slice(8);
 const withCatalog = checkDecor || !!suite;
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
@@ -69,6 +70,7 @@ async function main() {
     for (const { user } of sessions) await db.query('insert into auth.users values ($1,$2,$3)', [user.id, user.user_metadata,user.app_metadata]);
     await db.query("create function auth.uid() returns uuid language sql stable as $$ select (nullif(current_setting('request.jwt.claims',true),'')::jsonb->>'sub')::uuid $$");
     if (lootReadback) await lootReadback.setup(db, sessions[0].user.id);
+    if (battleReports) await battleReports.setup(db, sessions);
     {
       const records = JSON.parse(fs.readFileSync(path.join(root,'data/task083/catalog-current-2335.json'),'utf8'));
       await db.query('create table decor_catalog (record_id integer primary key,entry_type integer,name text)');
@@ -160,6 +162,7 @@ async function main() {
       }
       // Unrelated legacy modules see an empty guild and empty notifications.
       if (!/^\/rest\/v1\/(?:housing_|rpc\/(?:save_housing|discover_housing|[a-z_]*housing_[a-z_]*))/.test(req.url) &&
+          !(battleReports && battleReports.allows(req.url)) &&
           !(lootReadback && /^\/rest\/v1\/(?:guild_members|guilds|loot_drops|rpc\/req19[19]_submit_loot)(?:\?|$)/.test(req.url)) &&
           !(withCatalog && /^\/rest\/v1\/(?:decor_item_|decor_plan|rpc\/(?:record_decor|set_decor|favorite_decor))/.test(req.url))) {
         res.setHeader('Content-Type', 'application/json'); return res.end('[]');
@@ -186,10 +189,11 @@ async function main() {
     process.env.DEPLOY_RUN_HOST = host;
     process.env.CORS_ALLOWED_ORIGINS = base;
     // Run the actual entry point from a clean directory, independently of the developer's .env.
-    for (const file of ['server.js', 'index.html', 'decor.html', 'data.html']) fs.copyFileSync(path.join(root, file), path.join(temp, file));
+    for (const file of ['server.js', 'index.html', 'decor.html', 'data.html', ...(battleReports ? ['guild-report.html'] : [])]) fs.copyFileSync(path.join(root, file), path.join(temp, file));
     for (const dir of ['assets', 'css', 'js', 'lib']) {
       fs.symlinkSync(path.join(root, dir), path.join(temp, dir), 'junction'); links.push(path.join(temp, dir));
     }
+    if (battleReports) battleReports.installWclFixture();
     app = require(path.join(temp, 'server.js')).startServer();
     await new Promise(resolve => app.listening ? resolve() : app.once('listening', resolve));
     browser = await chromium.launch({ channel: 'chrome', headless: true });
@@ -207,6 +211,13 @@ async function main() {
       return page;
     }
     const author = await open(sessions[0], 1920);
+    if (battleReports) {
+      const precedingChecks = checks.length;
+      await battleReports.verify({author, guest:await open(null,1366), viewer:await open(sessions[1],1366), db, base, output, pass});
+      assert.deepEqual(errors, []);
+      fs.writeFileSync(path.join(output,'verification.json'), JSON.stringify({browser:browser.version(), database:'一次性本地 PostgreSQL / PostgREST', fixtures:'测试账号与 WCL 报告', checks:checks.slice(precedingChecks)},null,2)+'\n');
+      return;
+    }
     if (lootReadback) {
       await lootReadback.verify(author, db, base, pass);
       assert.deepEqual(errors, []);

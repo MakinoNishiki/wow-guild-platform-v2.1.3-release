@@ -1,0 +1,122 @@
+// Runs with verify-req203-web.cjs --guild-battles on a disposable PostgreSQL and PostgREST.
+'use strict';
+const assert = require('node:assert/strict');
+const https = require('node:https');
+const fs = require('node:fs');
+const path = require('node:path');
+const {EventEmitter} = require('node:events');
+const root = path.resolve(__dirname, '..');
+const code = 'TestBattleLog012';
+const start = Date.UTC(2026, 10, 22, 15, 58);
+const encounter = {id:1,encounterID:7001,name:'乌拉特克',difficulty:5,startTime:100,endTime:260000,gameZone:{id:3001,name:'烈毒之渊'}};
+const report = { code, visibility:'public', revision:1, region:{slug:'CN'},zone:{id:53,name:'烈毒之渊'},
+  title:'测试团本',startTime:start,endTime:start+450000, fights:[{...encounter,kill:false},{...encounter,id:2,startTime:290000,endTime:408000,kill:true}] };
+const dbSql = filename => fs.readFileSync(path.join(root,'sql',filename),'utf8');
+let guildId, activityId;
+async function setup(db,sessions) {
+  await db.query("create function auth.jwt() returns jsonb language sql stable as $$ select nullif(current_setting('request.jwt.claims',true),'')::jsonb $$");
+  for (const name of ['01_tables.sql','05_req014_activities_add_wcl.sql','08_activities_status_team_tag.sql','12_req062_activities_add_team_label.sql','10_master_data.sql','58_req190_guild_reports.sql','58_req190_guild_reports.sql']) await db.query(dbSql(name));
+  await db.query('grant usage on schema auth to service_role,authenticated; grant select on guild_members,guilds,activities,activity_attendance,game_seasons,game_bosses,game_raids to service_role,authenticated');
+  const guild = await db.query("insert into guilds(name,owner_id,invite_code) values('银松远征团',$1,'fixture') returning id",[sessions[0].user.id]);
+  guildId = guild.rows[0].id;
+  await db.query("insert into guild_members(guild_id,user_id,role) values ($1,$2,'owner'),($1,$3,'viewer')",[guildId,...sessions.slice(0,2).map(s=>s.user.id)]);
+  const season = await db.query("insert into game_seasons(name,start_date,is_current) values('测试第二赛季','2026-11-01',true) returning id");
+  const raid = await db.query("insert into game_raids(name,season_id,type) values('烈毒之渊',$1,'raid') returning id",[season.rows[0].id]);
+  await db.query("insert into game_bosses(raid_id,name,boss_order) values($1,'乌拉特克',2),($1,'盘卷祭坛',1)",[raid.rows[0].id]);
+  const activity = await db.query("insert into activities(guild_id,name,activity_date,raid,notes,team_label,wcl_report_code,wcl_url) values($1,'测试活动','2026-11-22','烈毒之渊','内部考勤备注','1',$2,$3) returning id",[guildId,code,'https://www.warcraftlogs.com/reports/'+code]);
+  activityId = activity.rows[0].id;
+}
+function allows(url) { return /^\/rest\/v1\/(?:guild_members|guilds|activities|activity_attendance|game_(?:seasons|raids|bosses)|guild_battle_report_read|rpc\/req190_save_report)(?:\?|$)/.test(url); }
+function installWclFixture() {
+  process.env.WCL_CLIENT_ID = 'local-fixture';
+  process.env.WCL_CLIENT_SECRET = 'local-fixture';
+  const original = https.request;
+  https.request = function(options, cb) {
+    if (!['www.warcraftlogs.com','cn.warcraftlogs.com'].includes(options.hostname)) return original.apply(this,arguments);
+    const req = new EventEmitter();
+    req.write = () => {};
+    req.setTimeout = () => req;
+    req.destroy = e => req.emit('error',e);
+    req.end = () => queueMicrotask(() => {
+      const res = new EventEmitter(); res.statusCode = 200;
+      req.emit('response',res); cb(res);
+      res.emit('data',JSON.stringify(options.path==='/oauth/token' ? {access_token:'isolated-fixture',expires_in:3600} : {data:{reportData:{report}}}));
+      res.emit('end'); req.emit('close');
+    });
+    return req;
+  };
+}
+async function verify({author,guest,viewer,db,base,output,pass}) {
+  author.on('dialog', dialog=>dialog.accept());
+  const rows = async () => (await db.query('select id,status,version from guild_battle_reports')).rows;
+  await author.goto(base+'/#/team/attendance');
+  await author.locator('[data-activity-id="'+activityId+'"]').click();
+  await author.locator('#attendanceWclActions summary').click();
+  await author.locator('#guildBattleOpen').click();
+  const draft = author.locator('#guildBattleDraft');
+  await author.waitForFunction(()=>!document.getElementById('guildBattleDraft').disabled);
+  assert.equal((await rows()).length,0);
+  pass('从考勤活动打开战报，WCL 预览只读，数据库记录为零');
+  await author.locator('#guildBattleMessage').fill('今晚的击杀献给一团。');
+  await draft.click();
+  await author.waitForFunction(()=>document.getElementById('guildBattleState').textContent.includes('已保存草稿'));
+  const [saved] = await rows();
+  assert.equal(saved.status,'draft');
+  const publicUrl = base+'/guild-report.html?report='+saved.id;
+  await guest.goto(publicUrl);
+  await guest.getByText('这篇战报尚未公开或已撤回。').waitFor();
+  pass('保存草稿，匿名读单篇无记录');
+  await author.locator('#guildBattlePreview').click();
+  await author.waitForFunction(()=>!document.getElementById('guildBattlePublish').disabled);
+  await author.locator('#guildBattlePublish').click();
+  await author.locator('#guildBattleLink').waitFor();
+  assert.equal((await rows()).length,1);
+  assert.equal((await rows())[0].status,'published');
+  await guest.goto(publicUrl);
+  await guest.getByRole('heading',{name:'烈毒之渊战报'}).waitFor();
+  assert.match(await guest.locator('main').innerText(),/今晚的击杀/);
+  assert.doesNotMatch(await guest.locator('main').innerText(),/内部考勤备注/);
+  assert.equal(await guest.getByText('查看 WCL 战斗').getAttribute('href'),'https://www.warcraftlogs.com/reports/'+code+'#fight=2');
+  await guest.screenshot({path:path.join(output,'published-1366.png')});
+  await guest.getByRole('link',{name:'← 公会主页'}).click();
+  await guest.getByText('1 / 2 位首领').waitFor();
+  await guest.getByLabel('难度').selectOption('heroic');
+  await guest.getByText('当前筛选下没有已发布的击杀记录。').waitFor();
+  await guest.getByLabel('难度').selectOption('mythic');
+  await guest.getByText('已收录最早击杀 · 乌拉特克').waitFor();
+  await guest.screenshot({path:path.join(output,'guild-progress-1366.png')});
+  await guest.setViewportSize({width:390,height:844});
+  assert.ok(await guest.evaluate(()=>document.documentElement.scrollWidth <= innerWidth));
+  pass('发布回读同一条记录；访客可看寄语、首领、具体战斗、分团进度，难度筛选和窄屏通过');
+  await viewer.goto(base+'/#/team/attendance');
+  await viewer.locator('[data-activity-id="'+activityId+'"]').click();
+  assert.equal(await viewer.locator('#guildBattleOpen').isVisible(),false);
+  report.visibility = 'private';
+  await author.locator('#guildBattleMessage').fill('公开恢复后保留这句寄语。');
+  await author.locator('#guildBattlePreview').click();
+  await author.waitForFunction(()=>document.getElementById('guildBattleState').textContent.includes('暂停'));
+  assert.equal(await author.locator('#guildBattleMessage').inputValue(),'公开恢复后保留这句寄语。');
+  await guest.goto(publicUrl);
+  await guest.getByText('这篇战报尚未公开或已撤回。').waitFor();
+  report.visibility = 'public';
+  await author.locator('#guildBattlePreview').click();
+  await author.waitForFunction(()=>!document.getElementById('guildBattlePublish').disabled);
+  await author.locator('#guildBattlePublish').click();
+  await author.locator('#guildBattleLink').waitFor();
+  await guest.goto(publicUrl);
+  await guest.getByText('公开恢复后保留这句寄语。').waitFor();
+  pass('管理者重新核对已转私有的日志后，外部分享暂停；恢复公开并重新发布后，同一地址可用，寄语保留');
+  await db.query("update activities set status='cancelled' where id=$1",[activityId]);
+  await guest.goto(publicUrl);
+  await guest.getByText('这篇战报尚未公开或已撤回。').waitFor();
+  pass('取消活动后，原分享链接立即隐藏');
+  await author.locator('#guildBattleWithdraw').click();
+  await author.waitForFunction(()=>document.getElementById('guildBattleState').textContent.includes('草稿'));
+  await guest.goto(publicUrl);
+  await guest.getByText('这篇战报尚未公开或已撤回。').waitFor();
+  await guest.goto(base+'/guild-report.html?guild='+guildId);
+  await guest.getByText('这个公会还没有公开战报。').waitFor();
+  assert.equal((await rows()).length,1);
+  pass('普通成员无发布入口；撤回后原分享地址、公开列表和里程碑同步隐藏，库内仍为同一份草稿');
+}
+module.exports={setup,allows,installWclFixture,verify};
