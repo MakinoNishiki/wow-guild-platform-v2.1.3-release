@@ -572,12 +572,16 @@ function loadData() {
 // ==================== 用户中心功能 ====================
 
 // 打开用户中心
-async function openUserCenter() {
+async function openUserCenter(tabName = 'profile', accountOnly = false) {
+  Workspaces.restorePanel();
+  const modal = document.getElementById('userCenterModal');
+  modal.classList.toggle('account-only', accountOnly);
+  modal.querySelector('h2').textContent = accountOnly ? '账号设置' : '用户中心';
   openModal('userCenterModal');
+  const tabReady = switchUserTab(tabName);
   await window.CloudSync.ensureTagNum(); // REQ-094：玩家ID 数字段确保已分配（幂等）
   await loadUserProfile();
-  await loadUserCharacters();
-  await loadNotifications();
+  await tabReady;
   // REQ-094：异步回填完成后重拍快照——openModal 时字段尚为空，
   // 不补拍则防误关把数据回填误判为「未保存编辑」（误拦关闭）
   snapshotModalForm('userCenterModal');
@@ -585,8 +589,12 @@ async function openUserCenter() {
 
 // 切换用户中心标签页
 function switchUserTab(tabName) {
-  document.querySelectorAll('.uc-tab').forEach(t => t.classList.remove('active'));
-  document.querySelectorAll('.uc-tab-content').forEach(c => c.style.display = 'none');
+  if (['claims','characters'].includes(tabName) && Workspaces.inlinePanelActive()) {
+    iaGoKey(tabName);
+    return;
+  }
+  document.querySelectorAll('#userCenterModal .uc-tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('#userCenterModal .uc-tab-content').forEach(c => c.style.display = 'none');
   
   const tab = document.querySelector(`.uc-tab[data-tab="${tabName}"]`);
   const content = document.getElementById(`tab-${tabName}`);
@@ -595,11 +603,11 @@ function switchUserTab(tabName) {
   if (content) content.style.display = 'block';
   
   if (tabName === 'notifications') {
-    loadNotifications();
+    return loadNotifications();
   }
-  if (tabName === 'characters') { loadWclAccount(); loadUserCharacters(); }
+  if (tabName === 'characters') return Promise.all([loadWclAccount(), loadUserCharacters()]);
   if (tabName === 'claims') {
-    loadMyClaims();
+    return loadMyClaims();
   }
 }
 
@@ -2215,7 +2223,6 @@ function updateCloudUI() {
 
   if (window.CloudSync && window.CloudSync.isCloudMode()) {
     const guild = window.CloudSync.getCurrentGuild();
-    const membership = window.CloudSync.getCurrentMembership();
     const user = window.CloudSync.getCachedUser ? window.CloudSync.getCachedUser() : null;
 
     // REQ-044（任务书 #13）：头像菜单（昵称取显示名，缺省用邮箱前缀；头像=昵称首字圆形底）
@@ -2231,16 +2238,6 @@ function updateCloudUI() {
     if (guild && guildName) {
       // BUG-073：统一走 guildDisplayName 单一拼接真源（含服务器名，空回退裸名）
       guildName.textContent = guildDisplayName(guild);
-    }
-    if (membership) {
-      const roleLabels = { owner: '会长', editor: '编辑', viewer: '浏览' };
-      // BUG-020（任务书 #13-补遗）：头像菜单旁同步身份徽章
-      const userRoleBadge = document.getElementById('userRoleBadge');
-      if (userRoleBadge) {
-        userRoleBadge.textContent = roleLabels[membership.role] || membership.role;
-        userRoleBadge.className = `role-badge role-${membership.role}`;
-        userRoleBadge.style.display = '';
-      }
     }
     const cloudSyncStatus = document.getElementById('cloudSyncStatus');
     if (cloudSyncStatus) cloudSyncStatus.textContent = '数据已云端同步';
@@ -2262,18 +2259,28 @@ function userMenuToggle(e) {
   const dd = document.getElementById('userMenuDropdown');
   if (!dd) return;
   dd.style.display = dd.style.display === 'none' ? 'block' : 'none';
+  document.getElementById('userMenuTrigger').setAttribute('aria-expanded', String(dd.style.display === 'block'));
+  if (dd.style.display === 'block') {
+    const email = CloudSync.getCachedUser()?.email || '';
+    document.getElementById('accountEmailHint').textContent = email.replace(/^(.).*(@.*)$/, '$1•••$2');
+    dd.querySelector('button').focus();
+  }
 }
 
 function userMenuClose() {
   const dd = document.getElementById('userMenuDropdown');
   if (dd) dd.style.display = 'none';
+  document.getElementById('userMenuTrigger')?.setAttribute('aria-expanded','false');
 }
 
 function userMenuAction(action) {
   userMenuClose();
-  // REQ-103（任务书 #36 WP2）：菜单只留退出登录；用户中心/切换公会入口迁用户中心公会卡
   if (action === 'logout') handleSignOut();
+  else if (action === 'profile' || action === 'notifications') openUserCenter(action, true);
 }
+document.getElementById('userMenu').addEventListener('focusout', event => {
+  if (event.relatedTarget && !event.currentTarget.contains(event.relatedTarget)) userMenuClose();
+});
 
 // 点击外部关闭菜单
 document.addEventListener('click', (e) => {
@@ -2295,11 +2302,14 @@ document.addEventListener('keydown', (e) => {
   if (dd && dd.style.display !== 'none') {
     e.stopImmediatePropagation();
     userMenuClose();
+    document.getElementById('userMenuTrigger').focus();
   }
 }, true);
 
 // 渲染当前页面
 function renderCurrentPage() {
+  const workspace = document.querySelector('.page.active')?.id.slice(5);
+  if (Workspaces.owns(workspace)) { iaApplyRoute(); return; }
   const activePage = document.querySelector('.nav-item.active');
   const page = activePage ? activePage.getAttribute('data-page') : 'dashboard';
   switch (page) {
@@ -2392,6 +2402,7 @@ window.showLoadFailureBanner = function (failedTables) {
 
 // ==================== 页面切换 ====================
 const pageTitles = {
+  guild: '公会战报', 'guild-settings': '公会设置', personal: '个人档案', characters: '我的角色', claims: '我的认领',
   dashboard: '仪表盘',
   members: '成员管理',
   attendance: '考勤记录',
@@ -2538,6 +2549,7 @@ async function setCalendarDensity(d) {
 }
 
 function switchPage(pageName, routeHash) {
+  Workspaces.show(pageName);
   if (pageName !== 'decor') window.DecorCatalog?.hideDetail();
   window.WowToken?.pageChanged();
   // 切换导航激活状态
@@ -2613,7 +2625,7 @@ function switchPage(pageName, routeHash) {
   // team-guide 不写 hash——路由守卫落引导卡时保留用户目标 hash 不改写（如 '#/team/members'）；
   // 与 iaApplyRoute 间经 iaLastHash 防环（hash 相同则不触发二次路由）。
   if (typeof iaSetHash === 'function' && pageName !== 'team-guide') {
-    iaSetHash((pageName === 'community' || pageName === 'decor') && routeHash ? routeHash : iaKeyToHash(pageName));
+    iaSetHash(['community','decor','personal'].includes(pageName) && routeHash ? routeHash : iaKeyToHash(pageName));
     iaPaintRoute(pageName, iaTabOfPage(pageName));
   }
 }
@@ -2694,7 +2706,7 @@ async function saveDecorPlan(items, name) {
 // 路由表：#/home 导航页（游客与登录均可见）；#/house/decor|plan|community 家宅系（全免登录可读，组单保存登录墙维持 #58 现状）；
 // #/team/<key> 团队系——需登录+公会（游客/无公会落 team-guide 引导卡，hash 不改写）。
 // 埋点 tab_click 仅此两处挂点（iaSwitchTab level:1 / iaGoKey level:2），WBTrack.event 直调不 await（track.js 自带静默兜底）。
-const IA_TEAM_KEYS = ['dashboard', 'members', 'attendance', 'loot', 'wishlist', 'reports', 'data', 'datacenter'];
+const IA_TEAM_KEYS = ['guild', 'guild-settings', 'dashboard', 'members', 'attendance', 'loot', 'wishlist', 'reports', 'data', 'datacenter'];
 let iaLastHash = ''; // 防环锚点：本模块写过的最后一个 hash（hashchange 回火时比对跳过）
 
 function iaSetHash(h) {
@@ -2703,6 +2715,8 @@ function iaSetHash(h) {
 }
 
 function iaKeyToHash(key) {
+  if (key === 'personal') return '#/personal';
+  if (key === 'characters' || key === 'claims') return '#/personal/' + key;
   if (key === 'home' || key === 'changelog' || key === 'lootdrop') return '#/' + key;
   if (key === 'decor') return '#/house/decor';
   if (key === 'decor-plan') return '#/house/plan';
@@ -2712,6 +2726,7 @@ function iaKeyToHash(key) {
 }
 
 function iaTabOfPage(page) {
+  if (['personal','characters','claims'].includes(page)) return 'personal';
   if (page === 'decor' || page === 'decor-plan' || page === 'community') return 'house';
   if (page === 'home') return null;
   if (page === 'changelog' || page === 'lootdrop') return page;
@@ -2725,16 +2740,26 @@ function iaHasGuild() {
   return !!(window.CloudSync && CloudSync.getCurrentGuild && CloudSync.getCurrentGuild());
 }
 
-// 顶部右侧按登录态显隐：游客见「登录 / 注册」，登录见「用户中心」+ 头像菜单
+// 访客显示登录入口，已登录用户使用头像菜单。
 function iaSyncTopRight() {
   window.DecorCatalog?.syncPersonalContext?.();
   const loggedIn = iaIsLoggedIn();
   const loginBtn = document.getElementById('iaLoginBtn');
-  const ucBtn = document.getElementById('iaUserCenterBtn');
   const userMenu = document.getElementById('userMenu');
   if (loginBtn) loginBtn.style.display = loggedIn ? 'none' : '';
-  if (ucBtn) ucBtn.style.display = loggedIn ? '' : 'none';
+  if (loggedIn) {
+    const user = CloudSync.getCachedUser();
+    const name = user.user_metadata?.display_name || user.email?.split('@')[0] || '用户';
+    document.getElementById('userNickname').textContent = name;
+    document.getElementById('userAvatar').textContent = name.slice(0,1);
+  }
   if (userMenu) userMenu.style.display = loggedIn ? '' : 'none';
+  const identity = loggedIn && CloudSync.getCachedUser().id;
+  const dot = document.getElementById('navNotifDot');
+  dot.classList.remove('show');
+  if (identity) CloudSync.getUnreadNotificationCount().then(count => {
+    if (CloudSync.getCachedUser()?.id === identity) dot.classList.toggle('show', count > 0);
+  }).catch(() => {});
 }
 
 // team-guide 引导卡按登录态控制（任务书 #59 WP2 正式版）：
@@ -2755,9 +2780,12 @@ function iaRenderTeamGuide() {
 
 // IA 导航态绘制：一级 tab active / 二级导航显隐 / pill active / QQ 悬浮钮（仅导航页）
 function iaPaintRoute(page, tab, activeKey) {
+  userMenuClose();
   // 任务书 #62 §1（BUG-109）：# 首页门户态（tab=null）高亮「首页」tab；无公会态 tab=null 其余逻辑不变
   const effTab = page === 'home' ? 'home' : tab;
   document.getElementById('mainContent').dataset.workspace = tab || '';
+  document.getElementById('mainContent').dataset.page = page;
+  document.getElementById('iaSubnavPersonal').style.display = tab === 'personal' && iaIsLoggedIn() ? '' : 'none';
   document.querySelectorAll('.ia-tab').forEach(button => {
     const active = button.dataset.iaTab === effTab;
     button.classList.toggle('active', active);
@@ -2812,6 +2840,8 @@ function iaApplyRoute() {
   let page = null, tab = null, activeKey = null;
   if (h === '#/home') {
     page = 'home'; tab = null;
+  } else if (['#/personal','#/personal/characters','#/personal/claims'].includes(h)) {
+    page = iaIsLoggedIn() ? h.split('/').at(-1) : 'personal'; tab = 'personal';
   } else if (h === '#/changelog' || h === '#/lootdrop') {
     page = h.slice(2); tab = page;
   } else if (h === '#/house' || h === '#/house/') {
@@ -2825,8 +2855,8 @@ function iaApplyRoute() {
     page = 'community'; tab = 'house';
   } else if (h === '#/team' || h === '#/team/') {
     if (hasGuild) {
-      iaLastHash = '#/team/dashboard'; location.replace('#/team/dashboard');
-      page = 'dashboard'; tab = 'team';
+      iaLastHash = '#/team/guild'; location.replace('#/team/guild');
+      page = 'guild'; tab = 'team';
     } else {
       page = 'team-guide'; tab = 'team'; // 游客/无公会：引导卡（WP1 占位）
     }
@@ -2867,12 +2897,12 @@ function iaSwitchTab(tab) {
   if (window.WBTrack) WBTrack.event('tab_click', { level: 1, key: tab });
   if (tab === 'home') {
     iaSetHash('#/home'); // 任务书 #62 §1（BUG-109）：首页 tab / 品牌区回门户
-  } else if (tab === 'changelog' || tab === 'lootdrop') {
+  } else if (tab === 'changelog' || tab === 'lootdrop' || tab === 'personal') {
     iaSetHash('#/' + tab);
   } else if (tab === 'house') {
     iaSetHash('#/house/decor');
   } else if (iaHasGuild()) {
-    iaSetHash('#/team/dashboard');
+    iaSetHash('#/team/guild');
   } else {
     iaSetHash('#/team'); // 游客/无公会 → 引导卡
   }
@@ -3044,6 +3074,9 @@ function closeModal(id) {
   el.style.zIndex = '';
   const si = modalStack.indexOf(id);
   if (si !== -1) modalStack.splice(si, 1);
+  const page = document.querySelector('.page.active')?.id.slice(5);
+  if ((id === 'userCenterModal' && ['personal','characters','claims'].includes(page)) ||
+      (id === 'guildBattleModal' && page === 'guild')) Workspaces.show(page);
 }
 
 // BUG-033（任务书 #12 补丁3）：弹窗栈统一管理——任何 openModal 都把弹窗置顶，
@@ -9158,6 +9191,10 @@ function lootFillAssignedTo(idOrName) {
 // ==================== 初始化 ====================
 // ==================== 更新日志 ====================
 const changelogData = [
+  {id:'req211-navigation',version:'v3.2.0',date:'2026-11-24',type:'feature',typeLabel:'新增功能',title:'在「公会」看战报，在「个人档案」管角色',summary:'打开公会就能查看已发布的战报、团本进度与里程碑。有编辑权限的成员可从活动写战报。角色和认领都能从顶栏的个人档案进入。',details:[]},
+  {id:'req211-token',version:'v3.2.0',date:'2026-11-24',type:'improve',typeLabel:'功能优化',title:'悬停时光徽章就能读走势',summary:'把鼠标移到顶栏价格上即可查看曲线，点区间统计可看高低价。问题反馈在徽章左侧。',details:[]},
+  {id:'req211-indicators',version:'v3.2.0',date:'2026-11-24',type:'fix',typeLabel:'修复BUG',title:'标签下的金线切换更柔和',summary:'鼠标移入和移出时金线渐显、渐隐。当前页持续高亮，开启减少动态效果后立即切换。',details:[]},
+  {id:'req211-account',version:'v3.2.0',date:'2026-11-24',type:'refactor',typeLabel:'模块调整',title:'账号设置与通知收进头像菜单',summary:'点自己的头像即可打开账号设置、查通知或退出。当前版本号可在更新日志页头查看。',details:[]},
   {id:'req208-home-signature',version:'v3.2.0',date:'2026-11-23',type:'feature',typeLabel:'新增功能',title:'桌面首页添上 WB 字标',summary:'首页左下角印上取自魔兽管家盾徽的 WB 连写字样，窄屏收起。',details:[]},
   {id:'req208-home-entries',version:'v3.2.0',date:'2026-11-23',type:'improve',typeLabel:'功能优化',title:'首页图鉴与掉落入口换上暗铁金边图标',summary:'从图鉴书、战利品宝箱和炉石屋徽，可以辨认家宅图鉴、副本掉落和家宅分享。',details:[]},
   {id:'req208-nav-shield',version:'v3.2.0',date:'2026-11-23',type:'fix',typeLabel:'修复BUG',title:'修正导航盾徽周围的深色方块',summary:'金色盾徽现在直接透出导航栏底色。',details:[]},
@@ -16590,29 +16627,34 @@ initNavDragSort();
 paintCalendarDensity(getCalendarDensity());
 
 // ==================== 任务书 #41（REQ-112）：问题反馈悬浮卡交互 ====================
-// 桌面显隐纯 CSS（.fb-entry:hover）；此处只补移动端降级与群号复制：
-// 移动端（hover 不可用：粗指针或 ≤768px）点击按钮切换 .open，点卡片外/ESC 关闭。
+// 鼠标悬停可预览；触屏、键盘或点击可主动展开，再点、移焦或 Esc 收起。
 (function initFeedbackEntry() {
   const entry = document.getElementById('feedbackEntry');
   if (!entry) return;
   const btn = document.getElementById('feedbackBtn');
-  const coarse = () => (window.matchMedia && window.matchMedia('(hover: none)').matches) || window.innerWidth <= 768;
+  let pinned = false;
+  function setOpen(open) {
+    entry.classList.toggle('open', open);
+    btn.setAttribute('aria-expanded', String(open));
+    if (!open) pinned = false;
+  }
+  entry.addEventListener('pointerenter', e => { if (e.pointerType === 'mouse') setOpen(true); });
+  entry.addEventListener('pointerleave', () => { if (!pinned && !entry.querySelector(':focus-visible')) setOpen(false); });
+  entry.addEventListener('focusout', e => { if (!entry.contains(e.relatedTarget)) setOpen(false); });
   btn.addEventListener('click', (e) => {
-    if (!coarse()) return; // 桌面走 CSS hover，点击不干预（防与 hover 态打架）
     e.stopPropagation();
-    const open = entry.classList.toggle('open');
-    btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+    pinned = !pinned;
+    setOpen(pinned);
   });
   document.addEventListener('click', (e) => {
     if (entry.classList.contains('open') && !entry.contains(e.target)) {
-      entry.classList.remove('open');
-      btn.setAttribute('aria-expanded', 'false');
+      setOpen(false);
     }
   });
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && entry.classList.contains('open')) {
-      entry.classList.remove('open');
-      btn.setAttribute('aria-expanded', 'false');
+      if (entry.contains(document.activeElement)) btn.focus();
+      setOpen(false);
     }
   });
   // 群号点按复制（非强制增强；剪贴板不可用回退 toast 展示）

@@ -11,7 +11,7 @@
   const when = value => time.format(new Date(value));
   const dateOrder = (left, right) => Date.parse(left) - Date.parse(right);
   const guildPage = id => '?guild=' + encodeURIComponent(id);
-  const reportPage = id => '?report=' + encodeURIComponent(id);
+  const reportPage = id => '/guild-report.html?report=' + encodeURIComponent(id);
   const fightPage = (report, kill) => reportPage(report.id) + '#fight-' + kill.fightId;
   const wcl = (snapshot, kill) => {
     if (!/^[a-z0-9]{10,20}$/i.test(snapshot.reportCode) || !Number.isSafeInteger(kill.fightId) || kill.fightId < 1) return null;
@@ -137,10 +137,13 @@
     wrapper.append(input);
     return wrapper;
   }
-  function renderGuild(reports) {
-    if (!reports.length) { root.replaceChildren(node('h1','公会战报'), meta('这个公会还没有公开战报。')); return; }
+  function renderGuild(reports, target = root) {
+    if (!reports.length) {
+      target.replaceChildren(...(target === root ? [node('h1', '公会战报')] : []), meta('这个公会还没有公开战报。'));
+      return;
+    }
     const heading = reports[0].guildName;
-    document.title = heading + ' · 公会战报 · 魔兽管家';
+    if (target === root) document.title = heading + ' · 公会战报 · 魔兽管家';
     const filters = { season: '', team: '', difficulty: '' };
     const seasons = new Map(reports.map(r => [r.snapshot.seasonId, r.snapshot.seasonName]));
     const teams = new Set(reports.map(r => teamName(r.snapshot.teamLabel)));
@@ -152,7 +155,7 @@
       select('团队', [...teams].map(t => [t,t]), '', value => change('team', value)),
       select('难度', Object.entries(difficulties), '', value => change('difficulty', value))
     );
-    root.replaceChildren(node('h1', heading), meta('公会已发布的团本战绩 · 北京时间'), filterBar, content);
+    target.replaceChildren(...(target === root ? [node('h1', heading)] : []), meta('公会已发布的团本战绩 · 北京时间'), filterBar, content);
     function draw() {
       const groups = progress(reports, filters);
       if (!groups.length) { content.replaceChildren(meta('当前筛选下没有已发布的击杀记录。')); return; }
@@ -185,7 +188,8 @@
       const matching = reports.filter(({snapshot:s}) => (!filters.season || filters.season === s.seasonId) &&
         (!filters.team || filters.team === teamName(s.teamLabel)) && (!filters.difficulty || s.kills.some(k => k.difficulty === filters.difficulty)));
       history.append(list(matching, r => [link(r.snapshot.raidName + ' · ' + teamName(r.snapshot.teamLabel), reportPage(r.id)), meta(when(r.snapshot.reportStartAt))]));
-      content.replaceChildren(cards, moments, renderAwards(honorsIn(matching, filters)), history);
+      if (target === root) content.replaceChildren(cards, moments, renderAwards(honorsIn(matching, filters)), history);
+      else content.replaceChildren(history, moments, cards, renderAwards(honorsIn(matching, filters)));
     }
     draw();
   }
@@ -225,12 +229,13 @@
     if (/^#fight-\d+$/.test(location.hash)) document.getElementById(location.hash.slice(1))?.scrollIntoView();
   }
   let generation = 0;
-  async function load() {
+  async function load(target = root, guildId, isCurrent = () => true) {
     const request = ++generation;
     const params = new URLSearchParams(location.search);
-    const id = params.get('report'), guild = params.get('guild');
-    root.setAttribute('aria-busy','true');
-    root.replaceChildren(meta('正在读取已发布战报…'));
+    const id = guildId ? null : params.get('report'), guild = guildId || params.get('guild');
+    const current = () => request === generation && isCurrent();
+    target.setAttribute('aria-busy','true');
+    target.replaceChildren(meta('正在读取已发布战报…'));
     try {
       if ((id && guild) || !uuid.test(id || guild || '')) throw new Error('这个分享链接不完整。');
       const get = async query => {
@@ -241,27 +246,29 @@
       };
       if (id) {
         const data = await get(new URLSearchParams({id}));
-        if (request === generation) renderReport(data.report);
+        if (current()) renderReport(data.report);
       } else {
         const unique = new Map();
         let offset = 0;
         do {
           const data = await get(new URLSearchParams({guildId:guild,offset,limit:100}));
-          if (request !== generation) return;
+          if (!current()) return;
           for (const report of data.reports) unique.set(report.id, report);
           if (!data.hasMore) break;
           if (!data.reports.length) throw new Error('分页读取中断，请重新载入。');
           offset += data.reports.length;
         } while (true);
-        renderGuild([...unique.values()].sort((a,b) => dateOrder(b.snapshot.reportStartAt,a.snapshot.reportStartAt)));
+        renderGuild([...unique.values()].sort((a,b) => dateOrder(b.snapshot.reportStartAt,a.snapshot.reportStartAt)), target);
       }
     } catch (err) {
-      if (request !== generation) return;
+      if (!current()) return;
       const retry = node('button','重新载入','btn');
-      retry.onclick = load;
-      root.replaceChildren(node('h1','公会战报'), meta(err.message), retry);
-    } finally { if (request === generation) root.setAttribute('aria-busy','false'); }
+      retry.onclick = () => load(target, guildId, isCurrent);
+      target.replaceChildren(...(target === root ? [node('h1', '公会战报')] : []), meta(err.message), retry);
+    } finally { if (current()) target.setAttribute('aria-busy','false'); }
   }
-  window.addEventListener('pageshow', e => { if (e.persisted) load(); });
-  load();
+  if (root) {
+    window.addEventListener('pageshow', e => { if (e.persisted) load(); });
+    load();
+  } else window.GuildPublished = { load };
 })();

@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+  <defs>
+    <linearGradient id="iron" x2=".7" y2="1"><stop stop-color="#737f86"/><stop offset=".48" stop-color="#434f5c"/><stop offset="1" stop-color="#26313c"/></linearGradient>
+    <linearGradient id="gold" x2=".65" y2="1"><stop stop-color="#ffde8f"/><stop offset=".45" stop-color="#edbe64"/><stop offset="1" stop-color="#a87539"/></linearGradient>
+  </defs>
+  <path d="M5 4h14v14.9l-7 3.2-7-3.2z" fill="url(#iron)" stroke="url(#gold)" stroke-width="1.25"/>
+  <path d="M7 6v11.8l5 2.2 5-2.2V6" fill="none" stroke="#af915b" stroke-width=".7"/>
+  <path d="m12 7 3 4-3 5-3-5z" fill="url(#gold)"/><path d="m12 9.5 1.25 1.65L12 13.5l-1.25-2.35z" fill="#35414b"/>
+  <path d="M2.2 3h19.6v1.7H2.2z" fill="url(#gold)"/><path d="M5.5 2v4m13-4v4" stroke="#f0cb83" stroke-width="1.4"/>
+</svg>

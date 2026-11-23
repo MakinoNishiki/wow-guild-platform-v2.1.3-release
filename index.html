@@ -4,17 +4,20 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>魔兽管家</title>
-<!-- 静态资源版本号：20261123.164（任务书 #22 WP3-②：凡改动 js/css 的 commit 必须同步递增此处与所有 ?v= 查询串，见 docs/开发规范.md 第五章） -->
+<!-- 静态资源版本号：20261124.165（任务书 #22 WP3-②：凡改动 js/css 的 commit 必须同步递增此处与所有 ?v= 查询串，见 docs/开发规范.md 第五章） -->
 <link rel="icon" type="image/png" sizes="32x32" href="assets/brand/favicon-32.png">
 <link rel="icon" type="image/png" sizes="16x16" href="assets/brand/favicon-16.png">
-<link rel="stylesheet" href="css/main.css?v=20261123.164">
-<link rel="stylesheet" href="css/data-public.css?v=20261123.164"><!-- 任务书 #28 WP5：副本掉落 tab（选择器全 .dp- 前缀 + #page-lootdrop 作用域，零泄漏） -->
-<link rel="stylesheet" href="css/housing-community.css?v=20261123.164">
-<link rel="stylesheet" href="css/housing-furniture.css?v=20261123.164">
-<link rel="stylesheet" href="css/guild-battle-editor.css?v=20261123.164">
-<link rel="stylesheet" href="css/decor-public.css?v=20261123.164"><!-- 任务书 #51：家宅图鉴（选择器全 .dh- 前缀，零泄漏，双壳共用） -->
-<link rel="stylesheet" href="css/decor-model.css?v=20261123.164">
-<script src="assets/vendor/supabase-js-2.js?v=20261123.164"></script>
+<link rel="stylesheet" href="css/main.css?v=20261124.165">
+<link rel="stylesheet" href="css/data-public.css?v=20261124.165"><!-- 任务书 #28 WP5：副本掉落 tab（选择器全 .dp- 前缀 + #page-lootdrop 作用域，零泄漏） -->
+<link rel="stylesheet" href="css/housing-community.css?v=20261124.165">
+<link rel="stylesheet" href="css/housing-furniture.css?v=20261124.165">
+<link rel="stylesheet" href="css/guild-battle-editor.css?v=20261124.165">
+<link rel="stylesheet" href="css/decor-public.css?v=20261124.165"><!-- 任务书 #51：家宅图鉴（选择器全 .dh- 前缀，零泄漏，双壳共用） -->
+<link rel="stylesheet" href="css/decor-model.css?v=20261124.165">
+<script src="assets/vendor/supabase-js-2.js?v=20261124.165"></script>
+<link rel="stylesheet" href="css/guild-battle-public.css?v=20261124.165">
+<link rel="stylesheet" href="css/workspaces.css?v=20261124.165">
+<link rel="stylesheet" href="css/tab-indicators.css?v=20261124.165">
 </head>
 <body>
 
@@ -200,12 +203,22 @@
       <div class="ia-brand" onclick="iaSwitchTab('home')" title="返回首页"><img src="assets/brand/wb-shield.svg" alt="" class="ia-brand-logo"><span class="ia-brand-name">魔兽管家</span><span class="ia-brand-sub">WoW Butler</span></div>
       <nav class="ia-tabs" aria-label="一级导航">
         <button type="button" class="ia-tab" data-ia-tab="home" onclick="iaSwitchTab('home')">首页</button>
-        <button type="button" class="ia-tab" data-ia-tab="team" onclick="iaSwitchTab('team')">团队管理</button>
+        <button type="button" class="ia-tab" data-ia-tab="team" onclick="iaSwitchTab('team')">公会</button>
+        <button type="button" class="ia-tab" data-ia-tab="personal" onclick="iaSwitchTab('personal')">个人档案</button>
         <button type="button" class="ia-tab" data-ia-tab="house" onclick="iaSwitchTab('house')">家宅房屋</button>
       <button type="button" class="ia-tab" data-ia-tab="lootdrop" onclick="iaSwitchTab('lootdrop')">副本掉落</button>
       <button type="button" class="ia-tab" data-ia-tab="changelog" onclick="iaSwitchTab('changelog')">更新日志</button>
       </nav>
       <div class="ia-top-right">
+        <div class="fb-entry" id="feedbackEntry">
+          <button type="button" class="fb-btn" id="feedbackBtn" aria-haspopup="true" aria-expanded="false">问题反馈</button>
+          <div class="fb-card" id="feedbackCard" role="dialog" aria-label="QQ 群二维码">
+            <div class="fb-qr-wrap"><img src="assets/qq-group-qr.png" alt="魔兽管家用户群 QQ 群二维码"></div>
+            <div class="fb-group">魔兽管家用户群</div>
+            <button type="button" class="fb-qq" id="feedbackQqCopy" title="点击复制群号">群号：1104273954</button>
+            <div class="fb-hint">扫码或搜群号加入，反馈问题/建议</div>
+          </div>
+        </div>
         <details class="token-menu" id="tokenMenu">
           <summary title="查看国服正式服时光徽章行情">
             <img src="assets/icons/nav/wow-token.svg" width="20" height="20" alt="">
@@ -213,11 +226,25 @@
           </summary>
           <div class="token-menu-body"></div>
         </details>
+        <div class="user-menu" id="userMenu" style="display:none">
+          <button class="user-menu-trigger" id="userMenuTrigger" aria-expanded="false" aria-controls="userMenuDropdown" onclick="userMenuToggle(event)">
+            <span class="user-avatar" id="userAvatar">?</span>
+            <span class="user-nickname" id="userNickname"></span>
+            <span id="navNotifDot" class="notif-dot nav-notif-dot"></span><span class="user-menu-caret">▾</span>
+          </button>
+          <div class="user-menu-dropdown" id="userMenuDropdown" style="display:none">
+            <span class="ws-account-hint" id="accountEmailHint"></span>
+            <button type="button" class="user-menu-item" onclick="userMenuAction('profile')">账号设置</button>
+            <button type="button" class="user-menu-item" onclick="userMenuAction('notifications')">通知</button>
+            <button type="button" class="user-menu-item user-menu-item-danger" onclick="userMenuAction('logout')">退出登录</button>
+          </div>
+        </div>
         <button type="button" class="btn btn-primary ia-login-btn" id="iaLoginBtn" style="display:none" onclick="iaOpenAuth()">登录 / 注册</button>
       </div>
     </div>
     <!-- 团队管理二级导航（任务书 #59 WP1：原侧栏纵向导航 pill 化，数据中心显隐与 #navDatacenter 同步） -->
     <div class="ia-subnav" role="navigation" aria-label="团队管理" id="iaSubnavTeam" style="display:none">
+      <span class="ws-rail-title">公会大厅</span><button type="button" class="ia-pill" data-ia-key="guild" onclick="iaGoKey('guild')"><img class="wb-nav-icon" width="20" height="20" src="assets/icons/nav/guild-banner.svg" alt="">公会战报</button><button type="button" class="ia-pill" data-ia-key="guild-settings" onclick="iaGoKey('guild-settings')"><img class="wb-nav-icon" width="20" height="20" src="assets/icons/nav/members.svg" alt="">公会设置</button><span class="ws-rail-title">团队管理</span>
       <button type="button" class="ia-pill" data-ia-key="dashboard" onclick="iaGoKey('dashboard')"><img class="wb-nav-icon" src="assets/icons/nav/dashboard.svg" width="20" height="20" alt=""><span>仪表盘</span></button>
       <button type="button" class="ia-pill" data-ia-key="members" onclick="iaGoKey('members')"><img class="wb-nav-icon" src="assets/icons/nav/members.svg" width="20" height="20" alt=""><span>成员管理</span></button>
       <button type="button" class="ia-pill" data-ia-key="attendance" onclick="iaGoKey('attendance')"><img class="wb-nav-icon" src="assets/icons/nav/attendance.svg" width="20" height="20" alt=""><span>考勤记录</span></button>
@@ -233,6 +260,15 @@
       <button type="button" class="ia-pill" data-ia-key="decor-plan" onclick="iaGoKey('decor-plan')"><img class="wb-nav-icon" src="assets/icons/nav/decor-plan.svg" width="20" height="20" alt=""><span>方案单 <span class="dh-nav-plan-badge" id="dhNavPlanBadge" style="display:none">0</span></span></button>
       <button type="button" class="ia-pill" data-ia-key="community" onclick="iaGoKey('community')"><img class="wb-nav-icon" src="assets/icons/nav/community.svg" width="20" height="20" alt=""><span>家宅分享</span></button>
     </div>
+      <nav class="ia-subnav" id="iaSubnavPersonal" aria-label="个人档案" style="display:none">
+       <span class="ws-rail-title">个人档案</span>
+       <button type="button" class="ia-pill" data-ia-key="personal" onclick="iaGoKey('personal')">
+        <img class="wb-nav-icon" width="20" height="20" src="assets/icons/nav/profile.svg" alt="">档案总览</button>
+        <button type="button" class="ia-pill" data-ia-key="characters" onclick="iaGoKey('characters')">
+         <img class="wb-nav-icon" width="20" height="20" src="assets/icons/nav/characters.svg" alt="">我的角色</button>
+         <button type="button" class="ia-pill" data-ia-key="claims" onclick="iaGoKey('claims')">
+          <img class="wb-nav-icon" width="20" height="20" src="assets/icons/nav/claims.svg" alt="">我的认领</button>
+         </nav>
     <!-- 顶部栏 -->
     <header class="topbar">
       <div class="topbar-left">
@@ -242,34 +278,6 @@
       <div class="topbar-right">
         <!-- 任务书 #59 WP1：问题反馈入口自侧栏 footer 整节点迁入（全部 id 不变，initFeedbackEntry 绑定不受影响；
              悬浮卡朝向由 CSS 覆写为按钮下方向下展开，z-index 60 层级沿用） -->
-        <div class="fb-entry" id="feedbackEntry">
-          <button type="button" class="fb-btn" id="feedbackBtn" aria-haspopup="true" aria-expanded="false">💬 问题反馈</button>
-          <div class="fb-card" id="feedbackCard" role="dialog" aria-label="QQ 群二维码">
-            <div class="fb-qr-wrap"><img src="assets/qq-group-qr.png" alt="魔兽管家用户群 QQ 群二维码"></div>
-            <div class="fb-group">魔兽管家用户群</div>
-            <button type="button" class="fb-qq" id="feedbackQqCopy" title="点击复制群号">群号：1104273954</button>
-            <div class="fb-hint">扫码或搜群号加入，反馈问题/建议</div>
-          </div>
-        </div>
-        <span class="ia-version" id="appVersion">v3.2.0</span>
-        <span id="userInfo" style="font-size:12px;color:var(--text-muted);margin-right:8px"></span>
-        <!-- 任务书 #59 WP1：用户中心按钮（侧栏退役后入口迁此，登录后显示；#navNotifDot 自侧栏 nav-item 迁入，id 唯一） -->
-        <button type="button" class="ia-uc-btn" id="iaUserCenterBtn" style="display:none" onclick="openUserCenter()">👤 用户中心<span class="notif-dot nav-notif-dot" id="navNotifDot"></span></button>
-        <!-- REQ-044（任务书 #13）：头像菜单替代裸「切换公会」按钮 -->
-        <div class="user-menu" id="userMenu" style="display:none">
-          <button class="user-menu-trigger" id="userMenuTrigger" onclick="userMenuToggle(event)">
-            <span class="user-avatar" id="userAvatar">?</span>
-            <span class="user-nickname" id="userNickname"></span>
-            <!-- BUG-020（任务书 #13-补遗）：头像菜单旁身份徽章（盾形分色+图标） -->
-            <span class="role-badge" id="userRoleBadge" style="display:none"></span>
-            <span class="user-menu-caret">▾</span>
-          </button>
-          <div class="user-menu-dropdown" id="userMenuDropdown" style="display:none">
-            <!-- REQ-103（任务书 #36 WP2）：菜单精简只留退出登录；REQ-094 头部与其他菜单项移除——
-                 玩家ID主展示=用户中心卡，用户中心/切换公会入口迁用户中心公会卡 -->
-            <div class="user-menu-item user-menu-item-danger" onclick="userMenuAction('logout')">🚪 退出登录</div>
-          </div>
-        </div>
         <span style="font-size:12px;color:var(--text-muted)" id="todayStr"></span>
       </div>
     </header>
@@ -277,6 +285,122 @@
     <!-- 内容区域 -->
     <div class="content-area">
       <!-- 仪表盘 -->
+      <div class="page" id="page-guild">
+       <header class="ws-hero">
+        <div>
+         <p class="ws-kicker">
+          <span id="wsGuildName">
+          </span>
+         </p>
+         <h1>公会战报</h1>
+         <p>
+          <span id="wsGuildRole">
+          </span>
+         </p>
+        </div>
+        <span class="ws-crest">
+         <img src="assets/icons/nav/guild-banner.svg" width="40" height="40" alt="">
+        </span>
+       </header>
+       <div id="wsWriteReport" class="ws-actions" hidden>
+        <label for="wsActivity">从活动写战报</label>
+        <select id="wsActivity" class="form-select">
+        </select>
+        <button id="wsEditReport" class="btn btn-primary">打开战报编辑器</button>
+       </div>
+       <div id="wsPublished" aria-live="polite">
+       </div>
+      </div>
+      <div class="page" id="page-guild-settings">
+       <header class="ws-hero">
+        <div>
+         <p class="ws-kicker">
+          <span id="wsSettingsGuild">
+          </span>
+         </p>
+         <h1>公会设置</h1>
+         <p>
+          <span id="wsSettingsRole">
+          </span>
+         </p>
+        </div>
+        <span class="ws-crest">
+         <img src="assets/icons/nav/guild-banner.svg" width="40" height="40" alt="">
+        </span>
+       </header>
+       <section class="card">
+        <h2>公会资料</h2>
+        <p id="wsGuildIntro">
+        </p>
+        <div class="ws-actions">
+         <button class="btn" onclick="openGuildSettings()">查看公会设置</button>
+         <button class="btn" onclick="openGuildSwitcher()">切换公会</button>
+        </div>
+       </section>
+      </div>
+      <div class="page" id="page-personal">
+       <header class="ws-hero">
+        <div>
+         <p class="ws-kicker">个人档案</p>
+         <h1>
+          <span id="wsPlayerName">个人档案</span>
+         </h1>
+         <p>
+          <span id="wsPlayerId">
+          </span>
+         </p>
+        </div>
+        <span class="ws-crest">
+         <img src="assets/icons/nav/characters.svg" width="40" height="40" alt="">
+        </span>
+       </header>
+       <div id="wsPersonalGuest" class="card" hidden>
+        <p>登录后可查看自己的角色与认领记录。</p>
+        <button class="btn btn-primary" onclick="iaOpenAuth()">登录 / 注册</button>
+       </div>
+       <div id="wsPersonalData" class="ws-columns">
+        <section class="card">
+         <h2>我的角色</h2>
+         <div id="wsCharacterPreview">
+         </div>
+         <button class="btn" onclick="iaGoKey('characters')">查看我的角色</button>
+        </section>
+        <section class="card">
+         <h2>所属公会</h2>
+         <p id="wsPlayerGuild">
+         </p>
+         <button class="btn" onclick="iaSwitchTab('team')">进入公会</button>
+        </section>
+       </div>
+      </div>
+      <div class="page" id="page-characters">
+       <header class="ws-hero">
+        <div>
+         <p class="ws-kicker">个人档案</p>
+         <h1>我的角色</h1>
+         <p>仅本人可见</p>
+        </div>
+        <span class="ws-crest">
+         <img src="assets/icons/nav/characters.svg" width="40" height="40" alt="">
+        </span>
+       </header>
+       <div class="ws-panel-host card">
+       </div>
+      </div>
+      <div class="page" id="page-claims">
+       <header class="ws-hero">
+        <div>
+         <p class="ws-kicker">个人档案</p>
+         <h1>我的认领</h1>
+         <p>仅本人可见</p>
+        </div>
+        <span class="ws-crest">
+         <img src="assets/icons/nav/claims.svg" width="40" height="40" alt="">
+        </span>
+       </header>
+       <div class="ws-panel-host card">
+       </div>
+      </div>
       <div class="page active" id="page-dashboard">
         <!-- 任务书 #52 WP2（REQ-137 一期收尾）：首页双入口耦合——拒绝独立页孤岛；插于统计卡之前、
              不影响既有 stats-grid/dashboard-grid 区块；复用 .card 体系（样式见 main.css .entry-cards 段），全角色可见 -->
@@ -306,7 +430,10 @@
                 <div class="card-title">最近活动</div>
                 <div class="card-subtitle">最近 5 次团本考勤</div>
               </div>
-              <a id="guildBattleHome" class="btn btn-sm" target="_blank" rel="noopener noreferrer" hidden>公会公开主页 ↗</a>
+              <div>
+                <a class="btn btn-sm" href="#/team/guild">查看全部公会战报</a>
+                <a id="guildBattleHome" class="btn btn-sm" target="_blank" rel="noopener noreferrer" hidden>公会公开主页 ↗</a>
+              </div>
             </div>
             <div class="recent-list" id="recentList"></div>
           </div>
@@ -801,10 +928,21 @@
 
       <!-- 更新日志 -->
       <div class="page" id="page-changelog">
+       <header class="ws-hero">
+        <div>
+         <p class="ws-kicker">魔兽管家</p>
+         <h1>更新日志</h1>
+         <p>当前版本 <span id="appVersion">v3.2.0</span>
+         </p>
+        </div>
+        <span class="ws-crest">
+         <img src="assets/icons/nav/notifications.svg" width="40" height="40" alt="">
+        </span>
+       </header>
         <div class="card">
           <div class="card-header">
             <div>
-              <div class="card-title">📝 更新日志</div>
+              <div class="card-title">版本记录</div>
               <div class="card-subtitle">记录每一次功能迭代与优化</div>
             </div>
             <div class="filter-bar">
@@ -922,8 +1060,8 @@
            双导流卡（家宅图鉴/副本掉落，各带「免登录」金 chip 与右箭头）+ 锁定功能预告带；
            文案逐字以任务书为准；字体/装饰线/光晕等纯视觉项随 WP4 不落地 -->
       <div class="page" id="page-home">
-        <svg class="home-signature" viewBox="268 329 407 352" aria-hidden="true" focusable="false"><use href="assets/brand/wb-shield.svg#letters"/></svg>
         <div class="home-hero">
+        <svg class="home-signature" viewBox="268 329 407 352" aria-hidden="true" focusable="false"><use href="assets/brand/wb-shield.svg#letters"/></svg>
           <div class="home-kicker">公会事务与游戏图鉴</div>
           <div class="home-hero-title"><span class="home-hero-light">魔兽</span><span class="home-hero-gold">管家</span></div>
           <div class="home-hero-sub">管理公会成员、考勤与装备，也可以直接浏览副本掉落和家宅装饰。</div>
@@ -2407,28 +2545,28 @@
   </div>
 </div>
 
-<script src="js/cloud.js?v=20261123.164"></script>
+<script src="js/cloud.js?v=20261124.165"></script>
 <!-- 任务书 #14：主数据层（快照兜底 + 加载层），须在 app.js 之前 -->
-<script src="js/masterDataSnapshot.js?v=20261123.164"></script>
-<script src="js/masterData.js?v=20261123.164"></script>
+<script src="js/masterDataSnapshot.js?v=20261124.165"></script>
+<script src="js/masterData.js?v=20261124.165"></script>
 <!-- 任务书 #22 WP2：职业/专精/职责图标集中映射（全站唯一取图处） -->
-<script src="js/iconMap.js?v=20261123.164"></script>
+<script src="js/iconMap.js?v=20261124.165"></script>
 <!-- 任务书 #31（REQ-097）：装备分类词表单一真源（公示页 chips / picker 过滤 / BUG-057 回填三处消费，须在 dataPublic.js 与 app.js 之前） -->
-<script src="js/itemQualityData.js?v=20261123.164"></script>
-<script src="js/lootTaxonomy.js?v=20261123.164"></script>
+<script src="js/itemQualityData.js?v=20261124.165"></script>
+<script src="js/lootTaxonomy.js?v=20261124.165"></script>
 <!-- 任务书 #28 WP5：副本掉落渲染层（双壳同源；无 data-public-body 不自动启动，由 app.js 懒挂载，须在 app.js 之前） -->
-<script src="js/dataPublic.js?v=20261123.164"></script>
+<script src="js/dataPublic.js?v=20261124.165"></script>
 <!-- 任务书 #51（REQ-137 一期）：家宅图鉴词表单一真源（价格/分类/尺寸/来源词表，须在 decorData.js 之前） -->
-<script src="js/decorDict.js?v=20261123.164"></script>
+<script src="js/decorDict.js?v=20261124.165"></script>
 <!-- 任务书 #51：家宅图鉴数据层+渲染层（双壳同源；无 data-decor-body 不自动启动，由 app.js 懒挂载，须在 app.js 之前） -->
-<script src="js/decorIntroducedPatches.js?v=20261123.164"></script>
-<script src="js/decorEffectIds.js?v=20261123.164"></script>
-<script src="js/decorUseFacts.js?v=20261123.164"></script>
-<script src="js/decorFacts.js?v=20261123.164"></script>
-<script src="js/decorEngagement.js?v=20261123.164"></script>
-<script src="js/decorModelManifest.js?v=20261123.164"></script>
-<script src="js/decorModelPreview.js?v=20261123.164"></script>
-<script src="js/decorData.js?v=20261123.164"></script>
+<script src="js/decorIntroducedPatches.js?v=20261124.165"></script>
+<script src="js/decorEffectIds.js?v=20261124.165"></script>
+<script src="js/decorUseFacts.js?v=20261124.165"></script>
+<script src="js/decorFacts.js?v=20261124.165"></script>
+<script src="js/decorEngagement.js?v=20261124.165"></script>
+<script src="js/decorModelManifest.js?v=20261124.165"></script>
+<script src="js/decorModelPreview.js?v=20261124.165"></script>
+<script src="js/decorData.js?v=20261124.165"></script>
 <div id="housingBuildEditor" class="modal-overlay">
   <section class="modal" role="dialog" aria-modal="true" aria-labelledby="hbEditorTitle">
     <div class="modal-header"><h2 class="modal-title" id="hbEditorTitle">创建作品</h2><button type="button" class="modal-close" aria-label="关闭" onclick="requestCloseModal('housingBuildEditor')">×</button></div>
@@ -2464,11 +2602,11 @@
     </div></form>
   </section>
 </div>
-<script src="js/housingCommunity.js?v=20261123.164"></script>
-<script src="js/housingBuildFurniture.js?v=20261123.164"></script>
-<script src="js/housingBuildTags.js?v=20261123.164"></script>
-<script src="js/housingBuilds.js?v=20261123.164"></script>
-<script src="js/lootEvidence.js?v=20261123.164"></script>
+<script src="js/housingCommunity.js?v=20261124.165"></script>
+<script src="js/housingBuildFurniture.js?v=20261124.165"></script>
+<script src="js/housingBuildTags.js?v=20261124.165"></script>
+<script src="js/housingBuilds.js?v=20261124.165"></script>
+<script src="js/lootEvidence.js?v=20261124.165"></script>
 <template id="tokenTrendTemplate">
   <div class="token-trend">
     <div class="token-trend-heading"><strong>近期走势</strong><div class="token-periods" role="group" aria-label="走势时段">
@@ -2476,23 +2614,25 @@
       <button type="button" data-hours="6" aria-pressed="true">6 小时</button>
       <button type="button" data-hours="24" aria-pressed="false">24 小时</button>
     </div></div>
-    <dl class="token-metrics">
+    <svg id="topTokenChart" viewBox="0 0 400 144" preserveAspectRatio="none" role="img" aria-label="时光徽章价格走势"></svg>
+    <div class="token-readout" data-value="reading"></div>
+    <details class="ws-token-details"><summary>区间统计</summary><dl class="token-metrics">
       <div><dt>已采时段涨跌</dt><dd data-value="change">—</dd><dd data-value="percent"></dd></div>
       <div><dt>最低价</dt><dd data-value="low">—</dd><dd data-value="lowTime"></dd></div>
       <div><dt>最高价</dt><dd data-value="high">—</dd><dd data-value="highTime"></dd></div>
     </dl>
-    <svg id="topTokenChart" viewBox="0 0 400 144" preserveAspectRatio="none" role="img" aria-label="时光徽章价格走势"></svg>
-    <div class="token-readout" data-value="reading"></div>
-    <div class="token-coverage" data-value="coverage"></div>
+    <div class="token-coverage" data-value="coverage"></div></details>
   </div>
 </template>
-<script src="js/wowTokenTrend.js?v=20261123.164"></script>
-<script src="js/wowToken.js?v=20261123.164"></script>
-<script src="js/guildBattleEditor.js?v=20261123.164"></script>
-<script src="js/app.js?v=20261123.164"></script>
-<script src="js/lootWorkflow.js?v=20261123.164"></script>
-<script src="js/personAttendance.js?v=20261123.164"></script>
-<script src="js/lootDetails.js?v=20261123.164"></script>
-<script src="js/track.js?v=20261123.164"></script><!-- 任务书 #54 WP1：全站埋点采集层（REQ-141，零依赖静默兜底） -->
+<script src="js/wowTokenTrend.js?v=20261124.165"></script>
+<script src="js/wowToken.js?v=20261124.165"></script>
+<script src="js/guildBattlePublic.js?v=20261124.165"></script>
+<script src="js/workspaces.js?v=20261124.165"></script>
+<script src="js/guildBattleEditor.js?v=20261124.165"></script>
+<script src="js/app.js?v=20261124.165"></script>
+<script src="js/lootWorkflow.js?v=20261124.165"></script>
+<script src="js/personAttendance.js?v=20261124.165"></script>
+<script src="js/lootDetails.js?v=20261124.165"></script>
+<script src="js/track.js?v=20261124.165"></script><!-- 任务书 #54 WP1：全站埋点采集层（REQ-141，零依赖静默兜底） -->
 </body>
 </html>

@@ -100,6 +100,22 @@
   }
 
   document.addEventListener('visibilitychange', schedule);
+  let hoverOpen = false, leaveTimer;
+  menu.addEventListener('pointerenter', event => {
+    if (event.pointerType !== 'mouse') return;
+    clearTimeout(leaveTimer);
+    if (!menu.open) { menu.open = true; hoverOpen = true; }
+  });
+  menu.addEventListener('pointerleave', event => {
+    if (event.pointerType !== 'mouse') return;
+    leaveTimer = setTimeout(() => {
+      if (hoverOpen && !menu.querySelector(':focus-visible')) menu.open = false;
+    }, 150);
+  });
+  summary.addEventListener('click', event => {
+    if (hoverOpen && menu.open) { event.preventDefault(); hoverOpen = false; }
+  });
+  menu.addEventListener('toggle', () => { if (!menu.open) hoverOpen = false; });
   document.addEventListener('click', event => {
     if (menu.open && !menu.contains(event.target)) menu.open = false;
   });
@@ -115,6 +131,8 @@
   });
   window.WowToken = {
     pageChanged() {
+      clearTimeout(leaveTimer);
+      hoverOpen = false;
       menu.open = false;
       if (started) return;
       started = true;

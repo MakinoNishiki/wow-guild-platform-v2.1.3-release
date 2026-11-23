@@ -7,7 +7,7 @@ const { chromium } = require('playwright');
 process.env.DEPLOY_RUN_PORT = '0';
 process.env.DEPLOY_RUN_HOST = '127.0.0.1';
 const { startServer } = require('../server.js');
-const output = path.join(__dirname, '../docs/evidence/req210-20261123');
+const output = process.env.WB_VERIFY_OUTPUT || path.join(__dirname, '../docs/evidence/req210-20261123');
 
 async function verify() {
   const server = startServer();
@@ -30,12 +30,13 @@ async function verify() {
     await waitPrice(formatted(live.gold));
     const go = name => page.locator('[data-ia-tab="' + name + '"]').click();
     const menu = page.locator('#tokenMenu');
-    const summary = menu.locator('summary');
+    const summary = menu.locator(':scope > summary');
     const card = menu.locator('.home-token');
-    assert.equal(await menu.evaluate(el => el.parentElement.classList.contains('ia-top-right') && el.nextElementSibling.id === 'iaLoginBtn'), true);
+    assert.equal(await menu.evaluate(el => el.parentElement.classList.contains('ia-top-right') && el.previousElementSibling.id === 'feedbackEntry'), true);
     assert.equal(await page.locator('#tokenMenuPrice').innerText(), formatted(live.gold) + ' 金');
     await summary.press('Enter');
     await card.waitFor();
+    await card.getByText('区间统计',{exact:true}).click();
     assert.equal(await card.locator('[data-value=change]').innerText(), '—');
     assert.match(await card.locator('[data-value=coverage]').innerText(), /已采 1 次/);
     assert.equal(await card.locator('img').evaluate(img => img.complete && img.naturalWidth > 0 && img.clientWidth === 20 && img.clientHeight === 20), true);
@@ -46,6 +47,7 @@ async function verify() {
     await page.keyboard.press('Escape');
     assert.equal(await card.isVisible(), false);
     assert.ok(await summary.evaluate(el => el === document.activeElement));
+    await page.mouse.move(10, 120);
     await summary.click();
     for (const width of [1366, 1920]) {
       await page.setViewportSize({ width, height: width === 1366 ? 850 : 1080 });
@@ -138,6 +140,7 @@ async function verify() {
     assert.equal(await page.locator('#tokenMenuPrice').innerText(), '暂无报价');
     assert.equal(await page.locator('#homeTokenUnit').isVisible(), false);
     await summary.click();
+    await card.getByText('区间统计',{exact:true}).click();
     assert.equal(await field('reading'), '所选时段暂无报价');
     assert.equal(await field('low'), '—');
     await summary.click();

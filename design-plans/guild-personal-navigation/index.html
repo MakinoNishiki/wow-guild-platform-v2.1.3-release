@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>公会与个人档案 · 魔兽管家导航评审</title>
+  <link rel="icon" href="../../assets/brand/favicon-32.png">
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="../../css/tab-indicators.css">
+  <script src="../../js/wowTokenTrend.js" defer></script>
+  <script src="preview.js" defer></script>
+</head>
+<body>
+  <header class="mast">
+    <a class="brand" href="#guild"><img src="../../assets/brand/wb-shield.svg" alt="">魔兽管家</a>
+    <nav class="global" aria-label="主导航">
+      <a id="home-nav" href="#home">首页</a>
+      <a id="guild-nav" href="#guild">公会</a><a id="person-nav" href="#person">个人档案</a>
+      <a id="house-nav" href="#house">家宅房屋</a><a id="loot-nav" href="#lootdrop">副本掉落</a><a id="release-nav" href="#release">更新日志</a>
+    </nav>
+    <div class="utilities">
+    <div class="quick-entry">
+      <button type="button" class="quick-trigger" id="feedback" aria-expanded="false" aria-controls="feedback-panel">问题反馈</button>
+      <div class="quick-layer" id="feedback-panel" hidden>
+        <section class="quick-card feedback-card" aria-label="问题反馈">
+          <strong>魔兽管家用户群</strong>
+          <img src="../../assets/qq-group-qr.png" width="148" height="148" alt="魔兽管家用户群的 QQ 群二维码">
+          <p>扫码或搜索群号，反馈问题和建议。</p>
+          <button type="button" class="button" id="copy-group" data-number="1104273954">复制群号 1104273954</button>
+          <span id="copy-status" role="status"></span>
+        </section>
+      </div>
+    </div>
+    <div class="quick-entry">
+      <button type="button" class="quick-trigger token" id="token" aria-expanded="false" aria-controls="quote-panel" aria-label="国服时光徽章，查看示例行情"><img src="../../assets/icons/nav/wow-token.svg" width="20" height="20" alt=""><span>时光徽章</span><b>692,686 金</b></button>
+      <div class="quick-layer" id="quote-panel" hidden>
+        <section class="quick-card quote-card" aria-label="时光徽章示例行情">
+          <div class="quote-heading"><strong>国服时光徽章</strong><small>示例行情</small></div>
+          <div class="quote-price">692,686 <small>金币 / 枚</small></div>
+          <div class="token-trend">
+            <div class="quote-heading"><strong>近期走势</strong><div class="periods" role="group" aria-label="走势时段">
+              <button type="button" data-hours="1" aria-pressed="false">1 小时</button>
+              <button type="button" data-hours="6" aria-pressed="true">6 小时</button>
+              <button type="button" data-hours="24" aria-pressed="false">24 小时</button>
+            </div></div>
+            <svg viewBox="0 0 400 144" aria-label="时光徽章价格走势"></svg>
+            <div class="reading" data-value="reading"></div>
+            <details class="quote-details"><summary>区间统计</summary><dl class="quote-stats">
+              <div><dt>区间涨跌</dt><dd data-value="change"></dd><dd data-value="percent"></dd></div>
+              <div><dt>最低价</dt><dd data-value="low"></dd><dd data-value="lowTime"></dd></div>
+              <div><dt>最高价</dt><dd data-value="high"></dd><dd data-value="highTime"></dd></div>
+            </dl>
+            <small data-value="coverage"></small></details>
+          </div>
+        </section>
+      </div>
+    </div>
+    <button id="identity" aria-expanded="false" aria-controls="account-menu"><span class="avatar">霜</span><b>霜林</b><span class="unread" aria-label="有未读通知"></span><span aria-hidden="true">⌄</span></button>
+    <div id="account-menu" class="menu" hidden>
+      <strong>霜林</strong><small>fs•••@example.org</small>
+      <a href="#account"><img src="../../assets/icons/nav/password.svg" alt="">账号设置</a>
+      <a href="#notifications"><img src="../../assets/icons/nav/notifications.svg" alt="">通知 <span class="unread" aria-label="有未读通知"></span></a>
+      <button id="logout">退出登录</button>
+    </div></div>
+  </header>
+  <main id="content" tabindex="-1"></main>
+  <footer><span>设计预览 · 使用示例资料</span><button id="compare">对照现有顶栏</button><button id="view-role">切换普通团员视角</button></footer>
+  <dialog id="dialog"><div class="dialog-body"><button class="close" aria-label="关闭">×</button><div id="dialog-copy"></div></div></dialog>
+</body>
+</html>

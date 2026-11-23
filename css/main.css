@@ -206,7 +206,7 @@ body {
   transform: translateY(6px);
   transition: opacity 0.2s ease-out, transform 0.2s ease-out, visibility 0.2s;
 }
-.fb-entry:hover .fb-card, .fb-entry.open .fb-card {
+.fb-entry.open .fb-card {
   opacity: 1;
   visibility: visible;
   transform: translateY(0);
@@ -5101,7 +5101,7 @@ img.class-icon[src$=".png"] { border-radius: 3px; }
   background-color: rgba(240, 192, 96, 0.12);
 }
 @media (min-width: 1200px) {
-  #mainContent:is([data-workspace="team"],[data-workspace="house"]) {
+  #mainContent:is([data-workspace="team"],[data-workspace="house"],[data-workspace="personal"]:has(#iaSubnavPersonal:not([style*="none"]))) {
     display: grid;
     grid-template-columns: 176px minmax(0, 1fr);
     grid-template-rows: auto auto 1fr;

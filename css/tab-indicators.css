@@ -1,0 +1,26 @@
+/* The line occupies the existing transparent border. Hover never moves the tab. */
+:is(.ia-tabs .ia-tab, .uc-tabs .uc-tab, .dh-exp-tab, .global a) {
+  position: relative;
+}
+:is(.ia-tabs .ia-tab, .uc-tabs .uc-tab, .dh-exp-tab, .global a):is(:hover, :focus-visible, .active, [aria-current], [aria-selected="true"]) {
+  border-bottom-color: transparent;
+}
+:is(.ia-tabs .ia-tab, .uc-tabs .uc-tab, .dh-exp-tab, .global a)::after {
+  content: "";
+  position: absolute;
+  inset: auto 0 -2px;
+  height: 2px;
+  background: var(--gold);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 160ms ease-out;
+}
+:is(.ia-tabs .ia-tab, .uc-tabs .uc-tab, .dh-exp-tab, .global a):is(.active, [aria-current="true"], [aria-current="page"], [aria-selected="true"], :focus-visible)::after {
+  opacity: 1;
+}
+@media (hover: hover) {
+  :is(.ia-tabs .ia-tab, .uc-tabs .uc-tab, .dh-exp-tab, .global a):hover:not(:disabled)::after { opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  :is(.ia-tabs .ia-tab, .uc-tabs .uc-tab, .dh-exp-tab, .global a)::after { transition: none; }
+}
