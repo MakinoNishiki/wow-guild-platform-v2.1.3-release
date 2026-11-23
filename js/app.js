@@ -9158,6 +9158,7 @@ function lootFillAssignedTo(idOrName) {
 // ==================== 初始化 ====================
 // ==================== 更新日志 ====================
 const changelogData = [
+  {id:'req190-fight-honors',version:'v3.2.0',date:'2026-11-23',type:'feature',typeLabel:'新增功能',title:'把开荒录像和成就留在那一次击杀上',summary:'会长和公会编辑可以在战报中添加 B 站视角、登记有凭据的成就。访客能在公会里程碑观看录像，在赛季荣誉查看获得者和对应战斗。',details:[]},
   {id:'req190-guild-battle',version:'v3.2.0',date:'2026-11-23',type:'feature',typeLabel:'新增功能',title:'团长可以发布公会战报',summary:'在活动详情打开「战斗日志 → 公会战报」，核对首领击杀、填写团长寄语后保存草稿或发布。发布后可复制链接，也可撤回。',details:[]},
   {id:'req190-public-home',version:'v3.2.0',date:'2026-11-23',type:'improve',typeLabel:'功能优化',title:'从仪表盘进入公会公开主页',summary:'最近活动卡片提供公会主页入口，访客可查看已发布的战报和里程碑。',details:[]},
   {id:'req190-battle-edits',version:'v3.2.0',date:'2026-11-23',type:'fix',typeLabel:'修复BUG',title:'战报校对提示多人修改冲突',summary:'另一位管理者已经保存时，编辑面板提示重新读取，保留当前输入供核对。',details:[]},

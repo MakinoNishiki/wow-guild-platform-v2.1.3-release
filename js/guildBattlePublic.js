@@ -12,6 +12,7 @@
   const dateOrder = (left, right) => Date.parse(left) - Date.parse(right);
   const guildPage = id => '?guild=' + encodeURIComponent(id);
   const reportPage = id => '?report=' + encodeURIComponent(id);
+  const fightPage = (report, kill) => reportPage(report.id) + '#fight-' + kill.fightId;
   const wcl = (snapshot, kill) => {
     if (!/^[a-z0-9]{10,20}$/i.test(snapshot.reportCode) || !Number.isSafeInteger(kill.fightId) || kill.fightId < 1) return null;
     return 'https://www.warcraftlogs.com/reports/' + snapshot.reportCode + '#fight=' + kill.fightId;
@@ -43,7 +44,28 @@
       return { ...group, milestones, complete };
     });
   }
-  if (typeof module === 'object' && module.exports) { module.exports = { progress, wcl }; return; }
+  // A later clear can unlock a new achievement for someone who missed the first.
+  // Deduplicate recipients inside each filtered set, retaining their earliest supporting fight.
+  function honorsIn(reports, filters) {
+    const awards = new Map();
+    for (const report of reports) {
+      const s = report.snapshot;
+      if (filters.season && filters.season !== s.seasonId || filters.team && filters.team !== teamName(s.teamLabel)) continue;
+      for (const kill of s.kills) {
+        if (filters.difficulty && filters.difficulty !== kill.difficulty) continue;
+        for (const honor of kill.honors || []) {
+          const key = JSON.stringify([s.region, s.seasonId, honor.scope, honor.id]);
+          if (!awards.has(key)) awards.set(key, {honor, recipients: new Map()});
+          const recipients = awards.get(key).recipients;
+          const subject = honor.subject.trim().normalize('NFKC').replace(/\s*-\s*/g, '-').toLowerCase();
+          const previous = recipients.get(subject);
+          if (!previous || dateOrder(kill.killedAt, previous.kill.killedAt) < 0) recipients.set(subject, {honor, kill, report});
+        }
+      }
+    }
+    return [...awards.values()];
+  }
+  if (typeof module === 'object' && module.exports) { module.exports = { progress, wcl, honorsIn }; return; }
 
   const root = document.getElementById('battleContent');
   const node = (tag, text, cls) => {
@@ -63,6 +85,42 @@
     const el = node('section');
     el.append(node('h2', title));
     return el;
+  }
+  function externalUrl(value) {
+    try {
+      const url = new URL(value);
+      return url.protocol === 'https:' && !url.username && !url.password ? url.href : '';
+    } catch { return ''; }
+  }
+  function videoLinks(kill) {
+    const links = [];
+    for (const video of kill.videos || []) {
+      const uri = externalUrl(video.url);
+      if (uri) links.push(link('录像 · ' + video.label, uri, true));
+    }
+    return links;
+  }
+  function renderAwards(awards) {
+    const honors = section('赛季荣誉');
+    if (!awards.length) {
+      honors.append(meta('当前筛选下暂无已核对的成就。'));
+      return honors;
+    }
+    for (const [scope, title, unit] of [['player', '个人成就', '位获得者'], ['guild', '公会成就', '家公会']]) {
+      const groups = awards.filter(group => group.honor.scope === scope);
+      if (!groups.length) continue;
+      honors.append(node('h3', title));
+      for (const {honor, recipients} of groups) {
+        const details = node('details', null, 'battle-awards');
+        details.append(node('summary', honor.name + ' · ' + recipients.size + ' ' + unit));
+        details.append(list([...recipients.values()], entry => [
+          node('span', entry.honor.subject), meta(entry.honor.earnedOn + ' · 管理者核对'),
+          link('查看对应击杀', fightPage(entry.report, entry.kill))
+        ]));
+        honors.append(details);
+      }
+    }
+    return honors;
   }
   function list(items, row) {
     const ul = node('ul', null, 'battle-list');
@@ -111,7 +169,7 @@
         if (group.complete) card.append(meta('已有全通击杀记录'));
         if (!s.teamLabel) card.append(meta('团号未注明，仅统计本场。'));
         grid.append(card);
-        const events = group.milestones.map(({kill, report}) => ({title:'已收录最早击杀 · ' + kill.bossName, at:kill.killedAt, report, diff:group.difficulty}));
+        const events = group.milestones.map(({kill, report}) => ({title:'已收录最早击杀 · ' + kill.bossName, at:kill.killedAt, report, kill, diff:group.difficulty}));
         timeline.push(...events);
         if (group.complete) timeline.push({...events[events.length-1], title:'全通 · ' + s.raidName});
       }
@@ -119,14 +177,15 @@
       const moments = section('里程碑');
       timeline.sort((a,b) => dateOrder(b.at,a.at));
       moments.append(list(timeline, event => [
-        link(event.title, reportPage(event.report.id)),
-        meta([event.report.snapshot.seasonName,teamName(event.report.snapshot.teamLabel),difficulties[event.diff],when(event.at)].join(' · '))
+        link(event.title, fightPage(event.report, event.kill)),
+        meta([event.report.snapshot.seasonName,teamName(event.report.snapshot.teamLabel),difficulties[event.diff],when(event.at)].join(' · ')),
+        ...videoLinks(event.kill)
       ]));
       const history = section('活动战报');
       const matching = reports.filter(({snapshot:s}) => (!filters.season || filters.season === s.seasonId) &&
         (!filters.team || filters.team === teamName(s.teamLabel)) && (!filters.difficulty || s.kills.some(k => k.difficulty === filters.difficulty)));
       history.append(list(matching, r => [link(r.snapshot.raidName + ' · ' + teamName(r.snapshot.teamLabel), reportPage(r.id)), meta(when(r.snapshot.reportStartAt))]));
-      content.replaceChildren(cards, moments, history);
+      content.replaceChildren(cards, moments, renderAwards(honorsIn(matching, filters)), history);
     }
     draw();
   }
@@ -139,12 +198,31 @@
       meta([report.guildName,teamName(s.teamLabel),s.seasonName,when(s.reportStartAt) + '（北京时间）'].join(' · ')));
     if (report.message) root.append(node('blockquote', report.message, 'battle-message'));
     const fights = section('首领击杀');
-    fights.append(list([...s.kills].sort((a,b) => dateOrder(a.killedAt,b.killedAt)), k => {
+    const fightList = node('ul', null, 'battle-list battle-fights');
+    for (const k of [...s.kills].sort((a,b) => dateOrder(a.killedAt,b.killedAt))) {
+      const item = node('li');
+      item.id = 'fight-' + k.fightId;
       const url = wcl(s,k);
-      return [node('strong', k.bossName + ' · ' + difficulties[k.difficulty]), meta(when(k.killedAt)),
-        ...(url ? [link('查看 WCL 战斗', url, true)] : [])];
-    }));
+      item.append(node('strong', k.bossName + ' · ' + difficulties[k.difficulty]), meta(when(k.killedAt)));
+      const actions = node('div', null, 'battle-fight-links');
+      if (url) actions.append(link('查看 WCL 战斗', url, true));
+      actions.append(...videoLinks(k));
+      item.append(actions);
+      if (k.honors?.length) {
+        const confirmed = node('div', null, 'battle-fight-honors');
+        confirmed.append(node('h3', '本场成就 · 管理者核对'));
+        confirmed.append(list(k.honors, honor => {
+          const proof = externalUrl(honor.proofUrl);
+          return [node('strong', honor.name), node('span', (honor.scope === 'guild' ? '公会 · ' : '角色 · ') + honor.subject),
+            meta(honor.earnedOn), ...(proof ? [link('查看凭据', proof, true)] : [])];
+        }));
+        item.append(confirmed);
+      }
+      fightList.append(item);
+    }
+    fights.append(fightList);
     root.append(fights, meta('战斗日志核对于 ' + when(s.verifiedAt) + '（北京时间）'));
+    if (/^#fight-\d+$/.test(location.hash)) document.getElementById(location.hash.slice(1))?.scrollIntoView();
   }
   let generation = 0;
   async function load() {

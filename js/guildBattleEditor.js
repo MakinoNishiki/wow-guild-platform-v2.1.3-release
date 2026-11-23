@@ -49,6 +49,136 @@
     return node;
   }
 
+  function annotation(snapshot, kill) {
+    return {
+      reportCode: snapshot.reportCode, fightId: kill.fightId, encounterId: kill.encounterId,
+      difficulty: kill.difficulty, killedAt: kill.killedAt,
+      videos: (kill.videos || []).map(({label, url}) => ({label, url})),
+      honors: (kill.honors || []).map(({id, subject, earnedOn, proofUrl}) => ({id, subject, earnedOn, proofUrl}))
+    };
+  }
+
+  function fightKey(snapshot, kill) {
+    return JSON.stringify([snapshot.region, snapshot.seasonId, snapshot.raidId, snapshot.teamLabel,
+      snapshot.reportCode, kill.bossId, kill.fightId, kill.encounterId, kill.difficulty, kill.killedAt]);
+  }
+
+  function hasMaterial(entry) { return entry.videos.length > 0 || entry.honors.length > 0; }
+
+  function editSnapshot(context, snapshot, preserve) {
+    const entries = new Map();
+    for (const kill of snapshot?.kills || []) {
+      const entry = annotation(snapshot, kill);
+      const key = fightKey(snapshot, kill);
+      entries.set(key, preserve && context.entries.get(key) || entry);
+    }
+    if (preserve && [...context.entries].some(([key, entry]) => !entries.has(key) && hasMaterial(entry)) &&
+        !confirm('日志中的部分击杀已变化，对应录像或成就需要重新填写。要放弃这些击杀的材料并采用新预览吗？')) return false;
+    context.entries = entries;
+    renderEvidence(snapshot);
+    return true;
+  }
+
+  function editField(title, control) {
+    const label = evidenceNode('label', title);
+    control.setAttribute('aria-label', title);
+    label.append(control);
+    return label;
+  }
+
+  function materialInput(entry, key, title, type, maxLength, placeholder) {
+    const input = document.createElement('input');
+    input.className = 'form-input';
+    input.type = type;
+    input.required = true;
+    if (maxLength) input.maxLength = maxLength;
+    if (placeholder) input.placeholder = placeholder;
+    input.value = entry[key];
+    input.addEventListener('input', () => { entry[key] = input.value; });
+    return editField(title, input);
+  }
+
+  function editButton(text, action) {
+    const button = evidenceNode('button', text);
+    button.type = 'button';
+    button.className = 'btn btn-sm';
+    button.addEventListener('click', action);
+    return button;
+  }
+
+  function materialEditor(entry, kill) {
+    const details = document.createElement('details');
+    details.className = 'battle-materials';
+    const summary = document.createElement('summary');
+    const panel = document.createElement('fieldset');
+    panel.setAttribute('aria-label', kill.bossName + '的录像和成就');
+    details.append(summary, panel);
+    function draw() {
+      summary.textContent = hasMaterial(entry) ? '录像 ' + entry.videos.length + ' · 成就 ' + entry.honors.length : '添加录像或成就';
+      panel.replaceChildren();
+      function remove(rows, row) {
+        rows.splice(rows.indexOf(row), 1);
+        draw();
+        summary.focus();
+      }
+      for (const video of entry.videos) {
+        const line = document.createElement('div');
+        line.className = 'battle-material-line';
+        line.append(materialInput(video, 'label', '录像视角', 'text', 40, '如：坦克视角'),
+          materialInput(video, 'url', 'B 站视频链接', 'url', 2048, 'https://'),
+          editButton('移除录像', () => remove(entry.videos, video)));
+        panel.append(line);
+      }
+      const options = kill.achievementOptions || [];
+      for (const honor of entry.honors) {
+        const line = document.createElement('div');
+        line.className = 'battle-honor-fields';
+        const select = document.createElement('select');
+        select.className = 'form-select';
+        select.required = true;
+        select.add(new Option('选择本场已解锁成就', ''));
+        for (const item of options) select.add(new Option(item.name, String(item.id)));
+        select.value = honor.id ? String(honor.id) : '';
+        const subject = materialInput(honor, 'subject', '获得者（名称-服务器）', 'text', 100);
+        const proof = materialInput(honor, 'proofUrl', '公开凭据链接', 'url', 2048, 'https://');
+        function updateHint() {
+          const item = options.find(item => item.id === honor.id);
+          subject.lastChild.placeholder = item?.scope === 'guild' ? '公会名-服务器' : '角色名-服务器';
+          proof.firstChild.textContent = item?.hall ? '官方名人堂或公会成就链接' : '公开凭据链接';
+          proof.lastChild.setAttribute('aria-label', proof.firstChild.textContent);
+        }
+        select.onchange = () => { honor.id = Number(select.value); updateHint(); };
+        updateHint();
+        line.append(editField('成就', select), subject,
+          materialInput(honor, 'earnedOn', '游戏中获得日期（北京时间）', 'date'), proof,
+          editButton('移除成就', () => remove(entry.honors, honor)));
+        panel.append(line);
+      }
+      const actions = document.createElement('div');
+      actions.className = 'battle-material-actions';
+      const addVideo = editButton('添加录像', () => {
+        entry.videos.push({label: '', url: ''});
+        draw();
+        panel.querySelectorAll('.battle-material-line')[entry.videos.length - 1].querySelector('input').focus();
+      });
+      addVideo.disabled = entry.videos.length >= 8;
+      actions.append(addVideo);
+      if (options.length) {
+        const addHonor = editButton('登记成就', () => {
+          entry.honors.push({id: 0, subject: '', earnedOn: '', proofUrl: ''});
+          draw();
+          panel.querySelectorAll('select')[entry.honors.length - 1]?.focus();
+        });
+        addHonor.disabled = entry.honors.length >= 80;
+        actions.append(addHonor);
+      }
+      panel.append(actions);
+      if (entry.honors.length) panel.append(evidenceNode('p', '请核对游戏内获得者、解锁日期和本场战斗。上述资料及凭据将在发布后公开。'));
+    }
+    draw();
+    return details;
+  }
+
   function renderEvidence(snapshot) {
     const area = element('Evidence');
     area.replaceChildren();
@@ -94,6 +224,9 @@
         link.setAttribute('aria-label', '打开' + kill.bossName + '的 WCL 战斗日志');
         cell.append(link);
       }
+      const detailCell = body.insertRow().insertCell();
+      detailCell.colSpan = 4;
+      detailCell.append(materialEditor(editor.entries.get(fightKey(snapshot, kill)), kill));
     }
     area.append(table);
   }
@@ -116,6 +249,7 @@
     element('Reload').disabled = !!context.busy;
     element('Preview').disabled = !ready;
     element('Message').disabled = !context.loaded || !!context.busy;
+    element('Evidence').querySelectorAll('fieldset').forEach(panel => { panel.disabled = !ready; });
     element('Draft').hidden = !context.loaded || published;
     element('Publish').hidden = !context.loaded;
     element('Draft').disabled = element('Publish').disabled = !ready || !context.previewToken;
@@ -215,6 +349,7 @@
     if (action !== 'withdraw') {
       fields.message = payload.message;
       fields.previewToken = payload.previewToken;
+      fields.annotations = payload.annotations;
     }
     const result = await request('save', payload, fields);
     return validateRow(result.report, payload);
@@ -230,6 +365,17 @@
     }
     if (payload.action !== 'withdraw' && row.evidenceStatus !== 'verified') {
       throw new Error('活动来源已发生变化，请重新核对日志。');
+    }
+    if (payload.action !== 'withdraw') {
+      const savedEntries = snapshot => (snapshot.kills || []).map(k => annotation(snapshot, k)).filter(hasMaterial);
+      const expected = payload.annotations.map(entry => ({...entry,
+        videos: entry.videos.map(v => ({label: v.label.trim(), url: new URL(v.url.trim()).href})),
+        honors: entry.honors.map(h => ({...h, subject: h.subject.trim(), proofUrl: new URL(h.proofUrl.trim()).href}))
+      }));
+      if (JSON.stringify(savedEntries(row.snapshot)) !== JSON.stringify(expected) ||
+          JSON.stringify(savedEntries(row.snapshot)) !== JSON.stringify(savedEntries(saved.snapshot))) {
+        throw new Error('战报录像或成就的回读结果不一致，请重新读取战报。');
+      }
     }
     return row;
   }
@@ -251,15 +397,13 @@
       if (!result.previewToken || !result.snapshot || !Array.isArray(result.snapshot.kills)) {
         throw new Error('日志预览不完整，请重新核对。');
       }
-      renderEvidence(result.snapshot);
+      if (!editSnapshot(context, result.snapshot, true)) { notice('保留了上次的内容，请重新核对日志后保存。'); return; }
       context.previewToken = result.previewToken;
       context.previewChanged = !!context.row && publicEvidence(result.snapshot) !== publicEvidence(context.row.snapshot);
-      notice('请核对下方内容。发布后，访客可通过链接查看战报和团长寄语。');
+      notice('请核对下方击杀，可逐场补充录像和成就凭据。');
     } catch (error) {
       if (active(context)) {
-        renderEvidence(context.row?.snapshot);
-        context.previewChanged = false;
-        notice(error.message + (context.row ? ' 当前显示上次保存的内容。' : ''), true);
+        notice(error.message + ' 当前输入已保留。', true);
       }
     } finally {
       if (active(context)) {
@@ -285,7 +429,7 @@
       context.loaded = true;
       element('Message').value = row?.message || '';
       snapshotModalForm(modalId);
-      renderEvidence(row?.snapshot);
+      editSnapshot(context, row?.snapshot, false);
       notice(row ? '下方是上次保存的内容。请重新核对日志后保存或发布。' : '');
     } catch (error) {
       if (active(context)) {
@@ -305,15 +449,23 @@
     const context = editor;
     if (!active(context) || context.busy || context.stale || !context.loaded) return;
     if (action === 'withdraw') {
-      if (!confirm('撤回后，访客将无法查看这篇战报。未保存的寄语也会放弃。确定撤回吗？')) return;
+      if (!confirm('撤回后，访客将无法查看这篇战报。未保存的修改也会放弃。确定撤回吗？')) return;
     } else {
       if (!context.previewToken) return;
-      if (action === 'publish' && !confirm('确认将预览中的战绩和团长寄语发布到公会公开主页吗？')) return;
+      const invalid = element('Evidence').querySelector('input:invalid, select:invalid');
+      if (invalid) {
+        invalid.closest('details').open = true;
+        invalid.focus(); invalid.reportValidity();
+        notice('请补全录像或成就资料，也可移除这一项。', true);
+        return;
+      }
+      if (action === 'publish' && !confirm('确认公开本场战绩、录像、已核对成就和团长寄语吗？')) return;
     }
     const payload = {
       guildId: context.guildId, userId: context.userId, activityId: context.activityId,
       expectedVersion: context.row?.version || 0, action,
-      message: element('Message').value.trim(), previewToken: context.previewToken
+      message: element('Message').value.trim(), previewToken: context.previewToken,
+      annotations: [...context.entries.values()].filter(hasMaterial)
     };
     context.busy = 'save';
     controls(context);
@@ -326,7 +478,7 @@
       context.previewChanged = false;
       element('Message').value = row.message || '';
       snapshotModalForm(modalId);
-      renderEvidence(row.snapshot);
+      editSnapshot(context, row.snapshot, false);
       notice(action === 'withdraw' ? '已撤回，访客无法查看这篇战报。' : action === 'publish' ? '战报已发布，可以复制分享链接。' : '草稿已保存，仅管理者可见。');
     } catch (error) {
       if (active(context)) {
@@ -356,7 +508,7 @@
   }
 
   function open(activityId) {
-    const context = { guildId: CloudSync.getCurrentGuild()?.id, userId: CloudSync.getCachedUser()?.id, activityId };
+    const context = { guildId: CloudSync.getCurrentGuild()?.id, userId: CloudSync.getCachedUser()?.id, activityId, entries: new Map() };
     if (!context.guildId || !context.userId || !activityId || !sameIdentity(context)) return;
     editor = context;
     element('Message').value = '';
@@ -367,7 +519,11 @@
   }
 
   function isDirty() {
-    return !!editor?.loaded && (editor.previewChanged || element('Message').value !== (editor.row?.message || ''));
+    if (!editor?.loaded) return false;
+    const saved = editor.row?.snapshot;
+    const annotations = (saved?.kills || []).map(k => annotation(saved, k)).filter(hasMaterial);
+    return editor.previewChanged || element('Message').value !== (editor.row?.message || '') ||
+      JSON.stringify([...editor.entries.values()].filter(hasMaterial)) !== JSON.stringify(annotations);
   }
 
   element('Preview').addEventListener('click', () => preview(editor));
@@ -398,7 +554,7 @@
   });
   element('Modal').addEventListener('keydown', event => {
     if (event.key !== 'Tab') return;
-    const targets = Array.from(element('Modal').querySelectorAll('button:not(:disabled), a[href], textarea:not(:disabled), input'))
+    const targets = Array.from(element('Modal').querySelectorAll('button:enabled, a[href], textarea:enabled, input:enabled, select:enabled, summary'))
       .filter(node => node.getClientRects().length);
     if (!targets.length) { event.preventDefault(); return; }
     const first = targets[0], last = targets[targets.length - 1];

@@ -23,6 +23,22 @@
 #guildBattleEvidence th { font-weight: 500; }
 #guildBattleEvidence td { color: var(--text-primary); }
 #guildBattleEvidence a { color: var(--gold); }
+#guildBattleEvidence td:has(.battle-materials) { padding-top: 0; }
+#guildBattleEvidence .battle-materials summary { cursor: pointer; color: var(--gold); width: fit-content; }
+#guildBattleEvidence .battle-materials fieldset { margin: 8px 0; padding: 0; border: 0; min-width: 0; }
+#guildBattleEvidence .battle-materials label { min-width: 0; display: grid; gap: 4px; color: var(--text-secondary); }
+#guildBattleEvidence .battle-materials :is(input, select) { width: 100%; min-width: 0; }
+#guildBattleEvidence .battle-material-line, #guildBattleEvidence .battle-honor-fields {
+  display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.55fr) auto;
+  align-items: end; gap: 8px; padding: 8px 0;
+}
+#guildBattleEvidence .battle-honor-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); border-top: 1px solid var(--border-color); }
+#guildBattleEvidence .battle-honor-fields button { justify-self: start; }
+#guildBattleEvidence .battle-material-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+@media (max-width: 560px) {
+  #guildBattleEvidence .battle-material-line, #guildBattleEvidence .battle-honor-fields { grid-template-columns: minmax(0, 1fr); }
+  #guildBattleEvidence .battle-material-line button { justify-self: start; }
+}
 #guildBattleModal .form-group { margin-bottom: 0; }
 #guildBattleSharing { margin-top: 16px; }
 #guildBattleWithdraw { margin-right: auto; }

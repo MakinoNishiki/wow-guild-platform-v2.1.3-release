@@ -1,7 +1,7 @@
 'use strict';
 const {test} = require('node:test');
 const assert = require('node:assert/strict');
-const {progress,wcl} = require('../js/guildBattlePublic.js');
+const {progress,wcl,honorsIn} = require('../js/guildBattlePublic.js');
 function entry(id, teamLabel, boss, day, extra = {}) {
   const {region='CN',difficulty='mythic',raidId='r1',seasonId='s1'} = extra;
   return { id, snapshot:{region, teamLabel, seasonId, raidId, bosses:[{id:'A'},{id:'B'}],
@@ -32,4 +32,17 @@ test('两次核对的首领清单不一致时不宣称全通',()=>{
 test('战斗链接仅使用已核对报告编号和战斗编号',()=>{
   assert.match(wcl({reportCode:'TestBattleLog012'},{fightId:2}),/#fight=2$/);
   assert.equal(wcl({reportCode:'https://example.com/'},{fightId:2}),null);
+});
+
+test('复杀新获得者纳入荣誉，已有人物按角色和服务器去重，公会与角色分别统计',()=>{
+  const first=entry('first','1','A',11), later=entry('later','2','A',18);
+  const earned=subject => ({id:63651,scope:'player',subject});
+  first.snapshot.kills[0].honors=[earned('团员-罗宁')];
+  later.snapshot.kills[0].honors=[earned('团员 - 罗宁'),earned('团员-白银之手'),{id:63648,scope:'guild',subject:'公会-罗宁'}];
+  const [player,guild]=honorsIn([later,first],{});
+  assert.equal(player.recipients.size,2);
+  assert.equal(player.recipients.get('团员-罗宁').report.id,'first');
+  assert.equal(guild.recipients.size,1);
+  assert.equal(honorsIn([first,later],{team:'1 团'})[0].recipients.size,1);
+  assert.deepEqual(honorsIn([first,later],{difficulty:'heroic'}),[]);
 });

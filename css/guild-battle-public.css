@@ -20,3 +20,11 @@
 .battle-public .battle-link { color: var(--gold); text-underline-offset: 3px; }
 .battle-public .battle-message { white-space: pre-wrap; overflow-wrap: anywhere; border-left: 3px solid var(--gold-dark); padding: 10px 16px; margin: 16px 0; background: var(--bg-secondary); }
 .battle-public :focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+.battle-fights > li { scroll-margin-top: 14px; }
+.battle-fights > li:target { outline: 1px solid var(--gold-dark); outline-offset: 3px; }
+.battle-fight-links { display: flex; gap: 6px 14px; flex-wrap: wrap; }
+.battle-fight-honors { flex-basis: 100%; padding: 8px 12px; background: var(--bg-secondary); border-left: 2px solid var(--gold-dark); }
+.battle-fight-honors h3 { margin: 0; font-size: 14px; }
+.battle-fight-honors .battle-list { margin: 0; }
+.battle-awards { padding: 8px 0; border-bottom: 1px solid var(--border-color); }
+.battle-awards summary { cursor: pointer; color: var(--gold); }

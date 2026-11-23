@@ -54,6 +54,73 @@ function setup() {
   }
   return {state,call,evidence};
 }
+
+function s2Fixture() {
+  const fixture = setup(), {evidence,call} = fixture;
+  Object.assign(evidence,{raidName:'烈毒之渊',seasonId:'370c4590-5fa0-47ba-a97a-d8a4436cbeea',reportCode:'TestBattleLog012'});
+  Object.assign(evidence.kills[0],{bossName:'乌拉特克',difficulty:'mythic',killedAt:'2026-09-07T16:15:00.000Z'});
+  const {fightId,encounterId,difficulty,killedAt} = evidence.kills[0];
+  const row = {reportCode:evidence.reportCode,fightId,encounterId,difficulty,killedAt,
+    videos:[{label:'法师视角',url:'https://www.bilibili.com/video/BV1ab411c7de/?p=2'}],
+    honors:[{id:63651,subject:'测试角色-罗宁',earnedOn:'2026-09-08',proofUrl:'https://evidence.example.org/game/123'}]};
+  async function save(annotations,expectedVersion=0) {
+    const {data:{previewToken}} = await call('preview');
+    return call('save',{...scope,action:'publish',previewToken,expectedVersion,annotations});
+  }
+  return {...fixture,row,save};
+}
+
+test('管理者登记的视角和已核对成就按战斗保存，访客看不到编辑候选，旧页面可安全更新寄语', async () => {
+  const {call,state,row,save} = s2Fixture();
+  const {data:before} = await call('preview');
+  assert.ok(before.snapshot.kills[0].achievementOptions.some(h => h.id===63651));
+  assert.equal(before.snapshot.kills[0].honors,undefined);
+  assert.equal((await save([row])).status,200);
+  const read = () => call('public',null,{method:'GET',token:null,query:'?id='+reportId});
+  const [kill] = (await read()).data.report.snapshot.kills;
+  assert.deepEqual(kill.videos,row.videos);
+  assert.equal(kill.honors[0].name,'千钧一发：乌拉特克');
+  assert.equal(kill.honors[0].scope,'player');
+  assert.equal(kill.achievementOptions,undefined);
+  assert.equal((await save(undefined,1)).status,200);
+  assert.deepEqual((await read()).data.report.snapshot.kills[0],kill);
+  assert.equal((await save([],2)).status,200);
+  assert.equal((await read()).data.report.snapshot.kills[0].videos,undefined);
+  state.role='viewer';
+  assert.equal((await call('save',{...scope,action:'publish',annotations:[row]})).status,403);
+});
+
+test('不同战斗、不同成就条件、非官方名人堂材料和不完整的视角均不能写入', async () => {
+  const {evidence,row,save,state,call} = s2Fixture();
+  for (const change of [
+    r=>{r.fightId++;},r=>{r.reportCode='WrongCode123';},r=>{r.encounterId++;},
+    r=>{r.honors[0].earnedOn='2026-09-07';},r=>{r.honors[0].id=63682;},
+    r=>{r.honors[0].subject='无区服';},r=>{r.honors[0].id=63652;},
+    r=>{r.honors[0].proofUrl='javascript:alert(1)';},r=>{r.videos[0].url='https://www.example.org/video/BV1ab411c7de';},
+    r=>{r.videos=[...r.videos,...r.videos];},r=>{r.honors=[...r.honors,...r.honors];},
+  ]) {
+    const copy=structuredClone(row);
+    change(copy);
+    assert.equal((await save([copy])).status,400);
+  }
+  assert.equal(state.args.length,0);
+  const options = async () => (await call('preview')).data.snapshot.kills[0].achievementOptions.map(x=>x.id);
+  assert.ok((await options()).includes(63652));
+  const hall=structuredClone(row); Object.assign(hall.honors[0],{id:63652,subject:'测试公会-罗宁',
+    proofUrl:'https://worldofwarcraft.blizzard.com/en-us/worldsoul/us/leaderboards/hall-of-fame/mythic-raid/the-venomous-abyss'});
+  assert.equal((await save([hall])).status,200);
+  evidence.kills[0].killedAt='2026-11-22T16:15:00.000Z';
+  const changed = (await call('preview')).data;
+  assert.equal(changed.snapshot.kills[0].videos,undefined);
+  assert.ok(!changed.snapshot.kills[0].achievementOptions.some(h=>h.id===63652));
+  evidence.kills[0].difficulty='heroic';
+  assert.ok((await options()).includes(63650));
+  assert.ok(!(await options()).includes(63651));
+  evidence.seasonEndDate='2026-10-31';
+  assert.ok(!(await options()).includes(63650));
+  evidence.seasonId='other';
+  assert.deepEqual(await options(),[]);
+});
 test('草稿预览零写入，发布重新取证并只传限定字段，读取最新数据库结果', async () => {
   const {state,call} = setup();
   const initial = await call('preview');
