@@ -108,17 +108,17 @@ window.Workspaces = (() => {
   }
 
   function profileDirty() {
-    return Object.keys(profileChanges()).length > 0 || !!byId('wclGuildInput').value.trim();
+    return Object.keys(profileChanges()).length > 0 || !!byId('wclGuildInput').value.trim() || GuildRecruitment.dirty();
   }
 
   function canLeaveProfile() {
     if (!sameProfile()) return true;
-    if (profile.saving) { showToast('正在保存公会资料','warning'); return false; }
+    if (profile.saving || GuildRecruitment.busy()) { showToast('正在保存公会资料','warning'); return false; }
     return !profileDirty() || confirm('内容未保存，确定放弃吗？');
   }
 
   window.addEventListener('beforeunload', event => {
-    if (sameProfile() && (profile.saving || profileDirty())) { event.preventDefault(); event.returnValue = ''; }
+    if (sameProfile() && (profile.saving || GuildRecruitment.busy() || profileDirty())) { event.preventDefault(); event.returnValue = ''; }
   });
 
   function readProfile(guild) {
@@ -178,6 +178,7 @@ window.Workspaces = (() => {
       await CloudSync.updateGuildProfile(changes);
       if (profile !== session || !sameProfile()) return;
       readProfile(CloudSync.getCurrentGuild());
+      GuildRecruitment.refreshProfile();
       byId('gpEdit').focus();
       showToast('公会资料已保存','success');
       renderMembers();
@@ -208,6 +209,7 @@ window.Workspaces = (() => {
     byId('wsSettingsRole').textContent = '我的身份 · ' + role;
     if (sameProfile() && profile.role === role) return;
     const session = profile = { userId:user.id, guildId:guild.id, role, original:null, saving:false };
+    GuildRecruitment.open();
     profileFacts(guild);
     byId('guildMembersList').textContent = '正在读取成员…';
     loadGuildMembers();
@@ -233,13 +235,42 @@ window.Workspaces = (() => {
     byId('wsSettingsGuild').textContent = guildHeading(guild);
     readProfile(guild);
     profileFacts(guild);
+    GuildRecruitment.refreshProfile();
     renderWclBindCard();
+  }
+
+  function clearProfile() {
+    profile = null;
+    GuildRecruitment.reset();
+    introEditor.setValue('');
+    profileForm.reset();
+    profileForm.hidden = true;
+    for (const id of ['wsSettingsGuild','wsSettingsRole','settingsInviteCode','settingsGuildId','settingsServer',
+      'wsGuildIntro','gpRule','gpRuleText','gpClaims','guildMembersList','wclBoundName','wclBoundMeta','wclLookupText']) byId(id).replaceChildren();
+    byId('wclGuildInput').value = '';
+    byId('gpWclLink').removeAttribute('href');
+    byId('wclLookupResult').style.display = 'none';
+  }
+
+  async function recheckGuild(checkNewRole) {
+    const id = profile?.guildId;
+    if (!id || !sameProfile()) return;
+    clearProfile();
+    if (checkNewRole) {
+      try {
+        await CloudSync.selectGuild(id);
+        iaApplyRoute();
+        return;
+      } catch { /* A departed member cannot reload this guild. */ }
+    }
+    if (CloudSync.getCurrentGuild()?.id === id) CloudSync.clearCurrentGuild();
+    iaApplyRoute();
   }
 
   function show(key) {
     const generation = ++epoch;
     restorePanel();
-    if (key !== 'guild-settings') profile = null;
+    if (profile && (key !== 'guild-settings' || !sameProfile())) clearProfile();
     if (!pages.has(key)) return;
     const user = window.CloudSync?.getCachedUser(), guild = window.CloudSync?.getCurrentGuild();
     const current = () => generation === epoch && user?.id === CloudSync.getCachedUser()?.id && guild?.id === CloudSync.getCurrentGuild()?.id;
@@ -260,5 +291,5 @@ window.Workspaces = (() => {
     if (canEdit) activityPicker(guild.id,current);
     GuildPublished.load(byId('wsPublished'),guild.id,current);
   }
-  return { owns:key => pages.has(key), show, restorePanel, canLeaveProfile, inlinePanelActive:() => !!inline };
+  return { owns:key => pages.has(key), show, restorePanel, canLeaveProfile, clearProfile, recheckGuild, inlinePanelActive:() => !!inline };
 })();

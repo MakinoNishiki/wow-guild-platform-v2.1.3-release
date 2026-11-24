@@ -4,6 +4,13 @@ body {
   font-family:"Segoe UI","Microsoft YaHei",sans-serif;
 }
 .folio { max-width:1104px; margin:0 auto; padding:24px clamp(12px,2.4vw,32px) 56px; }
+body.embedded { min-height:0; overflow:visible; background:transparent; }
+.embedded .folio { max-width:none; margin:0; padding:0; }
+.folio[hidden] { display:none; }
+.embedded .editor-grid,.embedded .poster { margin-top:0; }
+.embedded #cardSummary { margin:0 0 12px; color:var(--text-secondary); font-size:14px; }
+.embedded #guildLoot .fact-line { margin:0; }
+.embedded :is(button,input,select,textarea):focus-visible { outline:2px solid var(--gold); outline-offset:2px; }
 .folio *, .folio *::before, .folio *::after { box-sizing:border-box; }
 .folio [hidden] { display:none !important; }
 .mast { overflow:hidden; border:1px solid #484339; border-radius:9px; background:#1a2026; }

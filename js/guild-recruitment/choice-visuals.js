@@ -48,7 +48,7 @@ window.GuildChoiceVisuals = (() => {
     }
   }
   function gameMark({icon,color}) {
-    return {src:icon ? '../../'+icon : '',color};
+    return {src:icon || '',color};
   }
   function voiceMark(name) {
     return {src:Object.hasOwn(GuildVoiceBrands,name) ? GuildVoiceBrands[name] : ''};

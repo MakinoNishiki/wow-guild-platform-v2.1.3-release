@@ -74,8 +74,8 @@ async function verify() {
     assert.equal(await productOptions.locator('img').count(),7);
     await productOptions.locator('img').evaluateAll(images=>Promise.all(images.map(img=>img.decode())));
     const qq = tool.getByRole('option',{name:'QQ',exact:true});
-    assert.equal(await qq.locator('img').getAttribute('src'),'voice-brands/qq.png');
-    assert.equal(await tool.getByRole('option',{name:'QQ 频道',exact:true}).locator('img').getAttribute('src'),'voice-brands/qq-channel.png');
+    assert.equal(await qq.locator('img').getAttribute('src'),'assets/voice-brands/qq.png');
+    assert.equal(await tool.getByRole('option',{name:'QQ 频道',exact:true}).locator('img').getAttribute('src'),'assets/voice-brands/qq-channel.png');
     if (snapshotDir) {
       fs.mkdirSync(snapshotDir,{recursive:true});
       await page.screenshot({path:path.join(snapshotDir,'voice-menu.png')});

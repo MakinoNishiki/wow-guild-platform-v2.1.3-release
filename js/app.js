@@ -1294,14 +1294,16 @@ async function loadNotifications() {
         minute: '2-digit'
       });
       
+      const pendingInvite = n.type === 'guild_invite' && !n.is_read;
+      const readAction = n.is_read || pendingInvite ? '' : `onclick="markNotificationRead('${n.id}')"`;
       return `
-        <div class="uc-notification-item ${n.is_read ? 'read' : 'unread'}" onclick="markNotificationRead('${n.id}')">
+        <div class="uc-notification-item ${n.is_read ? 'read' : 'unread'}" ${readAction}>
           <div class="uc-notification-header">
             <span class="uc-notification-title">${typeIcons[n.type] || '📢'} ${escapeHtml(n.title)}</span>
             <span class="uc-notification-time">${timeStr}</span>
           </div>
           <div class="uc-notification-message">${escapeHtml(n.message)}</div>
-          ${n.type === 'guild_invite' && !n.is_read ? `
+          ${pendingInvite ? `
             <div class="uc-notification-actions">
               <button class="uc-btn uc-btn-primary" onclick="acceptGuildInvite('${n.guild_id}', '${n.id}')">接受邀请</button>
               <button class="uc-btn uc-btn-secondary" onclick="declineGuildInvite('${n.id}')">拒绝</button>
@@ -1339,8 +1341,8 @@ async function markAllNotificationsRead() {
 // 接受公会邀请
 async function acceptGuildInvite(guildId, notificationId) {
   try {
-    await window.CloudSync.joinGuildById(guildId);
-    await markNotificationRead(notificationId);
+    await window.CloudSync.joinGuildById(guildId, notificationId);
+    await loadNotifications();
     showAppView();
     // 任务书 #59 WP1：接受邀请入会成功落仪表盘（同建会/邀请码入会见衔）
     iaSyncTopRight();
@@ -1402,7 +1404,7 @@ async function cloudCrud(dataType, operation, payload, options = {}) {
     // 2. 重新读取数据库最新状态并更新 appData
     const refreshed = await window.CloudSync.reloadData(dataType, payload);
     // 战报由管理端逐条回读核对，不缓存私有草稿或预览凭据。
-    if (dataType === 'guildBattleReport') return { success: true, row: refreshed };
+    if (dataType === 'guildBattleReport' || dataType === 'guildRecruitment') return { success: true, row: refreshed };
     // 作者的原始蓝图仅用于本次编辑，单条云端回读后返回，不写进公会缓存。
     if (dataType === 'housingBuild' || dataType === 'housingBuildSupply' || dataType === 'decorEngagement' || dataType === 'housingCommunity') return { success: true, row: refreshed };
     const typesToReload = reloadTypes || [];
@@ -1889,10 +1891,13 @@ async function loadGuildMembers() {
   if (!container) return;
 
   const guildId = CloudSync.getCurrentGuild()?.id;
+  const userId = CloudSync.getCachedUser()?.id;
+  const stillMember = () => iaHasGuild() && guildId === CloudSync.getCurrentGuild()?.id &&
+    userId === CloudSync.getCachedUser()?.id;
+  if (!stillMember()) return;
   try {
     const members = await window.CloudSync.getGuildMembers();
-    const currentUserId = (await window.CloudSync.getCurrentUser())?.id;
-    if (guildId !== CloudSync.getCurrentGuild()?.id) return;
+    if (!stillMember()) return;
     const isOwner = window.CloudSync.isOwner();
 
     if (members.length === 0) {
@@ -1907,12 +1912,12 @@ async function loadGuildMembers() {
       <div class="guild-member-item">
         <div class="guild-member-info">
           <div>
-            <div class="guild-member-name">${wclEscapeHtml(m.display_name || '未设置昵称')}${m.user_id === currentUserId ? ' (我)' : ''}</div>
+            <div class="guild-member-name">${wclEscapeHtml(m.display_name || '未设置昵称')}${m.user_id === userId ? ' (我)' : ''}</div>
           </div>
         </div>
         <div class="guild-member-actions">
           <span class="guild-member-role ${roleClasses[m.role] || ''}">${roleLabels[m.role] || m.role}</span>
-          ${isOwner && m.user_id !== currentUserId ? `
+          ${isOwner && m.user_id !== userId ? `
             <select data-prev="${m.role}" onchange="handleChangeRole('${m.id}', this)">
               <option value="viewer" ${m.role === 'viewer' ? 'selected' : ''}>浏览</option>
               <option value="editor" ${m.role === 'editor' ? 'selected' : ''}>编辑</option>
@@ -1930,7 +1935,7 @@ async function loadGuildMembers() {
       button.onclick = () => handleRemoveMember(id, memberNames.get(id));
     }
   } catch (e) {
-    if (guildId === CloudSync.getCurrentGuild()?.id) container.textContent = '读取成员失败：' + e.message;
+    if (stillMember()) container.textContent = '读取成员失败：' + e.message;
   }
 }
 
@@ -2649,7 +2654,9 @@ function iaIsLoggedIn() {
   return !!(window.CloudSync && CloudSync.getCachedUser && CloudSync.getCachedUser());
 }
 function iaHasGuild() {
-  return !!(window.CloudSync && CloudSync.getCurrentGuild && CloudSync.getCurrentGuild());
+  const membership = window.CloudSync?.getCurrentMembership();
+  return !!membership && membership.guild_id === CloudSync.getCurrentGuild()?.id &&
+    membership.user_id === CloudSync.getCachedUser()?.id;
 }
 
 // 访客显示登录入口，已登录用户使用头像菜单。
@@ -9101,6 +9108,10 @@ function lootFillAssignedTo(idOrName) {
 // ==================== 初始化 ====================
 // ==================== 更新日志 ====================
 const changelogData = [
+  {id:'req212-card-save',version:'v3.2.0',date:'2026-11-25',type:'feature',typeLabel:'新增功能',title:'在公会档案保存招募卡',summary:'会长可填写固定活动时间、招募专精、团队约定和团本进度。团员在公会资料页就能看到最近保存的安排。',details:[]},
+  {id:'req212-card-contact',version:'v3.2.0',date:'2026-11-25',type:'improve',typeLabel:'功能优化',title:'团员可以查到招募负责人',summary:'会长可填写负责招募的人的微信、QQ 等联络方式。所有已填写的联系方式仅本公会成员可查。',details:[]},
+  {id:'req212-card-revision',version:'v3.2.0',date:'2026-11-25',type:'fix',typeLabel:'修复BUG',title:'保留招募卡的保存结果',summary:'刷新后可重新打开已保存的招募卡。如果另一窗口已经改过，页面会提示读取最新版本，本次填写的内容会先保留。',details:[]},
+  {id:'req212-card-internal',version:'v3.2.0',date:'2026-11-25',type:'refactor',typeLabel:'模块调整',title:'招募安排归入公会资料',summary:'招募卡沿用本公会的介绍和装备分配制度。游客打开档案会得到登录提示，已登录但尚未入会时可以加入或创建公会。',details:[]},
   {id:'req212-intro-editor',version:'v3.2.0',date:'2026-11-24',type:'feature',typeLabel:'新增功能',title:'给公会介绍排版',summary:'会长可直接设置小标题、引用、加粗、斜体和列表。保存后，团员在公会资料页即可看到同样的排版。',details:[]},
   {id:'req212-wcl-link',version:'v3.2.0',date:'2026-11-24',type:'feature',typeLabel:'新增功能',title:'从资料页打开已绑定的 WCL 公会主页',summary:'绑定完成后，公会成员可直接打开对应公会的日志主页。',details:[]},
   {id:'req212-profile',version:'v3.2.0',date:'2026-11-24',type:'improve',typeLabel:'功能优化',title:'在公会资料页直接编辑介绍和分配制度',summary:'会长可以就地修改、取消和保存。团员可以查看公会介绍、分配制度和认领方式。',details:[]},

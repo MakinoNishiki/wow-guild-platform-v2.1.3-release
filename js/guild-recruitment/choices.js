@@ -1,12 +1,13 @@
-// 本地评审中的自报记录随页面关闭清空；首领目录与公会实际击杀分别处理。
+// 目录仅用来选择首领。公会自报的资料由宿主另行保存。
 window.GuildChoices = (() => {
   'use strict';
   const dict = window.MASTER_DATA_SNAPSHOT;
-  const seasons = window.GUILD_REVIEW_RAIDS;
+  let seasons = window.GUILD_REVIEW_RAIDS;
   const roles = { TANK: '坦克', HEALER: '治疗', DAMAGE: '输出' };
   const recruitingModes = ['团队副本', '大秘境', 'PvP'];
   const teams = new Map();
   const records = new Map();
+  let historicalProgress = [];
   const lastRaid = new Map();
   const difficultyOptions = ['普通', '英雄', '史诗'];
   let edition, mode, group;
@@ -37,6 +38,7 @@ window.GuildChoices = (() => {
   }
   function options(select, values, chosen) {
     select.replaceChildren(...values.map(value => new Option(value, value)));
+    if (chosen && !values.includes(chosen)) select.add(new Option(chosen,chosen));
     select.value = chosen;
   }
 
@@ -79,12 +81,12 @@ window.GuildChoices = (() => {
       const spec = field(line, '专精', 'spec');
       const priority = field(line, '需求度', 'priority');
       options(priority, ['高', '中', '低'], need.priority);
-      function sync() {
+      function sync(clearMismatch = false) {
         const matching = dict.classes.filter(item => !need.role ||
           specsFor(item.name_zh).some(entry => roles[entry.role] === need.role));
-        if (!matching.some(item => item.name_zh === need.className)) need.className = '';
+        if (clearMismatch && !matching.some(item => item.name_zh === need.className)) need.className = '';
         const allowed = specsFor(need.className).filter(item => !need.role || roles[item.role] === need.role);
-        if (!allowed.some(item => item.name_zh === need.spec)) need.spec = '';
+        if (clearMismatch && !allowed.some(item => item.name_zh === need.spec)) need.spec = '';
         options(role, Object.values(roles), need.role);
         const inferred = derivedRole(need);
         role.add(new Option(inferred ? '自动 · ' + inferred : '职责不限', ''), 0);
@@ -102,7 +104,7 @@ window.GuildChoices = (() => {
         decorate(cls, value => gameMark(GuildRecruitArt.getClass(value)));
         decorate(spec, value => gameMark(GuildRecruitArt.getSpec(need.className,value)));
       }
-      role.onchange = () => { need.role = role.value; sync(); };
+      role.onchange = () => { need.role = role.value; sync(true); };
       cls.onchange = () => { need.className = cls.value; need.spec = ''; sync(); };
       spec.onchange = () => { need.spec = spec.value; sync(); };
       priority.onchange = () => { need.priority = priority.value; };
@@ -129,8 +131,8 @@ window.GuildChoices = (() => {
     return [...records.values()].map(entry => ({
       season: seasonLabel(entry.season), raid: entry.raid.name, difficulty: entry.difficulty,
       killed: entry.bosses.size, total: entry.raid.bosses.length,
-      bosses: entry.raid.bosses.filter(name => entry.bosses.has(name))
-    }));
+      bosses: [...entry.bosses]
+    })).concat(historicalProgress.map(entry => ({...entry,killed:entry.bosses.length,total:null})));
   }
   function seasonLabel(item) {
     return [item.version,item.name].filter(Boolean).join(' · ');
@@ -148,6 +150,7 @@ window.GuildChoices = (() => {
     seasonSelect.id = 'progressSeason'; raidSelect.id = 'progressRaid'; difficultySelect.id = 'progressDifficulty';
     for (const item of seasons) seasonSelect.add(new Option(seasonLabel(item) + (item.current ? '（当前赛季）' : ''), item.name));
     for (const version of window.GUILD_REVIEW_UNLISTED_VERSIONS) {
+      if (seasons.some(item=>item.version===version)) continue;
       const option = new Option(version+' · 团本待收录','');
       option.disabled = true;
       seasonSelect.add(option);
@@ -204,13 +207,21 @@ window.GuildChoices = (() => {
           changeContext('progressRaid');
         }));
       }
+      for (const entry of historicalProgress) {
+        const text = [entry.season,entry.raid,entry.difficulty].join(' · ');
+        otherRecords.append(element('span','muted',text+'（历史目录）'),button('移除 '+text,()=>{
+          historicalProgress = historicalProgress.filter(record=>record!==entry);
+          syncProgress();
+        }));
+      }
     }
     for (const name of raid.bosses) {
       const label = element('label','boss-choice');
       const check = document.createElement('input');
       check.type = 'checkbox'; check.value = name;
       check.onchange = () => {
-        const marked = new Set(checkboxes.filter(box => box.checked).map(box => box.value));
+        const marked = new Set([...records.get(id)?.bosses || []].filter(name=>!raid.bosses.includes(name)));
+        for (const box of checkboxes) if (box.checked) marked.add(box.value);
         if (marked.size) store(marked); else records.delete(id);
         syncProgress();
       };
@@ -233,14 +244,44 @@ window.GuildChoices = (() => {
     renderNeeds();
     if (editionChanged) renderProgress();
   }
-  function init() {
+  function restore(needRows,progressRows,liveCatalog) {
+    teams.clear();
+    records.clear();
+    lastRaid.clear();
+    historicalProgress = [];
+    seasons = liveCatalog?.length ? liveCatalog : window.GUILD_REVIEW_RAIDS;
+    season = seasons.find(item=>item.current) || seasons[0];
+    raid = season.raids[0];
+    difficulty = '史诗';
+    const selectedEdition = document.getElementById('edition').value;
+    const selectedMode = document.getElementById('mode').value;
+    const branch = selectedEdition==='怀旧服' ? document.getElementById('branch').value : '';
+    const key = [selectedEdition,branch,selectedMode].join('/');
+    teams.set(key,needRows.length ? needRows.map(item=>({...item})) : [blankNeed()]);
+    for (const entry of progressRows) {
+      const s = seasons.find(item=>item.name===entry.season || seasonLabel(item)===entry.season);
+      const r = s?.raids.find(item=>item.name===entry.raid);
+      if (r && difficultyOptions.includes(entry.difficulty)) {
+        records.set(r.id+':'+entry.difficulty,{season:s,raid:r,difficulty:entry.difficulty,bosses:new Set(entry.bosses)});
+      } else {
+        historicalProgress.push({...entry,bosses:[...entry.bosses]});
+      }
+    }
+    group = edition = undefined;
+    update(selectedEdition,selectedMode);
+  }
+  function getNeeds() {
+    if (!recruitingModes.includes(mode)) return [];
+    return (teams.get(group) || []).filter(need=>need.role || need.className).map(need=>({...need}));
+  }
+  function init(demo) {
     recruitHost = document.getElementById('recruitPicker');
     progressHost = document.getElementById('progressPicker');
-    if (!group) {
+    if (demo) {
       const sample = {...blankNeed(),className:'德鲁伊',spec:'平衡',priority:'高'};
       teams.set('正式服//团队副本', [sample]);
     }
     update(document.getElementById('edition').value, document.getElementById('mode').value);
   }
-  return { init, update, needs, progress };
+  return { init, update, needs, progress, restore, getNeeds };
 })();

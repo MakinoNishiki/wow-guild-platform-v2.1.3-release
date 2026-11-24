@@ -71,7 +71,7 @@
 
   // ---- 代理写入操作到 server.js ----
   // 通过 /api/db/rest/v1/{table} 代理，server.js 使用 service_role key 写入
-  async function dbWrite(method, table, { query, body } = {}) {
+  async function dbWrite(method, table, { query, body, joinProof } = {}) {
     const token = await getAccessToken();
     if (!token) throw new Error('未登录，请先登录');
 
@@ -88,6 +88,8 @@
       'Content-Type': 'application/json',
       'Prefer': 'return=representation',
     };
+    if (joinProof?.code) headers['X-Guild-Invite-Code'] = joinProof.code;
+    if (joinProof?.invitationId) headers['X-Guild-Invitation-Id'] = joinProof.invitationId;
 
     const opts = { method, headers };
     if (body && (method === 'POST' || method === 'PATCH')) {
@@ -144,8 +146,8 @@
   }
 
   // 便捷方法
-  function dbInsert(table, row) {
-    return dbWrite('POST', table, { body: row });
+  function dbInsert(table, row, joinProof) {
+    return dbWrite('POST', table, { body: row, joinProof });
   }
 
   function dbUpdate(table, row, filters) {
@@ -176,7 +178,13 @@
     supabaseClient.auth.onAuthStateChange((event, session) => {
       console.debug(`[diag] auth event: ${event}`);
       if (event === 'SIGNED_IN' && session) {
-        if (currentUser?.id && currentUser.id !== session.user.id) { window.HousingBuilds?.reset(); window.HousingCommunity?.reset(); }
+        if (currentUser?.id && currentUser.id !== session.user.id) {
+          currentGuild = currentMembership = null;
+          userGuilds = [];
+          window.Workspaces?.clearProfile();
+          window.HousingBuilds?.reset();
+          window.HousingCommunity?.reset();
+        }
         currentUser = session.user;
         setTimeout(() => { onUserSignedIn(); }, 0);
       } else if (event === 'SIGNED_OUT') {
@@ -353,8 +361,10 @@
 
   // ---- 清除当前公会上下文（BUG-015：退出公会后调用，不登出） ----
   function clearCurrentGuild() {
+    guildSelectionSequence++;
     currentGuild = null;
     currentMembership = null;
+    window.Workspaces?.clearProfile();
     window.GuildBattleEditor?.syncContext();
     localStorage.removeItem(lastGuildStorageKey());
     localStorage.removeItem('wow_raid_last_guild'); // 旧全局键废弃清理（BUG-078）
@@ -378,6 +388,7 @@
 
     try {
       await loadUserGuilds();
+      if (currentUser?.id !== signInUserId) return;
       // REQ-094（任务书 #29 WP1）：登录/注册后确保玩家ID 数字段已分配——fire-and-forget 不阻塞进应用，
       // 分配完成后刷新右上角等展示（改名不受影响，数字段恒定）
       ensureTagNum().then((tn) => {
@@ -401,6 +412,7 @@
 
   // ---- 用户登出后 ----
   function onUserSignedOut() {
+    window.Workspaces?.clearProfile();
     window.HousingBuilds?.reset();
     window.HousingCommunity?.reset();
     isCloudMode = false;
@@ -427,13 +439,15 @@
   // ---- 加载用户所属公会 (SELECT - 直接走 Supabase) ----
   async function loadUserGuilds() {
     if (!supabaseClient || !currentUser) return [];
+    const userId = currentUser.id;
 
     const { data, error } = await supabaseClient
       .from('guild_members')
       .select('*, guilds(*)')
-      .eq('user_id', currentUser.id)
+      .eq('user_id', userId)
       .order('created_at', { ascending: true });
 
+    if (currentUser?.id !== userId) return [];
     if (error) throw error;
 
     userGuilds = (data || []).map(m => ({
@@ -448,7 +462,8 @@
   // ---- 选择公会 ----
   async function selectGuild(guildId) {
     if (!supabaseClient || !currentUser) return;
-    const selectionUserId=currentUser.id,selection=++guildSelectionSequence;
+    const selectionUserId = currentUser.id;
+    const selection = ++guildSelectionSequence;
 
     const { data: guildData, error: guildError } = await supabaseClient
       .from('guilds')
@@ -458,22 +473,23 @@
 
     if (guildError) throw guildError;
     if (!guildData) throw new Error('公会不存在');
-    if(currentUser?.id!==selectionUserId||selection!==guildSelectionSequence)return;
-
-    clearPeopleContext();
-    currentGuild = guildData;
-    window.GuildBattleEditor?.syncContext();
+    if (currentUser?.id !== selectionUserId || selection !== guildSelectionSequence) return;
 
     const { data: memberData, error: memberError } = await supabaseClient
       .from('guild_members')
-      .select('id, role')
+      .select('id, role, guild_id, user_id')
       .eq('guild_id', guildId)
       .eq('user_id', currentUser.id)
       .maybeSingle();
 
     if (memberError) throw memberError;
-    if(currentUser?.id!==selectionUserId||selection!==guildSelectionSequence)return;
+    if (currentUser?.id !== selectionUserId || selection !== guildSelectionSequence) return;
+    if (!memberData) throw new Error('需要先加入这个公会');
+    if (currentGuild?.id !== guildId || currentMembership?.role !== memberData.role) window.Workspaces?.clearProfile();
+    clearPeopleContext();
+    currentGuild = guildData;
     currentMembership = memberData;
+    window.GuildBattleEditor?.syncContext();
 
     localStorage.setItem(lastGuildStorageKey(), guildId); // BUG-078：用户维度键，跨账号不串
 
@@ -497,6 +513,38 @@
     if (currentGuild?.id !== guildId) return;
     Object.assign(currentGuild, fields);
     updateGuildUI();
+  }
+
+  async function guildRecruitmentRequest(guildId, update) {
+    const userId = currentUser?.id;
+    const isCurrent = () => userId && currentUser?.id === userId && currentGuild?.id === guildId &&
+      currentMembership?.guild_id === guildId && currentMembership.user_id === userId;
+    if (!isCurrent()) throw new Error('请先加入并选择这个公会');
+    const token = await getAccessToken();
+    if (!token || !isCurrent()) throw new Error('登录或公会已切换，请重新打开档案');
+    const headers = { Authorization: 'Bearer ' + token };
+    const options = { headers, cache: 'no-store' };
+    let url = '/api/guild-recruitment';
+    if (update) {
+      options.method = 'POST';
+      headers['Content-Type'] = 'application/json';
+      options.body = JSON.stringify({guildId, expectedRevision:update.expectedRevision, card:update.card});
+    } else {
+      url += '?' + new URLSearchParams({guildId});
+    }
+    const response = await fetch(url, options);
+    const result = await response.json();
+    if (!isCurrent()) throw new Error('登录或公会已切换，请重新打开档案');
+    if (!response.ok) {
+      const error = new Error(result.message || '公会招募卡暂时无法读取');
+      error.status = response.status;
+      throw error;
+    }
+    if (!Number.isInteger(result.revision) || result.revision < 0 ||
+        (result.revision === 0 ? result.card !== null : !result.card || typeof result.card !== 'object')) {
+      throw new Error('未能确认招募卡数据，请重新读取');
+    }
+    return result;
   }
 
   // ---- 获取服务器列表 ----
@@ -553,53 +601,25 @@
     if (!client || !currentUser) throw new Error('请先登录');
 
     // 查找公会 (通过代理查询，绕过 RLS 限制)
-    const guild = await dbQuery('guilds', `invite_code=eq.${inviteCode}`, 'GET');
+    const guild = await dbQuery('guilds', `invite_code=eq.${encodeURIComponent(inviteCode)}`, 'GET');
     if (!guild || guild.length === 0) throw new Error('邀请码无效');
-    const guildData = guild[0];
-
-    // 检查是否已是成员
-    const { data: existing } = await supabaseClient
-      .from('guild_members')
-      .select('id')
-      .eq('guild_id', guildData.id)
-      .eq('user_id', currentUser.id)
-      .maybeSingle();
-
-    if (existing) throw new Error('你已经是该公会成员');
-
-    // 加入公会 (INSERT - 走代理)
-    const displayName = currentUser.user_metadata?.display_name || currentUser.email.split('@')[0];
-    await dbInsert('guild_members', {
-      guild_id: guildData.id,
-      user_id: currentUser.id,
-      role: 'viewer',
-      display_name: displayName,
-    });
-
-    // 创建通知给公会 owner 和 editor
-    await createJoinNotification(guildData.id, currentUser.id, displayName);
-
-    await loadUserGuilds();
-    await selectGuild(guildData.id);
-    return guildData;
+    return joinVerifiedGuild(guild[0].id, {code:inviteCode});
   }
 
   // ---- 通过公会 ID 加入公会（用户中心接受邀请，BUG-010） ----
-  async function joinGuildById(guildId) {
+  async function joinGuildById(guildId, invitationId) {
     const client = await initSupabase();
     if (!client || !currentUser) throw new Error('请先登录');
-    if (!guildId) throw new Error('公会不存在或邀请已失效');
+    if (!guildId || !invitationId) throw new Error('公会不存在或邀请已失效');
+    return joinVerifiedGuild(guildId, {invitationId});
+  }
 
-    // 通过代理查询，绕过 RLS（非成员不可读公会行）
-    const guild = await dbQuery('guilds', `id=eq.${guildId}`, 'GET');
-    if (!guild || guild.length === 0) throw new Error('公会不存在或已解散');
-    const guildData = guild[0];
-
+  async function joinVerifiedGuild(guildId, proof) {
     // 检查是否已是成员
     const { data: existing } = await supabaseClient
       .from('guild_members')
       .select('id')
-      .eq('guild_id', guildData.id)
+      .eq('guild_id', guildId)
       .eq('user_id', currentUser.id)
       .maybeSingle();
 
@@ -608,17 +628,17 @@
     // 加入公会 (INSERT - 走代理)
     const displayName = currentUser.user_metadata?.display_name || currentUser.email.split('@')[0];
     await dbInsert('guild_members', {
-      guild_id: guildData.id,
+      guild_id: guildId,
       user_id: currentUser.id,
       role: 'viewer',
       display_name: displayName,
-    });
+    }, proof);
 
-    await createJoinNotification(guildData.id, currentUser.id, displayName);
+    await createJoinNotification(guildId, currentUser.id, displayName);
 
     await loadUserGuilds();
-    await selectGuild(guildData.id);
-    return guildData;
+    await selectGuild(guildId);
+    return currentGuild;
   }
 
   // ---- 加载云端数据到 appData (SELECT - 直接走 Supabase) ----
@@ -656,6 +676,15 @@
 
   // ---- 重新加载指定模块数据（写成功后回读数据库最新状态） ----
   async function reloadData(dataType, payload) {
+    if (dataType === 'guildRecruitment') {
+      const row = await guildRecruitmentRequest(payload.guildId);
+      if (!row.card || row.revision !== payload.savedRevision) {
+        const error = new Error('招募卡已有新版本，请核对后再编辑');
+        error.status = 409;
+        throw error;
+      }
+      return row;
+    }
     if (dataType === 'guildBattleReport') return window.GuildBattleEditor.readBack(payload);
     if (dataType === 'housingBuildSupply') {
       const row = await window.HousingBuildFurniture.request('read', payload);
@@ -956,6 +985,12 @@
   }
 
   async function saveCloudData(dataType, operation, item, extra) {
+    if (dataType === 'guildRecruitment') {
+      if (operation !== 'save') throw new Error('不支持的招募卡操作');
+      const result = await guildRecruitmentRequest(item.guildId,item);
+      item.savedRevision = result.revision;
+      return;
+    }
     if (dataType === 'guildBattleReport') {
       item.receipt = await window.GuildBattleEditor.write(operation, item);
       return;
@@ -2044,6 +2079,7 @@
         .from('notifications')
         .update({ is_read: true })
         .eq('user_id', currentUser.id)
+        .or('type.is.null,type.neq.guild_invite')
         .eq('is_read', false);
       if (error) throw error;
       return true;
@@ -2127,6 +2163,7 @@
     joinGuildById: joinGuildById,
     selectGuild: selectGuild,
     updateGuildProfile: updateGuildProfile,
+    readGuildRecruitment: guildId => guildRecruitmentRequest(guildId),
     refreshGuildProfile,
     loadUserGuilds: loadUserGuilds,
     loadCloudData: loadCloudData,

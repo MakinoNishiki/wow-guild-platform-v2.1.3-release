@@ -11,7 +11,7 @@ const { createTokenMarket } = require("./lib/wowToken.cjs");
 const tokenMarket = createTokenMarket();
 // 任务书 #23 WP2：data.html 数据公示页（免登录公开页，与 index.html 同级放行）；
 // 任务书 #51 WP2：decor.html 家宅图鉴公示页同级放行（免登录，anon 只读）
-const PUBLIC_STATIC_FILES = new Set([path.join(ROOT, "index.html"), path.join(ROOT, "data.html"), path.join(ROOT, "decor.html"), path.join(ROOT, "guild-report.html")]);
+const PUBLIC_STATIC_FILES = new Set(["index.html","data.html","decor.html","guild-report.html","guild-recruitment.html"].map(name => path.join(ROOT,name)));
 const PUBLIC_STATIC_ROOTS = ["assets", "css", "js"].map(
   (dir) => `${path.join(ROOT, dir)}${path.sep}`
 );
@@ -362,7 +362,7 @@ function getCorsHeaders(req) {
   return {
     "Access-Control-Allow-Origin": origin,
     "Access-Control-Allow-Methods": "GET, POST, PATCH, DELETE, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type, Authorization, Prefer, Accept",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization, Prefer, Accept, X-Guild-Invite-Code, X-Guild-Invitation-Id",
     "Vary": "Origin",
   };
 }
@@ -604,6 +604,29 @@ function parseEqFilters(queryString) {
   return filters;
 }
 
+function isGuildUuid(value) {
+  return typeof value === "string" && /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(value);
+}
+
+async function joinAsViewer(row, headers) {
+  const code = headers['x-guild-invite-code'] || null;
+  const invitation = headers['x-guild-invitation-id'] || null;
+  if (Boolean(code) === Boolean(invitation) || (code && (typeof code !== 'string' || code.length > 128)) ||
+      (invitation && !isGuildUuid(invitation))) {
+    return {status:403, body:{message:'请使用有效邀请码或本人收到的邀请'}};
+  }
+  const result = await supabaseRestWrite('POST','/rest/v1/rpc/req212_join_guild',{
+    p_guild:row.guild_id, p_user:row.user_id, p_display_name:row.display_name || '', p_invite_code:code, p_invitation:invitation
+  });
+  if (result.status===200 && isGuildUuid(result.body)) {
+    roleCache.clear();
+    return {status:201, body:[{id:result.body, guild_id:row.guild_id, user_id:row.user_id, role:'viewer', display_name:row.display_name || ''}]};
+  }
+  if (result.body?.code==='42501') return {status:403,body:{message:'邀请码或邀请无效，请重新确认'}};
+  if (result.body?.code==='23505') return {status:409,body:{code:'23505',message:'你已经是该公会成员'}};
+  return {status:503,body:{message:'入会结果暂未确认，请刷新后再试'}};
+}
+
 // 把请求体规范化为行数组（POST 支持单对象或数组批量）
 function parseBodyRows(rawBody) {
   if (!rawBody) return [];
@@ -687,8 +710,17 @@ async function authorizeProxyRequest(user, table, method, queryString, rawBody) 
 
   // ---- GET：仅放行 guilds（邀请码/按 id 查找公会的唯一代理读场景），且必须带精确过滤，防止全表遍历 ----
   if (method === "GET") {
-    if (table === "guilds" && (filters.invite_code || filters.id)) return { ok: true };
-    if (table === "guilds") return deny("查询公会必须提供邀请码或公会 ID");
+    if (table === "guilds") {
+      const params = new URLSearchParams(queryString);
+      const matches = [...params].filter(([key]) => key === 'invite_code' || key === 'id');
+      if (matches.length !== 1 || !matches[0][1].startsWith('eq.') ||
+          [...params.keys()].some(key => !['id','invite_code','select','limit'].includes(key))) return deny("请提供一个完整的邀请码或公会 ID");
+      const [key, expression] = matches[0];
+      const value = expression.slice(3);
+      if (!value || value.length > 128 || key === 'id' && !isGuildUuid(value)) return deny("公会编号或邀请码无效");
+      // 加入前只读出匹配的编号。客户端提供的投影及关联参数均不转发。
+      return {ok:true, queryString:'?' + new URLSearchParams({[key]:'eq.'+value, select:'id', limit:'1'})};
+    }
     return deny("该表不允许通过代理读取");
   }
 
@@ -718,8 +750,10 @@ async function authorizeProxyRequest(user, table, method, queryString, rawBody) 
   // ---- guild_members ----
   if (table === "guild_members") {
     if (method === "POST") {
+      if (rows.length !== 1 || queryString) return deny("请逐一加入公会");
       for (const row of rows) {
-        if (!row || row.user_id !== uid) return deny("只能将自己的账号加入公会");
+        if (!row || row.user_id !== uid || !isGuildUuid(row.guild_id) ||
+            Object.keys(row).some(key => !['guild_id','user_id','role','display_name'].includes(key))) return deny("只能将自己的账号加入公会");
         if (row.role === "owner") {
           // 防自我提权：owner 行仅允许建在本人拥有的公会
           const guild = await fetchRowById("guilds", row.guild_id, "owner_id");
@@ -728,6 +762,8 @@ async function authorizeProxyRequest(user, table, method, queryString, rawBody) 
           return deny("非法的成员角色");
         } else if (row.role === "editor") {
           return deny("加入公会时不能以编辑身份加入");
+        } else {
+          return {ok:true, joinAsViewer:row};
         }
       }
       return { ok: true };
@@ -735,6 +771,9 @@ async function authorizeProxyRequest(user, table, method, queryString, rawBody) 
     // PATCH/DELETE：解析目标行
     const ids = filters.id || [];
     if (ids.length === 0) return badRequest("修改或删除公会成员必须提供成员关系 ID");
+    if (method === "PATCH" && rows.some(row => !row || Object.keys(row).some(key => !['display_name','role'].includes(key)))) {
+      return deny("仅可修改成员的显示名或角色");
+    }
     for (const rowId of ids) {
       const row = await fetchRowById("guild_members", rowId, "guild_id,user_id");
       if (!row) continue; // 目标不存在，no-op 放行
@@ -761,10 +800,14 @@ async function authorizeProxyRequest(user, table, method, queryString, rawBody) 
   // ---- notifications ----
   if (table === "notifications") {
     if (method === "POST") {
+      if (queryString) return deny("通知创建参数无效");
       // 入/退会通知等：调用者必须是目标公会成员
       for (const row of rows) {
         if (!row || !row.guild_id) return deny("通知缺少目标公会");
-        const role = await getGuildRoleCached(row.guild_id, uid);
+        if (!isGuildUuid(row.guild_id)) return deny("通知公会无效");
+        const role = row.type === 'guild_invite'
+          ? (await supabaseRestGet('/rest/v1/guild_members?select=role&guild_id=eq.'+row.guild_id+'&user_id=eq.'+uid+'&limit=1')).body?.[0]?.role
+          : await getGuildRoleCached(row.guild_id, uid);
         if (!role) return deny("无权向该公会成员发送通知");
       }
       return { ok: true };
@@ -780,7 +823,7 @@ async function authorizeProxyRequest(user, table, method, queryString, rawBody) 
     }
     if (method === "PATCH") {
       for (const row of rows) {
-        if (row && row.user_id && row.user_id !== uid) return deny("只能操作本人的通知");
+        if (!row || row.is_read !== true || Object.keys(row).some(key => key !== 'is_read')) return deny("仅可将本人的通知标为已读");
       }
     }
     return { ok: true };
@@ -1533,6 +1576,7 @@ const handleGuildBattleReports = require('./lib/guildBattleReportRoutes.cjs')({
   auth:verifyTokenCached, get:supabaseRestGet, write:supabaseRestWrite, body:readBody,
   readBattleEvidence
 });
+const handleGuildRecruitment = require('./lib/guildRecruitmentRoutes.cjs')({auth:verifyTokenCached, write:supabaseRestWrite, body:readBody});
 const handlePeople = require('./lib/peopleRoutes.cjs')({auth:verifyTokenCached,get:supabaseRestGet,write:supabaseRestWrite,body:readBody});
 const handleHousingBuilds = require('./lib/housingBuildRoutes.cjs')({auth:verifyTokenCached,get:supabaseRestGet,write:supabaseRestWrite,body:readBody});
 const handleHousingSupplies = require('./lib/housingSupplyRoutes.cjs')({auth:verifyTokenCached,get:supabaseRestGet,write:supabaseRestWrite,body:readBody});
@@ -1614,6 +1658,7 @@ const server = http.createServer(async (req, res) => {
   // REQ-185: authenticated account linking and confirmed batch claims.
   if (await handleLootObservations(req, res, corsHeaders, urlPath)) return;
   if (await handleGuildBattleReports(req, res, corsHeaders, urlPath)) return;
+  if (await handleGuildRecruitment(req, res, corsHeaders, urlPath)) return;
   if (await handlePeople(req, res, corsHeaders, urlPath)) return;
   if (await handleHousingBuilds(req, res, corsHeaders, urlPath)) return;
   if (await handleHousingSupplies(req, res, corsHeaders, urlPath)) return;
@@ -1843,7 +1888,7 @@ const server = http.createServer(async (req, res) => {
       }
 
       const table = urlPath.replace("/api/db/rest/v1/", "").split("/")[0];
-      const queryString = req.url.includes("?") ? req.url.substring(req.url.indexOf("?")) : "";
+      let queryString = req.url.includes("?") ? req.url.substring(req.url.indexOf("?")) : "";
       let body;
       try {
         body = await readBody(req);
@@ -1861,6 +1906,13 @@ const server = http.createServer(async (req, res) => {
           res.end(JSON.stringify({ message: authz.message }));
           return;
         }
+        if (authz.joinAsViewer) {
+          const joined = await joinAsViewer(authz.joinAsViewer,req.headers);
+          res.writeHead(joined.status, { "Content-Type":"application/json", ...corsHeaders });
+          res.end(JSON.stringify(joined.body));
+          return;
+        }
+        if (authz.queryString) queryString = authz.queryString;
       } catch (e) {
         res.writeHead(500, { "Content-Type": "application/json", ...corsHeaders });
         res.end(JSON.stringify({ message: "权限校验失败，请稍后重试" }));
@@ -1869,7 +1921,9 @@ const server = http.createServer(async (req, res) => {
       const perfAuthz = Date.now();
 
       const supabasePath = `/rest/v1/${table}${queryString}`;
-      proxyToSupabase(req.method, supabasePath, req.headers, body, (result) => {
+      const headers = req.method === 'POST' && ['guilds','guild_members','notifications'].includes(table)
+        ? {...req.headers,prefer:'return=representation'} : req.headers;
+      proxyToSupabase(req.method, supabasePath, headers, body, (result) => {
         const perfEnd = Date.now();
         // 任务书 #10：写路径分阶段计时日志（JWT 验证 / 鉴权联查 / 转发写入）
         console.log(`[perf] ${req.method} ${table} jwt=${perfJwt - perfT0}ms authz=${perfAuthz - perfJwt}ms write=${perfEnd - perfAuthz}ms total=${perfEnd - perfT0}ms`);

@@ -14,11 +14,12 @@ const { Client } = require('pg');
 const { chromium } = require('playwright');
 const assert = require('node:assert/strict');
 const root = path.resolve(__dirname, '..');
-const output = process.env.WB_VERIFY_OUTPUT || path.join(root, process.argv.includes('--guild-battles') ? 'docs/evidence/req190-20261123' : 'docs/evidence/req203-cover-20261119');
+const recruitment = process.argv.includes('--guild-recruitment') && require('./verify-req212-recruitment.cjs');
+const output = process.env.WB_VERIFY_OUTPUT || path.join(root, 'docs/evidence', recruitment ? 'req212-recruitment-20261125' : process.argv.includes('--guild-battles') ? 'req190-20261123' : 'req203-cover-20261119');
 const host = '127.0.0.1';
 const checkDecor = process.argv.includes('--decor-engagement');
 const lootReadback = process.argv.includes('--loot-readback') && require('./verify-loot-import-readback.cjs');
-const battleReports = process.argv.includes('--guild-battles') && require('./verify-req190-battles.cjs');
+const battleReports = (recruitment || process.argv.includes('--guild-battles')) && require('./verify-req190-battles.cjs');
 const suite = process.argv.find(arg => arg.startsWith('--suite='))?.slice(8);
 const withCatalog = checkDecor || !!suite;
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
@@ -71,6 +72,8 @@ async function main() {
     await db.query("create function auth.uid() returns uuid language sql stable as $$ select (nullif(current_setting('request.jwt.claims',true),'')::jsonb->>'sub')::uuid $$");
     if (lootReadback) await lootReadback.setup(db, sessions[0].user.id);
     if (battleReports) await battleReports.setup(db, sessions);
+    if (recruitment) await recruitment.setup(db, sessions);
+    else if (battleReports) await db.query(fs.readFileSync(path.join(root,'sql','59_req212_guild_recruitment.sql'),'utf8'));
     {
       const records = JSON.parse(fs.readFileSync(path.join(root,'data/task083/catalog-current-2335.json'),'utf8'));
       await db.query('create table decor_catalog (record_id integer primary key,entry_type integer,name text)');
@@ -162,7 +165,8 @@ async function main() {
       }
       // Unrelated legacy modules see an empty guild and empty notifications.
       if (!/^\/rest\/v1\/(?:housing_|rpc\/(?:save_housing|discover_housing|[a-z_]*housing_[a-z_]*))/.test(req.url) &&
-          !(battleReports && battleReports.allows(req.url)) &&
+          !(battleReports && (battleReports.allows(req.url) || req.url === '/rest/v1/rpc/req212_read_card')) &&
+          !(recruitment && recruitment.allows(req.url)) &&
           !(lootReadback && /^\/rest\/v1\/(?:guild_members|guilds|loot_drops|rpc\/req19[19]_submit_loot)(?:\?|$)/.test(req.url)) &&
           !(withCatalog && /^\/rest\/v1\/(?:decor_item_|decor_plan|rpc\/(?:record_decor|set_decor|favorite_decor))/.test(req.url))) {
         res.setHeader('Content-Type', 'application/json'); return res.end('[]');
@@ -189,7 +193,7 @@ async function main() {
     process.env.DEPLOY_RUN_HOST = host;
     process.env.CORS_ALLOWED_ORIGINS = base;
     // Run the actual entry point from a clean directory, independently of the developer's .env.
-    for (const file of ['server.js', 'index.html', 'decor.html', 'data.html', ...(battleReports ? ['guild-report.html'] : [])]) fs.copyFileSync(path.join(root, file), path.join(temp, file));
+    for (const file of ['server.js', 'index.html', 'decor.html', 'data.html', ...(battleReports ? ['guild-report.html', 'guild-recruitment.html'] : [])]) fs.copyFileSync(path.join(root, file), path.join(temp, file));
     for (const dir of ['assets', 'css', 'js', 'lib']) {
       fs.symlinkSync(path.join(root, dir), path.join(temp, dir), 'junction'); links.push(path.join(temp, dir));
     }
@@ -206,11 +210,22 @@ async function main() {
       const page = await context.newPage();
       page.on('pageerror', e => errors.push(e.message));
       page.setDefaultTimeout(9000);
-      await page.goto(base + '/#/house/community');
-      await page.locator('#hbResults').getByText('暂无公开作品。').waitFor();
+      if (recruitment) {
+        await page.goto(base + '/#/team/guild-settings');
+      } else {
+        await page.goto(base + '/#/house/community');
+        await page.locator('#hbResults').getByText('暂无公开作品。').waitFor();
+      }
       return page;
     }
     const author = await open(sessions[0], 1920);
+    if (recruitment) {
+      const precedingChecks = checks.length;
+      await recruitment.verify({author, guest:await open(null,1366), viewer:await open(sessions[1],1366), open, db, sessions, base, output, pass});
+      assert.deepEqual(errors, []);
+      fs.writeFileSync(path.join(output,'verification.json'), JSON.stringify({browser:browser.version(), database:'本地一次性 PostgreSQL / PostgREST', authentication:'模拟账号、认证服务与登录会话', checks:checks.slice(precedingChecks)},null,2)+'\n');
+      return;
+    }
     if (battleReports) {
       const precedingChecks = checks.length;
       await battleReports.verify({author, guest:await open(null,1366), viewer:await open(sessions[1],1366), db, base, output, pass});

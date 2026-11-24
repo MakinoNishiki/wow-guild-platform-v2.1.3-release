@@ -316,6 +316,12 @@
 }
 .gp-grid .card { margin: 0; min-width: 0; padding: 20px; }
 .gp-side { display: grid; gap: 16px; }
+.gp-recruitment { grid-column: 1 / -1; }
+#gpRecruitment .gp-audience, #grStatus { margin: 4px 0 0; font-size: 13px; color: var(--text-secondary); }
+#grStatus:empty { display: none; }
+#grRetry { margin-top: 8px; }
+#grFrame { display: block; width: 100%; border: 0; }
+#grActions { margin-bottom: 0; }
 .gp-members, .gp-grid #dangerZone { grid-column: 1 / -1; }
 .gp-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
 #page-guild-settings .gp-heading h2 { margin: 0; }
