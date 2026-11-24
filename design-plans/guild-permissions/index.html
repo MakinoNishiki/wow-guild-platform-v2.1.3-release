@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>公会权限对照 · 魔兽管家</title>
+  <link rel="icon" href="../../assets/brand/favicon-32.png">
+  <link rel="stylesheet" href="style.css">
+  <script src="preview.js" defer></script>
+</head>
+<body>
+  <header class="mast">
+    <div class="container mast-inner">
+      <img src="../../assets/brand/wb-shield.svg" width="32" height="32" alt="">
+      <strong>魔兽管家</strong><span class="divider"></span><span>公会档案</span>
+      <span class="review">交互评审稿</span>
+    </div>
+  </header>
+  <main class="container">
+    <div class="hero">
+      <div><h1>公会角色与权限</h1><p>创建者可为三种角色命名，决定每种角色能够办理哪些公会事务。</p></div>
+      <div class="standard" aria-hidden="true"><img src="../../assets/icons/nav/guild-banner.svg" alt=""></div>
+    </div>
+    <div class="view-bar">
+      <nav class="views" aria-label="评审页面">
+        <button type="button" data-view="permissions" aria-pressed="true">权限配置</button>
+        <button type="button" data-view="members" aria-pressed="false">成员管理预览</button>
+      </nav>
+      <label class="actor-field">模拟操作身份 <select id="actor"></select></label>
+    </div>
+    <div class="workspace" id="permissionsPanel">
+      <aside aria-label="按事务筛选">
+        <h2>公会事务</h2>
+        <div id="categories" class="categories"></div>
+        <div class="role-tools">
+          <h2>角色管理</h2>
+          <button type="button" id="rename">编辑角色名称</button>
+          <button type="button" id="restore">恢复默认配置</button>
+          <small id="manageHint"></small>
+        </div>
+      </aside>
+      <section class="results" aria-labelledby="sectionTitle">
+        <div class="section-head"><h2 id="sectionTitle"></h2><span id="count" aria-live="polite"></span></div>
+        <div class="toolbar">
+          <div id="roles" class="roles" role="group" aria-label="按身份查看"></div>
+          <label id="allowedLabel" hidden><input type="checkbox" id="allowed">只看有权限的操作</label>
+        </div>
+        <div class="table-wrap">
+          <table><thead id="head"></thead><tbody id="rows"></tbody></table>
+          <p id="empty" hidden>这个身份在此类事务中没有可办理的操作。</p>
+        </div>
+      </section>
+    </div>
+    <section id="membersPanel" hidden aria-labelledby="memberTitle">
+      <div class="member-top"><div><h2 id="memberTitle">成员管理</h2><p>已认领角色显示认领账号在本公会的身份。</p></div>
+        <div class="scheme-picker" aria-label="徽记样式对照" role="group">
+          <button type="button" data-scheme="heraldry" aria-pressed="true">公会纹章</button>
+          <button type="button" data-scheme="ranks" aria-pressed="false">远征军阶</button>
+        </div>
+      </div>
+      <div class="table-wrap"><table class="roster"><caption>示例名册</caption>
+        <thead><tr><th scope="col">游戏角色</th><th scope="col">认领账号</th><th scope="col">公会身份</th></tr></thead><tbody id="memberRows"></tbody>
+      </table></div>
+    </section>
+    <p class="scope-note">本机交互评审 · 调整仅保存在当前浏览器，正式公会仍使用线上配置。</p>
+  </main>
+  <dialog id="nameDialog" aria-labelledby="nameTitle">
+    <form id="nameForm">
+      <h2 id="nameTitle">编辑角色名称</h2><p>成员名册与权限表会一起显示新名称。已有成员保留原身份。</p>
+      <div id="nameFields"></div><p class="form-error" id="nameError" role="alert"></p>
+      <div class="dialog-actions"><button type="button" data-close>取消</button><button class="primary" type="submit">保存名称</button></div>
+    </form>
+  </dialog>
+  <dialog id="restoreDialog" aria-labelledby="restoreTitle">
+    <h2 id="restoreTitle">恢复三种角色的默认配置？</h2><p>本机评审中修改过的角色名称和权限将一并恢复。</p>
+    <div class="dialog-actions"><button type="button" data-close autofocus>保留修改</button><button type="button" class="primary" id="restoreConfirm">恢复默认</button></div>
+  </dialog>
+  <div id="feedback" role="status" aria-live="polite"></div>
+  <svg xmlns="http://www.w3.org/2000/svg" width="0" height="0" aria-hidden="true" focusable="false" style="position:absolute;overflow:hidden">
+    <defs>
+      <linearGradient id="guild-medal-gold" x2=".7" y2="1">
+        <stop stop-color="#ffe7a2"/><stop offset=".44" stop-color="#e4b75f"/><stop offset="1" stop-color="#97632f"/>
+      </linearGradient>
+      <linearGradient id="guild-medal-silver" x2=".7" y2="1">
+        <stop stop-color="#f1f4ec"/><stop offset=".45" stop-color="#bacbd3"/><stop offset="1" stop-color="#627888"/>
+      </linearGradient>
+      <linearGradient id="guild-medal-bronze" x2=".7" y2="1">
+        <stop stop-color="#f3c18a"/><stop offset=".47" stop-color="#c18858"/><stop offset="1" stop-color="#85533a"/>
+      </linearGradient>
+      <linearGradient id="guild-medal-iron" x2=".8" y2="1">
+        <stop stop-color="#46515c"/><stop offset="1" stop-color="#202932"/>
+      </linearGradient>
+      <symbol id="heraldry-owner" viewBox="0 0 24 24">
+        <path d="M2.2 7.1 8.1 11 12 3l3.9 8 5.9-3.9-2.3 11.2H4.5Z" fill="url(#guild-medal-gold)" stroke="#efce86" stroke-width="1.15" stroke-linejoin="round"/>
+        <path d="m3.8 9.7 4.5 3L12 5.2l-2.6 8.6-4.3-.1Zm16.3.1-1.5 3.9h-4.1l1.1-1.1Z" fill="#92662f"/>
+        <path d="M5 15.3h14l-.3 4H5.4Z" fill="url(#guild-medal-iron)" stroke="#f0cd7e" stroke-width="1.15"/>
+        <path d="m12 12.6 2.4 3.3-2.4 3.4-2.4-3.4Z" fill="#a9483e" stroke="#ffe2a0" stroke-width="1.1"/>
+      </symbol>
+      <symbol id="heraldry-editor" viewBox="0 0 24 24">
+        <path d="M6.3 5.1q3.9-2 7.5-.2 3.3 1.7 7.4.2l-3 4.7 2.7 3.2q-4 1.8-7.2.3-3.7-1.7-7.4.1Z" fill="url(#guild-medal-silver)" stroke="#ddd5b8" stroke-width="1.2" stroke-linejoin="round"/>
+        <path d="M9.1 4.9q1.6-.3 3 .2v7.1q-1.5-.4-3 0Z" fill="#50697a"/>
+        <path d="M6 4.6v16.5" stroke="#77604b" stroke-width="3.3" stroke-linecap="round"/>
+        <path d="M5.6 4.8v16.1" stroke="#eac688" stroke-width="1.5" stroke-linecap="round"/>
+        <path d="m5.9 1.6 2 2.9-2 2.2-2-2.2Z" fill="url(#guild-medal-silver)" stroke="#dac496" stroke-width=".8"/>
+      </symbol>
+      <symbol id="heraldry-viewer" viewBox="0 0 24 24">
+        <path d="m8.6 2.8 3.4 3.5 3.4-3.5 4.5 1.6-2.1 6.7 1.2 8.8-7 2-7-2 1.2-8.8-2.1-6.7Z" fill="url(#guild-medal-bronze)" stroke="#dfb581" stroke-width="1.15" stroke-linejoin="round"/>
+        <path d="M8.4 4.1 12 7.8l3.6-3.7-.8 4.2-2.8 3-2.8-3Z" fill="#36414a"/>
+        <path d="M6.5 12.7h11l.3 2.2H6.2Z" fill="#39414a"/>
+        <path d="M11 12.6h2v2.4h-2Z" fill="#f4ce91"/>
+        <path d="m12 16.3 1.5 4.1-1.5.5-1.5-.5Z" fill="#734a37"/>
+      </symbol>
+      <symbol id="ranks-owner" viewBox="0 0 24 24">
+        <path d="m12 1.7 8.1 3.5v11.2L12 22.2l-8.1-5.8V5.2Z" fill="url(#guild-medal-iron)" stroke="url(#guild-medal-gold)" stroke-width="1.6" stroke-linejoin="round"/>
+        <path d="m12 4 1.5 3.1 3.3.4-2.4 2.3.6 3.3-3-1.6-3 1.6.6-3.3-2.4-2.3 3.3-.4Z" fill="url(#guild-medal-gold)"/>
+        <path d="m6.5 12.9 5.5 3.6 5.5-3.6v2.9L12 19.7l-5.5-3.9Z" fill="url(#guild-medal-gold)"/>
+      </symbol>
+      <symbol id="ranks-editor" viewBox="0 0 24 24">
+        <path d="M4.2 4.2h15.6v11.9L12 22l-7.8-5.9Z" fill="url(#guild-medal-iron)" stroke="url(#guild-medal-silver)" stroke-width="1.45" stroke-linejoin="round"/>
+        <path d="m6.5 6.5 5.5 3.6 5.5-3.6v3.4L12 13.6 6.5 9.9Zm0 5.9 5.5 3.6 5.5-3.6v3.4L12 19.5l-5.5-3.7Z" fill="url(#guild-medal-silver)"/>
+      </symbol>
+      <symbol id="ranks-viewer" viewBox="0 0 24 24">
+        <path d="M4.4 7.5 12 9.6l7.6-2.1v7.8L12 21l-7.6-5.7Z" fill="url(#guild-medal-iron)" stroke="url(#guild-medal-bronze)" stroke-width="1.45" stroke-linejoin="round"/>
+        <path d="m6.6 10.8 5.4 3.3 5.4-3.3v3.8L12 18.3l-5.4-3.7Z" fill="url(#guild-medal-bronze)"/>
+      </symbol>
+    </defs>
+  </svg>
+</body>
+</html>

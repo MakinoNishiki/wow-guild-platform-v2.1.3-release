@@ -1,0 +1,36 @@
+{
+  "release": "ade7ced77abd6ffef29111b1a9ba420a5e31f5be",
+  "site": "https://wow.ddctl.com",
+  "migration": "sql/59_req212_guild_recruitment.sql",
+  "sha256": "e53c73d5e24b052b71f132db2e06f7d65f8afb3bffe5232cd301b87bea4734d9",
+  "releaseFilesMatched": [
+    "index.html",
+    "server.js",
+    "js/cloud.js",
+    "js/guildRecruitment.js",
+    "lib/guildRecruitmentRoutes.cjs"
+  ],
+  "previouslyInstalled": false,
+  "backup": {
+    "path": "/root/wowbutler-backups/req212-20261124T170332Z/before.dump",
+    "bytes": 1540588,
+    "sha256": "d7e9a85ed9343307debccfe31eb72113edea68e7fee341fe44ae95a336c62d37",
+    "restoreStreamReadable": true
+  },
+  "verified": {
+    "rowLevelSecurity": true,
+    "privateCard": true,
+    "cardFunctions": true,
+    "joinAndNotifications": true,
+    "uniquePerGuild": true
+  },
+  "checkedAtUTC": "2026-11-24T17:03:34.469684+00:00",
+  "onlineBrowser": {
+    "browser": "157.0.8103.79",
+    "action": "游客从首页点击公会档案，另直接打开招募表单地址",
+    "guestPrompt": "登录后可加入或创建公会",
+    "frameRedirect": "#/team/guild-settings",
+    "anonymousCardHttp": 401,
+    "memberSaveAndRead": "隔离数据库实测，正式公会待运营点验"
+  }
+}
