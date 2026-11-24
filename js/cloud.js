@@ -481,10 +481,20 @@
     updateGuildUI();
   }
 
+  async function refreshGuildProfile(isCurrent) {
+    const guild = currentGuild;
+    const fields = 'id,name,server_name,server_region,invite_code,description,loot_rule_type,loot_rule_text,show_claimer_label,claim_mode,wcl_guild_id,wcl_guild_name,wcl_server_name,wcl_bind_method,wcl_bound_at';
+    const { data, error } = await supabaseClient.from('guilds').select(fields).eq('id', guild.id).single();
+    if (error) throw error;
+    if (guild === currentGuild && isCurrent()) Object.assign(guild, data);
+  }
+
   // ---- REQ-025：更新公会资料（简介/分配制度/规则说明），服务端代理仅放行 owner ----
   async function updateGuildProfile(fields) {
     if (!currentGuild) throw new Error('未选择公会');
-    await dbUpdate('guilds', fields, { id: currentGuild.id });
+    const guildId = currentGuild.id;
+    await dbUpdate('guilds', fields, { id: guildId });
+    if (currentGuild?.id !== guildId) return;
     Object.assign(currentGuild, fields);
     updateGuildUI();
   }
@@ -2117,6 +2127,7 @@
     joinGuildById: joinGuildById,
     selectGuild: selectGuild,
     updateGuildProfile: updateGuildProfile,
+    refreshGuildProfile,
     loadUserGuilds: loadUserGuilds,
     loadCloudData: loadCloudData,
     saveCloudData: saveCloudData,

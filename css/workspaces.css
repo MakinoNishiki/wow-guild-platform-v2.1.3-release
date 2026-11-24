@@ -306,3 +306,29 @@
     display: none;
   }
 }
+
+/* 公会资料沿用两个档案页的横幅、按钮和字色。 */
+.gp-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.45fr) minmax(300px, 1fr);
+  align-items: start;
+  gap: 16px;
+}
+.gp-grid .card { margin: 0; min-width: 0; padding: 20px; }
+.gp-side { display: grid; gap: 16px; }
+.gp-members, .gp-grid #dangerZone { grid-column: 1 / -1; }
+.gp-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+#page-guild-settings .gp-heading h2 { margin: 0; }
+.gp-grid [hidden] { display: none !important; }
+.gp-grid p { line-height: 1.65; }
+.gp-prose { white-space: pre-wrap; overflow-wrap: anywhere; }
+.gp-grid h3 { margin: 1.25rem 0 .25rem; padding-top: .8rem; border-top: 1px solid var(--border-color); font-size: 14px; color: var(--gold); }
+.gp-grid h3 + p { margin: .25rem 0; }
+.gp-grid .gp-facts { display: grid; grid-template-columns: max-content minmax(0,1fr); align-items: baseline; gap: 10px 16px; margin-bottom: 0; }
+.gp-facts dt, #gpStatus { color: var(--text-secondary); }
+.gp-facts dd { margin: 0; overflow-wrap: anywhere; }
+#gpForm > label { display: block; margin: 16px 0 6px; }
+#gpForm .form-textarea { width: 100%; resize: vertical; min-height: 70px; }
+#gpForm .ws-actions { margin-bottom: 0; }
+#page-guild-settings #guildMembersList { margin-top: 12px; }
+@media (max-width: 950px) { .gp-grid { grid-template-columns: minmax(0, 1fr); } }

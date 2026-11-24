@@ -1,0 +1,59 @@
+.wb-intro-editor {
+  overflow: hidden;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: var(--bg-primary);
+}
+.wb-intro-editor:focus-within { border-color: var(--gold); }
+.wb-intro-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border-color);
+  background: var(--bg-card);
+}
+.wb-intro-toolbar :is(button,select) {
+  min-height: 30px;
+  width: auto;
+  margin: 0;
+  padding: 2px 8px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.wb-intro-toolbar select {
+  background: var(--bg-primary);
+  border-color: var(--border-color);
+  color: var(--text-primary);
+  color-scheme: dark;
+}
+.wb-intro-toolbar [data-command="bold"] { font-weight: 700; }
+.wb-intro-toolbar [data-command="italic"] { font: italic 600 15px/1 Georgia,serif; }
+.wb-intro-toolbar [data-command="undo"] { margin-inline-start: auto; }
+.wb-intro-toolbar [data-command="undo"],.wb-intro-toolbar [data-command="redo"] { font-size: 18px; }
+.wb-intro-toolbar button:hover,.wb-intro-toolbar [aria-pressed="true"] { background: var(--bg-hover); color: var(--gold); }
+.wb-intro-toolbar [aria-pressed="true"] { border-color: var(--gold); }
+.wb-intro-toolbar :focus-visible,.wb-intro-input:focus-visible { outline: 2px solid var(--gold); outline-offset: -2px; }
+.wb-intro-input { min-height: 9rem; padding: 12px 14px; cursor: text; }
+.wb-intro-prose {
+  font-size: 15px;
+  line-height: 1.7;
+  color: var(--text-primary);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.wb-intro-prose p { margin: .45em 0; }
+.wb-intro-prose h3 { border: 0; padding: 0; margin: .8em 0 .25em; font: 600 19px/1.45 var(--ws-book,serif); color: var(--gold); }
+.wb-intro-prose blockquote { margin: .65em 0; padding: .2em .85em; border-inline-start: 2px solid var(--gold); color: var(--text-secondary); }
+.wb-intro-prose :is(ul,ol) { margin: .45em 0; padding-inline-start: 1.6em; }
+.wb-intro-prose ul { list-style-type: disc; }
+.wb-intro-prose ol { list-style-type: decimal; }
+.wb-intro-prose > :first-child { margin-top: 0; }
+.wb-intro-prose > :last-child { margin-bottom: 0; }
+#wsGuildIntro { margin: .75em 0; }

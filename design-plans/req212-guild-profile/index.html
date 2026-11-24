@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>公会招募档案 · 魔兽管家</title>
+  <link rel="stylesheet" href="../../css/main.css">
+  <link rel="stylesheet" href="../../css/guild-intro.css">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+ <main class="folio">
+  <header class="mast">
+   <div class="topline"><span><img src="../../assets/brand/wb-shield.svg" alt=""> 魔兽管家 <i></i> 公会档案</span><small>示例资料 · 刷新后重置</small></div>
+   <div class="herald">
+    <div><h1>「挽歌」<span>金色平原</span></h1><p id="guildMeta"></p></div>
+    <div class="standard" aria-hidden="true"><img src="../../assets/icons/nav/guild-banner.svg" alt=""></div>
+   </div>
+   <nav class="view-switch" aria-label="档案视角">
+    <button id="editView" type="button" aria-pressed="true" aria-controls="editor">会长填写</button>
+    <button id="publicView" type="button" aria-pressed="false" aria-controls="reader">招募卡预览</button>
+   </nav>
+  </header>
+  <form id="editor" class="editor-grid">
+   <section class="panel"><h2><img src="../../assets/icons/nav/guild-banner.svg" alt="">公会与玩法</h2>
+    <div class="controls">
+     <label>地区<select id="region"><option>国服</option><option>台服</option><option>韩服</option><option>美服</option><option>欧服</option></select></label>
+     <label>游戏版本<select id="edition"><option>正式服</option><option>无限服</option><option>怀旧服</option></select></label>
+     <label id="classicEdition" class="wide" hidden>怀旧服分支<select id="branch"><option>泰坦重铸</option><option>燃烧的远征周年纪念版</option><option>经典怀旧服</option><option>熊猫人之谜</option></select></label>
+     <label>公会定位<select id="identity"><option>认真娱乐</option><option>挑战极限</option><option>休闲娱乐</option></select></label>
+     <label>主要玩法<select id="mode"><option>团队副本</option><option>大秘境</option><option>PvP</option><option>角色扮演</option><option>休闲社交</option></select></label>
+     <label class="wide">团队目标<select id="goal"></select></label>
+     <label id="goalExtra" class="wide" hidden>自定义目标<input id="goalText" placeholder="填写团队目标"></label>
+    </div>
+   </section>
+   <section class="panel"><h2><img src="../../assets/icons/nav/attendance.svg" alt="">固定活动 <small id="nightCount"></small></h2>
+    <div class="controls">
+     <label>团号<select id="team"><option>一团</option><option>二团</option><option>三团</option><option>其他</option></select></label>
+     <label>加班情况<select id="overtime"><option>从不加班</option><option>偶尔加班</option><option>频繁加班</option></select></label>
+     <label id="teamExtra" class="wide" hidden>自定义团号<input id="teamName"></label>
+    </div>
+    <fieldset id="week"><legend>活动日</legend><div id="dayButtons" class="weekdays"></div><div id="nights"></div></fieldset>
+   </section>
+   <section class="panel full"><h2><img src="../../assets/icons/nav/members.svg" alt="">招募需求</h2>
+    <div id="recruitPicker"></div>
+    <div class="controls extra-requirements">
+     <label data-modes="大秘境">分数范围<select id="score"><option>不限</option><option>1000–1500</option><option>1500–2000</option><option>2000–2500</option><option>2500–3000</option><option>3000 以上</option><option>自定义</option></select></label>
+     <label id="scoreExtra" hidden>自定义分数范围<input id="scoreText" placeholder="例如 2800–3200"></label>
+     <label data-modes="PvP">队伍形式<select id="bracket"><option>2v2</option><option>3v3</option><option>单人竞技场</option><option>评级战场</option></select></label>
+    </div>
+   </section>
+   <section class="panel full"><h2><img src="../../assets/icons/nav/profile.svg" alt="">公会介绍</h2>
+    <div id="introHost"></div>
+   </section>
+   <section class="panel"><h2><img src="../../assets/icons/nav/loot.svg" alt="">团队约定</h2>
+    <label>战利品分配<select id="loot"><option>ROLL</option><option>一需多贪</option><option>CL</option><option>DKP</option><option>GKP / G 团</option><option>自定义</option></select></label>
+    <details id="lootExtra"><summary>补充分配说明</summary><label>分配说明<input id="lootNote"></label></details>
+    <fieldset><legend>常用约定 <small>可多选</small></legend><div id="ruleChoices" class="checks"></div></fieldset>
+    <label id="ruleExtra" hidden>其他约定<textarea id="rules" rows="2"></textarea></label>
+   </section>
+   <section class="panel"><h2><img src="../../assets/icons/nav/notifications.svg" alt="">语音与联络</h2>
+    <div class="controls">
+     <label>是否需要语音<select id="voice"><option>是</option><option>视情况</option><option>否</option></select></label>
+     <label id="voiceTools">语音工具<select id="tool"><option>YY</option><option>Discord</option><option>Oopz</option><option>KOOK</option><option>QQ 频道</option><option>QQ</option><option>微信</option><option>其他</option></select></label>
+     <label id="toolExtra" class="wide" hidden>其他语音工具<input id="toolText"></label>
+    </div>
+    <fieldset><legend>招募联系方式 <small>选填，可多选</small></legend><div id="contactChoices" class="checks"></div><div id="contactFields"></div></fieldset>
+   </section>
+   <section class="panel full"><h2><img src="../../assets/icons/nav/reports.svg" alt="">团本进度 <small>管理者自报</small></h2><div id="progressPicker"></div></section>
+  </form>
+  <div id="reader" hidden aria-label="招募卡预览">
+   <div id="sheet" class="poster">
+    <section class="panel posting"><h2><img src="../../assets/icons/nav/members.svg" alt="">招募需求</h2><div id="readNeeds"></div></section>
+    <section class="panel roster"><h2><img src="../../assets/icons/nav/attendance.svg" alt="">固定活动 <small id="weekCount"></small></h2><div id="readSchedule"></div></section>
+    <section class="panel intro"><h2><img src="../../assets/icons/nav/profile.svg" alt="">公会介绍</h2><div id="readIntro"></div></section>
+    <section class="panel contract"><h2><img src="../../assets/icons/nav/loot.svg" alt="">团队约定</h2><div id="readRules"></div></section>
+    <section id="readProgressPanel" class="panel progress"><h2><img src="../../assets/icons/nav/reports.svg" alt="">团本进度 <small>管理者自报</small></h2><div id="readProgress"></div></section>
+    <section class="panel communication"><h2><img src="../../assets/icons/nav/notifications.svg" alt="">语音与联络</h2><div id="readContact"></div></section>
+   </div>
+  </div>
+ </main>
+ <script src="../../js/masterDataSnapshot.js"></script>
+ <script src="../../js/guildIntroEditor.js"></script>
+ <script src="raid-catalog.js"></script>
+ <script src="../../js/iconMap.js"></script>
+ <script src="recruit-art.js"></script>
+ <script src="voice-brands/brands.js"></script>
+ <script src="choice-visuals.js"></script>
+ <script src="choices.js"></script>
+ <script src="preview.js"></script>
+</body>
+</html>

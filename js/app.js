@@ -1874,109 +1874,13 @@ async function handleJoinGuild(codeOverride) {
   }
 }
 
-// 打开公会设置
-async function openGuildSettings() {
-  const guild = window.CloudSync.getCurrentGuild();
-  if (!guild) return;
-
-  document.getElementById('settingsGuildName').textContent = guild.name;
-  document.getElementById('settingsGuildId').textContent = guild.id;
-  document.getElementById('settingsInviteCode').textContent = guild.invite_code;
-  
-  // 显示服务器信息
-  const serverInfo = [];
-  if (guild.server_region) serverInfo.push(guild.server_region);
-  if (guild.server_name) serverInfo.push(guild.server_name);
-  document.getElementById('settingsServer').textContent = serverInfo.length > 0 ? serverInfo.join(' - ') : '未设置';
-
-  // BUG-015：危险区（退出公会）仅非 owner 可见；owner 退出=解散/转让，属另一需求
-  const dangerZone = document.getElementById('dangerZone');
-  if (dangerZone) {
-    dangerZone.style.display = window.CloudSync.isOwner() ? 'none' : '';
+// 账号入口与导航共用资料页。
+function openGuildSettings() {
+  if (document.getElementById('userCenterModal').classList.contains('show')) {
+    requestCloseModal('userCenterModal');
+    if (document.getElementById('userCenterModal').classList.contains('show')) return;
   }
-
-  // REQ-025：公会资料（仅 owner 可编辑）
-  const profileOwner = window.CloudSync.isOwner();
-  const descEl = document.getElementById('guildProfileDesc');
-  const typeEl = document.getElementById('guildProfileLootRuleType');
-  const textEl = document.getElementById('guildProfileLootRuleText');
-  descEl.value = guild.description || '';
-  typeEl.value = guild.loot_rule_type || '';
-  textEl.value = guild.loot_rule_text || '';
-  [descEl, typeEl, textEl].forEach(el => { el.disabled = !profileOwner; });
-  // 任务书 #18 WP2 R4：认领人标签开关（默认开；列未迁移时按开处理，勾选状态仅展示）
-  const claimerEl = document.getElementById('guildShowClaimerLabel');
-  if (claimerEl) {
-    claimerEl.checked = guild.show_claimer_label !== false;
-    claimerEl.disabled = !profileOwner;
-  }
-  // 任务书 #21 WP2：认领方式三档（仅 owner 可改；列未迁移时按 free 展示）
-  const claimModeEl = document.getElementById('guildClaimMode');
-  if (claimModeEl) {
-    claimModeEl.value = guild.claim_mode || 'free';
-    claimModeEl.disabled = !profileOwner;
-  }
-  document.getElementById('guildProfileSaveBtn').style.display = profileOwner ? '' : 'none';
-  document.getElementById('guildProfileOwnerHint').style.display = profileOwner ? 'none' : '';
-  toggleGuildProfileCustomHint();
-
-  // 任务书 #22 WP3-③：底部保存栏未保存提示——弹窗内任何字段变动即按未保存判定显隐（幂等绑定）
-  const dirtyHintEl = document.getElementById('guildSettingsDirtyHint');
-  const settingsModalEl = document.getElementById('guildSettingsModal');
-  const refreshDirtyHint = () => {
-    if (!dirtyHintEl) return;
-    const dirty = profileOwner && modalDirtyChecks.guildSettingsModal && modalDirtyChecks.guildSettingsModal();
-    dirtyHintEl.style.display = dirty ? '' : 'none';
-  };
-  if (settingsModalEl) {
-    settingsModalEl.oninput = refreshDirtyHint;
-    settingsModalEl.onchange = refreshDirtyHint;
-  }
-  refreshDirtyHint();
-
-  renderWclBindCard(); // 任务书 #70：WCL 公会绑定卡回填
-
-  openModal('guildSettingsModal');
-  await loadGuildMembers();
-}
-
-// REQ-025：自定义制度时提示规则说明必填
-function toggleGuildProfileCustomHint() {
-  const typeEl = document.getElementById('guildProfileLootRuleType');
-  const hint = document.getElementById('guildProfileCustomHint');
-  if (typeEl && hint) hint.style.display = typeEl.value === 'custom' ? '' : 'none';
-}
-
-// REQ-025：保存公会资料（服务端代理二次校验仅 owner 可写）
-async function saveGuildProfile() {
-  if (!window.CloudSync.isOwner()) { showToast('仅会长可编辑公会资料', 'error'); return; }
-  const description = document.getElementById('guildProfileDesc').value.trim();
-  const lootRuleType = document.getElementById('guildProfileLootRuleType').value;
-  const lootRuleText = document.getElementById('guildProfileLootRuleText').value.trim();
-  if (lootRuleType === 'custom' && !lootRuleText) {
-    showToast('选择自定义制度时，请填写分配规则说明', 'error');
-    return;
-  }
-  try {
-    await window.CloudSync.updateGuildProfile({
-      description: description || null,
-      loot_rule_type: lootRuleType || null,
-      loot_rule_text: lootRuleText || null,
-      // 任务书 #18 WP2 R4：认领人标签开关（列不存在时服务端会报错，由迁移 sql/14 解锁）
-      show_claimer_label: document.getElementById('guildShowClaimerLabel') ? document.getElementById('guildShowClaimerLabel').checked : true,
-      // 任务书 #21 WP2：认领方式三档（列不存在时服务端会报错，由迁移 sql/15 解锁）
-      claim_mode: document.getElementById('guildClaimMode') ? document.getElementById('guildClaimMode').value : 'free'
-    });
-    showToast('公会资料已保存', 'success');
-    // 任务书 #22 WP3-③：保存成功隐藏底部未保存提示
-    const dirtyHintEl = document.getElementById('guildSettingsDirtyHint');
-    if (dirtyHintEl) dirtyHintEl.style.display = 'none';
-    // 认领方式变更影响成员列表认领入口与审核区块，即时重渲染
-    renderMembers();
-    renderClaimReviewBlock();
-  } catch (e) {
-    showToast('保存失败: ' + e.message, 'error');
-  }
+  iaGoKey('guild-settings');
 }
 
 // 加载公会成员列表
@@ -1984,9 +1888,11 @@ async function loadGuildMembers() {
   const container = document.getElementById('guildMembersList');
   if (!container) return;
 
+  const guildId = CloudSync.getCurrentGuild()?.id;
   try {
     const members = await window.CloudSync.getGuildMembers();
     const currentUserId = (await window.CloudSync.getCurrentUser())?.id;
+    if (guildId !== CloudSync.getCurrentGuild()?.id) return;
     const isOwner = window.CloudSync.isOwner();
 
     if (members.length === 0) {
@@ -2001,7 +1907,7 @@ async function loadGuildMembers() {
       <div class="guild-member-item">
         <div class="guild-member-info">
           <div>
-            <div class="guild-member-name">${m.display_name}${m.user_id === currentUserId ? ' (我)' : ''}</div>
+            <div class="guild-member-name">${wclEscapeHtml(m.display_name || '未设置昵称')}${m.user_id === currentUserId ? ' (我)' : ''}</div>
           </div>
         </div>
         <div class="guild-member-actions">
@@ -2012,14 +1918,19 @@ async function loadGuildMembers() {
               <option value="editor" ${m.role === 'editor' ? 'selected' : ''}>编辑</option>
               <option value="owner" ${m.role === 'owner' ? 'selected' : ''}>会长</option>
             </select>
-            <button onclick="handleRemoveMember('${m.id}', '${m.display_name}')">移除</button>
+            <button data-remove-member="${m.id}">移除</button>
             <span class="role-change-hint" style="font-size:12px"></span>
           ` : ''}
         </div>
       </div>
     `).join('');
+    const memberNames = new Map(members.map(m => [m.id, m.display_name || '未设置昵称']));
+    for (const button of container.querySelectorAll('[data-remove-member]')) {
+      const id = button.dataset.removeMember;
+      button.onclick = () => handleRemoveMember(id, memberNames.get(id));
+    }
   } catch (e) {
-    container.innerHTML = `<div style="text-align:center;color:var(--danger);padding:20px">加载失败: ${e.message}</div>`;
+    if (guildId === CloudSync.getCurrentGuild()?.id) container.textContent = '读取成员失败：' + e.message;
   }
 }
 
@@ -2076,7 +1987,6 @@ async function handleLeaveGuild() {
     await window.CloudSync.leaveGuild(membership.id);
     // 清除本地会话中的公会上下文
     window.CloudSync.clearCurrentGuild();
-    closeModal('guildSettingsModal');
     // 重新加载公会列表：仍有其他公会则切到第一个，否则回"创建/加入公会"页
     const guilds = await window.CloudSync.loadUserGuilds();
     if (guilds.length > 0) {
@@ -2142,6 +2052,7 @@ async function openGuildSwitcher() {
 
 // 切换公会
 async function handleSwitchGuild(guildId) {
+  if (guildId !== CloudSync.getCurrentGuild()?.id && !Workspaces.canLeaveProfile()) return;
   try {
     await window.CloudSync.selectGuild(guildId);
     closeModal('guildSwitcherModal');
@@ -2154,6 +2065,7 @@ async function handleSwitchGuild(guildId) {
 
 // 退出登录（全站唯一 logout 路径：头像菜单 / 切换公会弹窗 都走这里）
 async function handleSignOut() {
+  if (!Workspaces.canLeaveProfile()) return;
   window.__wbUid = null; // REQ-141（任务书 #54 WP1）授权行②：退出清空埋点 uid
   try {
     await window.CloudSync.signOut(); // ①清理登录态（supabase 会话）与公会态（SIGNED_OUT 清空上下文）
@@ -2402,7 +2314,7 @@ window.showLoadFailureBanner = function (failedTables) {
 
 // ==================== 页面切换 ====================
 const pageTitles = {
-  guild: '公会战报', 'guild-settings': '公会设置', personal: '个人档案', characters: '我的角色', claims: '我的认领',
+  guild: '公会战报', 'guild-settings': '公会资料', personal: '个人档案', characters: '我的角色', claims: '我的认领',
   dashboard: '仪表盘',
   members: '成员管理',
   attendance: '考勤记录',
@@ -2706,7 +2618,7 @@ async function saveDecorPlan(items, name) {
 // 路由表：#/home 导航页（游客与登录均可见）；#/house/decor|plan|community 家宅系（全免登录可读，组单保存登录墙维持 #58 现状）；
 // #/team/<key> 团队系——需登录+公会（游客/无公会落 team-guide 引导卡，hash 不改写）。
 // 埋点 tab_click 仅此两处挂点（iaSwitchTab level:1 / iaGoKey level:2），WBTrack.event 直调不 await（track.js 自带静默兜底）。
-const IA_TEAM_KEYS = ['guild', 'guild-settings', 'dashboard', 'members', 'attendance', 'loot', 'wishlist', 'reports', 'data', 'datacenter'];
+const IA_TEAM_KEYS = ['guild-settings', 'guild', 'dashboard', 'members', 'attendance', 'loot', 'wishlist', 'reports', 'data', 'datacenter'];
 let iaLastHash = ''; // 防环锚点：本模块写过的最后一个 hash（hashchange 回火时比对跳过）
 
 function iaSetHash(h) {
@@ -2855,8 +2767,8 @@ function iaApplyRoute() {
     page = 'community'; tab = 'house';
   } else if (h === '#/team' || h === '#/team/') {
     if (hasGuild) {
-      iaLastHash = '#/team/guild'; location.replace('#/team/guild');
-      page = 'guild'; tab = 'team';
+      iaLastHash = '#/team/guild-settings'; location.replace(iaLastHash);
+      page = 'guild-settings'; tab = 'team';
     } else {
       page = 'team-guide'; tab = 'team'; // 游客/无公会：引导卡（WP1 占位）
     }
@@ -2879,6 +2791,11 @@ function iaApplyRoute() {
     tab = hasGuild ? 'team' : null;
   }
 
+  if (page !== 'guild-settings' && !Workspaces.canLeaveProfile()) {
+    iaLastHash = '#/team/guild-settings';
+    history.replaceState(null,'',iaLastHash);
+    return;
+  }
   iaPaintRoute(page, tab, activeKey);
   switchPage(page, h);
   if (page === 'decor' && /^#\/house\/decor\/item\/[1-9]\d{0,9}$/.test(h)) {
@@ -2902,7 +2819,7 @@ function iaSwitchTab(tab) {
   } else if (tab === 'house') {
     iaSetHash('#/house/decor');
   } else if (iaHasGuild()) {
-    iaSetHash('#/team/guild');
+    iaSetHash('#/team/guild-settings');
   } else {
     iaSetHash('#/team'); // 游客/无公会 → 引导卡
   }
@@ -3018,22 +2935,7 @@ const modalDirtyChecks = {
   wishlistModal: () => isModalFormDirty('wishlistModal') || tierSlotSel.wishlist !== '',
   // REQ-094（任务书 #29 WP1）：用户中心含可编辑字段（显示名/修改密码表单），纳入防误关
   userCenterModal: () => isModalFormDirty('userCenterModal'),
-  // 公会设置：成员角色变更即时保存不算未保存内容，只跟踪公会资料三字段
-  guildSettingsModal: () => {
-    const g = (window.CloudSync && window.CloudSync.getCurrentGuild()) || {};
-    const claimerEl = document.getElementById('guildShowClaimerLabel');
-    const claimModeEl = document.getElementById('guildClaimMode');
-    return document.getElementById('guildProfileDesc').value !== (g.description || '') ||
-      document.getElementById('guildProfileLootRuleType').value !== (g.loot_rule_type || '') ||
-      document.getElementById('guildProfileLootRuleText').value !== (g.loot_rule_text || '') ||
-      // 任务书 #18 WP2 R4：认领人标签开关同样纳入未保存判定（默认开）
-      (claimerEl && claimerEl.checked !== (g.show_claimer_label !== false)) ||
-      // 任务书 #21 WP2：认领方式三档纳入未保存判定（默认 free）
-      (claimModeEl && claimModeEl.value !== (g.claim_mode || 'free')) ||
-      // 任务书 #70：WCL 绑定卡——已检测出公会待确认 / 输入框有内容，视为有未保存操作
-      !!wclPendingLookup ||
-      (() => { const el = document.getElementById('wclGuildInput'); return !!(el && el.value.trim()); })();
-  }
+
 };
 
 // 遮罩点击/ESC 的统一关闭入口：有未保存内容时二次确认
@@ -5620,13 +5522,17 @@ function renderWclBindCard() {
   if (guild && guild.wcl_guild_id) {
     bound.style.display = '';
     unbound.style.display = 'none';
+    document.getElementById('gpWclEmpty').hidden = true;
+    document.getElementById('wclUnbindBtn').hidden = !CloudSync.canEdit();
+    document.getElementById('gpWclLink').href = 'https://www.warcraftlogs.com/guild/id/' + encodeURIComponent(guild.wcl_guild_id);
     document.getElementById('wclBoundName').textContent = `${guild.wcl_guild_name || ''} - ${guild.wcl_server_name || ''}`;
     const methodText = guild.wcl_bind_method === 'oauth' ? '账号授权' : '粘贴绑定';
     const boundAt = guild.wcl_bound_at ? formatDate(new Date(guild.wcl_bound_at)) : '';
     document.getElementById('wclBoundMeta').textContent = `（${methodText}${boundAt ? ' · ' + boundAt : ''}）`;
   } else {
     bound.style.display = 'none';
-    unbound.style.display = '';
+    unbound.style.display = CloudSync.canEdit() ? '' : 'none';
+    document.getElementById('gpWclEmpty').hidden = !!CloudSync.canEdit();
   }
 }
 
@@ -5644,6 +5550,7 @@ async function wclLookupGuild() {
     if (parsed.id) params.id = parsed.id;
     else { params.name = parsed.name; params.server = parsed.server; params.region = parsed.region || 'cn'; }
     const info = await wclApiGet('/api/wcl/guild-lookup', params);
+    if (guild.id !== CloudSync.getCurrentGuild()?.id || !document.getElementById('page-guild-settings').classList.contains('active')) return;
     wclPendingLookup = info;
     document.getElementById('wclLookupText').textContent = `检测到公会：${info.name} - ${info.serverName}（ID: ${info.id}）`;
     document.getElementById('wclLookupResult').style.display = '';
@@ -5664,10 +5571,12 @@ async function wclConfirmBind() {
   if (wclBindBusy || !wclPendingLookup) return;
   const guild = window.CloudSync.getCurrentGuild();
   if (!guild) return;
+  const target = wclPendingLookup;
   wclBindBusy = true;
   try {
-    await wclApiPost('/api/wcl/bind-guild-paste', { guildId: guild.id, wclGuildId: wclPendingLookup.id });
-    showToast(`已绑定 WCL 公会：${wclPendingLookup.name}`, 'success');
+    await wclApiPost('/api/wcl/bind-guild-paste', { guildId: guild.id, wclGuildId: target.id });
+    if (guild.id !== CloudSync.getCurrentGuild()?.id) return;
+    showToast(`已绑定 WCL 公会：${target.name}`, 'success');
     wclPendingLookup = null;
     await window.CloudSync.selectGuild(guild.id); // 重载公会行拿最新绑定字段
     renderWclBindCard();
@@ -5687,6 +5596,7 @@ async function wclUnbind() {
   wclBindBusy = true;
   try {
     await wclApiPost('/api/wcl/unbind-guild', { guildId: guild.id });
+    if (guild.id !== CloudSync.getCurrentGuild()?.id) return;
     showToast('已解绑 WCL 公会', 'success');
     await window.CloudSync.selectGuild(guild.id);
     renderWclBindCard();
@@ -5896,7 +5806,7 @@ async function wclSyncReports() {
   if (!window.CloudSync.canEdit()) return;
   const guild = window.CloudSync.getCurrentGuild();
   if (!guild) return;
-  if (!guild.wcl_guild_id) { showToast('尚未绑定 WCL 公会，请先在 公会设置 中绑定', 'warning'); return; }
+  if (!guild.wcl_guild_id) { showToast('尚未绑定 WCL 公会，请先在「公会资料」中绑定', 'warning'); return; }
   wclReportsBusy = true;
   const btn = document.getElementById('wclReportsSyncBtn');
   if (btn) { btn.disabled = true; btn.textContent = '🔄 同步中...'; }
@@ -9191,6 +9101,11 @@ function lootFillAssignedTo(idOrName) {
 // ==================== 初始化 ====================
 // ==================== 更新日志 ====================
 const changelogData = [
+  {id:'req212-intro-editor',version:'v3.2.0',date:'2026-11-24',type:'feature',typeLabel:'新增功能',title:'给公会介绍排版',summary:'会长可直接设置小标题、引用、加粗、斜体和列表。保存后，团员在公会资料页即可看到同样的排版。',details:[]},
+  {id:'req212-wcl-link',version:'v3.2.0',date:'2026-11-24',type:'feature',typeLabel:'新增功能',title:'从资料页打开已绑定的 WCL 公会主页',summary:'绑定完成后，公会成员可直接打开对应公会的日志主页。',details:[]},
+  {id:'req212-profile',version:'v3.2.0',date:'2026-11-24',type:'improve',typeLabel:'功能优化',title:'在公会资料页直接编辑介绍和分配制度',summary:'会长可以就地修改、取消和保存。团员可以查看公会介绍、分配制度和认领方式。',details:[]},
+  {id:'req212-read',version:'v3.2.0',date:'2026-11-24',type:'fix',typeLabel:'修复BUG',title:'回到公会资料时刷新当前介绍',summary:'会长修改资料后，其他成员下次进入资料页即可看到新内容。读取失败时可在原处重试。',details:[]},
+  {id:'req212-entry',version:'v3.2.0',date:'2026-11-24',type:'refactor',typeLabel:'模块调整',title:'公会档案先看资料，再看战报',summary:'从顶栏进入公会档案，侧栏第一项是公会资料，第二项是公会战报。原有战报链接仍可直达。',details:[]},
   {id:'req211-navigation',version:'v3.2.0',date:'2026-11-24',type:'feature',typeLabel:'新增功能',title:'在「公会」看战报，在「个人档案」管角色',summary:'打开公会就能查看已发布的战报、团本进度与里程碑。有编辑权限的成员可从活动写战报。角色和认领都能从顶栏的个人档案进入。',details:[]},
   {id:'req211-token',version:'v3.2.0',date:'2026-11-24',type:'improve',typeLabel:'功能优化',title:'悬停时光徽章就能读走势',summary:'把鼠标移到顶栏价格上即可查看曲线，点区间统计可看高低价。问题反馈在徽章左侧。',details:[]},
   {id:'req211-indicators',version:'v3.2.0',date:'2026-11-24',type:'fix',typeLabel:'修复BUG',title:'标签下的金线切换更柔和',summary:'鼠标移入和移出时金线渐显、渐隐。当前页持续高亮，开启减少动态效果后立即切换。',details:[]},

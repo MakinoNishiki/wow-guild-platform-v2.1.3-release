@@ -4,20 +4,21 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>魔兽管家</title>
-<!-- 静态资源版本号：20261124.165（任务书 #22 WP3-②：凡改动 js/css 的 commit 必须同步递增此处与所有 ?v= 查询串，见 docs/开发规范.md 第五章） -->
+<!-- 静态资源版本号：20261124.167（任务书 #22 WP3-②：凡改动 js/css 的 commit 必须同步递增此处与所有 ?v= 查询串，见 docs/开发规范.md 第五章） -->
 <link rel="icon" type="image/png" sizes="32x32" href="assets/brand/favicon-32.png">
 <link rel="icon" type="image/png" sizes="16x16" href="assets/brand/favicon-16.png">
-<link rel="stylesheet" href="css/main.css?v=20261124.165">
-<link rel="stylesheet" href="css/data-public.css?v=20261124.165"><!-- 任务书 #28 WP5：副本掉落 tab（选择器全 .dp- 前缀 + #page-lootdrop 作用域，零泄漏） -->
-<link rel="stylesheet" href="css/housing-community.css?v=20261124.165">
-<link rel="stylesheet" href="css/housing-furniture.css?v=20261124.165">
-<link rel="stylesheet" href="css/guild-battle-editor.css?v=20261124.165">
-<link rel="stylesheet" href="css/decor-public.css?v=20261124.165"><!-- 任务书 #51：家宅图鉴（选择器全 .dh- 前缀，零泄漏，双壳共用） -->
-<link rel="stylesheet" href="css/decor-model.css?v=20261124.165">
-<script src="assets/vendor/supabase-js-2.js?v=20261124.165"></script>
-<link rel="stylesheet" href="css/guild-battle-public.css?v=20261124.165">
-<link rel="stylesheet" href="css/workspaces.css?v=20261124.165">
-<link rel="stylesheet" href="css/tab-indicators.css?v=20261124.165">
+<link rel="stylesheet" href="css/main.css?v=20261124.167">
+<link rel="stylesheet" href="css/data-public.css?v=20261124.167"><!-- 任务书 #28 WP5：副本掉落 tab（选择器全 .dp- 前缀 + #page-lootdrop 作用域，零泄漏） -->
+<link rel="stylesheet" href="css/housing-community.css?v=20261124.167">
+<link rel="stylesheet" href="css/housing-furniture.css?v=20261124.167">
+<link rel="stylesheet" href="css/guild-battle-editor.css?v=20261124.167">
+<link rel="stylesheet" href="css/decor-public.css?v=20261124.167"><!-- 任务书 #51：家宅图鉴（选择器全 .dh- 前缀，零泄漏，双壳共用） -->
+<link rel="stylesheet" href="css/decor-model.css?v=20261124.167">
+<script src="assets/vendor/supabase-js-2.js?v=20261124.167"></script>
+<link rel="stylesheet" href="css/guild-battle-public.css?v=20261124.167">
+<link rel="stylesheet" href="css/workspaces.css?v=20261124.167">
+<link rel="stylesheet" href="css/guild-intro.css?v=20261124.167">
+<link rel="stylesheet" href="css/tab-indicators.css?v=20261124.167">
 </head>
 <body>
 
@@ -203,7 +204,7 @@
       <div class="ia-brand" onclick="iaSwitchTab('home')" title="返回首页"><img src="assets/brand/wb-shield.svg" alt="" class="ia-brand-logo"><span class="ia-brand-name">魔兽管家</span><span class="ia-brand-sub">WoW Butler</span></div>
       <nav class="ia-tabs" aria-label="一级导航">
         <button type="button" class="ia-tab" data-ia-tab="home" onclick="iaSwitchTab('home')">首页</button>
-        <button type="button" class="ia-tab" data-ia-tab="team" onclick="iaSwitchTab('team')">公会</button>
+        <button type="button" class="ia-tab" data-ia-tab="team" onclick="iaSwitchTab('team')">公会档案</button>
         <button type="button" class="ia-tab" data-ia-tab="personal" onclick="iaSwitchTab('personal')">个人档案</button>
         <button type="button" class="ia-tab" data-ia-tab="house" onclick="iaSwitchTab('house')">家宅房屋</button>
       <button type="button" class="ia-tab" data-ia-tab="lootdrop" onclick="iaSwitchTab('lootdrop')">副本掉落</button>
@@ -244,7 +245,7 @@
     </div>
     <!-- 团队管理二级导航（任务书 #59 WP1：原侧栏纵向导航 pill 化，数据中心显隐与 #navDatacenter 同步） -->
     <div class="ia-subnav" role="navigation" aria-label="团队管理" id="iaSubnavTeam" style="display:none">
-      <span class="ws-rail-title">公会大厅</span><button type="button" class="ia-pill" data-ia-key="guild" onclick="iaGoKey('guild')"><img class="wb-nav-icon" width="20" height="20" src="assets/icons/nav/guild-banner.svg" alt="">公会战报</button><button type="button" class="ia-pill" data-ia-key="guild-settings" onclick="iaGoKey('guild-settings')"><img class="wb-nav-icon" width="20" height="20" src="assets/icons/nav/members.svg" alt="">公会设置</button><span class="ws-rail-title">团队管理</span>
+      <span class="ws-rail-title">公会大厅</span><button type="button" class="ia-pill" data-ia-key="guild-settings" onclick="iaGoKey('guild-settings')"><img class="wb-nav-icon" width="20" height="20" src="assets/icons/nav/members.svg" alt="">公会资料</button><button type="button" class="ia-pill" data-ia-key="guild" onclick="iaGoKey('guild')"><img class="wb-nav-icon" width="20" height="20" src="assets/icons/nav/guild-banner.svg" alt="">公会战报</button><span class="ws-rail-title">团队管理</span>
       <button type="button" class="ia-pill" data-ia-key="dashboard" onclick="iaGoKey('dashboard')"><img class="wb-nav-icon" src="assets/icons/nav/dashboard.svg" width="20" height="20" alt=""><span>仪表盘</span></button>
       <button type="button" class="ia-pill" data-ia-key="members" onclick="iaGoKey('members')"><img class="wb-nav-icon" src="assets/icons/nav/members.svg" width="20" height="20" alt=""><span>成员管理</span></button>
       <button type="button" class="ia-pill" data-ia-key="attendance" onclick="iaGoKey('attendance')"><img class="wb-nav-icon" src="assets/icons/nav/attendance.svg" width="20" height="20" alt=""><span>考勤记录</span></button>
@@ -288,11 +289,8 @@
       <div class="page" id="page-guild">
        <header class="ws-hero">
         <div>
-         <p class="ws-kicker">
-          <span id="wsGuildName">
-          </span>
-         </p>
-         <h1>公会战报</h1>
+         <p class="ws-kicker">公会战报</p>
+         <h1 id="wsGuildName"></h1>
          <p>
           <span id="wsGuildRole">
           </span>
@@ -314,11 +312,8 @@
       <div class="page" id="page-guild-settings">
        <header class="ws-hero">
         <div>
-         <p class="ws-kicker">
-          <span id="wsSettingsGuild">
-          </span>
-         </p>
-         <h1>公会设置</h1>
+         <p class="ws-kicker">公会资料</p>
+         <h1 id="wsSettingsGuild"></h1>
          <p>
           <span id="wsSettingsRole">
           </span>
@@ -328,15 +323,78 @@
          <img src="assets/icons/nav/guild-banner.svg" width="40" height="40" alt="">
         </span>
        </header>
-       <section class="card">
-        <h2>公会资料</h2>
-        <p id="wsGuildIntro">
-        </p>
-        <div class="ws-actions">
-         <button class="btn" onclick="openGuildSettings()">查看公会设置</button>
-         <button class="btn" onclick="openGuildSwitcher()">切换公会</button>
+       <div class="gp-grid">
+        <section class="card gp-profile">
+         <div class="gp-heading"><h2>公会介绍</h2><button id="gpEdit" class="btn btn-sm" type="button" hidden>编辑资料</button></div>
+         <div role="status"><span id="gpLoadStatus"></span> <button type="button" id="gpRetry" class="btn btn-sm" hidden>重新读取</button></div>
+         <div id="gpRead">
+          <div id="wsGuildIntro"></div>
+          <h3>装备分配制度</h3><p id="gpRule"></p><p id="gpRuleText" class="gp-prose"></p>
+          <h3>角色认领</h3><p id="gpClaims"></p>
+         </div>
+         <form id="gpForm" hidden>
+          <div id="gpIntroEditor"></div>
+          <label for="guildProfileLootRuleType">装备分配制度</label>
+          <select class="form-select" id="guildProfileLootRuleType">
+           <option value="">未设置</option><option value="roll">ROLL</option><option value="yixuduotan">一需多贪</option>
+           <option value="cl">CL（团长分配）</option><option value="custom">自定义</option>
+          </select>
+          <label for="guildProfileLootRuleText">分配规则说明 <span id="guildProfileCustomHint" hidden>（自定义制度必填）</span></label>
+          <textarea class="form-textarea" id="guildProfileLootRuleText" rows="3"></textarea>
+          <label for="guildClaimMode">认领方式</label>
+          <select class="form-select" id="guildClaimMode">
+           <option value="free">自由认领</option><option value="approval">认领需审核</option><option value="assign">仅管理者分配</option>
+          </select>
+          <label class="gp-check"><input type="checkbox" id="guildShowClaimerLabel">在心愿单和装备分配中显示认领人</label>
+          <div class="ws-actions"><button id="guildProfileSaveBtn" type="submit" class="btn btn-primary">保存资料</button>
+           <button id="gpCancel" class="btn" type="button">取消</button><span id="gpStatus" role="status"></span></div>
+         </form>
+        </section>
+        <div class="gp-side">
+         <section class="card">
+          <div class="gp-heading"><h2>公会信息</h2><button type="button" class="btn btn-sm" onclick="openGuildSwitcher()">切换公会</button></div>
+          <dl class="gp-facts"><dt>所属服务器</dt><dd id="settingsServer"></dd>
+           <dt>公会 ID</dt><dd id="settingsGuildId"></dd>
+           <dt>邀请码</dt><dd><button type="button" id="settingsInviteCode" class="btn btn-sm" onclick="copyInviteCode()" title="复制邀请码"></button></dd></dl>
+         </section>
+         <!-- WCL 公会绑定（可选；绑定/解绑仅 owner/editor，viewer 只读状态） -->
+      <section class="card gp-wcl">
+        <div class="card-header">
+          <div class="card-title">WCL 公会主页</div>
         </div>
-       </section>
+        <div class="card-body">
+          <!-- 已绑定状态 -->
+          <div id="wclBindBound" style="display:none">
+            <div style="font-size:14px;color:var(--text-primary)">已绑定：<b id="wclBoundName"></b> <span id="wclBoundMeta" style="font-size:12px;color:var(--text-muted)"></span></div>
+            <div style="font-size:12px;color:var(--text-muted);margin-top:4px">在考勤记录中点击「查找新报告」，核对参战名单后关联或创建活动。绑定公会不会自动记入考勤。</div>
+            <a id="gpWclLink" target="_blank" rel="noopener noreferrer">打开 WCL 公会主页</a>
+            <button class="btn btn-sm edit-only" id="wclUnbindBtn" style="margin-top:10px" onclick="wclUnbind()">解绑</button>
+          </div>
+          <!-- 未绑定状态 -->
+          <p id="gpWclEmpty" hidden>尚未绑定 WCL 公会。</p>
+          <div id="wclBindUnbound">
+            <div style="font-size:13px;color:var(--text-secondary);margin-bottom:6px">绑定公会</div>
+            <div class="edit-only" style="display:flex;gap:8px">
+              <input class="form-input" id="wclGuildInput" aria-label="WCL 公会链接或编号" placeholder="https://www.warcraftlogs.com/guild/id/766716 或纯数字 ID" style="flex:1">
+              <button class="btn btn-sm btn-primary" id="wclLookupBtn" onclick="wclLookupGuild()">检测公会</button>
+            </div>
+            <div id="wclLookupResult" style="display:none;margin-top:10px;padding:10px;border:1px solid var(--border-color);border-radius:6px">
+              <div style="font-size:13px;color:var(--text-primary)" id="wclLookupText"></div>
+              <div style="display:flex;gap:8px;margin-top:8px">
+                <button class="btn btn-sm btn-primary edit-only" onclick="wclConfirmBind()">确认绑定</button>
+                <button class="btn btn-sm edit-only" onclick="wclCancelLookup()">取消</button>
+              </div>
+            </div>
+            <div style="font-size:12px;color:var(--text-muted);margin-top:8px">绑定后可在考勤页查找该公会的报告。</div>
+          </div>
+        </div>
+      </section>
+        </div>
+        <section class="card gp-members"><div class="gp-heading"><h2>成员权限</h2><button class="btn btn-sm" onclick="loadGuildMembers()">刷新</button></div>
+         <div id="guildMembersList" aria-live="polite"></div>
+        </section>
+        <div id="dangerZone" hidden><button class="btn btn-danger" onclick="handleLeaveGuild()">退出此公会</button></div>
+       </div>
       </div>
       <div class="page" id="page-personal">
        <header class="ws-hero">
@@ -2137,144 +2195,6 @@
   </div>
 </div>
 
-<!-- 公会设置弹窗 -->
-<div class="modal-overlay" id="guildSettingsModal">
-  <div class="modal" style="max-width:560px">
-    <div class="modal-header">
-      <div class="modal-title">公会设置</div>
-      <button class="modal-close" onclick="closeModal('guildSettingsModal')">&times;</button>
-    </div>
-    <div class="modal-body">
-      <!-- 公会信息 -->
-      <div class="card" style="margin-bottom:16px">
-        <div class="card-header">
-          <div class="card-title">公会信息</div>
-        </div>
-        <div class="card-body">
-          <div style="display:flex;gap:12px;align-items:center;margin-bottom:12px">
-            <div>
-              <div style="font-size:16px;font-weight:600;color:var(--text-primary)" id="settingsGuildName"></div>
-              <div style="font-size:12px;color:var(--text-muted);margin-top:4px">公会ID: <span id="settingsGuildId" style="color:var(--blue-highlight);font-family:monospace;font-size:11px"></span></div>
-              <div style="font-size:12px;color:var(--text-muted);margin-top:4px">服务器: <span id="settingsServer" style="color:var(--text-secondary)"></span></div>
-              <div style="font-size:12px;color:var(--text-muted);margin-top:4px">邀请码: <span id="settingsInviteCode" style="color:var(--gold);font-family:monospace;letter-spacing:1px;cursor:pointer" onclick="copyInviteCode()"></span></div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- 公会资料（REQ-025：仅会长可编辑） -->
-      <div class="card" style="margin-bottom:16px">
-        <div class="card-header">
-          <div class="card-title">公会资料</div>
-          <button class="btn btn-sm btn-primary" id="guildProfileSaveBtn" onclick="saveGuildProfile()">保存</button>
-        </div>
-        <div class="card-body">
-          <div class="form-group">
-            <label class="form-label">公会简介</label>
-            <textarea class="form-textarea" id="guildProfileDesc" style="height:70px" placeholder="介绍一下公会吧"></textarea>
-          </div>
-          <div class="form-group">
-            <label class="form-label">装备分配制度</label>
-            <select class="form-select" id="guildProfileLootRuleType" onchange="toggleGuildProfileCustomHint()">
-              <option value="">未设置</option>
-              <option value="roll">ROLL</option>
-              <option value="yixuduotan">一需多贪</option>
-              <option value="cl">CL（团长分配）</option>
-              <option value="custom">自定义</option>
-            </select>
-          </div>
-          <div class="form-group" style="margin-bottom:0">
-            <label class="form-label">分配规则说明<span id="guildProfileCustomHint" style="color:var(--warning);display:none">（自定义时必填）</span></label>
-            <textarea class="form-textarea" id="guildProfileLootRuleText" style="height:70px" placeholder="例如：主天赋一需多贪，套装优先坦克治疗"></textarea>
-          </div>
-          <!-- 任务书 #18 WP2 R4：认领人标签公会级开关（仅 owner 可改，默认开） -->
-          <div class="form-group" style="margin-top:12px;margin-bottom:0">
-            <label class="att-filter-toggle"><input type="checkbox" id="guildShowClaimerLabel"> 显示角色认领人标签（心愿单/装备分配列表）</label>
-            <!-- 任务书 #21 WP1-③：开关用途说明 -->
-            <div style="font-size:12px;color:var(--text-muted);margin-top:4px">控制心愿单与装备分配列表里是否显示每个角色背后的认领人；关闭后仅管理者在成员管理中可见认领状态。</div>
-          </div>
-          <!-- 任务书 #21 WP2：认领方式三档（仅 owner 可改；存量公会默认 free） -->
-          <div class="form-group" style="margin-top:12px;margin-bottom:0">
-            <label class="form-label">认领方式</label>
-            <select class="form-select" id="guildClaimMode">
-              <option value="free">自由认领（默认）</option>
-              <option value="approval">认领需审核</option>
-              <option value="assign">仅管理者分配</option>
-            </select>
-            <div style="font-size:12px;color:var(--text-muted);margin-top:4px">
-              <!-- 任务书 #22 WP3-①：三档说明分段，一行一个模式 -->
-              <div>自由认领：成员可自助认领未被认领的角色，先到先得。</div>
-              <div>认领需审核：成员提交申请，管理者在成员管理顶部批准后生效。</div>
-              <div>仅管理者分配：成员不可自助认领，由管理者在编辑成员时指定。</div>
-              <div>切换不影响已存在的认领。</div>
-            </div>
-          </div>
-          <div id="guildProfileOwnerHint" style="font-size:12px;color:var(--text-muted);display:none;margin-top:8px">仅会长可编辑公会资料</div>
-        </div>
-      </div>
-
-      <!-- WCL 公会绑定（可选；绑定/解绑仅 owner/editor，viewer 只读状态） -->
-      <div class="card" style="margin-bottom:16px">
-        <div class="card-header">
-          <div class="card-title">🔗 WCL 公会绑定（可选）</div>
-        </div>
-        <div class="card-body">
-          <!-- 已绑定状态 -->
-          <div id="wclBindBound" style="display:none">
-            <div style="font-size:14px;color:var(--text-primary)">已绑定：<b id="wclBoundName"></b> <span id="wclBoundMeta" style="font-size:12px;color:var(--text-muted)"></span></div>
-            <div style="font-size:12px;color:var(--text-muted);margin-top:4px">在考勤记录中点击「查找新报告」，核对参战名单后关联或创建活动。绑定公会不会自动记入考勤。</div>
-            <button class="btn btn-sm edit-only" id="wclUnbindBtn" style="margin-top:10px" onclick="wclUnbind()">解绑</button>
-          </div>
-          <!-- 未绑定状态 -->
-          <div id="wclBindUnbound">
-            <div style="font-size:13px;color:var(--text-secondary);margin-bottom:6px">方式一：粘贴 WCL 公会链接</div>
-            <div class="edit-only" style="display:flex;gap:8px">
-              <input class="form-input" id="wclGuildInput" placeholder="https://www.warcraftlogs.com/guild/id/766716 或纯数字 ID" style="flex:1">
-              <button class="btn btn-sm btn-primary" id="wclLookupBtn" onclick="wclLookupGuild()">检测公会</button>
-            </div>
-            <div id="wclLookupResult" style="display:none;margin-top:10px;padding:10px;border:1px solid var(--border-color);border-radius:6px">
-              <div style="font-size:13px;color:var(--text-primary)" id="wclLookupText"></div>
-              <div style="display:flex;gap:8px;margin-top:8px">
-                <button class="btn btn-sm btn-primary edit-only" onclick="wclConfirmBind()">确认绑定</button>
-                <button class="btn btn-sm edit-only" onclick="wclCancelLookup()">取消</button>
-              </div>
-            </div>
-            <div style="font-size:12px;color:var(--text-muted);margin-top:8px">💡 复制你的 WCL 公会页面链接粘贴即可；绑定后活动页可一键同步新报告</div>
-            <div style="font-size:13px;color:var(--text-secondary);margin-top:12px">方式二：WCL 账号授权</div>
-            <button class="btn btn-sm" disabled title="即将上线">WCL 登录授权（即将上线）</button>
-          </div>
-        </div>
-      </div>
-
-      <!-- 成员管理 -->
-      <div class="card">
-        <div class="card-header">
-          <div class="card-title">成员管理</div>
-          <button class="btn btn-sm" onclick="loadGuildMembers()">刷新</button>
-        </div>
-        <div class="card-body" id="guildMembersList">
-          <div style="text-align:center;color:var(--text-muted);padding:20px">加载中...</div>
-        </div>
-      </div>
-
-      <!-- 危险操作（BUG-015：仅非 owner 可见；owner 退出=解散/转让，另案） -->
-      <div class="card" id="dangerZone" style="margin-top:16px;display:none">
-        <div class="card-header">
-          <div class="card-title" style="color:var(--danger)">退出公会</div>
-        </div>
-        <div class="card-body">
-          <button class="btn btn-danger" onclick="handleLeaveGuild()">退出此公会</button>
-        </div>
-      </div>
-    </div>
-    <!-- 任务书 #22 WP3-③：保存栏吸附底部——左侧未保存提示（有改动时显示），右侧保存（与顶部按钮同逻辑并存） -->
-    <div class="modal-footer guild-settings-footer">
-      <span id="guildSettingsDirtyHint" class="guild-settings-dirty" style="display:none">● 有未保存的修改</span>
-      <button class="btn btn-primary" onclick="saveGuildProfile()">保存</button>
-    </div>
-  </div>
-</div>
-
 <!-- 公会切换弹窗 -->
 <div class="modal-overlay" id="guildSwitcherModal">
   <div class="modal" style="max-width:400px">
@@ -2322,7 +2242,7 @@
             <span class="role-badge" id="ucGuildCardRole" style="display:none"></span>
           </div>
           <div class="uc-guild-card-actions">
-            <button class="uc-btn uc-btn-secondary" onclick="openGuildSettings()">⚙ 公会设置</button>
+            <button class="uc-btn uc-btn-secondary" onclick="openGuildSettings()">公会资料</button>
             <button class="uc-btn uc-btn-secondary" onclick="openGuildSwitcher()">🏰 切换公会</button>
           </div>
         </div>
@@ -2545,28 +2465,28 @@
   </div>
 </div>
 
-<script src="js/cloud.js?v=20261124.165"></script>
+<script src="js/cloud.js?v=20261124.167"></script>
 <!-- 任务书 #14：主数据层（快照兜底 + 加载层），须在 app.js 之前 -->
-<script src="js/masterDataSnapshot.js?v=20261124.165"></script>
-<script src="js/masterData.js?v=20261124.165"></script>
+<script src="js/masterDataSnapshot.js?v=20261124.167"></script>
+<script src="js/masterData.js?v=20261124.167"></script>
 <!-- 任务书 #22 WP2：职业/专精/职责图标集中映射（全站唯一取图处） -->
-<script src="js/iconMap.js?v=20261124.165"></script>
+<script src="js/iconMap.js?v=20261124.167"></script>
 <!-- 任务书 #31（REQ-097）：装备分类词表单一真源（公示页 chips / picker 过滤 / BUG-057 回填三处消费，须在 dataPublic.js 与 app.js 之前） -->
-<script src="js/itemQualityData.js?v=20261124.165"></script>
-<script src="js/lootTaxonomy.js?v=20261124.165"></script>
+<script src="js/itemQualityData.js?v=20261124.167"></script>
+<script src="js/lootTaxonomy.js?v=20261124.167"></script>
 <!-- 任务书 #28 WP5：副本掉落渲染层（双壳同源；无 data-public-body 不自动启动，由 app.js 懒挂载，须在 app.js 之前） -->
-<script src="js/dataPublic.js?v=20261124.165"></script>
+<script src="js/dataPublic.js?v=20261124.167"></script>
 <!-- 任务书 #51（REQ-137 一期）：家宅图鉴词表单一真源（价格/分类/尺寸/来源词表，须在 decorData.js 之前） -->
-<script src="js/decorDict.js?v=20261124.165"></script>
+<script src="js/decorDict.js?v=20261124.167"></script>
 <!-- 任务书 #51：家宅图鉴数据层+渲染层（双壳同源；无 data-decor-body 不自动启动，由 app.js 懒挂载，须在 app.js 之前） -->
-<script src="js/decorIntroducedPatches.js?v=20261124.165"></script>
-<script src="js/decorEffectIds.js?v=20261124.165"></script>
-<script src="js/decorUseFacts.js?v=20261124.165"></script>
-<script src="js/decorFacts.js?v=20261124.165"></script>
-<script src="js/decorEngagement.js?v=20261124.165"></script>
-<script src="js/decorModelManifest.js?v=20261124.165"></script>
-<script src="js/decorModelPreview.js?v=20261124.165"></script>
-<script src="js/decorData.js?v=20261124.165"></script>
+<script src="js/decorIntroducedPatches.js?v=20261124.167"></script>
+<script src="js/decorEffectIds.js?v=20261124.167"></script>
+<script src="js/decorUseFacts.js?v=20261124.167"></script>
+<script src="js/decorFacts.js?v=20261124.167"></script>
+<script src="js/decorEngagement.js?v=20261124.167"></script>
+<script src="js/decorModelManifest.js?v=20261124.167"></script>
+<script src="js/decorModelPreview.js?v=20261124.167"></script>
+<script src="js/decorData.js?v=20261124.167"></script>
 <div id="housingBuildEditor" class="modal-overlay">
   <section class="modal" role="dialog" aria-modal="true" aria-labelledby="hbEditorTitle">
     <div class="modal-header"><h2 class="modal-title" id="hbEditorTitle">创建作品</h2><button type="button" class="modal-close" aria-label="关闭" onclick="requestCloseModal('housingBuildEditor')">×</button></div>
@@ -2602,11 +2522,11 @@
     </div></form>
   </section>
 </div>
-<script src="js/housingCommunity.js?v=20261124.165"></script>
-<script src="js/housingBuildFurniture.js?v=20261124.165"></script>
-<script src="js/housingBuildTags.js?v=20261124.165"></script>
-<script src="js/housingBuilds.js?v=20261124.165"></script>
-<script src="js/lootEvidence.js?v=20261124.165"></script>
+<script src="js/housingCommunity.js?v=20261124.167"></script>
+<script src="js/housingBuildFurniture.js?v=20261124.167"></script>
+<script src="js/housingBuildTags.js?v=20261124.167"></script>
+<script src="js/housingBuilds.js?v=20261124.167"></script>
+<script src="js/lootEvidence.js?v=20261124.167"></script>
 <template id="tokenTrendTemplate">
   <div class="token-trend">
     <div class="token-trend-heading"><strong>近期走势</strong><div class="token-periods" role="group" aria-label="走势时段">
@@ -2624,15 +2544,16 @@
     <div class="token-coverage" data-value="coverage"></div></details>
   </div>
 </template>
-<script src="js/wowTokenTrend.js?v=20261124.165"></script>
-<script src="js/wowToken.js?v=20261124.165"></script>
-<script src="js/guildBattlePublic.js?v=20261124.165"></script>
-<script src="js/workspaces.js?v=20261124.165"></script>
-<script src="js/guildBattleEditor.js?v=20261124.165"></script>
-<script src="js/app.js?v=20261124.165"></script>
-<script src="js/lootWorkflow.js?v=20261124.165"></script>
-<script src="js/personAttendance.js?v=20261124.165"></script>
-<script src="js/lootDetails.js?v=20261124.165"></script>
-<script src="js/track.js?v=20261124.165"></script><!-- 任务书 #54 WP1：全站埋点采集层（REQ-141，零依赖静默兜底） -->
+<script src="js/wowTokenTrend.js?v=20261124.167"></script>
+<script src="js/wowToken.js?v=20261124.167"></script>
+<script src="js/guildBattlePublic.js?v=20261124.167"></script>
+<script src="js/guildIntroEditor.js?v=20261124.167"></script>
+<script src="js/workspaces.js?v=20261124.167"></script>
+<script src="js/guildBattleEditor.js?v=20261124.167"></script>
+<script src="js/app.js?v=20261124.167"></script>
+<script src="js/lootWorkflow.js?v=20261124.167"></script>
+<script src="js/personAttendance.js?v=20261124.167"></script>
+<script src="js/lootDetails.js?v=20261124.167"></script>
+<script src="js/track.js?v=20261124.167"></script><!-- 任务书 #54 WP1：全站埋点采集层（REQ-141，零依赖静默兜底） -->
 </body>
 </html>

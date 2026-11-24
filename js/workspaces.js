@@ -84,9 +84,162 @@ window.Workspaces = (() => {
     }
   }
 
+  const profileForm = byId('gpForm');
+  const introEditor = GuildIntroEditor.mount(byId('gpIntroEditor'), {label:'公会介绍',id:'guildProfileDesc'});
+  let profile = null;
+
+  function profileFields() {
+    return {
+      description: introEditor.getValue() || null,
+      loot_rule_type: byId('guildProfileLootRuleType').value || null,
+      loot_rule_text: byId('guildProfileLootRuleText').value.trim() || null,
+      claim_mode: byId('guildClaimMode').value,
+      show_claimer_label: byId('guildShowClaimerLabel').checked
+    };
+  }
+
+  function profileChanges() {
+    if (!profile?.original) return {};
+    return Object.fromEntries(Object.entries(profileFields()).filter(([key,value]) => profile.original[key] !== value));
+  }
+
+  function sameProfile() {
+    return profile && profile.guildId === CloudSync.getCurrentGuild()?.id && profile.userId === CloudSync.getCachedUser()?.id;
+  }
+
+  function profileDirty() {
+    return Object.keys(profileChanges()).length > 0 || !!byId('wclGuildInput').value.trim();
+  }
+
+  function canLeaveProfile() {
+    if (!sameProfile()) return true;
+    if (profile.saving) { showToast('正在保存公会资料','warning'); return false; }
+    return !profileDirty() || confirm('内容未保存，确定放弃吗？');
+  }
+
+  window.addEventListener('beforeunload', event => {
+    if (sameProfile() && (profile.saving || profileDirty())) { event.preventDefault(); event.returnValue = ''; }
+  });
+
+  function readProfile(guild) {
+    const label = (id,value) => Array.from(byId(id).options).find(option => option.value === value)?.textContent;
+    GuildIntroEditor.render(byId('wsGuildIntro'),guild.description || '尚未填写公会介绍');
+    byId('gpRule').textContent = label('guildProfileLootRuleType',guild.loot_rule_type || '') || guild.loot_rule_type;
+    byId('gpRuleText').textContent = guild.loot_rule_text || '';
+    byId('gpClaims').textContent = (label('guildClaimMode',guild.claim_mode || 'free') || '尚未设置') +
+      (guild.show_claimer_label === false ? ' · 隐藏认领人标签' : ' · 显示认领人标签');
+    byId('gpRead').hidden = false;
+    profileForm.hidden = true;
+    byId('gpEdit').hidden = !CloudSync.isOwner();
+    profile.original = null;
+  }
+
+  byId('gpEdit').onclick = () => {
+    if (!sameProfile() || !CloudSync.isOwner()) return;
+    const guild = CloudSync.getCurrentGuild();
+    introEditor.setValue(guild.description);
+    byId('guildProfileLootRuleType').value = guild.loot_rule_type || '';
+    byId('guildProfileLootRuleText').value = guild.loot_rule_text || '';
+    byId('guildClaimMode').value = guild.claim_mode || 'free';
+    byId('guildShowClaimerLabel').checked = guild.show_claimer_label !== false;
+    profile.original = profileFields();
+    byId('gpEdit').hidden = byId('gpRead').hidden = true;
+    profileForm.hidden = false;
+    profileForm.oninput();
+    introEditor.focus();
+  };
+  byId('gpCancel').onclick = () => {
+    if (!sameProfile() || profile.saving) return;
+    readProfile(CloudSync.getCurrentGuild());
+    byId('gpEdit').focus();
+  };
+  profileForm.oninput = () => {
+    const custom = byId('guildProfileLootRuleType').value === 'custom';
+    byId('guildProfileLootRuleText').required = custom;
+    byId('guildProfileCustomHint').hidden = !custom;
+    byId('gpStatus').textContent = Object.keys(profileChanges()).length ? '有未保存的修改' : '';
+  };
+  profileForm.onsubmit = async event => {
+    event.preventDefault();
+    if (!sameProfile() || !CloudSync.isOwner() || profile.saving) return;
+    if (byId('guildProfileLootRuleType').value === 'custom' && !byId('guildProfileLootRuleText').value.trim()) {
+      byId('gpStatus').textContent = '请填写自定义分配规则';
+      byId('guildProfileLootRuleText').focus();
+      return;
+    }
+    const session = profile;
+    const changes = profileChanges();
+    if (!Object.keys(changes).length) { byId('gpCancel').click(); return; }
+    session.saving = true;
+    introEditor.setDisabled(true);
+    for (const el of profileForm.elements) el.disabled = true;
+    byId('gpStatus').textContent = '正在保存…';
+    try {
+      await CloudSync.updateGuildProfile(changes);
+      if (profile !== session || !sameProfile()) return;
+      readProfile(CloudSync.getCurrentGuild());
+      byId('gpEdit').focus();
+      showToast('公会资料已保存','success');
+      renderMembers();
+      renderClaimReviewBlock();
+    } catch (error) {
+      if (profile === session) byId('gpStatus').textContent = '保存失败，请重试。' + (error.message || '');
+    } finally {
+      session.saving = false;
+      introEditor.setDisabled(false);
+      for (const el of profileForm.elements) el.disabled = false;
+    }
+  };
+
+  function guildHeading(guild) {
+    return '「' + guild.name + '」' + (guild.server_name ? ' - ' + guild.server_name : '');
+  }
+
+  function profileFacts(guild) {
+    byId('settingsServer').textContent = [guild.server_region,guild.server_name].filter(Boolean).join(' · ') || '尚未填写';
+    byId('settingsGuildId').textContent = guild.id;
+    byId('settingsInviteCode').textContent = guild.invite_code || '未设置';
+    byId('settingsInviteCode').disabled = !guild.invite_code;
+    byId('dangerZone').hidden = !!CloudSync.isOwner();
+  }
+
+  async function enterProfile(user,guild,role) {
+    byId('wsSettingsGuild').textContent = guildHeading(guild);
+    byId('wsSettingsRole').textContent = '我的身份 · ' + role;
+    if (sameProfile() && profile.role === role) return;
+    const session = profile = { userId:user.id, guildId:guild.id, role, original:null, saving:false };
+    profileFacts(guild);
+    byId('guildMembersList').textContent = '正在读取成员…';
+    loadGuildMembers();
+    byId('gpLoadStatus').textContent = '正在读取公会资料…';
+    byId('gpEdit').disabled = true;
+    byId('gpRetry').hidden = true;
+    // Do not let a delayed read reset WCL lookup input for the active guild.
+    byId('wclGuildInput').value = '';
+    byId('wclBindBound').style.display = byId('wclBindUnbound').style.display = 'none';
+    byId('gpWclEmpty').hidden = true;
+    readProfile(guild);
+    try {
+      await CloudSync.refreshGuildProfile(() => profile === session && sameProfile());
+      if (profile !== session || !sameProfile()) return;
+      byId('gpLoadStatus').textContent = '';
+      byId('gpEdit').disabled = false;
+    } catch {
+      if (profile !== session || !sameProfile()) return;
+      byId('gpLoadStatus').textContent = '暂时无法刷新，以下为上次读取的资料。';
+      byId('gpRetry').hidden = false;
+      byId('gpRetry').onclick = () => { profile = null; enterProfile(user,CloudSync.getCurrentGuild(),role); };
+    }
+    byId('wsSettingsGuild').textContent = guildHeading(guild);
+    readProfile(guild);
+    profileFacts(guild);
+    renderWclBindCard();
+  }
+
   function show(key) {
     const generation = ++epoch;
     restorePanel();
+    if (key !== 'guild-settings') profile = null;
     if (!pages.has(key)) return;
     const user = window.CloudSync?.getCachedUser(), guild = window.CloudSync?.getCurrentGuild();
     const current = () => generation === epoch && user?.id === CloudSync.getCachedUser()?.id && guild?.id === CloudSync.getCurrentGuild()?.id;
@@ -96,12 +249,10 @@ window.Workspaces = (() => {
     if (!guild) return;
     const role = roleNames[CloudSync.getCurrentMembership()?.role] || '团员';
     if (key === 'guild-settings') {
-      byId('wsSettingsGuild').textContent = guildDisplayName(guild);
-      byId('wsSettingsRole').textContent = '我的身份 · '+role;
-      byId('wsGuildIntro').textContent = guild.description || '尚未填写公会介绍';
+      enterProfile(user,guild,role);
       return;
     }
-    byId('wsGuildName').textContent = guildDisplayName(guild);
+    byId('wsGuildName').textContent = guildHeading(guild);
     byId('wsGuildRole').textContent = '我的身份 · '+role;
     const canEdit = CloudSync.canEdit();
     byId('wsWriteReport').hidden = !canEdit;
@@ -109,5 +260,5 @@ window.Workspaces = (() => {
     if (canEdit) activityPicker(guild.id,current);
     GuildPublished.load(byId('wsPublished'),guild.id,current);
   }
-  return { owns:key => pages.has(key), show, restorePanel, inlinePanelActive:() => !!inline };
+  return { owns:key => pages.has(key), show, restorePanel, canLeaveProfile, inlinePanelActive:() => !!inline };
 })();
