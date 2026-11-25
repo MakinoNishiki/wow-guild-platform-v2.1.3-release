@@ -74,7 +74,7 @@ window.Workspaces = (() => {
       select.replaceChildren(...options);
       if (!options.length) { select.add(new Option('暂无考勤活动','')); return; }
       edit.disabled = select.disabled = false;
-      edit.onclick = () => { if (current() && CloudSync.canEdit()) GuildBattleEditor.open(select.value); };
+      edit.onclick = () => { if (current() && GuildBattleEditor.canOpen()) GuildBattleEditor.open(select.value); };
     } catch {
       if (!current()) return;
       select.replaceChildren(new Option('活动读取失败',''));
@@ -96,6 +96,28 @@ window.Workspaces = (() => {
       claim_mode: byId('guildClaimMode').value,
       show_claimer_label: byId('guildShowClaimerLabel').checked
     };
+  }
+
+  function canEditProfile() {
+    return GuildRoles.can('settings') || GuildRoles.can('claim-mode');
+  }
+
+  function profileControls() {
+    const settings = GuildRoles.can('settings');
+    introEditor.setDisabled(!settings);
+    for (const id of ['guildProfileLootRuleType','guildProfileLootRuleText','guildShowClaimerLabel']) byId(id).disabled = !settings;
+    byId('guildClaimMode').disabled = !GuildRoles.can('claim-mode');
+  }
+
+  function refreshProfilePermissions() {
+    if (!sameProfile()) return;
+    byId('wsSettingsRole').textContent = '我的身份 · ' + (GuildRoles.ownRoleInfo()?.name || '正在读取');
+    if (!profile.saving) {
+      if (profileForm.hidden) byId('gpEdit').hidden = !canEditProfile();
+      else profileControls();
+    }
+    GuildRecruitment.refreshPermissions();
+    renderWclBindCard();
   }
 
   function profileChanges() {
@@ -130,12 +152,12 @@ window.Workspaces = (() => {
       (guild.show_claimer_label === false ? ' · 隐藏认领人标签' : ' · 显示认领人标签');
     byId('gpRead').hidden = false;
     profileForm.hidden = true;
-    byId('gpEdit').hidden = !CloudSync.isOwner();
+    byId('gpEdit').hidden = !canEditProfile();
     profile.original = null;
   }
 
   byId('gpEdit').onclick = () => {
-    if (!sameProfile() || !CloudSync.isOwner()) return;
+    if (!sameProfile() || !canEditProfile()) return;
     const guild = CloudSync.getCurrentGuild();
     introEditor.setValue(guild.description);
     byId('guildProfileLootRuleType').value = guild.loot_rule_type || '';
@@ -146,7 +168,8 @@ window.Workspaces = (() => {
     byId('gpEdit').hidden = byId('gpRead').hidden = true;
     profileForm.hidden = false;
     profileForm.oninput();
-    introEditor.focus();
+    profileControls();
+    if (GuildRoles.can('settings')) introEditor.focus(); else byId('guildClaimMode').focus();
   };
   byId('gpCancel').onclick = () => {
     if (!sameProfile() || profile.saving) return;
@@ -161,8 +184,8 @@ window.Workspaces = (() => {
   };
   profileForm.onsubmit = async event => {
     event.preventDefault();
-    if (!sameProfile() || !CloudSync.isOwner() || profile.saving) return;
-    if (byId('guildProfileLootRuleType').value === 'custom' && !byId('guildProfileLootRuleText').value.trim()) {
+    if (!sameProfile() || !canEditProfile() || profile.saving) return;
+    if (GuildRoles.can('settings') && byId('guildProfileLootRuleType').value === 'custom' && !byId('guildProfileLootRuleText').value.trim()) {
       byId('gpStatus').textContent = '请填写自定义分配规则';
       byId('guildProfileLootRuleText').focus();
       return;
@@ -187,8 +210,8 @@ window.Workspaces = (() => {
       if (profile === session) byId('gpStatus').textContent = '保存失败，请重试。' + (error.message || '');
     } finally {
       session.saving = false;
-      introEditor.setDisabled(false);
       for (const el of profileForm.elements) el.disabled = false;
+      profileControls();
     }
   };
 
@@ -278,18 +301,18 @@ window.Workspaces = (() => {
     if (!user) return;
     if (key === 'characters' || key === 'claims') { personalDetail(key); return; }
     if (!guild) return;
-    const role = roleNames[CloudSync.getCurrentMembership()?.role] || '团员';
+    const role = GuildRoles.ownRoleInfo()?.name || roleNames[CloudSync.getCurrentMembership()?.role] || '团员';
     if (key === 'guild-settings') {
       enterProfile(user,guild,role);
       return;
     }
     byId('wsGuildName').textContent = guildHeading(guild);
     byId('wsGuildRole').textContent = '我的身份 · '+role;
-    const canEdit = CloudSync.canEdit();
+    const canEdit = GuildBattleEditor.canOpen();
     byId('wsWriteReport').hidden = !canEdit;
     byId('wsEditReport').textContent = '打开战报编辑器';
     if (canEdit) activityPicker(guild.id,current);
     GuildPublished.load(byId('wsPublished'),guild.id,current);
   }
-  return { owns:key => pages.has(key), show, restorePanel, canLeaveProfile, clearProfile, recheckGuild, inlinePanelActive:() => !!inline };
+  return { refreshProfilePermissions, owns:key => pages.has(key), show, restorePanel, canLeaveProfile, clearProfile, recheckGuild, inlinePanelActive:() => !!inline };
 })();

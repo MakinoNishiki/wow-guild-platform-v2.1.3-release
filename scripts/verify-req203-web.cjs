@@ -15,11 +15,12 @@ const { chromium } = require('playwright');
 const assert = require('node:assert/strict');
 const root = path.resolve(__dirname, '..');
 const recruitment = process.argv.includes('--guild-recruitment') && require('./verify-req212-recruitment.cjs');
-const output = process.env.WB_VERIFY_OUTPUT || path.join(root, 'docs/evidence', recruitment ? 'req212-recruitment-20261125' : process.argv.includes('--guild-battles') ? 'req190-20261123' : 'req203-cover-20261119');
+const guildRoles = process.argv.includes('--guild-roles') && require('./verify-guild-roles-real.cjs');
+const output = process.env.WB_VERIFY_OUTPUT || path.join(root, 'docs/evidence', guildRoles ? 'req191-guild-roles-20261125' : recruitment ? 'req212-recruitment-20261125' : process.argv.includes('--guild-battles') ? 'req190-20261123' : 'req203-cover-20261119');
 const host = '127.0.0.1';
 const checkDecor = process.argv.includes('--decor-engagement');
 const lootReadback = process.argv.includes('--loot-readback') && require('./verify-loot-import-readback.cjs');
-const battleReports = (recruitment || process.argv.includes('--guild-battles')) && require('./verify-req190-battles.cjs');
+const battleReports = (guildRoles || recruitment || process.argv.includes('--guild-battles')) && require('./verify-req190-battles.cjs');
 const suite = process.argv.find(arg => arg.startsWith('--suite='))?.slice(8);
 const withCatalog = checkDecor || !!suite;
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
@@ -53,7 +54,7 @@ async function main() {
     return { user, access_token: signer({ sub: id, role: 'authenticated', aud: 'authenticated' }),
       refresh_token: randomUUID(), token_type: 'bearer', expires_in: 3600, expires_at: Math.floor(Date.now() / 1000) + 3600 };
   });
-  let db, dbStarted, rest, gateway, app, browser;
+  let db, dbStarted, rest, gateway, app, browser, verifiedRoles = false;
   const links = [];
   const checks = [];
   const pass = name => { checks.push(name); console.log('PASS', name); };
@@ -74,6 +75,8 @@ async function main() {
     if (battleReports) await battleReports.setup(db, sessions);
     if (recruitment) await recruitment.setup(db, sessions);
     else if (battleReports) await db.query(fs.readFileSync(path.join(root,'sql','59_req212_guild_recruitment.sql'),'utf8'));
+    if (battleReports) await require('./verify-guild-roles-real.cjs').setupSchema(db);
+    if (guildRoles) await guildRoles.setup(db, sessions);
     {
       const records = JSON.parse(fs.readFileSync(path.join(root,'data/task083/catalog-current-2335.json'),'utf8'));
       await db.query('create table decor_catalog (record_id integer primary key,entry_type integer,name text)');
@@ -165,7 +168,8 @@ async function main() {
       }
       // Unrelated legacy modules see an empty guild and empty notifications.
       if (!/^\/rest\/v1\/(?:housing_|rpc\/(?:save_housing|discover_housing|[a-z_]*housing_[a-z_]*))/.test(req.url) &&
-          !(battleReports && (battleReports.allows(req.url) || req.url === '/rest/v1/rpc/req212_read_card')) &&
+          !(battleReports && (battleReports.allows(req.url) || req.url === '/rest/v1/rpc/req212_read_card' || /^\/rest\/v1\/rpc\/req191_/.test(req.url))) &&
+          !(guildRoles && /^\/rest\/v1\/raid_members\?/.test(req.url)) &&
           !(recruitment && recruitment.allows(req.url)) &&
           !(lootReadback && /^\/rest\/v1\/(?:guild_members|guilds|loot_drops|rpc\/req19[19]_submit_loot)(?:\?|$)/.test(req.url)) &&
           !(withCatalog && /^\/rest\/v1\/(?:decor_item_|decor_plan|rpc\/(?:record_decor|set_decor|favorite_decor))/.test(req.url))) {
@@ -210,7 +214,7 @@ async function main() {
       const page = await context.newPage();
       page.on('pageerror', e => errors.push(e.message));
       page.setDefaultTimeout(9000);
-      if (recruitment) {
+      if (recruitment || guildRoles) {
         await page.goto(base + '/#/team/guild-settings');
       } else {
         await page.goto(base + '/#/house/community');
@@ -219,11 +223,12 @@ async function main() {
       return page;
     }
     const author = await open(sessions[0], 1920);
-    if (recruitment) {
+    if (recruitment || guildRoles) {
       const precedingChecks = checks.length;
-      await recruitment.verify({author, guest:await open(null,1366), viewer:await open(sessions[1],1366), open, db, sessions, base, output, pass});
+      await (guildRoles || recruitment).verify({author, guest:await open(null,1366), viewer:await open(sessions[1],1366), open, db, sessions, base, output, pass});
       assert.deepEqual(errors, []);
       fs.writeFileSync(path.join(output,'verification.json'), JSON.stringify({browser:browser.version(), database:'本地一次性 PostgreSQL / PostgREST', authentication:'模拟账号、认证服务与登录会话', checks:checks.slice(precedingChecks)},null,2)+'\n');
+      verifiedRoles = !!guildRoles;
       return;
     }
     if (battleReports) {
@@ -604,6 +609,14 @@ async function main() {
     for (const entry of links) fs.rmdirSync(entry);
     if (fs.realpathSync(path.dirname(temp)) === fs.realpathSync(os.tmpdir()) && path.basename(temp).startsWith('wb-req203-')) {
       fs.rmSync(temp, { recursive: true, force: true });
+    }
+    if (verifiedRoles) {
+      assert.equal(fs.existsSync(temp), false, '本轮隔离数据库目录已移除');
+      assert.ok(rest.exitCode !== null || rest.signalCode, '本轮 PostgREST 已退出');
+      const file = path.join(output, 'verification.json');
+      const report = JSON.parse(fs.readFileSync(file, 'utf8'));
+      report.cleanup = 'Chrome、测试服务、PostgREST 及 PostgreSQL 已停止，本轮临时目录和全部测试会籍已移除';
+      fs.writeFileSync(file, JSON.stringify(report, null, 2)+'\n');
     }
   }
 }

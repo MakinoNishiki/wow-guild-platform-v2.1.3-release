@@ -10,9 +10,13 @@
   });
   let editor = null;
 
+  function canOpen() {
+    return ['video','publish','withdraw'].some(key => GuildRoles.can(key));
+  }
+
   function sameIdentity(context) {
     return !!context && CloudSync.getCurrentGuild()?.id === context.guildId &&
-      CloudSync.getCachedUser()?.id === context.userId && !!CloudSync.canEdit();
+      CloudSync.getCachedUser()?.id === context.userId && canOpen();
   }
 
   function active(context) {
@@ -26,6 +30,7 @@
     if (guildId) link.href = '/guild-report.html?guild=' + encodeURIComponent(guildId);
     else link.removeAttribute('href');
     if (editor && !sameIdentity(editor)) closeModal(modalId);
+    else if (editor) controls(editor);
   }
 
   function formatTime(value) {
@@ -161,9 +166,9 @@
         draw();
         panel.querySelectorAll('.battle-material-line')[entry.videos.length - 1].querySelector('input').focus();
       });
-      addVideo.disabled = entry.videos.length >= 8;
+      addVideo.disabled = !GuildRoles.can('video') || entry.videos.length >= 8;
       actions.append(addVideo);
-      if (options.length) {
+      if (options.length && GuildRoles.can('publish')) {
         const addHonor = editButton('登记成就', () => {
           entry.honors.push({id: 0, subject: '', earnedOn: '', proofUrl: ''});
           draw();
@@ -172,6 +177,8 @@
         addHonor.disabled = entry.honors.length >= 80;
         actions.append(addHonor);
       }
+      panel.querySelectorAll('.battle-material-line input,.battle-material-line button').forEach(el => el.disabled = !GuildRoles.can('video'));
+      panel.querySelectorAll('.battle-honor-fields input,.battle-honor-fields button,.battle-honor-fields select').forEach(el => el.disabled = !GuildRoles.can('publish'));
       panel.append(actions);
       if (entry.honors.length) panel.append(evidenceNode('p', '请核对游戏内获得者、解锁日期和本场战斗。上述资料及凭据将在发布后公开。'));
     }
@@ -248,13 +255,13 @@
     element('Reload').hidden = !context.reloadOffered;
     element('Reload').disabled = !!context.busy;
     element('Preview').disabled = !ready;
-    element('Message').disabled = !context.loaded || !!context.busy;
+    element('Message').disabled = !GuildRoles.can('publish') || !context.loaded || !!context.busy;
     element('Evidence').querySelectorAll('fieldset').forEach(panel => { panel.disabled = !ready; });
-    element('Draft').hidden = !context.loaded || published;
-    element('Publish').hidden = !context.loaded;
+    element('Draft').hidden = (!GuildRoles.can('video') && !GuildRoles.can('publish')) || !context.loaded || published;
+    element('Publish').hidden = !GuildRoles.can('publish') || !context.loaded;
     element('Draft').disabled = element('Publish').disabled = !ready || !context.previewToken;
     element('Publish').textContent = published ? '更新已发布战报' : '发布战报';
-    element('Withdraw').hidden = !published;
+    element('Withdraw').hidden = !GuildRoles.can('withdraw') || !published;
     element('Withdraw').disabled = !ready;
     element('Sharing').hidden = !published || changed || !!context.stale;
     if (!element('Sharing').hidden) {
@@ -446,6 +453,7 @@
   }
 
   async function save(action) {
+    if (action === 'draft' ? !GuildRoles.can('video') && !GuildRoles.can('publish') : !GuildRoles.can(action)) return;
     const context = editor;
     if (!active(context) || context.busy || context.stale || !context.loaded) return;
     if (action === 'withdraw') {
@@ -562,5 +570,5 @@
     if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
   });
 
-  window.GuildBattleEditor = { open, clear, syncContext, isDirty, isSaving: () => editor?.busy === 'save', write, readBack };
+  window.GuildBattleEditor = { canOpen, open, clear, syncContext, isDirty, isSaving: () => editor?.busy === 'save', write, readBack };
 })();

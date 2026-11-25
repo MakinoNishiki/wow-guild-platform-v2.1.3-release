@@ -1,0 +1,37 @@
+.gr-tools,.gr-badge,.gr-footer,.gr-assign { display:flex; align-items:center; gap:8px; }
+.gr-badge { display:inline-flex; gap:5px; color:var(--gold); font-weight:600; }
+.gr-piece { width:20px; height:20px; flex:none; vertical-align:middle; }
+.gr-modal { width:min(880px,95vw); max-width:880px; }
+.gr-modal .modal-body { overflow:auto; }
+.gr-layout { display:grid; grid-template-columns:minmax(135px,180px) minmax(0,1fr); gap:20px; }
+.gr-nav { position:sticky; top:0; display:flex; align-self:start; flex-direction:column; gap:3px; max-height:60vh; overflow:auto; }
+.gr-nav button { padding:7px 9px; text-align:left; background:transparent; color:var(--text-secondary); border:1px solid transparent; border-radius:4px; cursor:pointer; overflow-wrap:anywhere; }
+.gr-nav button[aria-pressed=true],.gr-nav button:hover { background:var(--bg-hover,#222832); border-color:var(--border-color,#4b4f57); }
+.gr-nav #grmNew { color:var(--gold); border-style:dashed; border-color:var(--border-color,#50545c); margin-top:6px; }
+.gr-editor { min-width:0; }
+.gr-editor h4 { margin:0 0 14px; color:var(--gold); }
+.gr-field { display:grid; gap:6px; margin:0 0 14px; color:var(--text-secondary); }
+.gr-field input,.gr-field select { width:100%; box-sizing:border-box; background:var(--bg-primary,#101419); border:1px solid var(--border-color,#464c55); border-radius:4px; padding:8px; color:var(--text-primary); }
+.gr-editor fieldset { min-width:0; border:0; padding:0; margin:15px 0; }
+.gr-editor legend { margin:0 0 7px; color:var(--gold); font-weight:600; }
+.gr-pieces { display:grid; grid-template-columns:repeat(auto-fit,minmax(86px,1fr)); gap:6px; }
+.gr-pieces label { position:relative; min-width:0; }
+.gr-pieces input { position:absolute; opacity:0; }
+.gr-pieces label>span { display:flex; align-items:center; justify-content:center; gap:4px; padding:5px 3px; font-size:13px; white-space:nowrap; border:1px solid var(--border-color,#424a53); border-radius:4px; cursor:pointer; }
+.gr-pieces input:checked+span { background:#3c3323; border-color:var(--gold); }
+.gr-pieces input:focus-visible+span { outline:2px solid var(--gold); outline-offset:2px; }
+.gr-grants label { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:7px 2px; border-top:1px solid var(--border-color,#383d45); }
+.gr-grants input { appearance:none; width:29px; height:16px; flex:none; border:1px solid #65717d; border-radius:10px; padding:2px; background:#343b44; cursor:pointer; }
+.gr-grants input::before { content:''; display:block; border-radius:50%; background:#b7c0c8; width:10px; height:10px; }
+.gr-grants input:checked { background:#80662f; border-color:#d8b569; }
+.gr-grants input:checked::before { transform:translateX(12px); background:#ffdf9b; }
+.gr-grants input:disabled { cursor:default; }
+.gr-fixed { color:var(--text-secondary); margin:15px 0; font-size:13px; }
+.gr-fixed summary { cursor:pointer; }
+.gr-fixed p { margin:7px 0; }
+.gr-assign { border-top:1px solid var(--border-color,#444); padding-top:8px; align-items:flex-end; }
+.gr-assign .gr-field { flex:1; margin:0; }
+.gr-footer #grmStatus { margin-right:auto; color:var(--gold); }
+.gr-footer #grmStatus.gr-error { color:var(--danger,#ff9c89); }
+#guildRolesModal [hidden],#guildRoleManager[hidden] { display:none; }
+@media (max-width:650px) { .gr-layout { grid-template-columns:1fr; gap:12px; } .gr-nav { position:static; flex-direction:row; overflow:auto; } .gr-nav button { flex:none; } }

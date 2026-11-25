@@ -426,7 +426,8 @@
     // 侧栏导航回默认序（无偏好 → applyNavOrder 落 DOM 原序快照，见 app.js BUG-078 段）
     if (typeof window.applyNavOrder === 'function') window.applyNavOrder();
     // BUG-012：登出时清除 viewer 权限门状态
-    if (typeof document !== 'undefined') document.body.classList.remove('viewer-mode');
+    if (typeof document !== 'undefined') document.body.dataset.guildGrants = '';
+    window.GuildRoles?.scopeChanged();
     // 任务书 #59 WP1：登出落地汇聚 app.js iaOnSignedOut（游客壳 #/home，不盖登录遮罩）；
     // 钩子缺席时回退旧行为（盖登录遮罩）
     if (typeof window.iaOnSignedOut === 'function') {
@@ -676,6 +677,7 @@
 
   // ---- 重新加载指定模块数据（写成功后回读数据库最新状态） ----
   async function reloadData(dataType, payload) {
+    if (dataType === 'guildRoles') return window.GuildRoles.readBack(payload);
     if (dataType === 'guildRecruitment') {
       const row = await guildRecruitmentRequest(payload.guildId);
       if (!row.card || row.revision !== payload.savedRevision) {
@@ -985,6 +987,10 @@
   }
 
   async function saveCloudData(dataType, operation, item, extra) {
+    if (dataType === 'guildRoles') {
+      await window.GuildRoles.write(operation, item);
+      return;
+    }
     if (dataType === 'guildRecruitment') {
       if (operation !== 'save') throw new Error('不支持的招募卡操作');
       const result = await guildRecruitmentRequest(item.guildId,item);

@@ -1,0 +1,24 @@
+{
+  "site": "https://wow.ddctl.com",
+  "priorRelease": "7f4641842de7edf0a9a7b73b1724e9d86e1418cc",
+  "migration": "sql/60_req191_guild_roles.sql",
+  "appliedSha256": "e211a2cb1fac4723162966dd70743eb29bbb25279f902106ac5dec137acf28de",
+  "backup": {
+    "path": "/root/wowbutler-backups/req191-chess-20261125T144904Z/before.dump",
+    "bytes": 1550825,
+    "sha256": "bed44a7406368bc8f7897233a7ad48b6ede8cc1f93243a4fddff8d660e5597c6",
+    "restoreStreamVerified": true
+  },
+  "transaction": "首次执行因数据库维护身份权限不足整笔回滚，核实回滚后改用现有数据库维护身份重新执行成功",
+  "verified": {
+    "guildsWithOwnerRead": 19,
+    "memberships": 36,
+    "existingAssignmentsMatchBefore": true,
+    "newCustomAssignments": 0,
+    "editorCanEditRecruitment": true,
+    "editorCanBindGuildWcl": false,
+    "rlsEnabled": true,
+    "clientRoleCannotWriteDirect": true
+  },
+  "checkedAt": "2026-11-25T15:02:49.1014802Z"
+}

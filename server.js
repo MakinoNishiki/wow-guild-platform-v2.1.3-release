@@ -581,15 +581,26 @@ function supabaseRestGet(restPath) {
 
 // 查询用户在指定公会的角色（owner/editor/viewer），非成员返回 null
 async function getGuildRole(guildId, userId) {
+  if (!isGuildUuid(guildId) || !isGuildUuid(userId)) return null;
   const { body } = await supabaseRestGet(
     `/rest/v1/guild_members?guild_id=eq.${guildId}&user_id=eq.${userId}&select=role&limit=1`
   );
   return Array.isArray(body) && body[0] ? body[0].role : null;
 }
 
+// Read the effective permission from the database for every protected operation. A role
+// reassignment or switch change must take effect even for an already signed-in member.
+async function hasGuildPermission(guild, user, permission) {
+  if (!isGuildUuid(guild) || !isGuildUuid(user)) return false;
+  const result = await supabaseRestWrite('POST','/rest/v1/rpc/req191_has_permission',{
+    p_guild:guild, p_user:user, p_permission:permission
+  });
+  return result.status === 200 && result.body === true;
+}
+
 // 解析 query string 中的 eq. 过滤条件 → { 列名: [值, ...] }
 function parseEqFilters(queryString) {
-  const filters = {};
+  const filters = Object.create(null);
   const qs = (queryString || "").replace(/^\?/, "");
   for (const pair of qs.split("&")) {
     if (!pair) continue;
@@ -649,49 +660,64 @@ async function resolveGuildIds(table, filters, rows) {
   rows.forEach((r) => add(r && r.guild_id));
   (filters.guild_id || []).forEach(add);
 
-  // 2. activity_attendance：从 activity_id 联查 activities
-  if (table === "activity_attendance") {
-    const activityIds = new Set();
-    rows.forEach((r) => r && r.activity_id && activityIds.add(r.activity_id));
-    (filters.activity_id || []).forEach((v) => activityIds.add(v));
-    for (const actId of activityIds) {
-      const { body } = await supabaseRestGet(`/rest/v1/activities?id=eq.${actId}&select=guild_id&limit=1`);
-      if (Array.isArray(body) && body[0]) add(body[0].guild_id);
+  // Resolve the stored record independently of any submitted guild_id and check referenced
+  // characters/activities in batches. A stale or missing reference cannot authorize a write.
+  async function collect(target, ids, viaActivity = false) {
+    const values = [...new Set(ids.filter(value => value != null))];
+    for (let start = 0; start < values.length; start += 80) {
+      const chunk = values.slice(start, start + 80);
+      const select = viaActivity ? 'id,activities!inner(guild_id)' : 'id,guild_id';
+      const {status,body} = await supabaseRestGet(`/rest/v1/${target}?id=in.(${chunk.join(',')})&select=${select}`);
+      if (status !== 200 || !Array.isArray(body) || body.length !== chunk.length) return false;
+      for (const row of body) {
+        const guild = viaActivity ? row.activities?.guild_id : row.guild_id;
+        if (!isGuildUuid(guild)) return false;
+        add(guild);
+      }
     }
+    return true;
   }
-
-  // 3. wishlists 按 member_id 过滤：联查 raid_members
-  if (table === "wishlists" && filters.member_id) {
-    for (const memberId of filters.member_id) {
-      const { body } = await supabaseRestGet(`/rest/v1/raid_members?id=eq.${memberId}&select=guild_id&limit=1`);
-      if (Array.isArray(body) && body[0]) add(body[0].guild_id);
-    }
-  }
-
-  // 4. 仅按 id 过滤（PATCH/DELETE）：查行取 guild_id
-  if (filters.id && ["raid_members", "activities", "loot_records", "wishlists", "claim_requests", "deleted_raid_members", "loot_drops"].includes(table)) {
-    for (const rowId of filters.id) {
-      const { body } = await supabaseRestGet(`/rest/v1/${table}?id=eq.${rowId}&select=guild_id&limit=1`);
-      if (Array.isArray(body) && body[0]) add(body[0].guild_id);
-    }
-  }
+  const refs = field => [...(filters[field] || []), ...rows.map(row => row?.[field])];
+  if (!await collect(table, filters.id || [], table === 'activity_attendance')) return new Set();
+  if (table === 'activity_attendance' && !await collect('activities',refs('activity_id'))) return new Set();
+  if (['activity_attendance','wishlists','claim_requests'].includes(table) && !await collect('raid_members',refs('member_id'))) return new Set();
+  if (table === 'loot_records' && (!await collect('raid_members',refs('character_id')) ||
+      !await collect('activities',refs('allocation_activity_id')))) return new Set();
 
   return guildIds;
 }
 
 // 按 id 查询单行（用于归属判断）
 async function fetchRowById(table, id, select) {
-  const { body } = await supabaseRestGet(`/rest/v1/${table}?id=eq.${id}&select=${select}&limit=1`);
-  return Array.isArray(body) && body[0] ? body[0] : null;
+  const { status,body } = await supabaseRestGet(`/rest/v1/${table}?id=eq.${encodeURIComponent(id)}&select=${select}&limit=1`);
+  if (status !== 200 || !Array.isArray(body)) throw new Error('无法核实记录归属');
+  return body[0] || null;
 }
 
 // 鉴权主函数：返回 { ok, status, message }
+const guildWritePermissions = Object.freeze({
+  raid_members:'assign-claim', claim_requests:'assign-claim', deleted_raid_members:'assign-claim',
+  activities:'attendance', activity_attendance:'attendance', loot_records:'allocate', wishlists:'wishlist'
+});
 async function authorizeProxyRequest(user, table, method, queryString, rawBody) {
   const uid = user.id;
   const deny = (message) => ({ ok: false, status: 403, message });
   const badRequest = (message) => ({ ok: false, status: 400, message });
   const filters = parseEqFilters(queryString);
   const rows = parseBodyRows(rawBody);
+  const isGuildData = Object.hasOwn(guildWritePermissions,table);
+  if (isGuildData || table === 'guild_members' || table === 'guilds') {
+    const fields = ['id','guild_id','member_id','character_id','activity_id','allocation_activity_id'];
+    if (method !== 'GET' && [...new URLSearchParams(queryString)].some(([column,value]) =>
+      !/^[a-z_]+$/.test(column) || !value.startsWith('eq.') || ['select','columns','on_conflict','or','and'].includes(column))) {
+      return badRequest('请使用记录本身的精确过滤条件');
+    }
+    for (const field of fields) {
+      if ([...(filters[field] || []),...rows.map(row => row?.[field])].some(value => value != null && !isGuildUuid(value))) {
+        return badRequest('记录编号无效');
+      }
+    }
+  }
 
   if (['housing_builds', 'housing_build_gallery', 'housing_build_images'].includes(table)) return deny('家宅作品请使用专用入口');
   if (table.startsWith('housing_community_') || ['housing_build_reactions','housing_build_comments','housing_build_community_totals'].includes(table)) return deny('社区互动请使用专用入口');
@@ -733,7 +759,7 @@ async function authorizeProxyRequest(user, table, method, queryString, rawBody) 
       }
       return { ok: true };
     }
-    // PATCH/DELETE：仅 owner
+    // PATCH/DELETE：资料和认领设置独立授权，其他设置由会长维护。
     // 任务书 #70：wcl_* 绑定字段只走 /api/wcl/bind-*、/api/wcl/unbind-guild 专用端点
     // （服务端核实 WCL 公会名、统一中文报错、token 密文不落明文），通用代理一律拦截
     if (method === "PATCH" && rows.some((row) => row && Object.keys(row).some((k) => k.startsWith("wcl_")))) {
@@ -742,8 +768,16 @@ async function authorizeProxyRequest(user, table, method, queryString, rawBody) 
     const ids = filters.id || [];
     if (ids.length === 0) return badRequest("修改或删除公会必须提供公会 ID");
     for (const guildId of ids) {
-      const role = await getGuildRoleCached(guildId, uid);
-      if (role !== "owner") return deny("仅公会会长可以修改或删除公会");
+      const fields = rows.flatMap(row => Object.keys(row || {}));
+      const profilePermissions = {
+        description:'settings', loot_rule_type:'settings', loot_rule_text:'settings',
+        show_claimer_label:'settings', claim_mode:'claim-mode'
+      };
+      if (method === 'PATCH' && fields.every(key => Object.hasOwn(profilePermissions,key))) {
+        for (const permission of new Set(fields.map(key => profilePermissions[key]))) {
+          if (!await hasGuildPermission(guildId,uid,permission)) return deny('缺少相应的公会资料编辑权限');
+        }
+      } else if (await getGuildRole(guildId,uid) !== 'owner') return deny("仅公会会长可以修改或删除公会");
     }
     return { ok: true };
   }
@@ -772,11 +806,11 @@ async function authorizeProxyRequest(user, table, method, queryString, rawBody) 
     // PATCH/DELETE：解析目标行
     const ids = filters.id || [];
     if (ids.length === 0) return badRequest("修改或删除公会成员必须提供成员关系 ID");
-    if (method === "PATCH" && rows.some(row => !row || Object.keys(row).some(key => !['display_name','role'].includes(key)))) {
-      return deny("仅可修改成员的显示名或角色");
+    if (method === "PATCH" && rows.some(row => !row || Object.keys(row).some(key => key !== 'display_name'))) {
+      return deny("请使用角色管理入口分配公会身份");
     }
     for (const rowId of ids) {
-      const row = await fetchRowById("guild_members", rowId, "guild_id,user_id");
+      const row = await fetchRowById("guild_members", rowId, "guild_id,user_id,role");
       if (!row) continue; // 目标不存在，no-op 放行
       if (method === "PATCH") {
         // 任务书 #22 WP3-④：本人改名同步公会快照 窄例外——单行（filters.id 与 body 均单条）
@@ -786,13 +820,13 @@ async function authorizeProxyRequest(user, table, method, queryString, rawBody) 
           "display_name" in rows[0] &&
           Object.keys(rows[0]).every((k) => k === "display_name");
         if (!(onlyDisplayName && row.user_id === uid)) {
-          const role = await getGuildRoleCached(row.guild_id, uid);
-          if (role !== "owner") return deny("仅公会会长可以变更成员角色");
+          const role = await getGuildRole(row.guild_id, uid);
+          if (role !== "owner") return deny("仅公会会长可以修改其他成员的显示名");
         }
       } else if (method === "DELETE") {
-        if (row.user_id === uid) continue; // 退出自己的公会，允许
-        const role = await getGuildRoleCached(row.guild_id, uid);
-        if (role !== "owner") return deny("仅公会会长可以移除成员");
+        if (row.role === 'owner') return deny('请先完成会长交接');
+        if (row.user_id === uid) continue;
+        if (!await hasGuildPermission(row.guild_id,uid,'remove')) return deny('缺少移出公会成员权限');
       }
     }
     return { ok: true };
@@ -886,12 +920,11 @@ async function authorizeProxyRequest(user, table, method, queryString, rawBody) 
         if (isSelfClaim) {
           const g = await fetchRowById("guilds", target.guild_id, "claim_mode");
           const mode = (g && g.claim_mode) || "free";
-          if (mode === "free") return { ok: true };
+          if (mode === "free" && await hasGuildPermission(target.guild_id,uid,'claim')) return { ok: true };
           // 任务书 #21-补丁 A：approval/assign 拒绝「认领形态」前先解析角色（复用 getGuildRoleCached）——
           // owner/editor 的管理权不被窄例外短路：不落拒绝，放行落入下方通用业务分支（通用分支再校验一次，双保险）；
           // viewer/非成员维持现状拒绝（文案不变）。
-          const role = await getGuildRoleCached(target.guild_id, uid);
-          const isManager = role === "owner" || role === "editor";
+          const isManager = await hasGuildPermission(target.guild_id,uid,'assign-claim');
           if (!isManager) {
             if (mode === "assign") return deny("本公会由管理者统一分配认领");
             return deny("本公会认领需审核，请提交认领申请");
@@ -915,7 +948,7 @@ async function authorizeProxyRequest(user, table, method, queryString, rawBody) 
       const member = await fetchRowById("raid_members", rows[0].member_id, "guild_id,user_id");
       if (member && member.guild_id === rows[0].guild_id && member.user_id === null) {
         const g = await fetchRowById("guilds", rows[0].guild_id, "claim_mode");
-        if (g && g.claim_mode === "approval") return { ok: true };
+        if (g && g.claim_mode === "approval" && await hasGuildPermission(member.guild_id,uid,'claim')) return { ok: true };
       }
     }
   }
@@ -944,7 +977,7 @@ async function authorizeProxyRequest(user, table, method, queryString, rawBody) 
   // viewer 的 INSERT/撤回已在上方窄例外处理。
   // deleted_raid_members（任务书 #27 WP2）：垃圾桶表，INSERT（删除成员时写快照）走本通用分支，无新权限分支。
   // loot_drops（任务书 #75）：拾取记录表，导入/删除走本通用分支（owner/editor 可写，viewer 只读）。
-  if (["raid_members", "activities", "activity_attendance", "loot_records", "wishlists", "claim_requests", "deleted_raid_members", "loot_drops"].includes(table)) {
+  if (isGuildData) {
     // REQ-020（任务书 #12）：activities.status 白名单校验，仅 normal / cancelled。
     // 仅针对 activities 表（raid_members 的 status 是中文，不受影响）；行不带 status 字段不校验。
     if (table === "activities" && (method === "POST" || method === "PATCH")) {
@@ -954,18 +987,12 @@ async function authorizeProxyRequest(user, table, method, queryString, rawBody) 
         }
       }
     }
+    if (method !== 'POST' && !filters.id && !filters.guild_id && !(table === 'activity_attendance' && filters.activity_id)
+        && !(table === 'wishlists' && filters.member_id)) return badRequest('请指定要修改的记录或公会');
     const guildIds = await resolveGuildIds(table, filters, rows);
-    if (guildIds.size === 0) {
-      // 精确 id 指向不存在记录时操作必然 no-op；其余归属不明请求一律拒绝。
-      if ((method === "PATCH" || method === "DELETE") && filters.id) return { ok: true };
-      return badRequest("无法确认目标数据所属公会");
-    }
-    for (const guildId of guildIds) {
-      const role = await getGuildRoleCached(guildId, uid);
-      if (role !== "owner" && role !== "editor") {
-        return deny("无权修改该公会数据（需要编辑或以上权限）");
-      }
-    }
+    if (guildIds.size !== 1) return badRequest("无法确认目标数据属于同一公会");
+    const [guild] = guildIds;
+    if (!await hasGuildPermission(guild,uid,guildWritePermissions[table])) return deny("缺少此项公会权限");
     return { ok: true };
   }
 
@@ -1185,10 +1212,9 @@ async function handleWclRequest(req, res, corsHeaders, withSnapshot) {
     const guildId = payload.guildId;
     if (!guildId) return send(400, { message: "缺少公会 ID（guildId）" });
 
-    const role = await getGuildRoleCached(guildId, user.id);
-    if (role !== "owner" && role !== "editor") {
-      return send(403, { message: "无权修改该公会数据（需要编辑或以上权限）" });
-    }
+    const required = withSnapshot ? ['attendance'] : ['find-wcl','attendance','assign-claim'];
+    const grants = await Promise.all(required.map(permission => hasGuildPermission(guildId,user.id,permission)));
+    if (!grants.some(Boolean)) return send(403, { message: "缺少读取该活动报告的权限" });
 
     const code = parseReportCode(payload.reportCode);
     if (!code) return send(400, { message: "无法识别的 WCL 报告链接或代码" });
@@ -1196,7 +1222,7 @@ async function handleWclRequest(req, res, corsHeaders, withSnapshot) {
     let snapshotExtra = {};
     if (withSnapshot) {
       const activityId = payload.activityId;
-      if (!activityId) return send(400, { message: "缺少活动 ID（activityId）" });
+      if (!isGuildUuid(activityId)) return send(400, { message: "活动编号无效" });
       const { body } = await supabaseRestGet(
         `/rest/v1/activities?id=eq.${activityId}&select=guild_id,wcl_snapshot&limit=1`
       );
@@ -1332,27 +1358,23 @@ async function fetchWclGuildInfo(params) {
 }
 
 // 绑定/解绑/同步/看板共用：JWT → 公会角色鉴权 → 读公会行
-// roleFloor: 'editor' = owner/editor；'member' = 任意公会成员
-async function wclGuildAuth(req, send, guildId, roleFloor) {
+// WCL 查找 / 绑定、报告发现、团队统计分别授权。
+async function wclGuildAuth(req, send, guildId, permission) {
   const authHeader = req.headers["authorization"] || "";
   const token = authHeader.replace("Bearer ", "");
   if (!token) { send(401, { message: "未登录或登录已过期，请重新登录" }); return null; }
   const user = await verifyTokenCached(token);
   if (!user) { send(401, { message: "登录状态无效，请重新登录" }); return null; }
   if (!guildId) { send(400, { message: "缺少公会 ID（guildId）" }); return null; }
-  const role = await getGuildRoleCached(guildId, user.id);
-  if (roleFloor === "member") {
-    if (!role) { send(403, { message: "无权访问该公会数据" }); return null; }
-  } else if (role !== "owner" && role !== "editor") {
-    send(403, { message: "无权修改该公会数据（需要编辑或以上权限）" });
-    return null;
+  if (!await hasGuildPermission(guildId,user.id,permission)) {
+    send(403, { message:"缺少此项公会权限" }); return null;
   }
   const { body } = await supabaseRestGet(
     `/rest/v1/guilds?id=eq.${encodeURIComponent(guildId)}&select=id,wcl_guild_id,wcl_guild_name,wcl_server_name,wcl_region,wcl_bind_method,wcl_auto_create_event&limit=1`
   );
   const guild = Array.isArray(body) && body[0] ? body[0] : null;
   if (!guild) { send(404, { message: "公会不存在" }); return null; }
-  return { user, role, guild };
+  return { user, guild };
 }
 
 // GET /api/wcl/guild-lookup?guildId=&id= 或 ?guildId=&name=&server=&region=
@@ -1362,7 +1384,7 @@ async function handleWclGuildLookup(req, res, corsHeaders, query) {
     res.end(JSON.stringify(obj));
   };
   try {
-    const auth = await wclGuildAuth(req, send, query.guildId, "editor");
+    const auth = await wclGuildAuth(req, send, query.guildId, "wcl");
     if (!auth) return;
     const params = { region: (query.region || "cn").toLowerCase() };
     const rawId = String(query.id || "").trim();
@@ -1395,13 +1417,14 @@ async function handleWclBindPaste(req, res, corsHeaders) {
     const rawBody = await readBody(req);
     let payload = {};
     try { payload = JSON.parse(rawBody || "{}"); } catch { payload = {}; }
-    const auth = await wclGuildAuth(req, send, payload.guildId, "editor");
+    const auth = await wclGuildAuth(req, send, payload.guildId, "wcl");
     if (!auth) return;
     if (auth.guild.wcl_guild_id) return send(409, { message: "已绑定 WCL 公会，请先解绑再重新绑定" });
     const wclGuildId = Number(payload.wclGuildId);
     if (!Number.isInteger(wclGuildId) || wclGuildId <= 0) return send(400, { message: "WCL 公会 ID 必须是数字" });
     const info = await fetchWclGuildInfo({ id: wclGuildId, region: "cn" });
     if (!info) return send(404, { message: "未找到该 WCL 公会（请核对链接/名称与服务器）" });
+    if (!await hasGuildPermission(payload.guildId,auth.user.id,"wcl")) return send(403,{message:"公会绑定权限已变化"});
     const wr = await supabaseRestWrite("PATCH", `/rest/v1/guilds?id=eq.${encodeURIComponent(payload.guildId)}`, {
       wcl_guild_id: info.id,
       wcl_guild_name: info.name,
@@ -1431,9 +1454,10 @@ async function handleWclUnbind(req, res, corsHeaders) {
     const rawBody = await readBody(req);
     let payload = {};
     try { payload = JSON.parse(rawBody || "{}"); } catch { payload = {}; }
-    const auth = await wclGuildAuth(req, send, payload.guildId, "editor");
+    const auth = await wclGuildAuth(req, send, payload.guildId, "wcl");
     if (!auth) return;
     if (!auth.guild.wcl_guild_id) return send(400, { message: "当前公会尚未绑定 WCL" });
+    if (!await hasGuildPermission(payload.guildId,auth.user.id,"wcl")) return send(403,{message:"公会绑定权限已变化"});
     const wr = await supabaseRestWrite("PATCH", `/rest/v1/guilds?id=eq.${encodeURIComponent(payload.guildId)}`, {
       wcl_guild_id: null,
       wcl_guild_name: null,
@@ -1482,7 +1506,7 @@ async function handleWclReports(req, res, corsHeaders, query) {
     res.end(JSON.stringify(obj));
   };
   try {
-    const auth = await wclGuildAuth(req, send, query.guildId, "editor");
+    const auth = await wclGuildAuth(req, send, query.guildId, "find-wcl");
     if (!auth) return;
     if (!auth.guild.wcl_guild_id) return send(400, { message: "当前公会尚未绑定 WCL，请先在公会设置中绑定" });
     const result = await fetchGuildReportsMarked(auth.guild);
@@ -1500,7 +1524,7 @@ async function handleWclReportFights(req, res, corsHeaders, query) {
     res.end(JSON.stringify(obj));
   };
   try {
-    const auth = await wclGuildAuth(req, send, query.guildId, "member");
+    const auth = await wclGuildAuth(req, send, query.guildId, "stats");
     if (!auth) return;
     const code = parseReportCode(query.code);
     if (!code) return send(400, { message: "无法识别的 WCL 报告代码" });
@@ -1572,19 +1596,22 @@ const readBattleEvidence = createBattleEvidenceReader({
   get: supabaseRestGet,
   query: (query, variables) => wclClientQuery(query, variables, true),
 });
-const handleLootObservations = require('./lib/lootObservationRoutes.cjs')({auth:verifyTokenCached,get:supabaseRestGet,write:supabaseRestWrite,body:readBody});
+const handleGuildRoles = require('./lib/guildRoleRoutes.cjs')({
+  auth:verifyTokenCached,write:supabaseRestWrite,body:readBody,onChange:() => roleCache.clear()
+});
+const handleLootObservations = require('./lib/lootObservationRoutes.cjs')({auth:verifyTokenCached,get:supabaseRestGet,write:supabaseRestWrite,body:readBody,can:hasGuildPermission});
 const handleGuildBattleReports = require('./lib/guildBattleReportRoutes.cjs')({
-  auth:verifyTokenCached, get:supabaseRestGet, write:supabaseRestWrite, body:readBody,
+  auth:verifyTokenCached, get:supabaseRestGet, write:supabaseRestWrite, body:readBody, can:hasGuildPermission,
   readBattleEvidence
 });
 const handleGuildRecruitment = require('./lib/guildRecruitmentRoutes.cjs')({auth:verifyTokenCached, write:supabaseRestWrite, body:readBody});
-const handlePeople = require('./lib/peopleRoutes.cjs')({auth:verifyTokenCached,get:supabaseRestGet,write:supabaseRestWrite,body:readBody});
+const handlePeople = require('./lib/peopleRoutes.cjs')({can:hasGuildPermission,auth:verifyTokenCached,get:supabaseRestGet,write:supabaseRestWrite,body:readBody});
 const handleHousingBuilds = require('./lib/housingBuildRoutes.cjs')({auth:verifyTokenCached,get:supabaseRestGet,write:supabaseRestWrite,body:readBody});
 const handleHousingSupplies = require('./lib/housingSupplyRoutes.cjs')({auth:verifyTokenCached,get:supabaseRestGet,write:supabaseRestWrite,body:readBody});
 const handleHousingCommunity = require('./lib/housingCommunityRoutes.cjs')({auth:verifyTokenCached,get:supabaseRestGet,write:supabaseRestWrite,body:readBody});
 const handleDecorEngagement = require('./lib/decorEngagementRoutes.cjs')({ auth: verifyTokenCached, get: supabaseRestGet, write: supabaseRestWrite, body: readBody, signingKey: getServiceRoleKey });
 const handleWclUser = require('./lib/wclUserRoutes.cjs')({
-  auth: verifyTokenCached, role: getGuildRoleCached, get: supabaseRestGet,
+  auth: verifyTokenCached, role: getGuildRole, can:hasGuildPermission, get: supabaseRestGet,
   write: supabaseRestWrite, body: readBody,
   exchange: async (code, redirectUri) => {
     loadEnv();
@@ -1663,6 +1690,7 @@ const server = http.createServer(async (req, res) => {
     return;
   }
   // REQ-185: authenticated account linking and confirmed batch claims.
+  if (await handleGuildRoles(req, res, corsHeaders, urlPath)) return;
   if (await handleLootObservations(req, res, corsHeaders, urlPath)) return;
   if (await handleGuildBattleReports(req, res, corsHeaders, urlPath)) return;
   if (await handleGuildRecruitment(req, res, corsHeaders, urlPath)) return;
@@ -1928,7 +1956,7 @@ const server = http.createServer(async (req, res) => {
       const perfAuthz = Date.now();
 
       const supabasePath = `/rest/v1/${table}${queryString}`;
-      const headers = req.method === 'POST' && ['guilds','guild_members','notifications'].includes(table)
+      const headers = req.method === 'POST' && (Object.hasOwn(guildWritePermissions,table) || ['guilds','guild_members','notifications'].includes(table))
         ? {...req.headers,prefer:'return=representation'} : req.headers;
       proxyToSupabase(req.method, supabasePath, headers, body, (result) => {
         const perfEnd = Date.now();

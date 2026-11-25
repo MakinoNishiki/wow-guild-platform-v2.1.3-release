@@ -34,10 +34,10 @@ window.GuildRecruitment = (() => {
   function busy() { return !!active?.saving; }
 
   function buttons(session) {
-    const owner = CloudSync.isOwner();
-    edit.hidden = !owner || !session.loaded || session.editing;
+    const allowed = GuildRoles.can('edit-card');
+    edit.hidden = !allowed || !session.loaded || session.editing;
     edit.textContent = session.row?.card ? '编辑招募卡' : '填写招募卡';
-    byId('grActions').hidden = !owner || !session.editing;
+    byId('grActions').hidden = !allowed || !session.editing;
     save.disabled = !session.formReady || session.saving || session.conflict;
     cancel.disabled = session.saving;
     if (content.firstElementChild) content.firstElementChild.inert = session.saving;
@@ -50,7 +50,7 @@ window.GuildRecruitment = (() => {
     const frame = content.firstElementChild;
     const api = form();
     if (!api) throw new Error('招募卡表单未能加载');
-    api.load({guild:CloudSync.getCurrentGuild(), card:session.row.card, canEdit:CloudSync.isOwner(), masterData:window.MasterData});
+    api.load({guild:CloudSync.getCurrentGuild(), card:session.row.card, canEdit:GuildRoles.can('edit-card'), masterData:window.MasterData});
     api.setView(session.editing ? 'edit' : 'read');
     session.formReady = true;
     buttons(session);
@@ -119,7 +119,7 @@ window.GuildRecruitment = (() => {
   }
 
   edit.onclick = () => {
-    if (!current(active) || !active.loaded || !CloudSync.isOwner()) return;
+    if (!current(active) || !active.loaded || !GuildRoles.can('edit-card')) return;
     active.editing = true;
     display(active);
   };
@@ -137,7 +137,7 @@ window.GuildRecruitment = (() => {
   };
   save.onclick = async () => {
     const session = active;
-    if (!current(session) || !session.editing || busy() || !session.formReady || session.conflict || !CloudSync.isOwner()) return;
+    if (!current(session) || !session.editing || busy() || !session.formReady || session.conflict || !GuildRoles.can('edit-card')) return;
     try {
       const card = form().getValue();
       session.saving = true;
@@ -163,6 +163,14 @@ window.GuildRecruitment = (() => {
     }
   };
 
+  function refreshPermissions() {
+    if (!current(active) || !active.loaded || active.saving) return;
+    if (active.editing && !GuildRoles.can('edit-card')) {
+      active.editing = false;
+      display(active, '你的招募卡编辑权限已变更。');
+    } else buttons(active);
+  }
+
   function refreshProfile() {
     if (current(active) && active.loaded && !active.editing && form()) draw(active);
   }
@@ -184,5 +192,5 @@ window.GuildRecruitment = (() => {
     }
   });
 
-  return { open, reset, dirty, busy, refreshProfile };
+  return { open, reset, dirty, busy, refreshPermissions, refreshProfile };
 })();

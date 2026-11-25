@@ -6,7 +6,7 @@
   const $=id=>document.getElementById(id);
   function syncGuild(){const id=CloudSync.getCurrentGuild()?.id;if(guild!==id){selected.clear();guild=id;visibleRows=[];}updateToolbar();}
   function updateToolbar(){const el=$('lootBatchCount');if(el)el.textContent=`已选 ${selected.size} 件`;}
-  function checkbox(d){return CloudSync.canEdit()&&!['merged','ignored'].includes(d.review_status)?`<input type="checkbox" class="loot-batch-check" aria-label="选择${esc(d.item_name)}，${esc(d.player_name)}" data-loot-select="${esc(d.id)}" ${selected.has(d.id)?'checked':''}>`:'';}
+  function checkbox(d){return (GuildRoles.can('review') || GuildRoles.can('allocate'))&&!['merged','ignored'].includes(d.review_status)?`<input type="checkbox" class="loot-batch-check" aria-label="选择${esc(d.item_name)}，${esc(d.player_name)}" data-loot-select="${esc(d.id)}" ${selected.has(d.id)?'checked':''}>`:'';}
   function visible(rows){visibleRows=rows;for(const id of selected)if(!rows.some(r=>r.id===id))selected.delete(id);updateToolbar();}
   function preview(rows,events){
     const groups=LootEvidence.completeness(rows,events);
@@ -16,7 +16,7 @@
   async function showTrades(drop,guildId,container){
     let panel=container.querySelector('.loot-trade-evidence');if(panel)panel.remove();
     panel=document.createElement('div');panel.className='loot-evidence-panel loot-trade-evidence';panel.textContent='正在读取交易参考…';container.append(panel);
-    if(!CloudSync.canEdit()){panel.textContent='交易证据由公会管理者核对。';return;}
+    if(!GuildRoles.can('review')){panel.textContent='交易证据由公会管理者核对。';return;}
     try{
       const r=await fetch('/api/loot-observations/evidence',{method:'POST',headers:{Authorization:'Bearer '+await CloudSync.getAccessToken(),'Content-Type':'application/json'},body:JSON.stringify({guildId,sourceDropId:drop.id})});const result=await r.json();
       if(CloudSync.getCurrentGuild()?.id!==guildId||!panel.isConnected)return;
@@ -25,7 +25,7 @@
     }catch(e){panel.textContent=(e.message||'交易参考暂不可用')+'；可继续人工核对，重新打开可重试。';}
   }
   async function review(){
-    syncGuild();if(busy||!CloudSync.canEdit())return;
+    syncGuild();if(busy||!GuildRoles.can('review'))return;
     const ids=[...selected];if(!ids.length)return showToast('请先勾选拾取记录','error');
     if(ids.length>50)return showToast('每批最多50件','error');
     if(!confirm(`确认核对这 ${ids.length} 件拾取？这不会自动分配装备。`))return;
@@ -46,7 +46,7 @@
   function snapshot(){return JSON.stringify([...document.querySelectorAll('#lootBatchModal input,#lootBatchModal select')].map(el=>el.value));}
   function statusChanged(tr){const status=tr.querySelector('[data-batch-status]').value,member=tr.querySelector('[data-batch-member]');if(status!=='已分配')member.value='';member.disabled=busy||status!=='已分配';member.style.color=window.IconMap?.classColor(appData.members.find(m=>m.id===member.value)?.class)||'var(--text-primary)';}
   async function open(){
-    syncGuild();if(busy||!CloudSync.canEdit())return;
+    syncGuild();if(busy||!GuildRoles.can('allocate'))return;
     const ids=[...selected];if(!ids.length||ids.length>50)return showToast('请勾选1至50件已核对的单件拾取','error');
     const g=guild;busy=true;setToolbarDisabled(true);
     try{
@@ -67,7 +67,7 @@
     finally{busy=false;setToolbarDisabled(false);}
   }
   async function save(){
-    if(busy||!CloudSync.canEdit())return;
+    if(busy||!GuildRoles.can('allocate'))return;
     if(CloudSync.getCurrentGuild()?.id!==openedGuild){$('lootBatchError').textContent='公会已切换，请关闭后重新打开';return;}
     const trs=[...$('lootBatchRows').querySelectorAll('tr')].filter(tr=>!tr.dataset.saved);
     const items=trs.map(tr=>({sourceDropId:tr.dataset.batchId,status:tr.querySelector('[data-batch-status]').value,characterId:tr.querySelector('[data-batch-member]').value||null,boss:tr.querySelector('[data-batch-boss]').value.trim(),activityId:$('lootBatchActivity').value||null,method:$('lootBatchMethod').value}));

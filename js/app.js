@@ -728,7 +728,7 @@ function renderUcGuildCard() {
   const roleEl = document.getElementById('ucGuildCardRole');
   if (roleEl && membership) {
     const roleLabels = { owner: '会长', editor: '编辑', viewer: '浏览' };
-    roleEl.textContent = roleLabels[membership.role] || membership.role;
+    roleEl.innerHTML = GuildRoles.ready() ? GuildRoles.badgeFor(window.CloudSync.getCachedUser()?.id) : (roleLabels[membership.role] || '团员');
     roleEl.className = `role-badge role-${membership.role}`;
     roleEl.style.display = '';
   }
@@ -1404,7 +1404,7 @@ async function cloudCrud(dataType, operation, payload, options = {}) {
     // 2. 重新读取数据库最新状态并更新 appData
     const refreshed = await window.CloudSync.reloadData(dataType, payload);
     // 战报由管理端逐条回读核对，不缓存私有草稿或预览凭据。
-    if (dataType === 'guildBattleReport' || dataType === 'guildRecruitment') return { success: true, row: refreshed };
+    if (dataType === 'guildBattleReport' || dataType === 'guildRecruitment' || dataType === 'guildRoles') return { success: true, row: refreshed };
     // 作者的原始蓝图仅用于本次编辑，单条云端回读后返回，不写进公会缓存。
     if (dataType === 'housingBuild' || dataType === 'housingBuildSupply' || dataType === 'decorEngagement' || dataType === 'housingCommunity') return { success: true, row: refreshed };
     const typesToReload = reloadTypes || [];
@@ -1887,74 +1887,7 @@ function openGuildSettings() {
 
 // 加载公会成员列表
 async function loadGuildMembers() {
-  const container = document.getElementById('guildMembersList');
-  if (!container) return;
-
-  const guildId = CloudSync.getCurrentGuild()?.id;
-  const userId = CloudSync.getCachedUser()?.id;
-  const stillMember = () => iaHasGuild() && guildId === CloudSync.getCurrentGuild()?.id &&
-    userId === CloudSync.getCachedUser()?.id;
-  if (!stillMember()) return;
-  try {
-    const members = await window.CloudSync.getGuildMembers();
-    if (!stillMember()) return;
-    const isOwner = window.CloudSync.isOwner();
-
-    if (members.length === 0) {
-      container.innerHTML = '<div style="text-align:center;color:var(--text-muted);padding:20px">暂无成员</div>';
-      return;
-    }
-
-    const roleLabels = { owner: '会长', editor: '编辑', viewer: '浏览' };
-    const roleClasses = { owner: 'role-owner', editor: 'role-editor', viewer: 'role-viewer' };
-
-    container.innerHTML = members.map(m => `
-      <div class="guild-member-item">
-        <div class="guild-member-info">
-          <div>
-            <div class="guild-member-name">${wclEscapeHtml(m.display_name || '未设置昵称')}${m.user_id === userId ? ' (我)' : ''}</div>
-          </div>
-        </div>
-        <div class="guild-member-actions">
-          <span class="guild-member-role ${roleClasses[m.role] || ''}">${roleLabels[m.role] || m.role}</span>
-          ${isOwner && m.user_id !== userId ? `
-            <select data-prev="${m.role}" onchange="handleChangeRole('${m.id}', this)">
-              <option value="viewer" ${m.role === 'viewer' ? 'selected' : ''}>浏览</option>
-              <option value="editor" ${m.role === 'editor' ? 'selected' : ''}>编辑</option>
-              <option value="owner" ${m.role === 'owner' ? 'selected' : ''}>会长</option>
-            </select>
-            <button data-remove-member="${m.id}">移除</button>
-            <span class="role-change-hint" style="font-size:12px"></span>
-          ` : ''}
-        </div>
-      </div>
-    `).join('');
-    const memberNames = new Map(members.map(m => [m.id, m.display_name || '未设置昵称']));
-    for (const button of container.querySelectorAll('[data-remove-member]')) {
-      const id = button.dataset.removeMember;
-      button.onclick = () => handleRemoveMember(id, memberNames.get(id));
-    }
-  } catch (e) {
-    if (stillMember()) container.textContent = '读取成员失败：' + e.message;
-  }
-}
-
-// 修改成员角色（REQ-043 任务书 #13：全程有感知——禁用防重+"变更中..."，成功 toast，失败就地提示并回滚选择）
-async function handleChangeRole(membershipId, selectEl) {
-  const newRole = selectEl.value;
-  const prevRole = selectEl.dataset.prev || '';
-  const hint = selectEl.parentElement ? selectEl.parentElement.querySelector('.role-change-hint') : null;
-  selectEl.disabled = true;
-  if (hint) { hint.style.color = 'var(--text-muted)'; hint.textContent = '变更中...'; }
-  try {
-    await window.CloudSync.updateMemberRole(membershipId, newRole);
-    showToast('变更成功', 'success');
-    await loadGuildMembers();
-  } catch (e) {
-    selectEl.value = prevRole; // 回滚选择
-    selectEl.disabled = false;
-    if (hint) { hint.style.color = 'var(--danger)'; hint.textContent = `变更失败：${e.message || '请重试'}`; }
-  }
+  return GuildRoles.refreshMembers();
 }
 
 // 移除成员
@@ -2114,13 +2047,29 @@ function showAppView() {
   loadUserPreferences();
 }
 
-// BUG-012：viewer 权限门。viewer 登录后隐藏/禁用全部写入口（界面收口，
-// 真正防线在 server.js 代理鉴权）。切换公会/登录/登出后都需调用。
-function updatePermissionUI() {
+function applyGuildGrantStyles() {
+  const grants = GuildRoles.ownRoleInfo()?.permissions || {};
+  document.body.dataset.guildGrants = Object.keys(grants).filter(key => grants[key]).join(' ');
   window.GuildBattleEditor?.syncContext();
-  const isViewer = !!(window.CloudSync && window.CloudSync.isCloudMode() && !window.CloudSync.canEdit());
-  document.body.classList.toggle('viewer-mode', isViewer);
 }
+
+function updatePermissionUI() {
+  GuildRoles.scopeChanged();
+  applyGuildGrantStyles();
+  if (window.CloudSync?.getCurrentGuild() && !GuildRoles.ready()) GuildRoles.load().catch(() => {});
+}
+
+window.addEventListener('guild-roles-ready', () => {
+  applyGuildGrantStyles();
+  const page = document.querySelector('.page.active')?.id;
+  if (page === 'page-guild-settings') Workspaces.refreshProfilePermissions();
+  else if (['page-guild','page-members','page-attendance','page-loot','page-wishlist','page-reports','page-dashboard'].includes(page)) renderCurrentPage();
+  renderUcGuildCard();
+});
+
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden && window.CloudSync?.getCurrentGuild()) GuildRoles.load(true).catch(() => {});
+});
 
 // BUG-073（任务书 #35 WP2）：公会名称行单一拼接真源——server_name 空回退裸名（不出空括号）。
 // #guildName 的全部写入点（本文件 updateCloudUI + cloud.js updateGuildUI）统一走它，
@@ -2926,6 +2875,7 @@ function isModalFormDirty(modalId) {
 
 // 各弹窗"有未保存内容"判定；未登记的弹窗遮罩点击/ESC 直接关闭（维持现状）
 const modalDirtyChecks = {
+  guildRolesModal: () => GuildRoles.dirty(),
   guildBattleModal: () => GuildBattleEditor.isDirty(),
   housingBuildEditor: () => isModalFormDirty('housingBuildEditor') || HousingBuilds.photosChanged() || HousingBuildTags.changed(),
   // 任务书 #58-WP1：方案单导出弹窗（decorData 双壳自足渲染，textarea 改动=未保存内容，规范 4.6 登记）
@@ -2951,6 +2901,7 @@ const modalDirtyChecks = {
 
 // 遮罩点击/ESC 的统一关闭入口：有未保存内容时二次确认
 function requestCloseModal(id) {
+  if (id === 'guildRolesModal' && GuildRoles.isSaving()) return;
   if (id === 'guildBattleModal' && GuildBattleEditor.isSaving()) return;
   if (id === 'housingBuildEditor' && HousingBuilds.isSaving()) return;
   if(id==='lootBatchModal'&&window.LootWorkflow?.isBusy()){showToast('正在保存本批分配，请稍候','warning');return;}
@@ -2974,6 +2925,7 @@ function openModal(id) {
 }
 
 function closeModal(id) {
+  if (id === 'guildRolesModal') GuildRoles.close();
   if (id === 'guildBattleModal') {
     GuildBattleEditor.clear();
     delete modalFormSnapshots[id];
@@ -3267,7 +3219,7 @@ const guildClaimRequests = { guildId: null, rows: null, loading: false };
 
 function ensureGuildClaimRequests() {
   const g = window.CloudSync.getCurrentGuild();
-  if (!g || getClaimMode() !== 'approval' || !window.CloudSync.canEdit()) return;
+  if (!g || getClaimMode() !== 'approval' || !GuildRoles.can('assign-claim')) return;
   if (guildClaimRequests.loading || guildClaimRequests.guildId === g.id) return;
   guildClaimRequests.loading = true;
   window.CloudSync.getGuildPendingClaimRequests()
@@ -3291,7 +3243,7 @@ async function reloadClaimGovernance() {
   guildClaimRequests.guildId = null;
   myClaimRequests.guildId = null;
   try {
-    if (window.CloudSync.canEdit()) {
+    if (GuildRoles.can('assign-claim')) {
       guildClaimRequests.rows = await window.CloudSync.getGuildPendingClaimRequests();
       guildClaimRequests.guildId = g.id;
     }
@@ -3309,7 +3261,7 @@ async function reloadClaimGovernance() {
 function renderClaimReviewBlock() {
   const el = document.getElementById('claimReviewBlock');
   if (!el) return;
-  const rows = (getClaimMode() === 'approval' && window.CloudSync.canEdit() && guildClaimRequests.rows) || [];
+  const rows = (getClaimMode() === 'approval' && GuildRoles.can('assign-claim') && guildClaimRequests.rows) || [];
   if (!rows.length) { el.style.display = 'none'; el.innerHTML = ''; return; }
   ensureClaimerNames();
   el.style.display = '';
@@ -3387,6 +3339,7 @@ function claimerLabelHtml(member) {
 
 function renderMembers() {
   personStatsControl('page-members');
+  GuildRoles.load().catch(() => {});
   const search = document.getElementById('memberSearch').value.toLowerCase();
   const classFilter = document.getElementById('classFilter').value;
   // 任务书 #18 WP2：认领/解除认领按钮按当前用户判定
@@ -3397,7 +3350,7 @@ function renderMembers() {
     ensureMyClaimRequests();
     ensureGuildClaimRequests();
   }
-  const canEditMembers = window.CloudSync.canEdit();
+  const canEditMembers = GuildRoles.can('assign-claim');
   
   // 职责过滤：获取所有勾选的职责
   const roleCheckboxes = document.querySelectorAll('#roleFilter input[type="checkbox"]:checked');
@@ -3430,14 +3383,14 @@ function renderMembers() {
   const tbody = document.getElementById('membersTableBody');
 
   if (!displayList.length) {
-    tbody.innerHTML = `<tr><td colspan="11"><div class="empty-state"><div class="empty-icon">👥</div><div class="empty-text">暂无成员数据</div><button class="btn btn-primary" onclick="showMemberModal()">+ 添加第一个成员</button></div></td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="12"><div class="empty-state"><div class="empty-icon">👥</div><div class="empty-text">暂无成员数据</div><button class="btn btn-primary" onclick="showMemberModal()">+ 添加第一个成员</button></div></td></tr>`;
     memberUpdateBatchToolbar();
     return;
   }
 
   tbody.innerHTML = displayList.map((m, i) => {
     // REQ-049：离队分组分隔标题行
-    if (m.__divider) return '<tr class="member-divider-row"><td colspan="11">—— 已离队成员 ——</td></tr>';
+    if (m.__divider) return '<tr class="member-divider-row"><td colspan="12">—— 已离队成员 ——</td></tr>';
     // BUG-034：行级防御——单行异常降级为提示行，不拖垮整表（否则整表停在旧渲染，出勤率列全是旧值）
     try {
     const cls = classMap[m.class] || '';
@@ -3467,6 +3420,7 @@ function renderMembers() {
           ${m.user_id ? claimerLabelHtml(m) : ''}
           ${personMemberLabel(m)}
         </td>
+        <td class="gr-character-identity" data-gr-user="${wclEscapeHtml(m.user_id || '')}">${GuildRoles.badgeFor(m.user_id)}</td>
         <td style="color:var(--text-secondary)">${(m.server || '').trim() || '—'}</td>
         <td>
           ${classChipHtml(m.class)}
@@ -3490,7 +3444,7 @@ function renderMembers() {
               ${!m.user_id
                 ? (claimMode === 'approval' && myClaimRequests.memberIds.has(m.id)
                   ? '<span class="tag tag-yellow">认领审核中</span>'
-                  : (claimMode === 'assign' && !canEditMembers
+                  : (!canEditMembers && (claimMode === 'assign' || !GuildRoles.can('claim'))
                     ? '<span class="tag tag-grey" title="本公会由管理者统一分配认领">待认领</span>'
                     : `<button class="tag tag-grey claim-pending-btn" onclick="claimMember('${m.id}')">待认领</button>`))
                 : (currentUserId && m.user_id === currentUserId
@@ -3503,7 +3457,7 @@ function renderMembers() {
     `;
     } catch (err) {
       console.error('成员行渲染失败（已降级为提示行）:', m && m.id, err);
-      return `<tr><td colspan="11" style="color:var(--danger)">该行数据异常，渲染失败（${(m && (m.name || m.id)) || '未知成员'}），请检查数据</td></tr>`;
+      return `<tr><td colspan="12" style="color:var(--danger)">该行数据异常，渲染失败（${(m && (m.name || m.id)) || '未知成员'}），请检查数据</td></tr>`;
     }
   }).join('');
 
@@ -3732,7 +3686,7 @@ function showMemberModal(member = null) {
   const claimGroup = document.getElementById('memberClaimGroup');
   const claimSel = document.getElementById('memberClaimUser');
   if (claimGroup && claimSel) {
-    if (member && window.CloudSync.canEdit()) {
+    if (member && GuildRoles.can('assign-claim')) {
       const opts = ['<option value="">未认领</option>'];
       if (claimerNames.map) {
         for (const [uid, dn] of claimerNames.map) {
@@ -3876,7 +3830,7 @@ function editMember(id) {
   const member = appData.members.find(m => m.id === id);
   if (!member) return;
   // 任务书 #18 WP2 R1：owner/editor 编辑时认领人下拉需先就绪名单，避免缺项误清
-  if (window.CloudSync.canEdit()) {
+  if (GuildRoles.can('assign-claim')) {
     ensureClaimerNamesAsync().then(() => showMemberModal(member));
     return;
   }
@@ -4104,20 +4058,21 @@ async function restoreMember(id, btn) {
 let pendingClaimMemberId = null;
 
 function claimMember(id) {
+  if (!GuildRoles.can('claim') && !GuildRoles.can('assign-claim')) return;
   const member = appData.members.find(m => m.id === id);
   const me = window.CloudSync.getCachedUser();
   if (!member || !me) return;
   if (member.user_id) { showToast('该角色已被认领', 'error'); return; }
   // 任务书 #21 WP2：assign 模式 viewer 无认领入口（按钮已隐藏，此处为兜底守卫）
   const mode = getClaimMode();
-  if (mode === 'assign' && !window.CloudSync.canEdit()) {
+  if (mode === 'assign' && !GuildRoles.can('assign-claim')) {
     showToast('本公会由管理者统一分配认领', 'error');
     return;
   }
   pendingClaimMemberId = id;
   document.getElementById('claimConfirmName').textContent = member.name;
   // approval 模式：viewer 确认即提交申请；任务书 #21-补丁 A——owner/editor 无需审核，与 free 同款二次确认直接认领
-  const needApproval = mode === 'approval' && !window.CloudSync.canEdit();
+  const needApproval = mode === 'approval' && !GuildRoles.can('assign-claim');
   const approvalNote = document.getElementById('claimConfirmApprovalNote');
   if (approvalNote) approvalNote.style.display = needApproval ? '' : 'none';
   document.getElementById('claimConfirmBtn').textContent = needApproval ? '提交认领申请' : '确认认领';
@@ -4126,6 +4081,7 @@ function claimMember(id) {
 
 // 认领确认弹窗「确认认领/提交认领申请」：free 直接认领；approval 下 viewer 生成申请、管理者直接认领（#21-补丁 A）
 async function confirmClaimMember() {
+  if (!GuildRoles.can('claim') && !GuildRoles.can('assign-claim')) return;
   const id = pendingClaimMemberId;
   const member = appData.members.find(m => m.id === id);
   const me = window.CloudSync.getCachedUser();
@@ -4133,7 +4089,7 @@ async function confirmClaimMember() {
   const btn = document.getElementById('claimConfirmBtn');
   if (btn) btn.disabled = true;
   try {
-    if (getClaimMode() === 'approval' && !window.CloudSync.canEdit()) {
+    if (getClaimMode() === 'approval' && !GuildRoles.can('assign-claim')) {
       // 任务书 #21 WP2：approval 不直写 raid_members，生成申请（server.js 窄例外）
       const g = window.CloudSync.getCurrentGuild();
       await window.CloudSync.insertClaimRequest(g.id, id, me.id);
@@ -4624,7 +4580,7 @@ function openDayActivities(dateStr) {
 
 function createActivityOnDate(dateStr) {
   // BUG-012：viewer 无创建权限（CSS 无法覆盖日历格子的动态 onclick，此处 JS 守卫）
-  if (window.CloudSync && window.CloudSync.isCloudMode() && !window.CloudSync.canEdit()) {
+  if (window.CloudSync && window.CloudSync.isCloudMode() && !GuildRoles.can('attendance')) {
     showToast('当前为只读权限，无法创建活动', 'warning');
     return;
   }
@@ -4910,7 +4866,7 @@ function renderActivityList() {
 
 function editAttendanceReport() {
   const activity = appData.activities.find(row => row.id === currentActivityId);
-  if (!activity || !window.CloudSync.canEdit() || activity.status === 'cancelled') return;
+  if (!activity || !GuildRoles.can('attendance') || activity.status === 'cancelled') return;
   if (attendanceHasUnsavedMarks(activity)) { showToast('考勤有未保存修改，请先保存考勤再编辑日志。', 'warning'); return; }
   showActivityModal(activity);
   document.getElementById('activityWclUrl').focus();
@@ -4988,7 +4944,7 @@ function parseWclUrl(input) {
 
 async function saveActivity() {
   if (activitySaving) return;
-  if (!window.CloudSync.canEdit()) return;
+  if (!GuildRoles.can('attendance')) return;
   if (editingActivityId && appData.activities.find(a => a.id === editingActivityId)?.status === 'cancelled') {
     showToast('请先恢复活动再编辑', 'warning'); return;
   }
@@ -5052,7 +5008,7 @@ async function saveActivity() {
           return;
         }
         const guild = window.CloudSync.getCurrentGuild();
-        if (!window.CloudSync.canEdit() || activity.status === 'cancelled' || !guild) return;
+        if (!GuildRoles.can('attendance') || activity.status === 'cancelled' || !guild) return;
         const data = await wclApiPost('/api/wcl/report-summary', { reportCode: activityData.wcl_report_code, guildId: guild.id });
         if (window.CloudSync.getCurrentGuild()?.id !== guild.id || editingActivityId !== activity.id || !document.getElementById('activityModal').classList.contains('show')) return;
         buildWclSyncPreview(activity, activityData.wcl_report_code, data, activityData);
@@ -5159,8 +5115,8 @@ function renderAttendanceReportActions(activity) {
   editReport.hidden = activity.status === 'cancelled';
   editReport.textContent = hasReport ? '编辑活动与链接' : '添加 WCL 链接';
   const battleButton = document.getElementById('guildBattleOpen');
-  battleButton.hidden = !activity.id || !window.CloudSync.getCurrentGuild() || !window.CloudSync.canEdit();
-  reportActions.hidden = !report?.code && battleButton.hidden && (editReport.hidden || !window.CloudSync.canEdit());
+  battleButton.hidden = !activity.id || !window.CloudSync.getCurrentGuild() || !GuildBattleEditor.canOpen();
+  reportActions.hidden = !report?.code && battleButton.hidden && (editReport.hidden || !GuildRoles.can('attendance'));
 }
 
 function openAttendanceDetail(activityId) {
@@ -5534,7 +5490,7 @@ function renderWclBindCard() {
     bound.style.display = '';
     unbound.style.display = 'none';
     document.getElementById('gpWclEmpty').hidden = true;
-    document.getElementById('wclUnbindBtn').hidden = !CloudSync.canEdit();
+    document.getElementById('wclUnbindBtn').hidden = !GuildRoles.can('wcl');
     document.getElementById('gpWclLink').href = 'https://www.warcraftlogs.com/guild/id/' + encodeURIComponent(guild.wcl_guild_id);
     document.getElementById('wclBoundName').textContent = `${guild.wcl_guild_name || ''} - ${guild.wcl_server_name || ''}`;
     const methodText = guild.wcl_bind_method === 'oauth' ? '账号授权' : '粘贴绑定';
@@ -5542,8 +5498,8 @@ function renderWclBindCard() {
     document.getElementById('wclBoundMeta').textContent = `（${methodText}${boundAt ? ' · ' + boundAt : ''}）`;
   } else {
     bound.style.display = 'none';
-    unbound.style.display = CloudSync.canEdit() ? '' : 'none';
-    document.getElementById('gpWclEmpty').hidden = !!CloudSync.canEdit();
+    unbound.style.display = GuildRoles.can('wcl') ? '' : 'none';
+    document.getElementById('gpWclEmpty').hidden = !!GuildRoles.can('wcl');
   }
 }
 
@@ -5747,7 +5703,7 @@ function wclCheckSummaryHtml(data) {
 
 async function wclInspectReport(code, button) {
   const guild = window.CloudSync.getCurrentGuild();
-  if (!guild || guild.id !== wclReportGuildId || !window.CloudSync.canEdit()) return;
+  if (!guild || guild.id !== wclReportGuildId || !GuildRoles.can('find-wcl')) return;
   const target = button.closest('.wcl-report-candidate').querySelector('.wcl-report-check');
   button.disabled = true;
   button.textContent = '核对中…';
@@ -5793,7 +5749,7 @@ function wclRenderNewReportsBanner() {
   const banner = document.getElementById('wclNewReportsBanner');
   if (!banner) return;
   const dismissed = wclDismissedSet();
-  if (window.CloudSync.getCurrentGuild()?.id !== wclReportGuildId) { banner.style.display = 'none'; return; }
+  if (!GuildRoles.can('find-wcl') || window.CloudSync.getCurrentGuild()?.id !== wclReportGuildId) { banner.style.display = 'none'; return; }
   const fresh = wclReportCache.filter(r => !r.is_linked && !dismissed.has(r.code) &&
     !appData.activities.some(a => (a.wcl_report_code || parseWclUrl(a.wcl_url)?.code) === r.code));
   if (!fresh.length) { banner.style.display = 'none'; return; }
@@ -5814,7 +5770,7 @@ function wclRenderNewReportsBanner() {
 
 async function wclSyncReports() {
   if (wclReportsBusy) return;
-  if (!window.CloudSync.canEdit()) return;
+  if (!GuildRoles.can('find-wcl')) return;
   const guild = window.CloudSync.getCurrentGuild();
   if (!guild) return;
   if (!guild.wcl_guild_id) { showToast('尚未绑定 WCL 公会，请先在「公会资料」中绑定', 'warning'); return; }
@@ -5857,7 +5813,7 @@ async function wclSyncReports() {
 }
 
 function wclLinkExistingReport(code, button) {
-  if (!window.CloudSync.canEdit() || window.CloudSync.getCurrentGuild()?.id !== wclReportGuildId || !wclReportCache.some(report => report.code === code)) return;
+  if (!GuildRoles.can('attendance') || window.CloudSync.getCurrentGuild()?.id !== wclReportGuildId || !wclReportCache.some(report => report.code === code)) return;
   const candidates = appData.activities.filter(activity => activity.status !== 'cancelled' &&
     !activity.wcl_report_code && !activity.wcl_url && !activity.wcl_snapshot);
   if (!candidates.length) {
@@ -5885,7 +5841,7 @@ function wclLinkExistingReport(code, button) {
 
 // 从 banner 创建活动：打开活动弹窗并预填 日期/团本/WCL 链接
 function wclCreateActivityFromReport(code) {
-  if (!window.CloudSync.canEdit() || window.CloudSync.getCurrentGuild()?.id !== wclReportGuildId) return;
+  if (!GuildRoles.can('attendance') || window.CloudSync.getCurrentGuild()?.id !== wclReportGuildId) return;
   const r = wclReportCache.find(x => x.code === code);
   if (!r) return;
   showActivityModal(null);
@@ -5990,7 +5946,7 @@ function attendanceHasUnsavedMarks(activity) {
 }
 
 async function syncAttendanceFromWcl() {
-  if (wclSyncing || !window.CloudSync.canEdit()) return; // 防重复点击
+  if (wclSyncing || !GuildRoles.can('attendance')) return; // 防重复点击
   const activity = appData.activities.find(a => a.id === currentActivityId);
   if (!activity || activity.status === 'cancelled') return;
   if (attendanceHasUnsavedMarks(activity)) { showToast('考勤有未保存修改，请先保存考勤再同步。', 'warning'); return; }
@@ -6207,7 +6163,7 @@ function wclSyncAddAsMember(i) {
 let wclSyncWriting = false;
 
 async function wclSyncConfirm() {
-  if (wclSyncWriting || !window.CloudSync.canEdit()) return;
+  if (wclSyncWriting || !GuildRoles.can('attendance')) return;
   const meta = wclSyncMeta;
   if (!meta) return;
   let activity = appData.activities.find(a => a.id === meta.activityId);
@@ -6333,6 +6289,7 @@ function setReportRange(days) {
 }
 
 function renderReports() {
+  if (!GuildRoles.can('stats')) return;
   personStatsControl('page-reports');
   // BUG-014：报表页尊重用户自选时间范围，算法与仪表盘/成员列表同源
   // BUG-107 补丁（任务书 #62 终审裁定）：主排名表同步剔除已删除成员——与活动卡/缺席榜同口径；
@@ -7064,7 +7021,7 @@ async function lootDropDelete(id) {
 
 async function lootDropReviewAction(id, action, targetId) {
   const cloud=window.CloudSync, guildId=cloud.getCurrentGuild()?.id;
-  if(!guildId||!cloud.canEdit()||lootDropDeleting.has(id))return;
+  if(!guildId||!GuildRoles.can('review')||lootDropDeleting.has(id))return;
   const row=(appData.lootDrops||[]).find(r=>r.id===id&&r.guild_id===guildId);
   if(!row)return;
   const message=action==='activity'?'更正这条拾取及其采集来源的所属活动？记录会重新进入待核对。':action==='ignore'?'忽略这条误录？保留来源证据，重复提交不会恢复；不删除装备分配或考勤。':action==='merge'?'确认这是同一件实际掉落？归并来源，不增加件数。请勿合并两件真实装备。':'确认已核对这条拾取？这不会自动生成分配记录，也不代表拾取人就是最终获得者。';
@@ -7084,7 +7041,7 @@ async function lootDropReviewAction(id, action, targetId) {
 
 async function lootDropReviewOpen(id) {
   const row=(appData.lootDrops||[]).find(r=>r.id===id);
-  if(!row||!window.CloudSync.canEdit())return;
+  if(!row||!GuildRoles.can('review'))return;
   const box=document.getElementById('lootDropReviewBody');
   box.textContent='来源加载中…';openModal('lootDropReviewModal');
   const guildId=window.CloudSync.getCurrentGuild()?.id;
@@ -7241,7 +7198,7 @@ function lootAllocationStatusChanged(clearError=false){
   document.getElementById('lootAllocationStatusHint').textContent=status==='无人需求'?'已确认无人需要，无需指定获得者；之后仍可重新分配。':'';
   if(pending)member.value='';
   if(member.options[0])member.options[0].textContent=status==='无人需求'?'无需指定获得者':'尚未确定';
-  member.disabled=pending||!window.CloudSync.canEdit();
+  member.disabled=pending||!GuildRoles.can('allocate');
   lootAllocationMemberChanged();
 }
 function lootAllocationMemberChanged(){
@@ -7269,7 +7226,7 @@ async function lootAllocationOpen(sourceDropId){
     const record=(appData.loots||[]).find(l=>l.source_drop_id===sourceDropId);
     if(!drop)throw new Error('拾取不存在，请刷新列表');
     if(drop.review_status!=='confirmed'||drop.quantity!==1)throw new Error('请先核对为单件拾取，再转分配');
-    if(!record&&!window.CloudSync.canEdit())throw new Error('仅管理者可创建分配');
+    if(!record&&!GuildRoles.can('allocate'))throw new Error('仅管理者可创建分配');
     lootAllocationContext={guildId,sourceDropId,id:record?.id||null,snapshot:null};
     const summary=document.getElementById('lootAllocationSummary');
     summary.innerHTML=`<p><strong>${lootPickupIcon(drop,drop.item_name)}${dropEsc(drop.item_name)}</strong> · 装等 ${drop.ilvl||'未提供'} · ${dropEsc(drop.difficulty||'未提供')} · ${dropEsc(drop.slot_cn||LOOT_DROP_INVTYPE_ZH[drop.slot]||drop.slot||'')}</p><p>拾取人：${dropEsc(drop.player_name)} · ${dropEsc(drop.player_server||'服务器未提供')}<br>原始来源：${dropEsc(drop.instance_name||'未提供')} · ${dropEsc(drop.boss_name||'首领未采集')}<br>拾取时间：${dropEsc(new Date(drop.timestamp).toLocaleString('zh-CN'))}</p>`;
@@ -7290,9 +7247,9 @@ async function lootAllocationOpen(sourceDropId){
     document.getElementById('lootAllocationRoll').value=record?.roll_value||'';
     document.getElementById('lootAllocationNote').value=record?.note||'';
     document.getElementById('lootAllocationError').textContent='';
-    lootAllocationFields.forEach(k=>document.getElementById('lootAllocation'+k).disabled=!window.CloudSync.canEdit());
+    lootAllocationFields.forEach(k=>document.getElementById('lootAllocation'+k).disabled=!GuildRoles.can('allocate'));
     lootAllocationStatusChanged();
-    document.getElementById('lootAllocationSave').disabled=!window.CloudSync.canEdit();
+    document.getElementById('lootAllocationSave').disabled=!GuildRoles.can('allocate');
     lootAllocationContext.snapshot=lootAllocationFormSnapshot();
     openModal('lootAllocationModal');
     if(window.LootWorkflow)LootWorkflow.showTrades(drop,guildId,summary);
@@ -7301,7 +7258,7 @@ async function lootAllocationOpen(sourceDropId){
 }
 async function lootAllocationSave(){
   const ctx=lootAllocationContext,cloud=window.CloudSync;
-  if(lootAllocationBusy||!ctx||!cloud.canEdit())return;
+  if(lootAllocationBusy||!ctx||!GuildRoles.can('allocate'))return;
   const err=document.getElementById('lootAllocationError');err.textContent='';
   if(cloud.getCurrentGuild()?.id!==ctx.guildId){err.textContent='公会已切换，请关闭后重新打开';return;}
   const status=document.getElementById('lootAllocationStatus').value,memberId=document.getElementById('lootAllocationMember').value;
@@ -7329,7 +7286,7 @@ async function lootAllocationSave(){
     lootSwitchView('assign');
     showToast(payload.repeated?'该拾取已有分配记录，已打开分配列表':`已保存为${saved.status}，可在分配记录中继续编辑`,'success');
   }catch(e){err.textContent=e.message||'保存未确认，请保留表单重试';}
-  finally{lootAllocationBusy=false;btn.disabled=!cloud.canEdit();btn.textContent='保存分配记录';lootAllocationFields.forEach(k=>document.getElementById('lootAllocation'+k).disabled=!cloud.canEdit());lootAllocationStatusChanged();}
+  finally{lootAllocationBusy=false;btn.disabled=!GuildRoles.can('allocate');btn.textContent='保存分配记录';lootAllocationFields.forEach(k=>document.getElementById('lootAllocation'+k).disabled=!GuildRoles.can('allocate'));lootAllocationStatusChanged();}
 }
 
 // ---- 导入弹窗 ----
@@ -7346,6 +7303,7 @@ function lootDropInvalidatePreview() {
 
 let lootDropImportOpening=false;
 async function lootDropImportOpen() {
+  if (!GuildRoles.can('submit')) return;
   if(lootDropImportSaving||lootDropImportOpening)return;
   const guildId=window.CloudSync.getCurrentGuild()?.id;
   if(!guildId)return;
@@ -8124,7 +8082,7 @@ function lootManualStatusChanged(){
   const noDemand=document.getElementById('lootStatus').value==='无人需求';
   if(noDemand)member.value='';
   if(member.options[0])member.options[0].textContent=noDemand?'无需指定获得者':'请选择成员';
-  member.disabled=noDemand||!window.CloudSync.canEdit();
+  member.disabled=noDemand||!GuildRoles.can('allocate');
   lootUpdateMemberInfo();
 }
 
@@ -9112,6 +9070,10 @@ function lootFillAssignedTo(idOrName) {
 // ==================== 初始化 ====================
 // ==================== 更新日志 ====================
 const changelogData = [
+  {id:'req191-roles',version:'v3.2.0',date:'2026-11-25',type:'feature',typeLabel:'新增功能',title:'给公会创建自己的角色',summary:'会长在公会资料的成员权限中创建角色、选择棋子，并把角色分配给成员。',details:[]},
+  {id:'req191-grants',version:'v3.2.0',date:'2026-11-25',type:'improve',typeLabel:'功能优化',title:'按公会分工开放操作',summary:'可以单独开放招募、录像、考勤或分配等操作。公会编辑默认可编辑内部招募卡，绑定公会 WCL 默认由会长负责。',details:[]},
+  {id:'req191-roster-badges',version:'v3.2.0',date:'2026-11-25',type:'fix',typeLabel:'修复BUG',title:'成员权限页现在能找到角色设置',summary:'从公会资料进入即可查看角色权限，成员行也会显示对应的棋子和角色名称。',details:[]},
+  {id:'req191-badges',version:'v3.2.0',date:'2026-11-25',type:'refactor',typeLabel:'模块调整',title:'公会身份与游戏角色对应展示',summary:'成员管理通过角色认领人显示公会身份，同一账号认领的角色沿用同一枚徽记。',details:[]},
   {id:'req213-rankings',version:'v3.2.0',date:'2026-11-25',type:'feature',typeLabel:'新增功能',title:'在魔兽管家查看国服排行榜',summary:'从顶部「排行榜」查询本服大秘境队伍成绩，或切换五种 PvP 赛制，查看玩家评分与战绩。',details:[]},
   {id:'req212-card-save',version:'v3.2.0',date:'2026-11-25',type:'feature',typeLabel:'新增功能',title:'在公会档案保存招募卡',summary:'会长可填写固定活动时间、招募专精、团队约定和团本进度。团员在公会资料页就能看到最近保存的安排。',details:[]},
   {id:'req212-card-contact',version:'v3.2.0',date:'2026-11-25',type:'improve',typeLabel:'功能优化',title:'团员可以查到招募负责人',summary:'会长可填写负责招募的人的微信、QQ 等联络方式。所有已填写的联系方式仅本公会成员可查。',details:[]},

@@ -153,10 +153,11 @@ async function verify({author, viewer, guest, open, db, sessions, base, pass, ou
     await viewer.reload();
     await seeContact(viewer,secondValue);
     await seeContact(viewer,'测试招募 QQ');
-    assert.equal(await viewer.locator('#grEdit').isVisible(),false);
+    assert.equal(await viewer.locator('#grEdit').isVisible(),role === 'editor');
     const member = await api(sessions[1],guildId);
     assert.deepEqual(member.data.card.contacts,edited.data.card.contacts);
-    assert.equal((await api(sessions[1],guildId,{expectedRevision:2,card:one.card})).status,403);
+    const canSave=await api(sessions[1],guildId,{expectedRevision:1,card:edited.data.card});
+    assert.equal(canSave.status,role==='editor' ? 200 : 403);
     if (role === 'viewer') {
       for (const [width,height] of [[1366,768],[1920,1080]]) {
         await viewer.setViewportSize({width,height});
@@ -176,7 +177,7 @@ async function verify({author, viewer, guest, open, db, sessions, base, pass, ou
   await viewer.goto(base+'/#/team/guild-settings');
   await viewer.locator('#page-team-guide.active').waitFor();
   assert.equal(await viewer.locator('#gpRecruitment').isVisible(),false);
-  pass('团员及公会编辑看到全部联络方式、均不可保存；离会后同一登录会话立即失去读取权限，刷新进入入会引导');
+  pass('本会成员可查全部联系方式，团员只读，公会编辑可保存；离会后同一登录会话立即失去读取权限');
 
   // Rejoin from the website with the real fixture invite, not an administrator write.
   await viewer.locator('#iaGuideInviteCode').fill(invite);

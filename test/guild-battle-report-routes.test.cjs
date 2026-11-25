@@ -16,6 +16,7 @@ function setup() {
       sourceUrl:'https://www.warcraftlogs.com/reports/test#fight=1',attendees:['出席名单']}],
     activitySource:{wcl_url:'原始链接',wcl_report_code:'test',team_label:'1',raid:'团队副本',status:'normal'}};
   const handler = createRoutes({
+    can:async (_guild,_user,key) => state.grants ? state.grants.includes(key) : ['owner','editor'].includes(state.role),
     auth:async token => token==='session' && {id:userId}, body:async req => JSON.stringify(req.data),
     get:async path => {
       state.queries.push(path);
@@ -69,6 +70,24 @@ function s2Fixture() {
   }
   return {...fixture,row,save};
 }
+
+test('录像编辑、发布和撤回可分开授权，团员按当前开关操作', async () => {
+  const {state,save,row,call}=s2Fixture();
+  state.role='viewer';
+  state.grants=['publish'];
+  assert.equal((await save([row])).status,403);
+  assert.equal((await save([])).status,200);
+  state.grants=['video'];
+  assert.equal((await save([row],1)).status,403);
+  const {data:{previewToken}}=await call('preview');
+  const draft={...scope,action:'draft',expectedVersion:1,previewToken,annotations:[{...row,honors:[]}]};
+  state.rows[0].status='draft';
+  assert.equal((await call('save',{...draft,message:'寄语'})).status,403);
+  assert.equal((await call('save',draft)).status,200);
+  state.grants=['withdraw'];
+  assert.equal((await call('save',{...scope,expectedVersion:2,action:'withdraw'})).status,200);
+  assert.equal((await call('save',draft)).status,403);
+});
 
 test('管理者登记的视角和已核对成就按战斗保存，访客看不到编辑候选，旧页面可安全更新寄语', async () => {
   const {call,state,row,save} = s2Fixture();

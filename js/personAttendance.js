@@ -29,7 +29,7 @@ function personStats(memberId, activities){
 }
 function personMemberLabel(member){const p=(appData.people||[]).find(p=>p.id===member.person_id);return `<small class="person-owner-label">团员：${personEsc(p?.name||'尚未关联')}</small>`;}
 async function personLinkOpen(){
-  if(!CloudSync.canEdit())return;
+  if(!GuildRoles.can('assign-claim'))return;
   if(!appData.peopleReady){showToast(appData.peopleError||'团员功能尚未就绪，请完成数据库更新','error');return;}
   const selected=appData.members.filter(m=>memberSelectedIds.has(m.id)&&!isDepartedStatus(m.status));
   if(!selected.length){showToast('请先勾选属于同一人的角色','warning');return;}
@@ -43,7 +43,7 @@ async function personLinkOpen(){
   document.getElementById('personLinkError').textContent='';personLinkAttempt='';personLinkRequestId=crypto.randomUUID();personLinkSnapshot=personLinkForm();openModal('personLinkModal');
 }
 async function personLinkSave(){
-  if(personLinkBusy||!CloudSync.canEdit())return;
+  if(personLinkBusy||!GuildRoles.can('assign-claim'))return;
   const memberIds=[...document.querySelectorAll('#personLinkMembers input:checked')].map(x=>x.value),name=document.getElementById('personLinkName').value.trim(),personId=document.getElementById('personLinkTarget').value||null;
   const error=document.getElementById('personLinkError');if(!memberIds.length||!name){error.textContent='请选择角色并填写团员称呼';return;}
   if(!confirm('确认所选角色属于同一团员？之后活动按此关系考勤，历史考勤保持不变。'))return;
@@ -64,7 +64,7 @@ function renderPersonAttendance(activity){
   const missing=appData.members.filter(m=>!m.person_id&&!isDepartedStatus(m.status));
   const saved=activity.person_attendees||[];
   const people=saved.length?saved.map(a=>({id:a.person_id,name:a.person_name})): (appData.people||[]).filter(p=>p.status==='active'&&personChildren(p.id).length);
-  const disabled=activity.status==='cancelled'||!CloudSync.canEdit();
+  const disabled=activity.status==='cancelled'||!GuildRoles.can('attendance');
   container.innerHTML=`<p>按团员记录：一人一条考勤，换角色不重复计数。</p>${missing.length?`<p>${missing.length} 个角色尚未关联团员。可先为各角色建立独立团员，再到成员管理关联主小号。</p><button type="button" class="btn btn-secondary edit-only" onclick="personEnsure()">建立未关联团员</button>`:''}`+people.map(p=>{
     const a=activity.person_attendees?.find(a=>a.person_id===p.id),status=a?.status||'缺席';
     const children=personChildren(p.id),known=new Set(children.map(m=>m.id));
@@ -93,7 +93,7 @@ function personSyncSelections(){
   }
 }
 async function savePersonAttendance(activity){
-  if(personAttendanceBusy||!CloudSync.canEdit())return;
+  if(personAttendanceBusy||!GuildRoles.can('attendance'))return;
   const rows=[...document.querySelectorAll('#attendanceMembersList .attend-status-select')].map(el=>({person_id:el.dataset.member,status:el.value,character_ids:['出席','迟到','替补'].includes(el.value)?[...new Set([...document.querySelectorAll(`.person-character[data-person="${el.dataset.member}"]:checked`)].map(c=>c.value).concat((activity.person_attendees?.find(a=>a.person_id===el.dataset.member)?.characters||[]).filter(c=>!personChildren(el.dataset.member).some(m=>m.id===c.id)).map(c=>c.id)))]:[]}));
   personAttendanceBusy=true;const button=document.getElementById('attendanceSaveBtn');button.disabled=true;button.textContent='保存中…';
   try{const payload={activityId:activity.id,rows};await cloudCrud('personAttendance','save',payload,{renderFn:renderAttendance,silentError:true});if(!cloudCrudSentinelCheck('personAttendance','save',payload))throw Error('回读未确认考勤，请保留表单重试');closeModal('attendanceDetailModal');if(window.WBTrack)WBTrack.event('attendance_save',{marked:rows.length});showToast('已按团员保存考勤','success');}

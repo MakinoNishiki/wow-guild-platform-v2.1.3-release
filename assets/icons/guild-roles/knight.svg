@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+<defs><linearGradient id="chess-metal" x1="0" y1="0" x2=".82" y2="1">
+        <stop stop-color="#ffdfa1"/><stop offset=".32" stop-color="#c29551"/>
+        <stop offset=".49" stop-color="#66523b"/><stop offset=".53" stop-color="#4d5151"/><stop offset="1" stop-color="#27303a"/>
+      </linearGradient></defs>
+        <path d="M8.5 6 9 1.9l4.3 2.3c5.4.8 8.6 7.5 6.2 13l-.6 1.2 1.2 1.3v2.1H5.4v-2.1l1.8-1.6c.3-2.4 3.1-4.4 4.8-7l-4.8 2.6-2-.2-2.4-2.2 2.8-3.1Z" fill="url(#chess-metal)" stroke="#f8ce83" stroke-width="1.45" stroke-linejoin="round"/>
+        <circle cx="9.3" cy="7.9" r="1" fill="#292b2a"/>
+        <path d="M7 19.5h11.7m-4.2-13c2.7 2.4 3.6 4.9 3.1 7.5" stroke="#e7bd76" stroke-width="1.2" fill="none"/>
+      </svg>

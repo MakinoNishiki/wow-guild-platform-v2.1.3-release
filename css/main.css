@@ -3615,15 +3615,45 @@ body {
 /* ==================== BUG-012 viewer 权限门 ====================
    viewer（无编辑权限）登录后隐藏/禁用所有写入口。
    真正的防线在 server.js 代理鉴权（SEC-001），此处仅界面收口。 */
-body.viewer-mode .edit-only,
-body.viewer-mode .action-btns,
-body.viewer-mode .wishlist-row-checkbox {
+body:not([data-guild-grants~="wcl"]) #page-guild-settings #wclBindUnbound,
+body:not([data-guild-grants~="wcl"]) #page-guild-settings #wclUnbindBtn,
+body:not([data-guild-grants~="assign-claim"]) #page-members .edit-only,
+body:not([data-guild-grants~="assign-claim"]) #page-members .action-btns,
+body:not([data-guild-grants~="assign-claim"]) .member-row-checkbox,
+body:not([data-guild-grants~="assign-claim"]) #memberSelectAll,
+body:not([data-guild-grants~="attendance"]) .wcl-report-actions [onclick^="wclCreateActivityFromReport"],
+body:not([data-guild-grants~="attendance"]) .wcl-report-actions [onclick^="wclLinkExistingReport"],
+body:not([data-guild-grants~="attendance"]) #page-attendance .edit-only:not(#wclReportsSyncBtn),
+body:not([data-guild-grants~="attendance"]) #attendanceDetailModal .edit-only:not(#guildBattleOpen),
+body:not([data-guild-grants~="attendance"]) .activity-select-checkbox,
+body:not([data-guild-grants~="attendance"]) .attend-pick-checkbox,
+body:not([data-guild-grants~="find-wcl"]) #wclReportsSyncBtn,
+body:not([data-guild-grants~="review"]) [data-drop-review],
+body:not([data-guild-grants~="review"]) [data-drop-delete],
+body:not([data-guild-grants~="review"]) [onclick="LootWorkflow.review()"],
+body:not([data-guild-grants~="allocate"]) #lootViewAssign .action-btns,
+body:not([data-guild-grants~="allocate"]) [onclick="lootShowModal()"],
+body:not([data-guild-grants~="allocate"]) #lootAllocationSave,
+body:not([data-guild-grants~="allocate"]) [onclick="LootWorkflow.open()"],
+body:not([data-guild-grants~="allocate"]) .edit-only[data-drop-allocate],
+body:not([data-guild-grants~="submit"]) [onclick="lootDropImportOpen()"],
+body:not([data-guild-grants~="wishlist"]) #page-wishlist .edit-only,
+body:not([data-guild-grants~="wishlist"]) #page-wishlist .action-btns,
+body:not([data-guild-grants~="wishlist"]) .wishlist-row-checkbox,
+body:not([data-guild-grants~="stats"]) #page-reports > :not(.gr-stats-denied),
+body:not([data-guild-grants~="stats"]) #statsGrid,
+body:not([data-guild-grants~="stats"]) #page-dashboard .card:has(#rankListTop5),
+body:not([data-guild-grants~="attendance"]) #btnImportLocal,
+body:not([data-guild-grants~="assign-claim"]) #btnImportLocal,
+body:not([data-guild-grants~="allocate"]) #btnImportLocal,
+body:not([data-guild-grants~="wishlist"]) #btnImportLocal,
+body:not([data-guild-grants~="review"]):not([data-guild-grants~="allocate"]) #lootBatchToolbar,
+body[data-guild-grants~="stats"] .gr-stats-denied {
   display: none !important;
 }
 
-/* 考勤详情：viewer 可查看，但不可修改 */
-body.viewer-mode .attend-checkbox,
-body.viewer-mode .attend-status-select {
+body:not([data-guild-grants~="attendance"]) .attend-checkbox,
+body:not([data-guild-grants~="attendance"]) .attend-status-select {
   pointer-events: none;
   opacity: 0.6;
 }
@@ -3762,14 +3792,6 @@ body.viewer-mode .attend-status-select {
   color: var(--danger);
   font-size: 13px;
   font-weight: 600;
-}
-
-/* viewer 权限门补充：批量勾选入口一并隐藏 */
-body.viewer-mode .member-row-checkbox,
-body.viewer-mode .activity-select-checkbox,
-body.viewer-mode .attend-pick-checkbox,
-body.viewer-mode #memberSelectAll {
-  display: none !important;
 }
 
 /* REQ-042（软删除）：已离队成员行灰显（成员列表 / 考勤详情历史行共用） */
