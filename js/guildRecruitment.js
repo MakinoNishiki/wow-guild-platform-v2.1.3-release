@@ -80,7 +80,7 @@ window.GuildRecruitment = (() => {
     const next = document.createElement('iframe');
     next.id = 'grFrame';
     next.title = '公会招募资料';
-    next.src = 'guild-recruitment.html';
+    next.src = 'guild-recruitment.html?v=20261125.173';
     next.onload = () => {
       if (!current(session) || !next.isConnected) return;
       try { draw(session); }

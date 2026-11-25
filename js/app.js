@@ -2268,7 +2268,7 @@ window.showLoadFailureBanner = function (failedTables) {
 
 // ==================== 页面切换 ====================
 const pageTitles = {
-  guild: '公会战报', 'guild-settings': '公会资料', personal: '个人档案', characters: '我的角色', claims: '我的认领',
+  guild: '公会战报', 'guild-settings': '公会资料', 'guild-permissions': '成员权限', personal: '个人档案', characters: '我的角色', claims: '我的认领',
   dashboard: '仪表盘',
   members: '成员管理',
   attendance: '考勤记录',
@@ -2574,7 +2574,7 @@ async function saveDecorPlan(items, name) {
 // 路由表：#/home 导航页（游客与登录均可见）；#/house/decor|plan|community 家宅系（全免登录可读，组单保存登录墙维持 #58 现状）；
 // #/team/<key> 团队系——需登录+公会（游客/无公会落 team-guide 引导卡，hash 不改写）。
 // 埋点 tab_click 仅此两处挂点（iaSwitchTab level:1 / iaGoKey level:2），WBTrack.event 直调不 await（track.js 自带静默兜底）。
-const IA_TEAM_KEYS = ['guild-settings', 'guild', 'dashboard', 'members', 'attendance', 'loot', 'wishlist', 'reports', 'data', 'datacenter'];
+const IA_TEAM_KEYS = ['guild-settings', 'guild-permissions', 'guild', 'dashboard', 'members', 'attendance', 'loot', 'wishlist', 'reports', 'data', 'datacenter'];
 let iaLastHash = ''; // 防环锚点：本模块写过的最后一个 hash（hashchange 回火时比对跳过）
 
 function iaSetHash(h) {
@@ -9070,6 +9070,10 @@ function lootFillAssignedTo(idOrName) {
 // ==================== 初始化 ====================
 // ==================== 更新日志 ====================
 const changelogData = [
+  {id:'req214-recruit',version:'v3.2.0',date:'2026-11-25',type:'feature',typeLabel:'新增功能',title:'同一职业可同时招募多个专精',summary:'一条需求可勾选多个职责和专精。勾选战士的坦克职责会自动选中防护，输出专精可按需勾选。',details:[]},
+  {id:'req214-priorities',version:'v3.2.0',date:'2026-11-25',type:'improve',typeLabel:'功能优化',title:'一眼区分招募需求度',summary:'招募卡用三档刻度和颜色区分高、中、低需求。',details:[]},
+  {id:'bug132-guild-refresh',version:'v3.2.0',date:'2026-11-25',type:'fix',typeLabel:'修复BUG',title:'切回成员权限页时保留成员名单',summary:'修复点击刷新与切回标签页同时发生时，成员列表偶尔无法显示的问题。',details:[]},
+  {id:'req214-permissions',version:'v3.2.0',date:'2026-11-25',type:'refactor',typeLabel:'模块调整',title:'从公会大厅直接打开成员权限',summary:'从公会资料、公会战报旁边的国王棋子入口，可查看公会身份与授权。',details:[]},
   {id:'bug131-role-names',version:'v3.2.0',date:'2026-11-25',type:'fix',typeLabel:'修复BUG',title:'公会角色名称完整显示',summary:'修复成员列表和分配窗口中「团员」等中文角色名偶尔出现乱码的问题。「分配角色」悬停呈金色，「移除」悬停呈红色。',details:[]},
   {id:'req191-roles',version:'v3.2.0',date:'2026-11-25',type:'feature',typeLabel:'新增功能',title:'给公会创建自己的角色',summary:'会长在公会资料的成员权限中创建角色、选择棋子，并把角色分配给成员。',details:[]},
   {id:'req191-grants',version:'v3.2.0',date:'2026-11-25',type:'improve',typeLabel:'功能优化',title:'按公会分工开放操作',summary:'可以单独开放招募、录像、考勤或分配等操作。公会编辑默认可编辑内部招募卡，绑定公会 WCL 默认由会长负责。',details:[]},

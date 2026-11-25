@@ -34,6 +34,18 @@ async function setup(db, sessions) {
 async function verify({author, viewer, guest, db, sessions, base, output, pass}) {
   const {rows:[guild]} = await db.query("select id from guilds where name='银松远征团'");
   const roleRow = async () => (await db.query('select * from guild_roles where guild_id=$1 and name=$2',[guild.id,'考勤官'])).rows[0];
+  const entry = author.locator('[data-ia-key=guild-permissions]');
+  assert.deepEqual((await author.locator('#iaSubnavTeam .ia-pill').allTextContents()).slice(0,3),['公会资料','成员权限','公会战报']);
+  await entry.click();
+  assert.equal(await entry.locator('img').getAttribute('src'),'assets/icons/guild-roles/king.svg');
+  await viewer.locator('[data-ia-key=guild-permissions]').click();
+  await guest.goto(base+'/#/team/guild-permissions');
+  await guest.locator('#page-team-guide.active').waitFor();
+  await author.locator('#page-guild-permissions.active').waitFor();
+  await author.locator('#guildMembersList .gr-badge').first().waitFor();
+  await author.evaluate(()=>Promise.all([GuildRoles.refreshMembers(), GuildRoles.load(true)]));
+  assert.ok(await author.locator('#guildMembersList .gr-badge').count(),'刷新成员和重新激活页签后应仍有成员身份');
+  await author.screenshot({path:path.join(output,'permissions-entry.png'),animations:'disabled'});
   const manager = author.locator('#guildRoleManager');
   const member = author.locator('#guildMembersList .guild-member-item').filter({hasText:'测试团员'});
   const modal = author.locator('#guildRolesModal');
@@ -105,7 +117,9 @@ async function verify({author, viewer, guest, db, sessions, base, output, pass})
   const {rows:[assigned]}=await db.query('select role,custom_role_key from guild_members where user_id=$1 and guild_id=$2',[sessions[1].user.id,guild.id]);
   assert.deepEqual(assigned,{role:'viewer',custom_role_key:role.role_key});
   await author.reload();
-  await author.locator('#guildMembersList .gr-badge').filter({hasText:'考勤官'}).waitFor();
+  await author.locator('#guildMembersList .gr-badge').filter({hasText:'考勤官'}).waitFor().catch(async error=>{
+    throw new Error(error.message+'；当前视图 '+new URL(author.url()).hash+'；'+await author.locator('#guildMembersList').textContent());
+  });
   await author.locator('.gp-members').screenshot({path:path.join(output,'guild-members-entry.png'),animations:'disabled'});
   await viewer.reload();
   await viewer.getByRole('button',{name:'查看角色权限'}).click();
@@ -118,6 +132,7 @@ async function verify({author, viewer, guest, db, sessions, base, output, pass})
   await viewer.screenshot({path:path.join(output,'member-role-1366.png'),animations:'disabled'});
   pass('会长分配后刷新仍见新身份；另一成员账号读取同一结果并具备考勤权限，管理入口只读');
   await viewer.locator('#guildRolesModal .modal-close').click();
+  await viewer.locator('[data-ia-key=guild-settings]').click();
   await viewer.getByRole('button',{name:'填写招募卡'}).click();
   await viewer.locator('#grSave:enabled').waitFor();
   await viewer.locator('#grCancel').click();

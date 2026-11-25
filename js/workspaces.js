@@ -2,7 +2,7 @@
 window.Workspaces = (() => {
   'use strict';
   const byId = id => document.getElementById(id);
-  const pages = new Set(['guild','guild-settings','personal','characters','claims']);
+  const pages = new Set(['guild','guild-settings','guild-permissions','personal','characters','claims']);
   const roleNames = { owner:'会长', editor:'编辑', viewer:'团员' };
   let epoch = 0;
   let inline = null;
@@ -234,8 +234,6 @@ window.Workspaces = (() => {
     const session = profile = { userId:user.id, guildId:guild.id, role, original:null, saving:false };
     GuildRecruitment.open();
     profileFacts(guild);
-    byId('guildMembersList').textContent = '正在读取成员…';
-    loadGuildMembers();
     byId('gpLoadStatus').textContent = '正在读取公会资料…';
     byId('gpEdit').disabled = true;
     byId('gpRetry').hidden = true;
@@ -269,7 +267,7 @@ window.Workspaces = (() => {
     profileForm.reset();
     profileForm.hidden = true;
     for (const id of ['wsSettingsGuild','wsSettingsRole','settingsInviteCode','settingsGuildId','settingsServer',
-      'wsGuildIntro','gpRule','gpRuleText','gpClaims','guildMembersList','wclBoundName','wclBoundMeta','wclLookupText']) byId(id).replaceChildren();
+      'wsGuildIntro','gpRule','gpRuleText','gpClaims','wclBoundName','wclBoundMeta','wclLookupText']) byId(id).replaceChildren();
     byId('wclGuildInput').value = '';
     byId('gpWclLink').removeAttribute('href');
     byId('wclLookupResult').style.display = 'none';
@@ -301,6 +299,7 @@ window.Workspaces = (() => {
     if (!user) return;
     if (key === 'characters' || key === 'claims') { personalDetail(key); return; }
     if (!guild) return;
+    if (key === 'guild-permissions') { loadGuildMembers(); return; }
     const role = GuildRoles.ownRoleInfo()?.name || roleNames[CloudSync.getCurrentMembership()?.role] || '团员';
     if (key === 'guild-settings') {
       enterProfile(user,guild,role);

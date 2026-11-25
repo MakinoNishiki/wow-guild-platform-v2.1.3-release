@@ -54,7 +54,9 @@ async function verify({author, viewer, guest, open, db, sessions, base, pass, ou
   let acceptDialog = true;
   author.on('dialog',dialog=>acceptDialog ? dialog.accept() : dialog.dismiss());
   await profile(author).locator('#grEdit').waitFor();
-  await profile(author).locator('#guildMembersList').getByText('团长 (我)',{exact:true}).waitFor();
+  await author.locator('[data-ia-key=guild-permissions]').click();
+  await author.locator('#page-guild-permissions.active #guildMembersList').getByText('团长 (我)',{exact:true}).waitFor();
+  await author.locator('[data-ia-key=guild-settings]').click();
   assert.deepEqual(await dbState(),[]);
   assert.deepEqual(await api(sessions[0],guildId),{status:200,data:{card:null,revision:0}});
   assert.equal((await api(null,guildId)).status,401);
@@ -97,7 +99,20 @@ async function verify({author, viewer, guest, open, db, sessions, base, pass, ou
   if (!(await form.locator('.picker-row').count())) await form.getByRole('button',{name:'添加招募需求'}).click();
   const need = form.locator('.picker-row').first();
   await need.locator('[data-field=class]').selectOption('德鲁伊');
-  await need.locator('[data-field=spec]').selectOption('平衡');
+  await need.getByRole('checkbox',{name:'平衡',exact:true}).check();
+  await form.getByRole('button',{name:'添加招募需求'}).click();
+  const warrior = form.locator('.picker-row').last();
+  await warrior.locator('[data-field=class]').selectOption('战士');
+  await warrior.getByRole('checkbox',{name:'坦克',exact:true}).check();
+  assert.equal(await warrior.getByRole('checkbox',{name:'防护',exact:true}).isChecked(),true);
+  await warrior.getByRole('checkbox',{name:'输出',exact:true}).check();
+  for (const name of ['武器','狂怒']) {
+    const spec = warrior.getByRole('checkbox',{name,exact:true});
+    assert.equal(await spec.isChecked(),false);
+    await spec.check();
+  }
+  await warrior.locator('[data-field=priority]').selectOption('高');
+  await warrior.screenshot({path:path.join(output,'warrior-editor.png')});
   acceptDialog = false;
   await author.locator('[data-ia-key="guild"]').click();
   assert.equal(await form.getByLabel('微信号',{exact:true}).inputValue(),contactValue);
@@ -119,6 +134,8 @@ async function verify({author, viewer, guest, open, db, sessions, base, pass, ou
   assert.equal(one.guild_id,guildId);
   assert.deepEqual(one.card.contacts.map(c=>c.value).sort(),[contactValue,'测试招募 QQ'].sort());
   assert.equal(one.card.needs.some(n=>n.spec==='平衡'),true);
+  const savedWarrior = one.card.needs.filter(n=>n.className==='战士');
+  assert.deepEqual(savedWarrior,[{className:'战士',priority:'高',roles:['坦克','输出'],specs:['防护','武器','狂怒']}]);
   assert.ok(one.card.progress.length);
   assert.equal(JSON.stringify(one.card).includes('旧资料简介'),false);
   await author.reload();
@@ -127,10 +144,20 @@ async function verify({author, viewer, guest, open, db, sessions, base, pass, ou
   const shownProgress = await form.locator('#readProgress').innerText();
   assert.ok(shownProgress.includes('1 / '+bossCount),'原始首领总数 '+bossCount+'；刷新后 '+shownProgress);
   assert.match(await form.locator('#readNeeds').innerText(),/平衡/);
+  const restoredWarrior = form.locator('#readNeeds .need-line').filter({hasText:'战士'});
+  for (const value of ['防护','武器','狂怒','坦克','输出','高需求']) await restoredWarrior.getByText(value,{exact:true}).waitFor();
+  await form.locator('#readNeeds').screenshot({path:path.join(output,'warrior-card.png')});
+  pass('一条战士需求的双职责、三专精和高需求刻度经保存、刷新、资料库回读一致，旧格式的单专精仍可读取');
   pass('会长在公会资料选择专精、跨日排班和首领，填两种招募联系方式；放弃离开与失败保留表单，重试写入一条，刷新后全部回读');
 
   const secondValue = '更新后的招募负责人';
   await author.locator('#grEdit').click();
+  const savedRow = form.locator('.picker-row:has([data-field=class] option:checked[value="战士"])');
+  await savedRow.getByRole('checkbox',{name:'坦克',exact:true}).uncheck();
+  assert.equal(await savedRow.getByRole('checkbox',{name:'防护',exact:true}).count(),0);
+  assert.equal(await savedRow.getByRole('checkbox',{name:'狂怒',exact:true}).isChecked(),true);
+  await savedRow.getByRole('checkbox',{name:'坦克',exact:true}).check();
+  assert.equal(await savedRow.getByRole('checkbox',{name:'防护',exact:true}).isChecked(),true);
   await form.getByLabel('微信号',{exact:true}).fill('取消编辑的内容');
   await author.locator('#grCancel').click();
   await seeContact(author,contactValue);

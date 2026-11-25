@@ -43,7 +43,7 @@ window.GuildChoices = (() => {
   }
 
   function blankNeed() {
-    return { role: '', className: '', spec: '', priority: '中' };
+    return { roles: [], className: '', specs: [], priority: '中' };
   }
   function classRecord(name) {
     return dict.classes.find(item => item.name_zh === name);
@@ -52,19 +52,51 @@ window.GuildChoices = (() => {
     const cls = classRecord(name);
     return cls ? dict.specs.filter(spec => spec.class_key === cls.class_key) : [];
   }
-  function derivedRole(need) {
-    const entries = specsFor(need.className).filter(item => !need.spec || item.name_zh === need.spec);
-    const possible = new Set(entries.map(item => roles[item.role]));
-    return possible.size === 1 ? [...possible][0] : '';
+  function inferredRoles(need) {
+    const entries = specsFor(need.className).filter(item => !need.specs.length || need.specs.includes(item.name_zh));
+    const matches = [...new Set(entries.map(item => roles[item.role]).filter(Boolean))];
+    return need.specs.length || matches.length === 1 ? matches : [];
   }
   function needs() {
     if (!recruitingModes.includes(mode)) return [];
-    return (teams.get(group) || []).filter(need => need.role || need.className).map(need => ({
-      role: need.role || derivedRole(need) || '职责不限',
-      className: need.className || '职业不限',
-      spec: need.spec || '专精待确认',
-      priority: need.priority
+    return (teams.get(group) || []).filter(need => need.roles.length || need.className).map(need => ({
+      ...need, roles: need.roles.length ? need.roles : inferredRoles(need)
     }));
+  }
+  function addUniqueSpecs(need, selectedRoles) {
+    const entries = specsFor(need.className);
+    for (const value of selectedRoles) {
+      const matching = entries.filter(entry => roles[entry.role] === value);
+      if (matching.length === 1 && !need.specs.includes(matching[0].name_zh)) {
+        need.specs.push(matching[0].name_zh);
+      }
+    }
+  }
+  function groupField(parent, title, key) {
+    const group = element('fieldset', 'need-options');
+    group.dataset.field = key;
+    group.append(element('legend', '', title));
+    parent.append(group);
+    return group;
+  }
+  function checkOptions(group, values, selected, artwork, change, empty) {
+    const list = element('div', 'need-choices');
+    for (const value of values) {
+      const label = element('label', 'need-chip');
+      const check = document.createElement('input');
+      check.type = 'checkbox';
+      check.value = value;
+      check.checked = selected.includes(value);
+      const {icon,color} = artwork(value);
+      check.onchange = () => {
+        change(check.checked ? [...selected,value] : selected.filter(v => v !== value));
+        [...group.querySelectorAll('input')].find(input => input.value === value)?.focus({preventScroll:true});
+      };
+      label.append(check,GuildChoiceVisuals.label(value,icon,color));
+      list.append(label);
+    }
+    if (!values.length) list.append(element('span','muted',empty));
+    group.replaceChildren(group.firstElementChild,list);
   }
   function renderNeeds() {
     const list = teams.get(group);
@@ -76,38 +108,45 @@ window.GuildChoices = (() => {
     for (const need of list) {
       const row = element('div', 'picker-row');
       const line = element('div', 'field-line');
-      const role = field(line, '职责', 'role');
       const cls = field(line, '职业', 'class');
-      const spec = field(line, '专精', 'spec');
+      const role = groupField(line, '职责（可多选）', 'role');
+      const spec = groupField(line, '专精（可多选）', 'spec');
       const priority = field(line, '需求度', 'priority');
       options(priority, ['高', '中', '低'], need.priority);
-      function sync(clearMismatch = false) {
-        const matching = dict.classes.filter(item => !need.role ||
-          specsFor(item.name_zh).some(entry => roles[entry.role] === need.role));
-        if (clearMismatch && !matching.some(item => item.name_zh === need.className)) need.className = '';
-        const allowed = specsFor(need.className).filter(item => !need.role || roles[item.role] === need.role);
-        if (clearMismatch && !allowed.some(item => item.name_zh === need.spec)) need.spec = '';
-        options(role, Object.values(roles), need.role);
-        const inferred = derivedRole(need);
-        role.add(new Option(inferred ? '自动 · ' + inferred : '职责不限', ''), 0);
-        role.value = need.role;
+      GuildChoiceVisuals.decoratePriority(priority);
+      function sync() {
+        const matching = dict.classes.filter(item => need.roles.every(value =>
+          specsFor(item.name_zh).some(entry => roles[entry.role] === value)));
         options(cls, edition === '正式服' ? matching.map(item => item.name_zh) : [], need.className);
         cls.add(new Option(edition === '正式服' ? '职业不限' : '词表待补充', ''), 0);
         cls.value = need.className;
         cls.disabled = edition !== '正式服';
-        options(spec, allowed.map(item => item.name_zh), need.spec);
-        spec.add(new Option('专精待确认', ''), 0);
-        spec.value = need.spec;
-        spec.disabled = !need.className;
-        const {decorate,gameMark} = GuildChoiceVisuals;
-        decorate(role, value => gameMark(GuildRecruitArt.getRole(value || inferred)));
-        decorate(cls, value => gameMark(GuildRecruitArt.getClass(value)));
-        decorate(spec, value => gameMark(GuildRecruitArt.getSpec(need.className,value)));
+        GuildChoiceVisuals.decorate(cls, value => GuildChoiceVisuals.gameMark(GuildRecruitArt.getClass(value)));
+        const entries = specsFor(need.className);
+        const availableRoles = entries.length ? Object.values(roles).filter(value => entries.some(entry => roles[entry.role] === value)) : Object.values(roles);
+        checkOptions(role, [...new Set([...availableRoles,...need.roles])], need.roles, GuildRecruitArt.getRole, values => {
+          const added = values.filter(value => !need.roles.includes(value));
+          need.roles = values;
+          need.specs = need.specs.filter(name => {
+            const entry = entries.find(item => item.name_zh === name);
+            return !entry || values.includes(roles[entry.role]);
+          });
+          addUniqueSpecs(need, added);
+          sync();
+        });
+        const allowedSpecs = entries.filter(entry => !need.roles.length || need.roles.includes(roles[entry.role])).map(entry => entry.name_zh);
+        checkOptions(spec, [...new Set([...allowedSpecs,...need.specs])], need.specs,
+          value => GuildRecruitArt.getSpec(need.className,value), values => { need.specs = values; sync(); },
+          need.className ? '专精待确认' : '先选职业');
+        priority.dataset.level = need.priority;
       }
-      role.onchange = () => { need.role = role.value; sync(true); };
-      cls.onchange = () => { need.className = cls.value; need.spec = ''; sync(); };
-      spec.onchange = () => { need.spec = spec.value; sync(); };
-      priority.onchange = () => { need.priority = priority.value; };
+      cls.onchange = () => {
+        need.className = cls.value;
+        need.specs = [];
+        addUniqueSpecs(need, need.roles);
+        sync();
+      };
+      priority.onchange = () => { need.priority = priority.value; priority.dataset.level = priority.value; };
       sync();
       row.append(line, button('移除需求', () => {
         list.splice(list.indexOf(need), 1);
@@ -257,7 +296,11 @@ window.GuildChoices = (() => {
     const selectedMode = document.getElementById('mode').value;
     const branch = selectedEdition==='怀旧服' ? document.getElementById('branch').value : '';
     const key = [selectedEdition,branch,selectedMode].join('/');
-    teams.set(key,needRows.length ? needRows.map(item=>({...item})) : [blankNeed()]);
+    teams.set(key,needRows.length ? needRows.map(item => ({
+      className:item.className, priority:item.priority,
+      roles:item.roles || (item.role ? [item.role] : []),
+      specs:item.specs || (item.spec ? [item.spec] : [])
+    })) : [blankNeed()]);
     for (const entry of progressRows) {
       const s = seasons.find(item=>item.name===entry.season || seasonLabel(item)===entry.season);
       const r = s?.raids.find(item=>item.name===entry.raid);
@@ -272,14 +315,23 @@ window.GuildChoices = (() => {
   }
   function getNeeds() {
     if (!recruitingModes.includes(mode)) return [];
-    return (teams.get(group) || []).filter(need=>need.role || need.className).map(need=>({...need}));
+    return (teams.get(group) || []).filter(need => need.roles.length || need.className).map(need => {
+      const {className,priority,roles,specs} = need;
+      if (roles.length <= 1 && specs.length <= 1) return {className,priority,role:roles[0] || '',spec:specs[0] || ''};
+      return {className,priority,roles:[...roles],specs:[...specs]};
+    });
   }
   function init(demo) {
     recruitHost = document.getElementById('recruitPicker');
     progressHost = document.getElementById('progressPicker');
     if (demo) {
-      const sample = {...blankNeed(),className:'德鲁伊',spec:'平衡',priority:'高'};
-      teams.set('正式服//团队副本', [sample]);
+      const sample = {...blankNeed(),className:'德鲁伊',specs:['平衡'],priority:'高'};
+      const warriorExample = new URLSearchParams(location.search).get('sample') === 'warrior';
+      teams.set('正式服//团队副本', warriorExample ? [
+        {className:'战士',roles:['坦克','输出'],specs:['防护','武器','狂怒'],priority:'高'},
+        {...blankNeed(),className:'武僧',specs:['织雾'],priority:'中'},
+        {...sample,priority:'低'}
+      ] : [sample]);
     }
     update(document.getElementById('edition').value, document.getElementById('mode').value);
   }

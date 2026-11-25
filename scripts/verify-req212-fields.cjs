@@ -43,7 +43,7 @@ async function verify() {
     // Check the visible artwork in both the open menu and the collapsed control.
     async function chooseSpec(row,cls,spec) {
       await row.locator('[data-field=class]').selectOption(cls);
-      await row.locator('[data-field=spec]').selectOption(spec);
+      await row.getByRole('checkbox',{name:spec,exact:true}).check();
     }
     const rows = page.locator('.picker-row');
     const firstRole = rows.first().locator('[data-field=role]');
@@ -59,8 +59,7 @@ async function verify() {
     assert.match(await at('readNeeds').locator('.recruit-portrait').getAttribute('src'),/classes\/paladin\.png$/);
     await changeView(false);
     await chooseSpec(rows.first(),'圣骑士','神圣');
-    await firstRole.click();
-    const colors = await firstRole.locator('option:not([value=""]) .choice-visual').evaluateAll(nodes=>nodes.map(node=>getComputedStyle(node).color));
+    const colors = await firstRole.locator('.choice-visual').evaluateAll(nodes=>nodes.map(node=>getComputedStyle(node).color));
     assert.equal(new Set(colors).size,3);
     await page.keyboard.press('Escape');
     await page.getByRole('button',{name:'添加招募需求'}).click();
@@ -124,16 +123,35 @@ async function verify() {
     assert.match(await page.locator('.progress-tally').innerText(),/1 \/ 8/);
 
     const first = page.locator('.picker-row').first();
-    assert.equal(await first.locator('[data-field=role] option:checked').innerText(),'自动 · 输出');
+    assert.equal(await first.locator('[data-field=role] :checked').count(),0);
+    assert.deepEqual(await page.evaluate(()=>GuildChoices.needs()[0].roles),['输出']);
     await page.getByRole('button',{name:'添加招募需求'}).click();
     const second = page.locator('.picker-row').nth(1);
-    await second.locator('[data-field=role]').selectOption('治疗');
+    await second.getByRole('checkbox',{name:'治疗',exact:true}).check();
     const classes = await second.locator('[data-field=class]').innerText();
     assert.ok(classes.includes('武僧') && !classes.includes('猎人'));
     await second.locator('[data-field=class]').selectOption('武僧');
     assert.ok(!(await second.locator('[data-field=spec]').innerText()).includes('踏风'));
-    await second.locator('[data-field=spec]').selectOption('织雾');
-    await second.locator('[data-field=priority]').selectOption('中');
+    assert.equal(await second.getByRole('checkbox',{name:'织雾',exact:true}).isChecked(),true);
+    const priority = second.locator('[data-field=priority]');
+    // Exercise the minimum column width with the real picker open and closed.
+    await priority.evaluate(el => { el.style.width='85px'; });
+    for (const level of ['低','高','中']) {
+      await priority.click();
+      const choice = priority.getByRole('option',{name:level,exact:true});
+      assert.equal(await choice.isVisible(),true);
+      const colors = await priority.locator('option .priority-mark').evaluateAll(nodes=>nodes.map(n=>getComputedStyle(n).color));
+      assert.equal(new Set(colors).size,3);
+      await choice.click();
+      assert.equal(await priority.inputValue(),level);
+      const chosen = priority.locator('selectedcontent .priority-mark');
+      assert.equal(await chosen.innerText(),level);
+      assert.equal(await chosen.evaluate(el=>{
+        const rect=el.getBoundingClientRect(), select=el.closest('select').getBoundingClientRect();
+        return rect.left >= select.left && rect.right <= select.right-16 && el.scrollWidth <= el.clientWidth+1;
+      }),true,'需求度收起后应留出箭头空间并完整显示 '+level);
+    }
+    await priority.evaluate(el=>el.style.removeProperty('width'));
 
     await name('周五结束').fill('00:30');
     await name('QQ').check();

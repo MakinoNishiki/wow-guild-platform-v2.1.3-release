@@ -62,14 +62,21 @@
     }
     return data;
   }
-  async function load(force=false) {
+  async function load(force=false, afterWrite=false) {
     const ctx = context();
     if (!ctx) throw new Error('请先进入公会');
-    if (!force && reading && same(reading.ctx)) return reading.promise;
+    // A page refresh and a tab-focus refresh can use the same in-flight read.
+    // A confirmed write needs a read that started after its commit.
+    if (!afterWrite && reading && same(reading.ctx)) return reading.promise;
     if (!force && ready()) return snapshot;
     const seq = ++sequence;
     const promise = request(ctx).then(data => {
-      if (seq !== sequence || !same(ctx)) throw new Error('权限正在重新读取');
+      if (!same(ctx)) throw new Error('当前公会已切换');
+      if (seq !== sequence) {
+        if (reading && same(reading.ctx)) return reading.promise;
+        if (ready()) return snapshot;
+        throw new Error('权限正在重新读取');
+      }
       if (!Array.isArray(data.roles) || !Array.isArray(data.assignments) ||
           !data.roles.some(r => r.key === data.ownRole)) throw new Error('公会角色资料不完整，请刷新');
       const signature=JSON.stringify([data.ownRole,data.roles.map(r=>[r.key,r.revision]).sort(),data.assignments.map(a=>[a.user_id,a.key]).sort()]);
@@ -77,7 +84,10 @@
       snapshot = {ctx,signature,ownRole:data.ownRole,roles:new Map(data.roles.map(r=>[r.key,r])),
         accounts:new Map(data.assignments.map(a=>[a.user_id,a.key]))};
       paintIdentities();
-      if(changed) window.dispatchEvent(new Event('guild-roles-ready'));
+      if(changed) {
+        if (same(membersContext)) renderMemberList();
+        window.dispatchEvent(new Event('guild-roles-ready'));
+      }
       return snapshot;
     }).catch(e => {
       if (seq === sequence) { const changed=ready(); snapshot=null; paintIdentities();setManagerButton();if(changed)window.dispatchEvent(new Event('guild-roles-ready')); }
@@ -93,7 +103,7 @@
   }
   async function readBack(payload) {
     if (!same(payload.ctx)) throw new Error('公会已切换，请回到原公会查看保存结果');
-    const result=await load(true);
+    const result=await load(true,true);
     if (payload.membershipId) {
       const member=members.find(m=>m.id===payload.membershipId);
       if (!member || result.accounts.get(member.user_id)!==payload.key) throw new Error('分配后回读未确认，请刷新核对');

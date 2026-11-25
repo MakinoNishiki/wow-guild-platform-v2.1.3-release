@@ -129,7 +129,8 @@ async function verify({author,guest,viewer,db,base,output,pass}) {
   await viewer.screenshot({path:path.join(output,'profile-member.png')});
   await db.query("update guild_members set role='editor' where guild_id=$1 and role='viewer'",[guildId]);
   await viewer.reload();
-  await viewer.locator('#wclLookupBtn').waitFor();
+  await viewer.waitForFunction(()=>GuildRoles.ownRoleInfo()?.key==='editor');
+  assert.equal(await viewer.locator('#wclLookupBtn').isVisible(),false);
   assert.equal(await viewer.locator('#gpEdit').isVisible(),false);
   await viewer.locator('[data-ia-key="guild"]').click();
   await viewer.locator('#wsEditReport').waitFor();

@@ -17,8 +17,38 @@ window.GuildChoiceVisuals = (() => {
     return content;
   }
 
-  function decorate(select, visualFor) {
+  function prepareSelect(select) {
     select.classList.add('visual-select');
+    if (richSelect && !select.querySelector('selectedcontent')) {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.append(document.createElement('selectedcontent'));
+      select.prepend(button);
+    }
+  }
+
+  function priorityMark(level, text) {
+    const mark = document.createElement('span');
+    mark.className = 'priority-mark';
+    mark.dataset.level = level;
+    const bars = document.createElement('span');
+    bars.className = 'priority-bars';
+    bars.setAttribute('aria-hidden','true');
+    for (let i = 0; i < 3; i++) bars.append(document.createElement('i'));
+    mark.append(bars, document.createTextNode(text));
+    return mark;
+  }
+
+  function decoratePriority(select) {
+    for (const option of select.options) {
+      option.dataset.level = option.value;
+      if (richSelect) option.replaceChildren(priorityMark(option.value, option.value));
+      else option.textContent = option.value + ' ' + ({高:'▮▮▮',中:'▮▮',低:'▮'}[option.value] || '');
+    }
+    prepareSelect(select);
+  }
+
+  function decorate(select, visualFor) {
     const options = [...select.options];
     for (const option of options) {
       const {src,color} = visualFor(option.value);
@@ -26,14 +56,8 @@ window.GuildChoiceVisuals = (() => {
       option.style.color = color || '';
       if (richSelect) option.replaceChildren(label(title,src,color));
     }
-    if (richSelect) {
-      if (!select.querySelector('selectedcontent')) {
-        const button = document.createElement('button');
-        button.type = 'button';
-        button.append(document.createElement('selectedcontent'));
-        select.prepend(button);
-      }
-    } else {
+    prepareSelect(select);
+    if (!richSelect) {
       function syncMark() {
         const {src,color} = visualFor(select.value);
         select.style.color = color || '';
@@ -53,5 +77,5 @@ window.GuildChoiceVisuals = (() => {
   function voiceMark(name) {
     return {src:Object.hasOwn(GuildVoiceBrands,name) ? GuildVoiceBrands[name] : ''};
   }
-  return {label,decorate,gameMark,voiceMark};
+  return {label,decorate,gameMark,voiceMark,decoratePriority,priorityMark};
 })();

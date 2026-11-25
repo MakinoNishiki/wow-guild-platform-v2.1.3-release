@@ -149,18 +149,35 @@ function drawPreview() {
   for (const need of needs) {
     const line = make('div',null,'need-line');
     const cls = GuildRecruitArt.getClass(need.className);
-    const spec = GuildRecruitArt.getSpec(need.className,need.spec);
-    const role = visuals.gameMark(GuildRecruitArt.getRole(need.role));
-    const portrait = spec.icon || cls.icon;
+    const single = need.specs.length === 1;
+    const portrait = (single && GuildRecruitArt.getSpec(need.className,need.specs[0]).icon) || cls.icon;
     if (portrait) {
       const img = document.createElement('img'); img.src = portrait; img.alt=''; img.className='recruit-portrait'; line.append(img);
     }
-    const text = make('div');
-    const title = make('b',need.className+' · '+need.spec);
+    const text = make('div',null,'need-summary');
+    const name = need.className || '职业不限';
+    const title = make('b',single ? name+' · '+need.specs[0] : need.specs.length ? name : name+' · 专精待确认');
     if (cls.color) title.style.color = cls.color;
-    text.append(title,visuals.label(need.role,role.src,role.color));
+    text.append(title);
+    if (need.specs.length > 1) {
+      const specs = make('div',null,'need-marks');
+      for (const value of need.specs) specs.append(visuals.label(value,GuildRecruitArt.getSpec(need.className,value).icon));
+      text.append(specs);
+    }
+    const marks = make('div',null,'need-marks');
+    for (const value of need.roles) {
+      const {icon,color} = GuildRecruitArt.getRole(value);
+      marks.append(visuals.label(value,icon,color));
+    }
+    if (!need.roles.length) marks.textContent='职责不限';
+    text.append(marks);
     line.append(text);
-    if (mode==='团队副本' && need.priority) line.append(make('span',need.priority+'需求','priority'));
+    if (need.priority) {
+      const badge = make('span',null,'priority');
+      badge.dataset.level = need.priority;
+      badge.append(visuals.priorityMark(need.priority,need.priority+'需求'));
+      line.append(badge);
+    }
     needHost.append(line);
   }
   if (!needs.length && (!el('recruitPicker').hidden || !mode)) needHost.append(make('p','尚未指定职业缺口','muted'));
