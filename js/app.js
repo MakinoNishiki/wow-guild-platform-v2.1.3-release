@@ -9070,6 +9070,7 @@ function lootFillAssignedTo(idOrName) {
 // ==================== 初始化 ====================
 // ==================== 更新日志 ====================
 const changelogData = [
+  {id:'bug133-member-role-preview',version:'v3.2.0',date:'2026-11-26',type:'fix',typeLabel:'修复BUG',title:'分配成员角色时直接查看完整权限',summary:'打开「分配角色」即可查看这名成员当前角色的权限。切换备选角色可预览授权，点击「保存分配」后生效。',details:[]},
   {id:'req214-recruit',version:'v3.2.0',date:'2026-11-25',type:'feature',typeLabel:'新增功能',title:'同一职业可同时招募多个专精',summary:'一条需求可勾选多个职责和专精。勾选战士的坦克职责会自动选中防护，输出专精可按需勾选。',details:[]},
   {id:'req214-priorities',version:'v3.2.0',date:'2026-11-25',type:'improve',typeLabel:'功能优化',title:'一眼区分招募需求度',summary:'招募卡用三档刻度和颜色区分高、中、低需求。',details:[]},
   {id:'bug132-guild-refresh',version:'v3.2.0',date:'2026-11-25',type:'fix',typeLabel:'修复BUG',title:'切回成员权限页时保留成员名单',summary:'修复点击刷新与切回标签页同时发生时，成员列表偶尔无法显示的问题。',details:[]},

@@ -160,7 +160,7 @@
       permissions:Object.fromEntries(permissions.map(id => [id,form.elements.namedItem('grant-'+id).checked]))};
   }
   function dirty() {
-    if (editor?.assignMember && same(editor.ctx)) return get('grmAssignedRole')?.value!==editor.expectedRole;
+    if (editor?.assignMember && same(editor.ctx)) return editor.key!==editor.expectedRole;
     return same(editor?.ctx) && editor.baseline != null && JSON.stringify(currentForm())!==editor.baseline;
   }
   function status(message, error=false) {
@@ -173,36 +173,50 @@
   function open(key, assignMember) {
     if (!ready() || !same(membersContext)) return;
     if (modalOpen() && !changeAllowed()) return;
-    editor={ctx:context(),key,createKey:key?null:'custom-'+crypto.randomUUID(),newRole:!key,assignMember:assignMember||null,baseline:null};
+    editor={ctx:context(),key,createKey:key?null:'custom-'+crypto.randomUUID(),newRole:!key,assignMember:assignMember||null,expectedRole:assignMember?key:null,baseline:null};
     if (!modalOpen()) openModal('guildRolesModal');
     showForm();
+  }
+  function permissionDetails(role, editable) {
+    const groups=categories.map(([group,actions])=>'<fieldset class="gr-grants"><legend>'+group+'</legend>'+Object.entries(actions).map(([id,label])=>'<label><span>'+label+'</span><input type="checkbox" role="switch" name="grant-'+id+'"'+(role.permissions[id]?' checked':'')+(editable?'':' disabled')+'></label>').join('')+'</fieldset>').join('');
+    return groups+'<details class="gr-fixed"><summary>固定权限</summary><p>本会成员可查看内部招募卡与联系方式。已发布战报对访客开放。</p><p>创建者可管理角色权限，并为成员分配角色。</p></details>';
+  }
+  function assignmentPreview(role) {
+    return '<h4>'+badge(role)+' · 权限预览</h4>'+permissionDetails(role,false);
+  }
+  function selectAssignment(key) {
+    const role=roleOf(key);
+    if (!editor?.assignMember || !isEditor() || saving || !role || key==='owner' || key===editor.key) return;
+    editor.key=key;
+    get('grmAssignedRole').value=key;
+    get('grmBody').querySelectorAll('[data-gr-role]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.grRole===key)));
+    get('grmPreview').innerHTML=assignmentPreview(role);
+    get('grmSave').disabled=!dirty();
   }
   function showForm() {
     if (!same(editor?.ctx) || !ready()) return;
     const existing=roleOf(editor.key);
     const r=editor.original=existing || {key:'',name:'',piece:'rook',permissions:{},revision:0};
     const edit=isEditor(), disabled=edit?'':' disabled', assign=editor.assignMember;
-    const nav=[...snapshot.roles.values()].map(role=>'<button type="button" data-gr-role="'+esc(role.key)+'" aria-pressed="'+(r.key===role.key)+'">'+badge(role)+'</button>').join('');
+    const roles=[...snapshot.roles.values()].filter(role=>!assign || role.key!=='owner');
+    const nav=roles.map(role=>'<button type="button" data-gr-role="'+esc(role.key)+'" aria-pressed="'+(r.key===role.key)+'">'+badge(role)+'</button>').join('');
     let body;
     if (assign) {
       const name=assign.display_name||'未设置昵称';
-      const roleKey=snapshot.accounts.get(assign.user_id);
-      editor.expectedRole=roleKey;
-      body='<h4>分配成员角色</h4><label class="gr-field">'+esc(name)+'<select id="grmAssignedRole">'+[...snapshot.roles.values()].filter(item=>item.key!=='owner').map(item=>'<option value="'+esc(item.key)+'"'+(item.key===roleKey?' selected':'')+'>'+esc(item.name)+'</option>').join('')+'</select></label>';
+      body='<label class="gr-field">为「'+esc(name)+'」分配角色<select id="grmAssignedRole">'+roles.map(item=>'<option value="'+esc(item.key)+'"'+(item.key===r.key?' selected':'')+'>'+esc(item.name)+'</option>').join('')+'</select></label><section id="grmPreview">'+assignmentPreview(r)+'</section>';
     } else {
       const choosePiece=edit && !builtins.includes(r.key);
       const picker=choosePiece ? '<fieldset class="gr-pieces"><legend>身份徽记</legend>'+Object.entries(pieces).map(([piece,label])=>'<label><input type="radio" name="grmPiece" value="'+piece+'"'+(r.piece===piece?' checked':'')+'><span>'+icon(piece)+label+'</span></label>').join('')+'</fieldset>' : '';
-      const groups=categories.map(([group,actions])=>'<fieldset class="gr-grants"><legend>'+group+'</legend>'+Object.entries(actions).map(([id,label])=>'<label><span>'+label+'</span><input type="checkbox" role="switch" name="grant-'+id+'"'+(r.permissions[id]?' checked':'')+disabled+'></label>').join('')+'</fieldset>').join('');
-      const fixed='<details class="gr-fixed"><summary>固定权限</summary><p>本会成员可查看内部招募卡与联系方式。已发布战报对访客开放。</p><p>创建者可管理角色权限，并为成员分配角色。</p></details>';
-      body='<form id="grmForm"><h4>'+ (editor.newRole?'创建角色':badge(r))+'</h4><label class="gr-field">角色名称<input name="grmName" autocomplete="off" maxlength="32" value="'+esc(r.name)+'"'+disabled+' required></label>'+picker+groups+fixed+'</form>';
+      body='<form id="grmForm"><h4>'+ (editor.newRole?'创建角色':badge(r))+'</h4><label class="gr-field">角色名称<input name="grmName" autocomplete="off" maxlength="32" value="'+esc(r.name)+'"'+disabled+' required></label>'+picker+permissionDetails(r,edit)+'</form>';
       if (edit && existing && r.key!=='owner') {
         const options=members.filter(m=>m.user_id!==context().user && snapshot.accounts.has(m.user_id) && snapshot.accounts.get(m.user_id)!=='owner');
         if(options.length) body+='<div class="gr-assign"><label class="gr-field">成员账号<select id="grmMemberChoice">'+options.map(m=>'<option value="'+esc(m.id)+'">'+esc(m.display_name||'未设置昵称')+'</option>').join('')+'</select></label><button class="btn btn-secondary" id="grmAssignSelected" type="button">分配给成员</button></div>';
       }
     }
-    get('grmBody').innerHTML='<div class="gr-layout"><aside class="gr-nav" aria-label="公会角色">'+nav+(edit?'<button type="button" id="grmNew">＋ 创建角色</button>':'')+'</aside><section class="gr-editor">'+body+'</section></div>';
+    get('grmTitle').textContent=assign?'分配成员角色':'公会角色与权限';
+    get('grmBody').innerHTML='<div class="gr-layout"><aside class="gr-nav" aria-label="公会角色">'+nav+(edit && !assign?'<button type="button" id="grmNew">＋ 创建角色</button>':'')+'</aside><section class="gr-editor">'+body+'</section></div>';
     get('grmSave').hidden=!edit;
-    get('grmSave').disabled=false;
+    get('grmSave').disabled=!!assign && !dirty();
     get('grmSave').textContent=assign?'保存分配':editor.newRole?'创建角色':'保存修改';
     editor.baseline=JSON.stringify(currentForm());
     get('grmBody').scrollTop=0;
@@ -231,8 +245,13 @@
           refresh.type='button';refresh.className='btn btn-sm';refresh.textContent='重新读取';
           refresh.onclick=async()=>{
             if (!changeAllowed()) return;
+            const targetId=editor.assignMember?.id;
             closeModal('guildRolesModal');await refreshMembers();
-            if(same(ctx) && ready())open(snapshot.ownRole);
+            if(!same(ctx) || !ready()) return;
+            if (!targetId) { open(snapshot.ownRole); return; }
+            const target=members.find(member=>member.id===targetId);
+            const role=target && snapshot.accounts.get(target.user_id);
+            if (can('membership') && role && role!=='owner') open(role,target);
           };
           get('grmStatus').append(' ',refresh);
         }
@@ -240,13 +259,14 @@
     } finally {
       saving=false;
       get('grmBody').inert=false;
-      get('grmSave').disabled=false;
+      get('grmSave').disabled=!!editor?.assignMember && !dirty();
     }
   }
   async function submit() {
     if (!isEditor() || saving) return;
     if (editor.assignMember) {
-      return save('assign',{membershipId:editor.assignMember.id,key:get('grmAssignedRole').value,expectedRole:editor.expectedRole});
+      if (dirty()) return save('assign',{membershipId:editor.assignMember.id,key:editor.key,expectedRole:editor.expectedRole});
+      return;
     }
     const values=currentForm();
     if (!values) return;
@@ -268,7 +288,10 @@
   get('grmBody').addEventListener('click',event=>{
     const button=event.target.closest('button');
     if (!button || !same(editor?.ctx)) return;
-    if (button.hasAttribute('data-gr-role')) open(button.dataset.grRole);
+    if (button.hasAttribute('data-gr-role')) {
+      if (editor.assignMember) selectAssignment(button.dataset.grRole);
+      else open(button.dataset.grRole);
+    }
     else if (button.id==='grmNew' && isEditor()) open(null);
     else if (button.id==='grmAssignSelected' && isEditor() && !dirty()) {
       const m=members.find(row=>row.id===get('grmMemberChoice').value);
@@ -276,6 +299,9 @@
     } else if(button.id==='grmAssignSelected') status('先保存角色修改，再分配给成员',true);
   });
   get('grmBody').addEventListener('submit',e=>{e.preventDefault();submit();});
+  get('grmBody').addEventListener('change',event=>{
+    if (event.target.id==='grmAssignedRole') selectAssignment(event.target.value);
+  });
   get('grmBody').addEventListener('input',()=>{if(get('grmStatus').classList.contains('gr-error') && !get('grmStatus').querySelector('button'))status('');});
   get('grmSave').onclick=submit;
   function scopeChanged() {
