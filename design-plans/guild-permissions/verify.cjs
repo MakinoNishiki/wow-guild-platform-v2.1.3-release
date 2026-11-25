@@ -6,42 +6,37 @@ const {pathToFileURL} = require('node:url');
 const {chromium} = require('playwright');
 const base = process.argv.slice(2).find(arg => !arg.startsWith('--')) || pathToFileURL(path.join(__dirname,'index.html')).href;
 const saveScreenshots = !process.argv.includes('--skip-shots');
+const pieces = ['king', 'queen', 'rook', 'bishop', 'knight', 'pawn'];
 const override = (page, action, role) => page.locator('[data-permission="'+action+'"][data-for="'+role+'"]');
 
-async function captureBadgeComparison(page) {
-  await page.locator('[data-view=members]').click();
-  await page.locator('#membersPanel').waitFor();
-  const variants = [];
-  for (const scheme of ['heraldry','ranks']) {
-    const choice = page.locator('[data-scheme='+scheme+']');
-    await choice.click();
-    const badges = await page.locator('#memberRows tr:nth-child(-n+3) .roster-badge').evaluateAll(nodes=>nodes.map(node=>node.outerHTML));
-    variants.push({label:await choice.innerText(),badges});
-  }
-  // Put the actual member-list badges side by side at their native CSS size.
-  await page.evaluate(variants=>{
-    const figure = document.createElement('figure');
-    figure.id = 'comparison';
-    figure.style.cssText = 'position:fixed;top:0;left:0;z-index:5;margin:0;padding:16px 20px;width:412px;background:#161b22;display:grid;grid-template-columns:1fr 1.2fr 1.2fr;align-items:center;gap:12px;color:#cbd2d8;font-size:14px;border:1px solid #414851';
-    for (const title of ['基础角色',...variants.map(scheme=>scheme.label)]) {
-      const header = document.createElement('strong');
-      header.style.color = '#efd198';
-      header.textContent = title;
-      figure.append(header);
+async function verifyBadge(container, piece) {
+  const icon = container.locator('svg').first();
+  assert.equal(await icon.locator('use').getAttribute('href'), '#chess-'+piece);
+  const appearsBeforeName = await container.evaluate(element => {
+    const node = element.querySelector('svg');
+    const box = node.getBoundingClientRect();
+    const texts = document.createTreeWalker(element,NodeFilter.SHOW_TEXT);
+    let name;
+    while (name = texts.nextNode()) {
+      if (name.textContent.trim() && !name.parentElement.closest('svg')) break;
     }
-    ['创建者','管理者','普通用户'].forEach((tier,index)=>{
-      const label = document.createElement('span');
-      label.textContent = tier;
-      figure.append(label);
-      for (const variant of variants) {
-        const cell = document.createElement('div');
-        cell.innerHTML = variant.badges[index];
-        figure.append(cell);
-      }
-    });
-    document.body.append(figure);
-  },variants);
-  await page.locator('#comparison').screenshot({path:path.join(__dirname,'role-badges-20px.png')});
+    if (!name) return false;
+    const range = new Range();
+    range.selectNodeContents(name);
+    const ink = node.getBBox();
+    return box.width === 20 && box.height === 20 && ink.width > 0 && ink.height > 0
+      && box.right <= range.getBoundingClientRect().left + 1;
+  });
+  assert.ok(appearsBeforeName, '棋子必须画在身份名称左侧，实际尺寸 20 × 20');
+}
+
+async function captureIdentityColumn(page) {
+  const top = await page.locator('.roster thead th').nth(2).boundingBox();
+  const last = await page.locator('#memberRows tr:last-child td').nth(1).boundingBox();
+  const scrollY = await page.evaluate(() => window.scrollY);
+  await page.screenshot({path:path.join(__dirname,'role-badges-20px.png'),fullPage:true,clip:{
+    x:top.x, y:top.y + scrollY, width:top.width, height:last.y + last.height - top.y
+  }});
 }
 
 async function run(browser, width, height) {
@@ -57,6 +52,7 @@ async function run(browser, width, height) {
   try {
     await page.goto(base);
     await page.locator('[data-permission]').first().waitFor();
+    assert.equal(await page.locator('[data-scheme]').count(),0);
     assert.equal(await checked('edit-card','editor'),'true');
     assert.equal(await checked('wcl','editor'),'false');
     assert.equal(await checked('wcl','owner'),'true');
@@ -114,34 +110,104 @@ async function run(browser, width, height) {
     assert.equal(new URL(page.url()).hash,'#members');
     await page.reload();
     await page.locator('#membersPanel').waitFor();
-    assert.equal(await rows.count(),5);
+    assert.equal(await rows.count(),6);
     assert.match(await rows.nth(1).innerText(),/副团长/);
     assert.match(await rows.nth(1).innerText(),/管理者/);
     assert.equal(await rows.nth(4).locator('.badge').count(),0);
     assert.equal(await rows.nth(3).locator('.badge').innerText(),await rows.nth(2).locator('.badge').innerText());
-    for (const scheme of ['heraldry','ranks']) {
-      await click('[data-scheme='+scheme+']');
-      for (const key of ['owner','editor','viewer']) {
-        const glyph = page.locator('.roster-badge.'+key+' svg').first();
-        assert.equal(await glyph.locator('use').getAttribute('href'),'#'+scheme+'-'+key);
-        assert.ok(await glyph.evaluate(node=>node.getBoundingClientRect().width === 20 &&
-          node.getBBox().width > 0 && node.getBBox().height > 0));
-      }
-      await page.locator('#memberTitle').click();
-      if (saveScreenshots && width === 1366) await page.waitForFunction(()=>!document.getElementById('feedback').textContent);
-      if (width===1366) await screenshot('members-'+scheme+'-1366.png');
+    for (const [key,piece] of Object.entries({owner:'king',editor:'knight',viewer:'pawn'})) {
+      await verifyBadge(page.locator('.roster-badge.'+key).first(),piece);
     }
+    if (width===1366) await screenshot('members-chess-1366.png');
     await click('[data-view=permissions]');
-    for (const actor of ['editor','viewer']) {
+    await click('#createRole');
+    for (const invalid of ['   ','副团长','甲'.repeat(17)]) {
+      await page.fill('#newName',invalid);
+      await click('#createForm button[type=submit]');
+      assert.equal(await page.locator('#createDialog').isVisible(),true);
+      assert.ok(await page.locator('#createError').innerText());
+      assert.equal(await page.locator('[data-role^=custom-]').count(),0);
+    }
+    const newPieces = page.locator('#createForm input[type=radio]');
+    assert.deepEqual(await newPieces.evaluateAll(nodes => nodes.map(node => node.value)), pieces);
+    assert.equal(await page.locator('#createForm input[type=radio]:checked').inputValue(),'rook');
+    for (const piece of pieces) {
+      await page.locator('#createForm label').filter({has:page.locator('input[value="'+piece+'"]')}).click();
+      assert.equal(await page.locator('#createForm input[type=radio]:checked').inputValue(),piece);
+    }
+    await page.locator('#createForm label').filter({has:page.locator('input[value="rook"]')}).click();
+    await page.fill('#newName','考勤员');
+    assert.equal(await page.locator('#createError').innerText(),'');
+    if (saveScreenshots && width===1366) await page.locator('#createDialog').screenshot({path:path.join(__dirname,'chess-picker-1366.png')});
+    page.once('dialog',dialog=>dialog.dismiss());
+    await page.locator('#newName').press('Escape');
+    assert.equal(await page.locator('#createDialog').isVisible(),true);
+    await click('#createForm button[type=submit]');
+    assert.equal(await page.locator('[data-role=custom-1]').getAttribute('aria-pressed'),'true');
+    assert.equal(await page.locator('button[role=switch][aria-checked=true]').count(),0);
+    assert.equal(await page.locator('[data-permission=membership],[data-permission=configure]').count(),0);
+    assert.match(await page.locator('#rows tr.action').filter({hasText:'分配成员的公会角色'}).innerText(),/无权限/);
+    assert.match(await page.locator('#rows tr.action').filter({hasText:'查看内部招募卡与联系方式'}).innerText(),/随会籍/);
+    await click('[data-category=roster]');
+    await override(page,'attendance','custom-1').click();
+    assert.equal(await checked('find-wcl','custom-1'),'false');
+    await page.locator('#allowed').check();
+    assert.equal(await page.locator('[data-permission]').count(),1);
+    if (width===1366) await screenshot('attendance-role-1366.png');
+    await click('#rename');
+    await page.locator('#nameFields input[name=editor]').fill('公会编辑');
+    await click('#nameForm button[type=submit]');
+    await click('#assignRole');
+    assert.equal(await page.locator('#assignTarget option[value=owner], #assignAccount option[value=keeper]').count(),0);
+    assert.equal(await page.locator('#assignAccount').inputValue(),'hiker');
+    assert.match(await page.locator('#assignInfo').innerText(),/山脊、晨露/);
+    await click('#assignForm button[type=submit]');
+    await page.locator('#membersPanel').waitFor();
+    await page.reload();
+    assert.equal(await page.locator('#memberRows .roster-badge.custom').count(),2);
+    for (const index of [2,3]) {
+      const badge = rows.nth(index).locator('.roster-badge');
+      assert.equal(await badge.innerText(),'考勤员');
+      await verifyBadge(badge,'rook');
+    }
+    assert.equal(await rows.nth(0).locator('[data-account]').count(),0);
+    assert.equal(await rows.nth(4).locator('.badge,[data-account]').count(),0);
+    if (width===1366) await screenshot('members-attendance-1366.png');
+    if (saveScreenshots && width===1366) await captureIdentityColumn(page);
+    await click('[data-view=permissions]');
+    await click('[data-role=custom-1]');
+    await click('[data-category=roster]');
+    assert.equal(await checked('attendance','custom-1'),'true');
+    await click('#rename');
+    await page.locator('#nameForm label').filter({has:page.locator('input[type=radio][value="queen"]')}).click();
+    await click('#nameForm button[type=submit]');
+    await page.reload();
+    await click('[data-view=members]');
+    await page.locator('#membersPanel').waitFor();
+    await verifyBadge(rows.nth(2).locator('.roster-badge'),'queen');
+    await verifyBadge(rows.nth(3).locator('.roster-badge'),'queen');
+    await click('[data-view=permissions]');
+    await verifyBadge(page.locator('[data-role=custom-1]'),'queen');
+    await click('[data-role=custom-1]');
+    await click('[data-category=roster]');
+    assert.equal(await checked('attendance','custom-1'),'true');
+    for (const actor of ['editor','viewer','custom-1']) {
       await page.selectOption('#actor',actor);
+      assert.equal(await page.locator('#createRole').isVisible(),false);
+      assert.equal(await page.locator('#assignRole').isVisible(),false);
       assert.equal(await page.locator('#rename').isDisabled(),true);
       assert.equal(await page.locator('#restore').isDisabled(),true);
       assert.equal(await page.locator('button[role=switch]:enabled').count(),0);
       await click('[data-role='+actor+']');
       assert.ok(await page.locator('button[role=switch]:disabled').count());
       await click('[data-role=all]');
+      await click('[data-view=members]');
+      await page.locator('#membersPanel').waitFor();
+      assert.equal(await page.locator('[data-account]').count(),0);
+      await click('[data-view=permissions]');
     }
     await page.selectOption('#actor','owner');
+    await click('[data-category=key]');
     await click('#restore');
     await click('#restoreDialog [data-close]');
     assert.equal(await checked('video','viewer'),'true');
@@ -151,11 +217,32 @@ async function run(browser, width, height) {
     assert.equal(await checked('wcl','owner'),'true');
     assert.equal(await page.locator('[data-role=editor]').innerText(),'公会编辑');
     await page.reload();
+    assert.equal(await page.locator('[data-role^=custom-]').count(),0);
+    await click('[data-view=members]');
+    await page.locator('#membersPanel').waitFor();
+    assert.equal(await rows.nth(2).locator('.roster-badge').innerText(),'团员');
+    await click('[data-view=permissions]');
     assert.equal(await checked('video','viewer'),'false');
     assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth <= innerWidth),true);
     assert.ok(await page.evaluate(()=>Array.from(document.images).every(img=>img.complete && img.naturalWidth>0)));
     assert.deepEqual(errors,[]);
-    if (saveScreenshots && width===1366) await captureBadgeComparison(page);
+    await page.evaluate(()=>localStorage.setItem('wb.guild-permissions.review.v2',JSON.stringify({
+      names:{owner:'老会长',editor:'老编辑',viewer:'老团员','custom-8':'老后勤'},
+      overrides:{'video/viewer':true,'attendance/custom-8':true},assignments:{hiker:'custom-8'},scheme:'ranks'
+    })));
+    await page.reload();
+    assert.equal(await page.locator('[data-role=editor]').innerText(),'老编辑');
+    assert.equal(await checked('video','viewer'),'true');
+    await click('[data-view=members]');
+    await page.locator('#membersPanel').waitFor();
+    await verifyBadge(rows.nth(0).locator('.roster-badge'),'king');
+    await verifyBadge(rows.nth(5).locator('.roster-badge'),'pawn');
+    assert.equal(await rows.nth(5).locator('.roster-badge').innerText(),'老团员');
+    for (const index of [2,3]) {
+      const oldCustom = rows.nth(index).locator('.roster-badge');
+      await verifyBadge(oldCustom,'rook');
+      assert.equal(await oldCustom.innerText(),'老后勤');
+    }
   } finally { await context.close(); }
 }
 

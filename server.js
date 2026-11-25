@@ -9,6 +9,7 @@ const { execSync } = require("child_process");
 const ROOT = __dirname;
 const { createTokenMarket } = require("./lib/wowToken.cjs");
 const tokenMarket = createTokenMarket();
+const { handleCnLeaderboards } = require("./lib/cnLeaderboards.cjs");
 // 任务书 #23 WP2：data.html 数据公示页（免登录公开页，与 index.html 同级放行）；
 // 任务书 #51 WP2：decor.html 家宅图鉴公示页同级放行（免登录，anon 只读）
 const PUBLIC_STATIC_FILES = new Set(["index.html","data.html","decor.html","guild-report.html","guild-recruitment.html"].map(name => path.join(ROOT,name)));
@@ -1631,6 +1632,12 @@ const server = http.createServer(async (req, res) => {
     req.resume();
     res.writeHead(413, { "Content-Type": "application/json", ...corsHeaders });
     res.end(JSON.stringify({ message: `请求体超过 ${requestBodyLimit(req) / (1024 * 1024)} MiB 限制` }));
+    return;
+  }
+
+  // REQ-213 权限：公开访客可读国服官方排行榜，不访问公会、账号或数据库。
+  if (urlPath.startsWith("/api/cn-leaderboards/")) {
+    await handleCnLeaderboards(req, res, corsHeaders, urlPath.slice("/api/cn-leaderboards/".length));
     return;
   }
 

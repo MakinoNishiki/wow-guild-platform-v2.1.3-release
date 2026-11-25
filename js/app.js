@@ -2328,6 +2328,7 @@ const pageTitles = {
   reports: '统计报表',
   data: '数据管理',
   changelog: '更新日志',
+  rankings: '排行榜',
   datacenter: '数据中心',
   lootdrop: '副本掉落', // 任务书 #28 WP5（REQ-086）：原「数据公示」更名 + 双壳嵌入
   decor: '家宅图鉴', // 任务书 #51（REQ-137 一期）：双壳登录壳页签，只读
@@ -2523,6 +2524,7 @@ function switchPage(pageName, routeHash) {
     ensureDecorPlanPageMounted();
   }
   if (pageName === 'community') HousingBuilds.show(routeHash || '#/house/community');
+  if (pageName === 'rankings') CnLeaderboards.show(routeHash || '#/rankings');
 
   // 移动端关闭侧边栏
   if (window.innerWidth <= 768) {
@@ -2542,7 +2544,7 @@ function switchPage(pageName, routeHash) {
   // team-guide 不写 hash——路由守卫落引导卡时保留用户目标 hash 不改写（如 '#/team/members'）；
   // 与 iaApplyRoute 间经 iaLastHash 防环（hash 相同则不触发二次路由）。
   if (typeof iaSetHash === 'function' && pageName !== 'team-guide') {
-    iaSetHash(['community','decor','personal'].includes(pageName) && routeHash ? routeHash : iaKeyToHash(pageName));
+    iaSetHash(['community','decor','personal','rankings'].includes(pageName) && routeHash ? routeHash : iaKeyToHash(pageName));
     iaPaintRoute(pageName, iaTabOfPage(pageName));
   }
 }
@@ -2632,7 +2634,7 @@ function iaSetHash(h) {
 }
 
 function iaKeyToHash(key) {
-  if (key === 'personal') return '#/personal';
+  if (key === 'rankings' || key === 'personal') return '#/' + key;
   if (key === 'characters' || key === 'claims') return '#/personal/' + key;
   if (key === 'home' || key === 'changelog' || key === 'lootdrop') return '#/' + key;
   if (key === 'decor') return '#/house/decor';
@@ -2646,7 +2648,7 @@ function iaTabOfPage(page) {
   if (['personal','characters','claims'].includes(page)) return 'personal';
   if (page === 'decor' || page === 'decor-plan' || page === 'community') return 'house';
   if (page === 'home') return null;
-  if (page === 'changelog' || page === 'lootdrop') return page;
+  if (page === 'changelog' || page === 'lootdrop' || page === 'rankings') return page;
   return 'team'; // 团队系 + team-guide
 }
 
@@ -2761,6 +2763,8 @@ function iaApplyRoute() {
     page = 'home'; tab = null;
   } else if (['#/personal','#/personal/characters','#/personal/claims'].includes(h)) {
     page = iaIsLoggedIn() ? h.split('/').at(-1) : 'personal'; tab = 'personal';
+  } else if (h === '#/rankings' || /^#\/rankings\/pvp\/(2v2|3v3|battlegrounds|shuffle|blitz)$/.test(h)) {
+    page = 'rankings'; tab = page;
   } else if (h === '#/changelog' || h === '#/lootdrop') {
     page = h.slice(2); tab = page;
   } else if (h === '#/house' || h === '#/house/') {
@@ -2821,7 +2825,7 @@ function iaSwitchTab(tab) {
   if (window.WBTrack) WBTrack.event('tab_click', { level: 1, key: tab });
   if (tab === 'home') {
     iaSetHash('#/home'); // 任务书 #62 §1（BUG-109）：首页 tab / 品牌区回门户
-  } else if (tab === 'changelog' || tab === 'lootdrop' || tab === 'personal') {
+  } else if (tab === 'changelog' || tab === 'lootdrop' || tab === 'personal' || tab === 'rankings') {
     iaSetHash('#/' + tab);
   } else if (tab === 'house') {
     iaSetHash('#/house/decor');
@@ -9108,6 +9112,7 @@ function lootFillAssignedTo(idOrName) {
 // ==================== 初始化 ====================
 // ==================== 更新日志 ====================
 const changelogData = [
+  {id:'req213-rankings',version:'v3.2.0',date:'2026-11-25',type:'feature',typeLabel:'新增功能',title:'在魔兽管家查看国服排行榜',summary:'从顶部「排行榜」查询本服大秘境队伍成绩，或切换五种 PvP 赛制，查看玩家评分与战绩。',details:[]},
   {id:'req212-card-save',version:'v3.2.0',date:'2026-11-25',type:'feature',typeLabel:'新增功能',title:'在公会档案保存招募卡',summary:'会长可填写固定活动时间、招募专精、团队约定和团本进度。团员在公会资料页就能看到最近保存的安排。',details:[]},
   {id:'req212-card-contact',version:'v3.2.0',date:'2026-11-25',type:'improve',typeLabel:'功能优化',title:'团员可以查到招募负责人',summary:'会长可填写负责招募的人的微信、QQ 等联络方式。所有已填写的联系方式仅本公会成员可查。',details:[]},
   {id:'req212-card-revision',version:'v3.2.0',date:'2026-11-25',type:'fix',typeLabel:'修复BUG',title:'保留招募卡的保存结果',summary:'刷新后可重新打开已保存的招募卡。如果另一窗口已经改过，页面会提示读取最新版本，本次填写的内容会先保留。',details:[]},
@@ -16175,7 +16180,7 @@ const ANX_TAB_LABEL = {
   wishlist: '心愿单', reports: '统计报表', data: '数据管理', changelog: '更新日志',
   lootdrop: '副本掉落', decor: '家宅图鉴', datacenter: '数据中心', login: '登录墙',
   // 任务书 #60 WP1：新 IA 页签四键（旧键原样保留，历史数据兼容展示）
-  home: '首页', 'team-guide': '团队引导', 'decor-plan': '方案单', community: '家宅分享'
+  home: '首页', 'team-guide': '团队引导', 'decor-plan': '方案单', community: '家宅分享', rankings: '排行榜'
 };
 
 function anxEsc(s) {
@@ -16223,7 +16228,7 @@ function mdRenderAnalytics(panel) {
     ['index:attendance', '主站·考勤记录'], ['index:loot', '主站·装备分配'], ['index:wishlist', '主站·心愿单'],
     ['index:reports', '主站·统计报表'], ['index:data', '主站·数据管理'], ['index:changelog', '主站·更新日志'],
     ['index:datacenter', '主站·数据中心'], ['index:lootdrop', '主站·副本掉落'], ['index:decor', '主站·家宅图鉴'],
-    ['index:decor-plan', '主站·方案单'], ['index:community', '主站·家宅分享']]
+    ['index:decor-plan', '主站·方案单'], ['index:community', '主站·家宅分享'], ['index:rankings', '主站·排行榜']]
     .map(([v, l]) => `<option value="${v}"${anxState.page === v ? ' selected' : ''}>${l}</option>`).join('');
   const custom = anxState.range === 'custom';
   panel.innerHTML = `
