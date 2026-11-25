@@ -4,7 +4,7 @@ const path = require('node:path');
 const fs = require('node:fs');
 const {chromium} = require('playwright');
 const root = process.env.WB_REVIEW_URL || 'http://127.0.0.1:56180';
-const evidence = path.resolve(__dirname,'../docs/evidence/req213-leaderboards');
+const evidence = process.env.WB_VERIFY_OUTPUT || path.resolve(__dirname,'../docs/evidence/req213-leaderboards');
 const rankRow = '#rbRows tr';
 async function verify(browser,width,height) {
   const page=await browser.newPage({viewport:{width,height}});

@@ -23,7 +23,13 @@
   }
   const pageSize = 25;
   const picks = {realm:'abbendis', dungeon:'249', classId:'6', specId:'250', faction:''};
-  const dictionaries = new Map();
+  const minute = 60000;
+  const recent = new Map();
+  const pending = new Map();
+  const keyFor = (resource,query) => resource+'?'+new URLSearchParams(query);
+  const ttl = resource => (resource==='params' || resource==='realms' ? 60 : 5)*minute;
+  const canPreview = result => result && Date.now()-result.readAt<30*minute;
+  let displayed = null;
   let mode = null, lastMode = modes[0], serial = 0, page = 0, rows = [], classes = [], specs = [];
   async function request(resource,query={}) {
     const search = new URLSearchParams(query);
@@ -33,15 +39,25 @@
     if (!result.data) throw new Error('榜单暂时不可用');
     return result;
   }
-  async function dictionary(resource,query={}) {
-    const key = resource+'?'+new URLSearchParams(query);
-    let cached = dictionaries.get(key);
-    if (!cached || Date.now()-cached.at>300000) {
-      cached = {at:Date.now(), promise:request(resource,query).then(r=>r.data)};
-      dictionaries.set(key,cached);
-    }
-    try { return await cached.promise; }
-    catch (e) { if (dictionaries.get(key)===cached) dictionaries.delete(key); throw e; }
+  function read(resource,query={}) {
+    const key=keyFor(resource,query), cached=recent.get(key);
+    if (cached && Date.now()-cached.readAt<ttl(resource)) return Promise.resolve(cached);
+    if (pending.has(key)) return pending.get(key);
+    const job=request(resource,query).then(result=>{
+      recent.delete(key);
+      if (recent.size>=32) recent.delete(recent.keys().next().value);
+      recent.set(key,result);
+      return result;
+    }).finally(()=>pending.delete(key));
+    pending.set(key,job);
+    return job;
+  }
+  function scoreQuery() {
+    if (!mode) return {slug:picks.realm,leaderboard_id:picks.dungeon};
+    const query={pvp_rank:mode.id};
+    if (mode.specialize) Object.assign(query,{class_id:picks.classId,specialization_id:picks.specId});
+    if (mode.faction && picks.faction) query.faction=picks.faction;
+    return query;
   }
   function makeSelect(id,title,items) {
     const label = make('label',title);
@@ -125,45 +141,78 @@
     $('rbNext').disabled = page+1>=pages;
     $('rbPage').textContent = (page+1)+' / '+pages;
   }
-  async function load(focusKey) {
-    const version = ++serial;
-    const current = () => version===serial;
+  function clearStandings() {
+    displayed=null;
     page=0;
     rows=[];
-    $('rbScroll').hidden = $('rbPagination').hidden = $('rbRetry').hidden = true;
+    $('rbScroll').hidden = $('rbPagination').hidden = true;
     $('rbRows').replaceChildren();
     $('rbCount').textContent = $('rbStamp').textContent = '';
     $('rbPeriod').textContent='国服正式服';
-    $('rbTitle').textContent=mode?.name || '地下城队伍';
-    $('rbOfficial').href=officialURL();
-    $('rbStatus').textContent='正在读取官方榜单…';
-    $('rbFilters').replaceChildren();
+  }
+  function paintResult(key,result) {
+    const {data,readAt}=result;
+    rows=mode ? data.list : data.leading_groups;
+    if (!Array.isArray(rows)) throw new Error();
+    page=displayed?.key===key ? Math.min(page,Math.max(0,Math.ceil(rows.length/pageSize)-1)) : 0;
+    $('rbPeriod').textContent=mode ? (data.season || '国服正式服') :
+      '统计周期　'+dateText(data.period_start_timestamp,cnDate)+' – '+dateText(data.period_end_timestamp,cnDate);
+    $('rbCount').textContent=rows.length+(mode?' 位玩家':' 支队伍');
+    $('rbStatus').textContent=rows.length?'':(data.in_season===false?'当前不在赛季内。':'此条件下暂无官方排名。');
+    $('rbStamp').textContent='来源：魔兽世界国服官网 · 本站读取 '+dateText(readAt,cnTime)+'（北京时间）';
+    paintPages();
+    displayed={key,result};
+  }
+  async function load(focusKey) {
+    const version = ++serial;
+    const current = () => version===serial;
+    const resource=mode?'pvp':'runs';
+    const firstQuery=scoreQuery();
+    let key=keyFor(resource,firstQuery);
+    const keepDisplayed=()=>displayed?.key===key && canPreview(displayed.result);
+    $('rbRetry').hidden=true;
+    if (!keepDisplayed()) {
+      clearStandings();
+      $('rbFilters').replaceChildren();
+      $('rbTitle').textContent=mode?.name || '地下城队伍';
+      $('rbOfficial').href=officialURL();
+      $('rbStatus').textContent='正在读取官方榜单…';
+    } else if (Date.now()-displayed.result.readAt>=ttl(resource)) {
+      $('rbStatus').textContent='正在更新成绩…';
+    }
+    // Start only the requested board. Check selections against the official lists before displaying it.
+    // Changing a parent filter can invalidate its former dungeon or specialization.
+    const needsOptions=focusKey==='realm' || focusKey==='classId' || Object.values(firstQuery).includes('');
+    const initialScores=needsOptions ? null : read(resource,firstQuery);
+    const initialRealm=picks.realm;
+    const initialDungeons=!mode && initialRealm ? read('dungeons',{slug:initialRealm}) : null;
+    // A dependent choice can change (e.g. a dungeon leaves the season), making these promises unused.
+    initialScores?.catch(()=>{});
+    initialDungeons?.catch(()=>{});
     try {
-      const params = await dictionary('params');
+      const [paramsResponse,realmsResponse]=await Promise.all([read('params'),mode ? null : read('realms')]);
       if (!current()) return;
+      const params=paramsResponse.data;
       classes = params.class;
       specs = params.specializations;
-      let resource, query;
+      $('rbFilters').replaceChildren();
       if (!mode) {
-        const {realms} = await dictionary('realms');
-        if (!current()) return;
+        const {realms} = realmsResponse.data;
         const realmsList=realms.map(r=>[r.slug,r.name]);
         ensureChoice('realm',realmsList);
         if (!picks.realm) throw new Error();
         $('rbFilters').append(makeSelect('realm','服务器',realmsList));
-        const data=await dictionary('dungeons',{slug:picks.realm});
+        const {data}=await (picks.realm===initialRealm ? initialDungeons : read('dungeons',{slug:picks.realm}));
         if (!current()) return;
         const dungeons=data.current_leaderboards.map(d=>[d.id,d.name]);
         ensureChoice('dungeon',dungeons);
         const realmName=realmsList.find(([v])=>v===picks.realm)?.[1];
         const dungeonName=dungeons.find(([v])=>String(v)===picks.dungeon)?.[1];
         $('rbOfficial').href=officialURL(realmName,dungeonName);
-        if (!dungeons.length) { $('rbStatus').textContent='该服务器当前没有开放的地下城榜单。'; return; }
+        if (!dungeons.length) { clearStandings(); $('rbTitle').textContent=realmName; $('rbStatus').textContent='该服务器当前没有开放的地下城榜单。'; return; }
         $('rbFilters').append(makeSelect('dungeon','地下城',dungeons));
         $('rbTitle').textContent=dungeonName+' · '+realmName;
-        resource='runs'; query={slug:picks.realm,leaderboard_id:picks.dungeon};
       } else {
-        resource='pvp'; query={pvp_rank:mode.id};
         if (mode.specialize) {
           const available=classes.filter(c=>specs.some(s=>String(s.class_id)===String(c.id))).map(c=>[c.id,c.name]);
           ensureChoice('classId',available);
@@ -171,28 +220,34 @@
           ensureChoice('specId',chosen);
           if (!picks.specId) throw new Error();
           $('rbFilters').append(makeSelect('classId','职业',available),makeSelect('specId','专精',chosen));
-          Object.assign(query,{class_id:picks.classId,specialization_id:picks.specId});
         }
         if (mode.faction) {
           $('rbFilters').append(makeSelect('faction','阵营',[['','双方阵营'],['alliance','联盟'],['horde','部落']]));
-          if (picks.faction) query.faction=picks.faction;
         }
         $('rbOfficial').href=officialURL();
       }
       if (focusKey) $('rb-'+focusKey)?.focus({preventScroll:true});
-      const {data,readAt}=await request(resource,query);
+      const query=scoreQuery();
+      key=keyFor(resource,query);
+      if (displayed && displayed.key!==key) {
+        clearStandings();
+        $('rbStatus').textContent='正在读取官方榜单…';
+      }
+      const previous=recent.get(key);
+      if (canPreview(previous) && Date.now()-previous.readAt>=ttl(resource)) {
+        paintResult(key,previous);
+        $('rbStatus').textContent='正在更新成绩…';
+      }
+      const result=await (initialScores && key===keyFor(resource,firstQuery) ? initialScores : read(resource,query));
       if (!current()) return;
-      rows=mode ? data.list : data.leading_groups;
-      if (!Array.isArray(rows)) throw new Error();
-      $('rbPeriod').textContent=mode ? (data.season || '国服正式服') :
-        '统计周期　'+dateText(data.period_start_timestamp,cnDate)+' – '+dateText(data.period_end_timestamp,cnDate);
-      $('rbCount').textContent=rows.length+(mode?' 位玩家':' 支队伍');
-      $('rbStatus').textContent=rows.length?'':(data.in_season===false?'当前不在赛季内。':'此条件下暂无官方排名。');
-      $('rbStamp').textContent='来源：魔兽世界国服官网 · 本站读取 '+dateText(readAt,cnTime)+'（北京时间）';
-      paintPages();
+      paintResult(key,result);
     } catch {
       if (!current()) return;
-      $('rbStatus').textContent='暂时无法读取官方榜单，请重试或查看官方榜单。';
+      if (keepDisplayed()) $('rbStatus').textContent='本次更新失败，当前显示上次读取的成绩。';
+      else {
+        clearStandings();
+        $('rbStatus').textContent='暂时无法读取官方榜单，请重试或查看官方榜单。';
+      }
       $('rbRetry').hidden=false;
     }
   }
@@ -217,7 +272,7 @@
     link.dataset.mode=m.key;
     $('rbModes').append(link);
   }
-  $('rbRetry').addEventListener('click',()=>{ dictionaries.clear(); void load(); });
+  $('rbRetry').addEventListener('click',()=>void load());
   function changePage(direction) {
     page+=direction;
     paintPages();

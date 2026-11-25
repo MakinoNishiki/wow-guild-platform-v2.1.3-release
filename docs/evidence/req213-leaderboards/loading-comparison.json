@@ -1,0 +1,14 @@
+{
+  "browser": "158.0.8127.37",
+  "delayMs": 500,
+  "before": {
+    "firstMs": 2057,
+    "revisitMs": 534,
+    "revisitRequests": 1
+  },
+  "after": {
+    "firstMs": 544,
+    "revisitMs": 7,
+    "revisitRequests": 0
+  }
+}

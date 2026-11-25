@@ -9070,6 +9070,7 @@ function lootFillAssignedTo(idOrName) {
 // ==================== 初始化 ====================
 // ==================== 更新日志 ====================
 const changelogData = [
+  {id:'req213-load',version:'v3.2.0',date:'2026-11-26',type:'improve',typeLabel:'功能优化',title:'更快打开国服排行榜',summary:'首次打开时同步读取榜单和筛选资料，五分钟内回看同一榜单可直接看到成绩。后台更新近期成绩时保留原读取时间。',details:[]},
   {id:'bug133-member-role-preview',version:'v3.2.0',date:'2026-11-26',type:'fix',typeLabel:'修复BUG',title:'分配成员角色时直接查看完整权限',summary:'打开「分配角色」即可查看这名成员当前角色的权限。切换备选角色可预览授权，点击「保存分配」后生效。',details:[]},
   {id:'req214-recruit',version:'v3.2.0',date:'2026-11-25',type:'feature',typeLabel:'新增功能',title:'同一职业可同时招募多个专精',summary:'一条需求可勾选多个职责和专精。勾选战士的坦克职责会自动选中防护，输出专精可按需勾选。',details:[]},
   {id:'req214-priorities',version:'v3.2.0',date:'2026-11-25',type:'improve',typeLabel:'功能优化',title:'一眼区分招募需求度',summary:'招募卡用三档刻度和颜色区分高、中、低需求。',details:[]},
