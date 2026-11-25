@@ -179,7 +179,12 @@ async function main() {
       const { host: incomingHost, connection: incomingConnection, ...forwardHeaders } = req.headers;
       const upstream = http.request({ hostname: host, port: restPort, path: req.url.slice(8), method: req.method,
         agent: false, headers: forwardHeaders }, incoming => {
-        res.writeHead(incoming.statusCode, incoming.headers); incoming.pipe(res);
+        res.writeHead(incoming.statusCode, incoming.headers);
+        if (guildRoles && req.url === '/rest/v1/rpc/req191_read_roles' && incoming.statusCode === 200) {
+          guildRoles.sendFragmentedRoles(incoming, res);
+        } else {
+          incoming.pipe(res);
+        }
       });
       upstream.on('error', error => {
         console.error('隔离数据库连接失败', error.code, req.url.split('?')[0]);

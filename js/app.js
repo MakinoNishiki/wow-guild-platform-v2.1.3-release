@@ -9070,6 +9070,7 @@ function lootFillAssignedTo(idOrName) {
 // ==================== 初始化 ====================
 // ==================== 更新日志 ====================
 const changelogData = [
+  {id:'bug131-role-names',version:'v3.2.0',date:'2026-11-25',type:'fix',typeLabel:'修复BUG',title:'公会角色名称完整显示',summary:'修复成员列表和分配窗口中「团员」等中文角色名偶尔出现乱码的问题。「分配角色」悬停呈金色，「移除」悬停呈红色。',details:[]},
   {id:'req191-roles',version:'v3.2.0',date:'2026-11-25',type:'feature',typeLabel:'新增功能',title:'给公会创建自己的角色',summary:'会长在公会资料的成员权限中创建角色、选择棋子，并把角色分配给成员。',details:[]},
   {id:'req191-grants',version:'v3.2.0',date:'2026-11-25',type:'improve',typeLabel:'功能优化',title:'按公会分工开放操作',summary:'可以单独开放招募、录像、考勤或分配等操作。公会编辑默认可编辑内部招募卡，绑定公会 WCL 默认由会长负责。',details:[]},
   {id:'req191-roster-badges',version:'v3.2.0',date:'2026-11-25',type:'fix',typeLabel:'修复BUG',title:'成员权限页现在能找到角色设置',summary:'从公会资料进入即可查看角色权限，成员行也会显示对应的棋子和角色名称。',details:[]},

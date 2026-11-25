@@ -4,23 +4,23 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>魔兽管家</title>
-<!-- 静态资源版本号：20261125.170（任务书 #22 WP3-②：凡改动 js/css 的 commit 必须同步递增此处与所有 ?v= 查询串，见 docs/开发规范.md 第五章） -->
+<!-- 静态资源版本号：20261125.171（任务书 #22 WP3-②：凡改动 js/css 的 commit 必须同步递增此处与所有 ?v= 查询串，见 docs/开发规范.md 第五章） -->
 <link rel="icon" type="image/png" sizes="32x32" href="assets/brand/favicon-32.png">
 <link rel="icon" type="image/png" sizes="16x16" href="assets/brand/favicon-16.png">
-<link rel="stylesheet" href="css/main.css?v=20261125.170">
-<link rel="stylesheet" href="css/data-public.css?v=20261125.170"><!-- 任务书 #28 WP5：副本掉落 tab（选择器全 .dp- 前缀 + #page-lootdrop 作用域，零泄漏） -->
-<link rel="stylesheet" href="css/housing-community.css?v=20261125.170">
-<link rel="stylesheet" href="css/housing-furniture.css?v=20261125.170">
-<link rel="stylesheet" href="css/guild-battle-editor.css?v=20261125.170">
-<link rel="stylesheet" href="css/decor-public.css?v=20261125.170"><!-- 任务书 #51：家宅图鉴（选择器全 .dh- 前缀，零泄漏，双壳共用） -->
-<link rel="stylesheet" href="css/decor-model.css?v=20261125.170">
-<script src="assets/vendor/supabase-js-2.js?v=20261125.170"></script>
-<link rel="stylesheet" href="css/guild-battle-public.css?v=20261125.170">
-<link rel="stylesheet" href="css/workspaces.css?v=20261125.170">
-<link rel="stylesheet" href="css/guild-intro.css?v=20261125.170">
-<link rel="stylesheet" href="css/tab-indicators.css?v=20261125.170">
-<link rel="stylesheet" href="css/cn-leaderboards.css?v=20261125.170">
-<link rel="stylesheet" href="css/guild-roles.css?v=20261125.170">
+<link rel="stylesheet" href="css/main.css?v=20261125.171">
+<link rel="stylesheet" href="css/data-public.css?v=20261125.171"><!-- 任务书 #28 WP5：副本掉落 tab（选择器全 .dp- 前缀 + #page-lootdrop 作用域，零泄漏） -->
+<link rel="stylesheet" href="css/housing-community.css?v=20261125.171">
+<link rel="stylesheet" href="css/housing-furniture.css?v=20261125.171">
+<link rel="stylesheet" href="css/guild-battle-editor.css?v=20261125.171">
+<link rel="stylesheet" href="css/decor-public.css?v=20261125.171"><!-- 任务书 #51：家宅图鉴（选择器全 .dh- 前缀，零泄漏，双壳共用） -->
+<link rel="stylesheet" href="css/decor-model.css?v=20261125.171">
+<script src="assets/vendor/supabase-js-2.js?v=20261125.171"></script>
+<link rel="stylesheet" href="css/guild-battle-public.css?v=20261125.171">
+<link rel="stylesheet" href="css/workspaces.css?v=20261125.171">
+<link rel="stylesheet" href="css/guild-intro.css?v=20261125.171">
+<link rel="stylesheet" href="css/tab-indicators.css?v=20261125.171">
+<link rel="stylesheet" href="css/cn-leaderboards.css?v=20261125.171">
+<link rel="stylesheet" href="css/guild-roles.css?v=20261125.171">
 </head>
 <body>
 
@@ -2509,28 +2509,28 @@
   </div>
 </div>
 
-<script src="js/cloud.js?v=20261125.170"></script>
+<script src="js/cloud.js?v=20261125.171"></script>
 <!-- 任务书 #14：主数据层（快照兜底 + 加载层），须在 app.js 之前 -->
-<script src="js/masterDataSnapshot.js?v=20261125.170"></script>
-<script src="js/masterData.js?v=20261125.170"></script>
+<script src="js/masterDataSnapshot.js?v=20261125.171"></script>
+<script src="js/masterData.js?v=20261125.171"></script>
 <!-- 任务书 #22 WP2：职业/专精/职责图标集中映射（全站唯一取图处） -->
-<script src="js/iconMap.js?v=20261125.170"></script>
+<script src="js/iconMap.js?v=20261125.171"></script>
 <!-- 任务书 #31（REQ-097）：装备分类词表单一真源（公示页 chips / picker 过滤 / BUG-057 回填三处消费，须在 dataPublic.js 与 app.js 之前） -->
-<script src="js/itemQualityData.js?v=20261125.170"></script>
-<script src="js/lootTaxonomy.js?v=20261125.170"></script>
+<script src="js/itemQualityData.js?v=20261125.171"></script>
+<script src="js/lootTaxonomy.js?v=20261125.171"></script>
 <!-- 任务书 #28 WP5：副本掉落渲染层（双壳同源；无 data-public-body 不自动启动，由 app.js 懒挂载，须在 app.js 之前） -->
-<script src="js/dataPublic.js?v=20261125.170"></script>
+<script src="js/dataPublic.js?v=20261125.171"></script>
 <!-- 任务书 #51（REQ-137 一期）：家宅图鉴词表单一真源（价格/分类/尺寸/来源词表，须在 decorData.js 之前） -->
-<script src="js/decorDict.js?v=20261125.170"></script>
+<script src="js/decorDict.js?v=20261125.171"></script>
 <!-- 任务书 #51：家宅图鉴数据层+渲染层（双壳同源；无 data-decor-body 不自动启动，由 app.js 懒挂载，须在 app.js 之前） -->
-<script src="js/decorIntroducedPatches.js?v=20261125.170"></script>
-<script src="js/decorEffectIds.js?v=20261125.170"></script>
-<script src="js/decorUseFacts.js?v=20261125.170"></script>
-<script src="js/decorFacts.js?v=20261125.170"></script>
-<script src="js/decorEngagement.js?v=20261125.170"></script>
-<script src="js/decorModelManifest.js?v=20261125.170"></script>
-<script src="js/decorModelPreview.js?v=20261125.170"></script>
-<script src="js/decorData.js?v=20261125.170"></script>
+<script src="js/decorIntroducedPatches.js?v=20261125.171"></script>
+<script src="js/decorEffectIds.js?v=20261125.171"></script>
+<script src="js/decorUseFacts.js?v=20261125.171"></script>
+<script src="js/decorFacts.js?v=20261125.171"></script>
+<script src="js/decorEngagement.js?v=20261125.171"></script>
+<script src="js/decorModelManifest.js?v=20261125.171"></script>
+<script src="js/decorModelPreview.js?v=20261125.171"></script>
+<script src="js/decorData.js?v=20261125.171"></script>
 <div id="housingBuildEditor" class="modal-overlay">
   <section class="modal" role="dialog" aria-modal="true" aria-labelledby="hbEditorTitle">
     <div class="modal-header"><h2 class="modal-title" id="hbEditorTitle">创建作品</h2><button type="button" class="modal-close" aria-label="关闭" onclick="requestCloseModal('housingBuildEditor')">×</button></div>
@@ -2566,11 +2566,11 @@
     </div></form>
   </section>
 </div>
-<script src="js/housingCommunity.js?v=20261125.170"></script>
-<script src="js/housingBuildFurniture.js?v=20261125.170"></script>
-<script src="js/housingBuildTags.js?v=20261125.170"></script>
-<script src="js/housingBuilds.js?v=20261125.170"></script>
-<script src="js/lootEvidence.js?v=20261125.170"></script>
+<script src="js/housingCommunity.js?v=20261125.171"></script>
+<script src="js/housingBuildFurniture.js?v=20261125.171"></script>
+<script src="js/housingBuildTags.js?v=20261125.171"></script>
+<script src="js/housingBuilds.js?v=20261125.171"></script>
+<script src="js/lootEvidence.js?v=20261125.171"></script>
 <template id="tokenTrendTemplate">
   <div class="token-trend">
     <div class="token-trend-heading"><strong>近期走势</strong><div class="token-periods" role="group" aria-label="走势时段">
@@ -2588,19 +2588,19 @@
     <div class="token-coverage" data-value="coverage"></div></details>
   </div>
 </template>
-<script src="js/wowTokenTrend.js?v=20261125.170"></script>
-<script src="js/wowToken.js?v=20261125.170"></script>
-<script src="js/guildBattlePublic.js?v=20261125.170"></script>
-<script src="js/guildIntroEditor.js?v=20261125.170"></script>
-<script src="js/guildRecruitment.js?v=20261125.170"></script>
-<script src="js/workspaces.js?v=20261125.170"></script>
-<script src="js/cnLeaderboards.js?v=20261125.170"></script>
-<script src="js/guildRoles.js?v=20261125.170"></script>
-<script src="js/guildBattleEditor.js?v=20261125.170"></script>
-<script src="js/app.js?v=20261125.170"></script>
-<script src="js/lootWorkflow.js?v=20261125.170"></script>
-<script src="js/personAttendance.js?v=20261125.170"></script>
-<script src="js/lootDetails.js?v=20261125.170"></script>
-<script src="js/track.js?v=20261125.170"></script><!-- 任务书 #54 WP1：全站埋点采集层（REQ-141，零依赖静默兜底） -->
+<script src="js/wowTokenTrend.js?v=20261125.171"></script>
+<script src="js/wowToken.js?v=20261125.171"></script>
+<script src="js/guildBattlePublic.js?v=20261125.171"></script>
+<script src="js/guildIntroEditor.js?v=20261125.171"></script>
+<script src="js/guildRecruitment.js?v=20261125.171"></script>
+<script src="js/workspaces.js?v=20261125.171"></script>
+<script src="js/cnLeaderboards.js?v=20261125.171"></script>
+<script src="js/guildRoles.js?v=20261125.171"></script>
+<script src="js/guildBattleEditor.js?v=20261125.171"></script>
+<script src="js/app.js?v=20261125.171"></script>
+<script src="js/lootWorkflow.js?v=20261125.171"></script>
+<script src="js/personAttendance.js?v=20261125.171"></script>
+<script src="js/lootDetails.js?v=20261125.171"></script>
+<script src="js/track.js?v=20261125.171"></script><!-- 任务书 #54 WP1：全站埋点采集层（REQ-141，零依赖静默兜底） -->
 </body>
 </html>

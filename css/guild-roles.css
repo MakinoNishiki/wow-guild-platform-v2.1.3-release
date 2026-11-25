@@ -1,6 +1,16 @@
 .gr-tools,.gr-badge,.gr-footer,.gr-assign { display:flex; align-items:center; gap:8px; }
 .gr-badge { display:inline-flex; gap:5px; color:var(--gold); font-weight:600; }
 .gr-piece { width:20px; height:20px; flex:none; vertical-align:middle; }
+.guild-member-actions [data-gr-assign],.guild-member-actions [data-gr-remove] {
+  min-height:30px; padding:4px 9px; color:var(--text-secondary);
+}
+.guild-member-actions [data-gr-assign] {
+  background:var(--bg-secondary); color:var(--text-primary); font-weight:600;
+}
+.guild-member-actions [data-gr-assign]:hover {
+  border-color:var(--gold); color:var(--gold);
+}
+.guild-member-actions button:focus-visible { outline:2px solid var(--gold); outline-offset:2px; }
 .gr-modal { width:min(880px,95vw); max-width:880px; }
 .gr-modal .modal-body { overflow:auto; }
 .gr-layout { display:grid; grid-template-columns:minmax(135px,180px) minmax(0,1fr); gap:20px; }

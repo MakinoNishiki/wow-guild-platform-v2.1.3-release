@@ -5,6 +5,21 @@ const fs = require('node:fs');
 const path = require('node:path');
 const sql = name => fs.readFileSync(path.join(__dirname, '..', 'sql', name), 'utf8');
 
+// The real upstream can end one network chunk in the middle of a Chinese character.
+function sendFragmentedRoles(incoming, response) {
+  const chunks = [];
+  incoming.on('data', chunk => chunks.push(chunk));
+  incoming.on('end', () => {
+    const bytes = Buffer.concat(chunks);
+    const name = bytes.includes(Buffer.from('考勤官')) ? '考勤官' : '团员';
+    const start = bytes.indexOf(Buffer.from(name));
+    assert.notEqual(start, -1);
+    const split = start + Buffer.byteLength(name[0]) + 1;
+    response.write(bytes.subarray(0, split));
+    setTimeout(() => response.end(bytes.subarray(split)), 15);
+  });
+}
+
 async function setupSchema(db) {
   for (const file of ['42_task075_loot_drops.sql','45_req191_loot_observations.sql','46_req195_person_attendance.sql','47_req199_loot_evidence.sql','60_req191_guild_roles.sql','60_req191_guild_roles.sql']) {
     await db.query(sql(file));
@@ -20,8 +35,49 @@ async function verify({author, viewer, guest, db, sessions, base, output, pass})
   const {rows:[guild]} = await db.query("select id from guilds where name='银松远征团'");
   const roleRow = async () => (await db.query('select * from guild_roles where guild_id=$1 and name=$2',[guild.id,'考勤官'])).rows[0];
   const manager = author.locator('#guildRoleManager');
-  await manager.click();
+  const member = author.locator('#guildMembersList .guild-member-item').filter({hasText:'测试团员'});
   const modal = author.locator('#guildRolesModal');
+  await member.locator('.gr-badge').waitFor();
+  assert.equal(await member.locator('.gr-badge').innerText(),'团员');
+  assert.equal(await member.locator('.gr-piece').getAttribute('src'),'assets/icons/guild-roles/pawn.svg');
+  const assign = member.getByRole('button',{name:'分配角色'});
+  const remove = member.getByRole('button',{name:'移除'});
+  const color = button => button.evaluate(async el => {
+    const style = getComputedStyle(el);
+    await Promise.all(el.getAnimations().map(animation => animation.finished));
+    return style.color;
+  });
+  const token = name => member.evaluate((el, name) => {
+    const probe = document.createElement('span');
+    probe.style.color = 'var(' + name + ')';
+    el.append(probe);
+    const value = getComputedStyle(probe).color;
+    probe.remove();
+    return value;
+  }, name);
+  assert.equal(await color(assign),await token('--text-primary'));
+  await assign.hover();
+  assert.equal(await color(assign),await token('--gold'));
+  await assign.click();
+  assert.equal(await modal.locator('#grmAssignedRole').inputValue(),'viewer');
+  assert.equal(await modal.locator('#grmAssignedRole option:checked').innerText(),'团员');
+  await modal.locator('.modal-close').click();
+  const dialogSeen = new Promise(resolve => author.once('dialog', async dialog => {
+    const message = dialog.message();
+    await dialog.dismiss();
+    resolve(message);
+  }));
+  await remove.hover();
+  assert.equal(await color(remove),await token('--danger'));
+  await remove.click();
+  assert.match(await dialogSeen,/移除成员.*测试团员/);
+  assert.equal(await member.count(),1);
+  await viewer.locator('#guildMembersList .gr-badge').first().waitFor();
+  assert.equal(await viewer.locator('#guildMembersList [data-gr-assign],#guildMembersList [data-gr-remove]').count(),0);
+  await author.mouse.move(0,0);
+  await author.locator('.gp-members').screenshot({path:path.join(output,'default-member-actions.png'),animations:'disabled'});
+  pass('角色响应在汉字中间分包，成员行和分配窗口仍显示「团员」；会长可打开分配、取消移除，普通成员无管理按钮');
+  await manager.click();
   assert.equal(await modal.locator('[data-gr-role]').count(),3);
   assert.equal(await modal.locator('[data-gr-role=owner] img').getAttribute('src'),'assets/icons/guild-roles/king.svg');
   await modal.locator('[data-gr-role=editor]').click();
@@ -91,4 +147,4 @@ async function verify({author, viewer, guest, db, sessions, base, output, pass})
   assert.equal(response.status(),401);
   pass('并发改名时旧表单保留输入、提示重新读取，较新的改名保留；访客读取角色接口返回 401');
 }
-module.exports={setupSchema,setup,verify};
+module.exports={setupSchema,setup,verify,sendFragmentedRoles};

@@ -251,6 +251,8 @@ function proxyToSupabase(method, supabasePath, headers, body, callback) {
   };
 
   const req = https.request(options, (res) => {
+    // Buffer chunks may split a UTF-8 character. Decode across chunk boundaries.
+    res.setEncoding("utf8");
     let data = "";
     res.on("data", (chunk) => { data += chunk; });
     res.on("end", () => {
