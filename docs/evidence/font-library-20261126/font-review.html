@@ -1,0 +1,317 @@
+<!doctype html>
+<html lang="zh-CN">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>国服字体库评审 · 魔兽管家</title>
+<style>
+:root{color-scheme:dark;--bg:#0e141a;--card:#1a2128;--deep:#161d24;--border:#34404a;--fg:#e7eced;--muted:#afbac4;--gold:#f0c060;--rim:#796443}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.6 "Microsoft YaHei UI","Microsoft YaHei",sans-serif}
+header{border-bottom:1px solid var(--border);padding:15px max(24px,calc((100% - 1380px)/2));background:#161c22;display:flex;align-items:center;gap:16px}
+header strong{color:var(--gold)}header span,small,.note,label{color:var(--muted)}main{width:min(1380px,calc(100% - 48px));margin:29px auto 46px}
+h1,h2,h3,p{margin:0}h1{font-size:29px;letter-spacing:.025em;margin-bottom:5px}h2{font-size:23px}h3{font-size:17px}a{color:var(--gold);text-underline-offset:3px}
+.layout{display:grid;grid-template-columns:minmax(270px,310px) minmax(0,1fr);gap:18px;align-items:start;margin-top:20px}
+.panel{border:1px solid var(--border);background:var(--card);border-radius:8px}.side{position:sticky;top:12px;padding:17px}
+.filters{display:flex;gap:5px;margin:12px 0}button,input{font:inherit;color:inherit}button{cursor:pointer}
+.filters button,.close{background:var(--deep);border:1px solid var(--border);border-radius:4px;padding:5px 9px;font-size:14px}
+.filters button[aria-pressed=true]{background:#332d22;color:var(--gold);border-color:var(--rim)}input{display:block;width:100%;border:1px solid #46505a;background:#11171c;border-radius:4px;padding:8px 10px;margin-top:4px}
+button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+.font-list{max-height:62vh;overflow-y:auto;margin-top:8px}.font-list button{display:block;width:100%;text-align:left;padding:7px 11px;background:none;border:1px solid transparent;border-left:2px solid transparent;border-radius:3px}
+.font-list button:hover{background:#222b32}.font-list button[aria-current=true]{border-left-color:var(--gold);background:#302d26;color:#f3d08d}
+.detail{overflow:hidden}.head{background:linear-gradient(110deg,#302c24,#1b232a 60%);padding:20px 23px 17px;border-bottom:1px solid var(--border)}
+.meta{display:flex;align-items:baseline;flex-wrap:wrap;gap:7px 15px;font-size:13px;color:#c6cbd0}
+.identity{padding:15px 23px;display:grid;grid-template-columns:minmax(170px,320px) 1fr;gap:18px;align-items:end;border-bottom:1px solid var(--border)}
+#check{padding-bottom:6px;color:#a8d7aa}#check.missing{color:#ffc494}.intro{padding:15px 23px 0;font-size:14px}
+.scene{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,320px);gap:15px;align-items:center;padding:16px 23px;border-bottom:1px solid var(--border)}.scene:last-child{border:0}
+.sample-box{overflow:hidden;margin-top:9px;background:var(--deep);border-radius:3px}.sample{height:76px;max-width:385px;background-repeat:no-repeat;background-size:385px 304px}
+.scene-nav{display:flex;gap:6px;flex-wrap:wrap;margin:14px 23px 0;padding-bottom:12px;border-bottom:1px solid var(--border)}
+.scene-nav button{background:var(--deep);color:var(--muted);border:1px solid var(--border);border-radius:4px;padding:5px 12px}
+.scene-nav button[aria-pressed=true]{background:#332d22;color:var(--gold);border-color:var(--rim)}
+figure{margin:0}figcaption{font-size:12px;color:var(--muted);margin-top:5px}
+.framed{display:block;width:100%;aspect-ratio:16/9;position:relative;isolation:isolate;padding:0;background:#0f151b;border:0;border-radius:3px;overflow:hidden;box-shadow:0 0 0 1px #11171b,0 2px 6px #0005}
+.framed img{display:block;width:100%;height:100%;object-fit:contain}
+.scene-image{position:relative;display:block;width:100%;aspect-ratio:16/9;overflow:hidden}
+.scene-image img:first-child{width:100%;height:100%;display:block}
+.scene-image .scene-ink,.scene-image canvas{position:absolute;pointer-events:none}
+.scene-image canvas{inset:0;width:100%;height:100%}
+.framed::before,.framed::after{z-index:1}
+.dirbar{margin-top:16px;display:flex;gap:10px 18px;align-items:center;flex-wrap:wrap}
+.dirbar button,.view-mode button{background:#1e262d;color:var(--fg);border:1px solid #49515a;border-radius:4px;padding:6px 12px}
+.dirbar button:first-child{background:#332b1f;border-color:var(--rim);color:var(--gold)}
+.dirbar p{font-size:13px;color:var(--muted);flex-basis:100%}.dirbar p:empty{display:none}
+.filters{flex-wrap:wrap}.stats{display:flex;align-items:baseline;flex-wrap:wrap;gap:4px 16px;margin:8px 0 6px}
+.stats strong{font-size:18px;color:var(--gold)}.stats span{color:#c8d0d7;font-size:14px}
+.view-mode{display:flex;flex-wrap:wrap;gap:6px;margin:12px 23px 0}.view-mode button[aria-pressed=true]{border-color:var(--rim);color:var(--gold);background:#332d22}
+.local-lines{padding:7px 10px;min-height:76px}.local-lines div{line-height:1.4}
+#dialogPicture{width:640px;max-width:100%}#light .view-mode{margin:10px 0}#light .dialog-head{margin-bottom:8px}
+.framed::before,.framed::after{content:"";position:absolute;inset:0;pointer-events:none}
+.framed::before{border:1px solid var(--rim);box-shadow:inset 0 0 0 2px #242a2deb}
+.framed::after{background:linear-gradient(var(--gold),var(--gold)) left top/16px 2px,linear-gradient(var(--gold),var(--gold)) left top/2px 14px,linear-gradient(var(--gold),var(--gold)) right bottom/16px 2px,linear-gradient(var(--gold),var(--gold)) right bottom/2px 14px;background-repeat:no-repeat;opacity:.85}
+.framed:hover::before{border-color:var(--gold)}.chat-key{font-size:14px;line-height:1.85}.chat-key span{display:inline-flex;align-items:center;gap:6px;margin-right:8px}.chat-key i{width:9px;height:9px;border-radius:2px;background:var(--c)}
+.foot{color:var(--muted);font-size:13px;margin:12px 0}.empty{padding:16px 0}dialog{background:var(--card);color:var(--fg);border:1px solid var(--rim);border-radius:6px;padding:14px;max-width:min(680px,95vw)}dialog::backdrop{background:#080b0fcc}
+.dialog-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;gap:18px}dialog img{width:640px;max-width:100%;display:block;height:auto}
+@media(max-width:950px){.layout{grid-template-columns:225px 1fr}.scene{grid-template-columns:minmax(0,1fr) minmax(0,40%);padding:14px}.side{padding:12px}.filters button{padding:4px 6px}.identity{grid-template-columns:1fr;gap:5px}}
+@media(max-width:700px){main{width:calc(100% - 24px)}.layout{display:block}.side{position:static;margin-bottom:12px}.font-list{max-height:140px}.scene{grid-template-columns:1fr}.scene figure{max-width:320px}.head,.identity,.intro{padding-left:14px;padding-right:14px}}
+.install{padding:14px 23px 15px;background:#181f26;border-bottom:1px solid var(--border)}
+.install-row,.install-actions{display:flex;align-items:end;gap:8px 12px;flex-wrap:wrap}.install-row{justify-content:space-between}
+.install label{font-size:13px}.install select{display:block;background:#11171c;color:var(--fg);font:inherit;min-height:36px;border:1px solid #495660;border-radius:4px;padding:4px 26px 4px 10px}
+.install-actions button,.confirm-actions button,#supplyFont{border:1px solid #52606b;border-radius:4px;background:#202831;color:var(--fg);padding:6px 12px;min-height:36px}
+button.apply{background:#eec066;color:#221c10;border-color:#eec066;font-weight:700}
+.install-actions button:disabled{opacity:.52;cursor:default}.install button:enabled:hover,.confirm-actions button:hover{filter:brightness(1.13)}
+.install button:enabled:active,.confirm-actions button:active{filter:brightness(.88)}
+.install-status{font-size:13px;color:var(--muted);margin-top:8px}.install-status[data-kind=success]{color:#aadba8}.install-status[data-kind=error]{color:#ffbb94}
+#installConfirm{width:min(460px,95vw);padding:20px}#installConfirm p{margin:10px 0}.confirm-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:16px}
+select:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+.current-panel{margin-top:16px;padding:16px 20px;background:linear-gradient(115deg,#29271f,var(--card) 54%)}
+.current-tools{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px 18px}
+.current-tools h2{font-size:19px}.current-tools .dirbar{margin:0;gap:8px}
+.current-panel dl{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));margin:14px 0 8px;gap:9px}
+.current-panel dl div{padding:8px 12px;border-left:2px solid var(--rim);background:var(--deep);overflow-wrap:anywhere}
+.current-panel dt,.preview-label{font-size:13px;color:var(--muted)}.current-panel dd{margin:3px 0 0;font-weight:600}
+.current-panel .current-sample{color:#e7d3a7;font-size:20px;font-weight:400}.current-panel [data-slot="ARKai_T.TTF"] .current-sample{color:#40ff40}
+.current-panel [data-slot="ARKai_C.TTF"] .current-sample{color:#f8cb52}
+.current-panel p,.side-actions{font-size:13px;color:var(--muted)}.side-actions{margin:8px 0;gap:6px}
+@media(max-width:950px){.current-panel dl{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:600px){.current-panel dl{grid-template-columns:repeat(2,minmax(0,1fr))}.current-panel{padding:12px}}
+</style>
+<header><strong>魔兽管家</strong><span>字体库评审</span></header>
+<main>
+<h1>国服字体库</h1><p class="note">选择字体，对照游戏场景，并检查自己的角色名。</p>
+<section class="panel current-panel" aria-labelledby="currentHeading">
+<div class="current-tools"><h2 id="currentHeading">我的游戏字体</h2><div class="dirbar">
+<button id="pickGame" type="button">选择魔兽游戏目录</button><button id="resumeGame" hidden>重新授权读取</button><button id="rescanGame" hidden>刷新当前字体</button><button id="forgetGame" hidden>忘记目录</button>
+<button id="pickFontsTarget" type="button" hidden>选择游戏的 Fonts 子目录</button>
+<input hidden type="file" id="fontFolder" webkitdirectory multiple style="display:none">
+<input hidden type="file" id="gameFolderFallback" webkitdirectory style="display:none">
+</div></div>
+<dl id="currentSlots" aria-label="正式服各用途的当前字体"></dl>
+<p id="dirStatus" role="status">首次请选择正式服游戏目录，读取后可看各用途的字体名称和样字。插件可能单独指定字体。</p>
+</section>
+<div class="layout">
+<aside class="panel side"><label>查找字体<input id="find" type="search" placeholder="输入字体名称"></label>
+<div class="dirbar side-actions"><button id="pickFonts" type="button">导入本地字体目录</button><button id="systemFontButton" type="button" hidden>读取电脑字体</button></div><p id="libraryStatus" role="status" class="note"></p>
+<div class="filters" aria-label="按来源语种筛选"><button data-type="全部">全部</button><button data-type="简中">简中</button><button data-type="繁中">繁中</button><button data-type="外文">外文</button><button data-type="本地" hidden>本地</button><button data-type="电脑" hidden>电脑字体</button></div>
+<small id="count"></small><div class="font-list" id="fonts"></div></aside>
+<section class="panel detail" id="detail">
+<div class="head"><p class="preview-label">正在试看的字体</p><h2 id="family"></h2><div class="stats" id="coverage" aria-live="polite"><strong id="missingTotal"></strong><span id="missingSC"></span><span id="missingTC"></span></div><div class="meta"><span id="familyType"></span><a id="source" target="_blank" rel="noopener">字体来源</a><a id="license" target="_blank" rel="noopener">授权</a></div></div>
+<section class="install" aria-label="管理游戏字体">
+<div class="install-row"><label for="installSlot">应用位置 · 国服简中正式服<select id="installSlot"></select></label>
+<div class="install-actions"><button class="apply" id="applyFont">应用到游戏</button><button id="deleteFont" disabled>删除已应用字体</button><button id="forgetFont" hidden>从本地列表移除</button></div></div>
+<p class="install-status" id="installStatus" role="status"></p>
+<div id="sourceFallback" hidden><a id="downloadOriginal" target="_blank" rel="noopener">下载作者原件</a>　<button type="button" id="supplyFont">选择已下载的字体文件</button><input hidden style="display:none" type="file" id="sourceFile" accept=".ttf,.otf"></div>
+</section>
+<div class="identity"><label>检查角色名（可简繁混填）<input id="name" value="雲梦𠮷" maxlength="60" autocomplete="off"></label><p id="check" aria-live="polite"></p></div>
+<p class="intro note">场景模拟将所选字体排进游戏画面。可放大，或切换到拍摄时的原图对照。</p>
+<div class="view-mode" id="imageModes" aria-label="场景图显示方式"></div>
+<div class="scene-nav" id="modes" aria-label="预览场景"></div>
+<div id="scenes"></div>
+</section></div>
+<p class="foot">缺字总数按两份测试字表的并集计算，同一个汉字只计一次。简中检查 GB 2312 的 6763 字，繁中检查 Big5 常用区的 5401 字。生僻角色名可在上方单独检查。</p>
+</main>
+<dialog id="light" aria-labelledby="caption"><div class="dialog-head"><b id="caption"></b><button class="close">关闭</button></div><div id="dialogModes" class="view-mode" aria-label="放大图显示方式"></div><div id="dialogPicture"></div><small id="dialogLegend"></small></dialog>
+<dialog id="installConfirm" aria-labelledby="actionTitle" aria-describedby="actionTarget actionEffect"><h3 id="actionTitle"></h3><p id="actionTarget"></p><p id="actionEffect" class="note"></p><div class="confirm-actions"><button id="cancelInstall" autofocus>取消</button><button class="apply" id="confirmInstall"></button></div></dialog>
+<script src="font-review-data.js"></script>
+<script src="scene-samples.js"></script>
+<script src="font-preview-tools.js"></script>
+<script src="font-install-sources.js"></script>
+<script src="font-install.js"></script>
+<script>
+const catalog = window.FONT_REVIEW;
+const librarySize = catalog.length;
+const tools = window.WBFontPreview;
+const el = id => document.getElementById(id);
+const slots = [
+  {name:'任务正文', file:'game-quest.png', label:'追火猎焰 · 2023.07.16'},
+  {name:'界面姓名', file:'game-name.png', label:'NPC 弥泽恩 · 2024.08.01'},
+  {name:'战斗数字', file:'game-damage.png', label:'战斗飘字 · 2024.08.08'},
+  {name:'聊天频道'}
+];
+let filter = '简中', selected = catalog[0], sceneFilter = '场景总览';
+let original = false, zoomIndex = 0;
+function checkName(){
+  const sample = el('name').value.trim(), chars = [...new Set(Array.from(sample))];
+  if(!selected.r){el('check').textContent='';el('check').title='';return;}
+  const absent = chars.filter(c=>!tools.hasGlyph(selected.r,c.codePointAt(0)));
+  el('check').classList.toggle('missing',absent.length>0);
+  const details=absent.map(c=>c+' (U+'+c.codePointAt(0).toString(16).toUpperCase()+')');
+  el('check').textContent = !sample?'输入名字查看字形覆盖':absent.length?'该名字缺 '+absent.length+' 个字：「'+absent.join('、')+'」，游戏中可能显示方框。':'这个名字的每个字都有字形。';
+  el('check').title=details.join('、');
+}
+function renderZoom(){
+  const slot=slots[zoomIndex];
+  el('caption').textContent=slot.name+' · '+(original?'实拍原图':selected.n);
+  el('dialogPicture').replaceChildren(tools.scene(slot,zoomIndex,selected,original));
+  el('dialogLegend').textContent=(original?slot.label+' · 历史实拍':'字体场景模拟')+' · 640 × 360';
+}
+function showPicture(i){zoomIndex=i;renderZoom();el('light').showModal()}
+function localLines(box,font,i){
+  const lang=tools.language(font);
+  const lines=[
+    [lang===8?'Travel to Tirisfal Glades.':'前往提瑞斯法林地。'],
+    [lang===8?'Training Dummy':lang===7?'訓練假人':'训练假人'],
+    ['38,327',lang===8?'Immune':lang===7?'免疫  1.8萬':'免疫  1.8万'],
+    lang===8?['[Guild] Raid tonight','[Party] Ready','[Raid] Pulling']:lang===7?['[公會] 今晚集合','[隊伍] 我到了','[團隊] 準備開怪']:['[公会] 今晚集合','[队伍] 我到了','[团队] 准备开怪']
+  ][i];
+  box.className+=' local-lines';box.style.fontFamily=font.face;
+  lines.forEach((t,j)=>{const p=document.createElement('div');p.textContent=Array.from(t,c=>tools.hasGlyph(font.r,c.codePointAt(0))?c:'□').join('');
+    p.style.color=i===3?['#40FF40','#AAAAFF','#FF7F00'][j]:i===2?'#f8cb52':'inherit';p.style.fontSize=i===3?'16px':'22px';box.append(p)});
+}
+function renderDetails(){
+  const f=selected;
+  el('family').textContent=f.n;
+  el('forgetFont').hidden=f.t!=='本地';
+  el('source').hidden=el('license').hidden=!!(f.file||f.systemRef);
+  if(!f.file&&!f.systemRef){el('source').href=f.h;el('license').href=f.u;el('license').textContent=f.l}
+  el('familyType').textContent=f.systemRef?'电脑已安装':f.file?'本地字体 · '+f.file.name:f.t;
+  el('scenes').replaceChildren();
+  if(!f.r){
+    el('missingTotal').textContent=f.error?'字体读取失败':'正在读取字体…';
+    el('missingSC').textContent=f.error||'';el('missingTC').textContent='';
+    checkName();return;
+  }
+  const m=tools.coverage(f);
+  el('missingTotal').textContent='去重缺字 '+m.total.toLocaleString()+' / '+m.base.toLocaleString();
+  el('missingSC').textContent='简中缺 '+m.sc.toLocaleString()+' / 6,763';
+  el('missingTC').textContent='繁中缺 '+m.tc.toLocaleString()+' / 5,401';
+  slots.forEach((slot,i)=>{
+    if(sceneFilter!=='场景总览' && sceneFilter!==slot.name)return;
+    const row=document.createElement('section');row.className='scene';
+    const left=document.createElement('div'), title=document.createElement('h3');
+    title.textContent=slot.name;left.append(title);
+    const box=document.createElement('div'),sample=document.createElement('div');
+    box.className='sample-box';sample.className='sample';sample.setAttribute('role','img');
+    sample.setAttribute('aria-label',f.n+' · '+slot.name+'排印样例');
+    if(f.file)localLines(box,f,i);else{
+      sample.style.backgroundImage='url(data:image/webp;base64,'+f.p+')';
+      sample.style.backgroundPosition='0 -'+i*76+'px';box.append(sample);
+    }
+    left.append(box);row.append(left);
+    if(slot.file){
+      const fig=document.createElement('figure'),btn=document.createElement('button'),cap=document.createElement('figcaption');
+      btn.className='framed';btn.setAttribute('aria-label','放大'+slot.name);btn.onclick=()=>showPicture(i);
+      btn.append(tools.scene(slot,i,f,original));cap.textContent=original?'实拍原图 · '+slot.label:'场景模拟 · '+f.n;fig.append(btn,cap);row.append(fig);
+    }else{
+      const box=document.createElement('div');box.className='chat-key';box.textContent='普通频道标准色';
+      const legend=document.createElement('div');
+      for(const [text,color] of [['公会','#40FF40'],['队伍','#AAAAFF'],['团队','#FF7F00']]){
+        const span=document.createElement('span'),dot=document.createElement('i');dot.style.setProperty('--c',color);
+        span.append(dot,text+' '+color);legend.append(span);
+      }
+      box.append(legend);row.append(box);
+    }
+    el('scenes').append(row);
+  });checkName();
+}
+async function choose(f){
+  selected=f;
+  fontActions.refresh();
+  for(const btn of el('fonts').children)btn.setAttribute('aria-current',String(btn.fontEntry===f));
+  if((f.file || f.systemRef) && !f.face){
+    f.error='';renderDetails();
+    try{await tools.loadLocal(f)}catch(e){f.error='请使用带 Unicode 字符表的 TTF 或 OTF 文件。'}
+    if(selected!==f)return;
+    fontActions.refresh();
+  }
+  renderDetails();
+}
+function list(){
+  const q=el('find').value.trim().toLowerCase();
+  const matches=catalog.filter(f=>(filter==='全部'||f.t.startsWith(filter))&&f.n.toLowerCase().includes(q));
+  el('count').textContent=matches.length+' 项 · 字库 '+librarySize+' 个家族';
+  document.querySelectorAll('[data-type]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.type===filter)));
+  el('fonts').replaceChildren();el('detail').hidden=!matches.length;
+  if(!matches.length){el('fonts').textContent='没有符合条件的字体';return}
+  if(!matches.includes(selected))selected=matches[0];
+  matches.forEach(f=>{const b=document.createElement('button');b.textContent=f.n;b.fontEntry=f;b.onclick=()=>choose(f);el('fonts').append(b)});
+  choose(selected);
+}
+el('name').oninput=checkName;el('find').oninput=list;
+document.querySelectorAll('[data-type]').forEach(b=>b.onclick=()=>{filter=b.dataset.type;list()});
+el('light').querySelector('button').onclick=()=>el('light').close();
+el('light').addEventListener('click',e=>{if(e.target===el('light'))el('light').close()});
+function setImageMode(value){
+  original=value;
+  document.querySelectorAll('[data-original]').forEach(b=>b.setAttribute('aria-pressed',String((b.dataset.original==='true')===value)));
+  if(selected.r)renderDetails();
+  if(el('light').open)renderZoom();
+}
+for(const id of ['imageModes','dialogModes']){
+  for(const [label,value] of [['随字体预览',false],['实拍原图',true]]){
+    const b=document.createElement('button');b.textContent=label;b.dataset.original=String(value);
+    b.setAttribute('aria-pressed',String(original===value));b.onclick=()=>setImageMode(value);el(id).append(b);
+  }
+}
+el('pickFonts').onclick=()=>el('fontFolder').click();
+el('forgetFont').onclick=()=>{
+  if(!selected.file)return;
+  const index=catalog.indexOf(selected), removed=selected;
+  if(index<librarySize)return;
+  if(removed.loadedFace)document.fonts.delete(removed.loadedFace);
+  catalog.splice(index,1);
+  if(!catalog.some(f=>f.t==='本地')){
+    filter='简中';document.querySelector('[data-type="本地"]').hidden=true;
+  }
+  selected=catalog[index]||catalog[catalog.length-1];el('find').value='';list();
+  el('libraryStatus').textContent='已从本页列表移除「'+removed.n+'」，磁盘原件和游戏设置均已保留。';
+};
+el('fontFolder').onchange=e=>{
+  const files=Array.from(e.target.files);
+  e.target.value='';
+  const matches=files.filter(file=>/\.(ttf|otf)$/i.test(file.name));
+  if(!matches.length){
+    el('libraryStatus').textContent='所选目录没有可预览的 TTF 或 OTF 单字体文件。';return;
+  }
+  const counts=new Map();
+  for(const f of matches)counts.set(f.name,(counts.get(f.name)||0)+1);
+  for(let i=catalog.length-1;i>=librarySize;i--)if(catalog[i].t==='本地'){
+    if(catalog[i].loadedFace)document.fonts.delete(catalog[i].loadedFace);catalog.splice(i,1);
+  }
+  const local=matches.map(file=>({file,t:'本地',n:counts.get(file.name)>1?file.webkitRelativePath:file.name.replace(/\.(ttf|otf)$/i,'')}));
+  local.sort((a,b)=>a.n.localeCompare(b.n,'zh-CN'));catalog.push(...local);
+  el('libraryStatus').textContent='已从「'+matches[0].webkitRelativePath.split('/')[0]+'」读取 '+local.length+' 款本地字体。';
+  filter='本地';selected=local[0];original=false;setImageMode(false);el('find').value='';
+  document.querySelector('[data-type="本地"]').hidden=false;list();
+};
+for(const name of ['场景总览',...slots.map(s=>s.name)]){
+  const b=document.createElement('button');b.textContent=name;
+  b.setAttribute('aria-pressed',String(name===sceneFilter));
+  b.onclick=()=>{sceneFilter=name;for(const button of el('modes').children)button.setAttribute('aria-pressed',String(button===b));renderDetails()};
+  el('modes').append(b);
+}
+</script>
+<script src="font-current.js"></script>
+<script src="font-install-panel.js"></script>
+<script>
+list();
+fontActions.restore();
+if(typeof window.queryLocalFonts==='function'){
+  const button=el('systemFontButton');
+  button.hidden=false;
+  let touched=false,enumerating=false;
+  document.addEventListener('pointerdown',()=>{touched=true},{once:true,capture:true});
+  document.addEventListener('keydown',()=>{touched=true},{once:true,capture:true});
+  async function readSystem(automatic){
+    if(enumerating)return;
+    enumerating=true;button.disabled=true;
+    try{
+      const refs=await window.queryLocalFonts();
+      if(!refs.length){if(!automatic)el('libraryStatus').textContent='浏览器未返回电脑字体，可使用「导入本地字体目录」。';return;}
+      const existing=new Set(catalog.filter(f=>f.systemRef).map(f=>f.systemRef.postscriptName));
+      const entries=refs.filter(ref=>!existing.has(ref.postscriptName)).map(ref=>({n:ref.fullName||ref.postscriptName,t:'电脑',systemRef:ref}));
+      entries.sort((a,b)=>a.n.localeCompare(b.n,'zh-CN'));
+      catalog.push(...entries);
+      document.querySelector('[data-type="电脑"]').hidden=false;
+      button.hidden=true;
+      if(!automatic||(!touched && filter==='简中' && selected===catalog[0])){
+        filter='电脑';el('find').value='';list();
+      }
+    }catch{
+      if(!automatic)el('libraryStatus').textContent='尚未读取电脑字体。可重新允许访问，或导入自己的字体目录。';
+    }finally{enumerating=false;button.disabled=false;}
+  }
+  button.onclick=()=>readSystem(false);
+  navigator.permissions?.query({name:'local-fonts'}).then(p=>{
+    if(p.state==='granted')return readSystem(true);
+  }).catch(()=>{});
+}
+</script>
+</html>
