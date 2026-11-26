@@ -7,13 +7,16 @@ const path = require("path");
 const { execSync } = require("child_process");
 
 const ROOT = __dirname;
+const searchPages = require('./js/publicSearchPages.js');
+const searchOrigin = 'https://wow.ddctl.com';
+const publicSearchPaths = new Map(Object.entries(searchPages).map(([key, page]) => [page.path, key]));
 const { createTokenMarket } = require("./lib/wowToken.cjs");
 const tokenMarket = createTokenMarket();
 const { handleCnLeaderboards } = require("./lib/cnLeaderboards.cjs");
 // 任务书 #23 WP2：data.html 数据公示页（免登录公开页，与 index.html 同级放行）；
 // 任务书 #51 WP2：decor.html 家宅图鉴公示页同级放行（免登录，anon 只读）
 const PUBLIC_STATIC_FILES = new Set(["index.html","data.html","decor.html","guild-report.html","guild-recruitment.html"].map(name => path.join(ROOT,name)));
-const PUBLIC_STATIC_ROOTS = ["assets", "css", "js"].map(
+const PUBLIC_STATIC_ROOTS = ["assets", "css", "js", "font-manager"].map(
   (dir) => `${path.join(ROOT, dir)}${path.sep}`
 );
 
@@ -1554,7 +1557,7 @@ async function handleWclReportFights(req, res, corsHeaders, query) {
 
 
 
-function serveFile(res, filePath, req) {
+function serveFile(res, filePath, req, searchKey) {
   const ext = path.extname(filePath).toLowerCase();
   const contentType = MIME[ext] || "application/octet-stream";
   // 任务书 #23-补丁 修正项⑤（任务书 #66 1.5 强化）：.html 文档（含 / 根路径映射的 index.html）
@@ -1575,7 +1578,7 @@ function serveFile(res, filePath, req) {
       headers["Expires"] = "0";
       headers["Last-Modified"] = stats.mtime.toUTCString();
       const ims = req && req.headers["if-modified-since"];
-      if (ims && !Number.isNaN(Date.parse(ims)) && Date.parse(ims) >= Math.floor(stats.mtimeMs / 1000) * 1000) {
+      if ((!searchKey || searchKey === 'home') && ims && !Number.isNaN(Date.parse(ims)) && Date.parse(ims) >= Math.floor(stats.mtimeMs / 1000) * 1000) {
         res.writeHead(304, headers);
         res.end();
         return;
@@ -1586,6 +1589,16 @@ function serveFile(res, filePath, req) {
         res.writeHead(404, { "Content-Type": "text/plain" });
         res.end("Not Found");
         return;
+      }
+      if (searchKey && searchKey !== 'home') {
+        const page = searchPages[searchKey];
+        data = data.toString('utf8')
+          .replace(/<title>[^<]*<\/title>/, '<title>' + page.title + '</title>')
+          .replace(/(<meta name="description" content=")[^"]*/, '$1' + page.description)
+          .replace(/(<link rel="canonical" href=")[^"]*/, '$1' + searchOrigin + page.path)
+          .replace('class="page active" id="page-home"', 'class="page" id="page-home"')
+          .replace('class="page" id="page-' + searchKey + '"', 'class="page active" id="page-' + searchKey + '"')
+          .replace('id="pageTitle">首页', 'id="pageTitle">' + (searchKey === 'decor' ? '家宅图鉴' : '国服排行榜'));
       }
       res.writeHead(200, headers);
       res.end(data);
@@ -2072,13 +2085,29 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  if (urlPath === "/") urlPath = "/index.html";
-
   if (req.method !== "GET" && req.method !== "HEAD") {
     res.writeHead(405, { "Content-Type": "text/plain; charset=utf-8", "Allow": "GET, HEAD" });
     res.end("Method Not Allowed");
     return;
   }
+
+  if (urlPath === '/robots.txt' || urlPath === '/sitemap.xml') {
+    const robots = urlPath === '/robots.txt';
+    res.writeHead(200, { 'Content-Type': robots ? 'text/plain; charset=utf-8' : 'application/xml; charset=utf-8', 'Cache-Control': 'public, max-age=300' });
+    res.end(robots ? 'User-agent: *\nAllow: /\nSitemap: ' + searchOrigin + '/sitemap.xml\n' :
+      '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n' +
+      [...publicSearchPaths.keys()].map(p => '  <url><loc>' + searchOrigin + p + '</loc></url>').join('\n') + '\n</urlset>\n');
+    return;
+  }
+  const normalizedPublicPath = urlPath.endsWith('/') ? urlPath.slice(0,-1) : urlPath + '/';
+  if (urlPath !== '/' && !publicSearchPaths.has(urlPath) && publicSearchPaths.has(normalizedPublicPath)) {
+    res.writeHead(308, {Location: normalizedPublicPath + req.url.slice(urlPath.length)});
+    res.end();
+    return;
+  }
+  if (urlPath === searchPages.fonts.path) urlPath = '/font-manager/index.html';
+  const searchKey = publicSearchPaths.get(urlPath);
+  if (searchKey) urlPath = '/index.html';
 
   const safePath = path.normalize(urlPath).replace(/^(\.\.(\/|\\|$))+/, "");
   const filePath = path.join(ROOT, safePath);
@@ -2095,7 +2124,7 @@ const server = http.createServer(async (req, res) => {
       res.end("Not Found");
       return;
     }
-    serveFile(res, filePath, req);
+    serveFile(res, filePath, req, searchKey);
   });
 });
 

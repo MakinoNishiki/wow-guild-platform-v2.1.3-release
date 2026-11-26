@@ -1,8 +1,9 @@
 // ==================== 数据管理 ====================
 const STORAGE_KEY = 'wow_raid_attendance_data';
 
-// DEC-004：版本号单一事实源（发布时只改这一处），侧边栏左下角显示
-const APP_VERSION = 'v3.2.0';
+// 每次正式发版按发布标签新增一组，保留旧组供历史公告引用。
+const releaseNov27 = { version: 'v3.2.0', date: '2026-11-27' };
+const APP_VERSION = releaseNov27.version;
 
 let appData = {
   members: [],
@@ -2577,9 +2578,22 @@ async function saveDecorPlan(items, name) {
 const IA_TEAM_KEYS = ['guild-settings', 'guild-permissions', 'guild', 'dashboard', 'members', 'attendance', 'loot', 'wishlist', 'reports', 'data', 'datacenter'];
 let iaLastHash = ''; // 防环锚点：本模块写过的最后一个 hash（hashchange 回火时比对跳过）
 
+const iaPublicEntries = [PublicSearchPages.decor, PublicSearchPages.rankings];
+function iaLocationRoute() {
+  return location.hash || iaPublicEntries.find(entry => entry.path === location.pathname)?.route || '';
+}
+function iaPlainClick(event) {
+  return event.button === 0 && !event.ctrlKey && !event.metaKey && !event.shiftKey && !event.altKey;
+}
 function iaSetHash(h) {
   iaLastHash = h;
-  if (location.hash !== h) location.hash = h;
+  // Native hash navigation still notifies existing dialogs and records a history entry.
+  if (iaLocationRoute() !== h) location.hash = h;
+  const publicEntry = iaPublicEntries.find(entry => entry.route === h);
+  if (/^https?:$/.test(location.protocol) && (publicEntry || iaPublicEntries.some(entry => entry.path === location.pathname))) {
+    const url = publicEntry ? publicEntry.path + location.search : '/' + location.search + h;
+    if (location.pathname + location.search + location.hash !== url) history.replaceState(history.state, '', url);
+  }
 }
 
 function iaKeyToHash(key) {
@@ -2651,6 +2665,10 @@ function iaRenderTeamGuide() {
 // IA 导航态绘制：一级 tab active / 二级导航显隐 / pill active / QQ 悬浮钮（仅导航页）
 function iaPaintRoute(page, tab, activeKey) {
   userMenuClose();
+  const searchPage = PublicSearchPages[page] || PublicSearchPages.home;
+  document.title = searchPage.title;
+  document.querySelector('meta[name="description"]').content = searchPage.description;
+  document.querySelector('link[rel="canonical"]').href = 'https://wow.ddctl.com' + searchPage.path;
   // 任务书 #62 §1（BUG-109）：# 首页门户态（tab=null）高亮「首页」tab；无公会态 tab=null 其余逻辑不变
   const effTab = page === 'home' ? 'home' : tab;
   document.getElementById('mainContent').dataset.workspace = tab || '';
@@ -2691,7 +2709,7 @@ function iaLegacyRedirect(hash) {
 
 // 路由应用：解析 → 守卫 → IA 导航态 → switchPage（PV 由 track.js 包装自动发，新 key 均过既有 regex）
 function iaApplyRoute() {
-  let h = location.hash || '';
+  let h = iaLocationRoute();
   iaLastHash = h;
   const legacy = ['#/team/changelog', '#/team/lootdrop'].includes(h) ? h.replace('/team/', '/') : iaLegacyRedirect(h);
   if (legacy) {
@@ -2763,11 +2781,11 @@ function iaApplyRoute() {
   }
 }
 
-window.addEventListener('hashchange', () => {
-  const h = location.hash || '';
-  if (h === iaLastHash) return; // 本模块自写 hash 的回火，跳过防环
-  iaApplyRoute();
-});
+function iaRestoreRoute() {
+  if (iaLocationRoute() !== iaLastHash) iaApplyRoute();
+}
+window.addEventListener('hashchange', iaRestoreRoute);
+window.addEventListener('popstate', iaRestoreRoute);
 
 // 一级 tab 点击（埋点 level:1；导航内联不转调 iaGoKey，避免一次点击双事件）
 function iaSwitchTab(tab) {
@@ -9070,6 +9088,8 @@ function lootFillAssignedTo(idOrName) {
 // ==================== 初始化 ====================
 // ==================== 更新日志 ====================
 const changelogData = [
+  {id:'req215-fonts',...releaseNov27,type:'feature',typeLabel:'新增功能',title:'从顶部导航打开国服字体管理器',summary:'预览任务、姓名板、战斗数字和聊天字体，输入角色名检查缺字。在支持的浏览器里选择游戏目录后，可按用途应用字体或恢复原文件。',details:[]},
+  {id:'req217-search',...releaseNov27,type:'improve',typeLabel:'功能优化',title:'家宅图鉴和国服排行榜有了独立网址',summary:'打开或收藏对应网址，即可直接进入图鉴或排行榜。以前分享的链接也可以继续使用。',details:[]},
   {id:'req216-analytics',version:'v3.2.0',date:'2026-11-27',type:'improve',typeLabel:'功能优化',title:'访问统计支持按时间查看来源',summary:'管理员可查看各来源每小时、每天、每周或每月的浏览量与访客数。事件排行改用中文名称。',details:[]},
   {id:'req213-load',version:'v3.2.0',date:'2026-11-26',type:'improve',typeLabel:'功能优化',title:'更快打开国服排行榜',summary:'首次打开时同步读取榜单和筛选资料，五分钟内回看同一榜单可直接看到成绩。后台更新近期成绩时保留原读取时间。',details:[]},
   {id:'bug133-member-role-preview',version:'v3.2.0',date:'2026-11-26',type:'fix',typeLabel:'修复BUG',title:'分配成员角色时直接查看完整权限',summary:'打开「分配角色」即可查看这名成员当前角色的权限。切换备选角色可预览授权，点击「保存分配」后生效。',details:[]},
@@ -11598,6 +11618,12 @@ async function init() {
   // DEC-004：侧边栏版本号来自单一常量 APP_VERSION
   const verEl = document.getElementById('appVersion');
   if (verEl) verEl.textContent = APP_VERSION;
+  const changeDate = document.getElementById('latestChangeDate');
+  if (changeDate && changelogData.length) {
+    const latestDate = changelogData.reduce((latest, entry) => entry.date > latest ? entry.date : latest, '');
+    changeDate.dateTime = latestDate;
+    changeDate.textContent = latestDate;
+  }
 
   // 设置今日日期显示（REQ-106，任务书 #34 WP2：精确到秒、每秒走动；页面隐藏时跳过 DOM 写入，可见即恢复准确值）
   const weekdays = ['日', '一', '二', '三', '四', '五', '六'];
@@ -16152,7 +16178,7 @@ const ANX_TAB_LABEL = {
   wishlist: '心愿单', reports: '统计报表', data: '数据管理', changelog: '更新日志',
   lootdrop: '副本掉落', decor: '家宅图鉴', datacenter: '数据中心', login: '登录墙',
   // 任务书 #60 WP1：新 IA 页签四键（旧键原样保留，历史数据兼容展示）
-  home: '首页', 'team-guide': '团队引导', 'decor-plan': '方案单', community: '家宅分享', rankings: '排行榜'
+  home: '首页', 'team-guide': '团队引导', 'decor-plan': '方案单', community: '家宅分享', rankings: '排行榜', 'font-manager': '字体管理器'
 };
 
 function anxPageLabel(p) {
@@ -16192,7 +16218,8 @@ function mdRenderAnalytics(panel) {
     ['index:attendance', '主站·考勤记录'], ['index:loot', '主站·装备分配'], ['index:wishlist', '主站·心愿单'],
     ['index:reports', '主站·统计报表'], ['index:data', '主站·数据管理'], ['index:changelog', '主站·更新日志'],
     ['index:datacenter', '主站·数据中心'], ['index:lootdrop', '主站·副本掉落'], ['index:decor', '主站·家宅图鉴'],
-    ['index:decor-plan', '主站·方案单'], ['index:community', '主站·家宅分享'], ['index:rankings', '主站·排行榜']]
+    ['index:decor-plan', '主站·方案单'], ['index:community', '主站·家宅分享'], ['index:rankings', '主站·排行榜'],
+    ['index:font-manager', '主站·字体管理器']]
     .map(([v, l]) => `<option value="${v}"${anxState.page === v ? ' selected' : ''}>${l}</option>`).join('');
   const custom = anxState.range === 'custom';
   panel.innerHTML = `

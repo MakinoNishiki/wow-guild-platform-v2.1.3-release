@@ -5,8 +5,8 @@ const path = require('node:path');
 const os = require('node:os');
 const crypto = require('node:crypto');
 const {chromium} = require('playwright');
-const folder = path.resolve(__dirname, '../docs/evidence/font-library-20261126');
-const url = 'http://127.0.0.1:57983/font-review.html';
+const folder = path.resolve(__dirname, '../font-manager');
+const url = 'http://127.0.0.1:57983/font-manager/index.html';
 
 async function run() {
   const source = process.argv[2] || path.join(process.env.WINDIR || 'C:/Windows', 'Fonts', 'arial.ttf');

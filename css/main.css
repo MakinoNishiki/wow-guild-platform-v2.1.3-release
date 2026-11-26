@@ -4764,6 +4764,9 @@ img.class-icon[src$=".png"] { border-radius: 3px; }
 .ia-brand-sub { font-size: 10px; color: var(--text-muted); }
 .ia-tabs { display: flex; align-items: stretch; height: 100%; }
 .ia-tab {
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
   height: 40px;
   padding: 0 16px;
   font-size: 14px;
@@ -4860,7 +4863,11 @@ img.class-icon[src$=".png"] { border-radius: 3px; }
 
 /* 导航页（#/home，游客与登录用户均可见） */
 .home-hero { text-align: center; padding: 56px 20px 32px; }
-.home-hero-title { font-size: 28px; font-weight: 700; color: var(--text-primary); }
+.home-hero-title { margin: 0; font-size: 28px; font-weight: 700; color: var(--text-primary); }
+.search-decor-intro { margin-bottom: 16px; color: var(--text-secondary); }
+.search-decor-intro h1 { margin: 0 0 6px; font-size: 20px; color: var(--text-primary); }
+.search-decor-intro p { margin: 0; }
+.search-decor-intro a { color: var(--gold); }
 .home-hero-gold { color: var(--gold); }
 .home-hero-sub { margin-top: 12px; font-size: 14px; color: var(--text-secondary); line-height: 1.7; }
 .home-entry-grid {
