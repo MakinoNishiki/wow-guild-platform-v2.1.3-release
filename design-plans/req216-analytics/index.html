@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>访问统计 · 魔兽管家本地评审</title>
+  <link rel="stylesheet" href="../../css/main.css">
+  <style>
+    body { overflow:auto; height:auto; }
+    main { max-width:1320px; margin:40px auto; padding:0 24px; }
+    h1 { margin-bottom:12px; }
+    .anx-controls { align-items:center; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>访问统计</h1>
+    <p class="anx-count-note">本地评审使用模拟访问记录。展开「按时间查看」后可选择来源。</p>
+    <label class="anx-controls">统计时间粒度
+      <select class="form-select anx-select" id="grain">
+        <option value="hour">小时</option><option value="day" selected>天</option>
+        <option value="week">周</option><option value="month">月</option>
+      </select>
+    </label>
+    <div id="anxBody" class="anx-panels"></div>
+  </main>
+  <script src="../../js/analyticsBreakdown.js"></script>
+  <script src="sample.js"></script>
+  <script>
+    const state = { appliedGrain: 'day', sourceName: '', sourcePage: 0, sourceOpen: false };
+    function renderReview() {
+      state.appliedGrain = document.getElementById('grain').value;
+      state.sourcePage = 0;
+      const sample = analyticsSamples[state.appliedGrain];
+      const data = { ...sample, series: sample.buckets.map(bucket => ({bucket})) };
+      document.getElementById('anxBody').innerHTML = anxBreakdownPanelsHtml(data, state);
+      anxBindSourceHistory(data, state);
+    }
+    document.getElementById('grain').addEventListener('change', renderReview);
+    renderReview();
+  </script>
+</body>
+</html>

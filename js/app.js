@@ -9070,6 +9070,7 @@ function lootFillAssignedTo(idOrName) {
 // ==================== 初始化 ====================
 // ==================== 更新日志 ====================
 const changelogData = [
+  {id:'req216-analytics',version:'v3.2.0',date:'2026-11-27',type:'improve',typeLabel:'功能优化',title:'访问统计支持按时间查看来源',summary:'管理员可查看各来源每小时、每天、每周或每月的浏览量与访客数。事件排行改用中文名称。',details:[]},
   {id:'req213-load',version:'v3.2.0',date:'2026-11-26',type:'improve',typeLabel:'功能优化',title:'更快打开国服排行榜',summary:'首次打开时同步读取榜单和筛选资料，五分钟内回看同一榜单可直接看到成绩。后台更新近期成绩时保留原读取时间。',details:[]},
   {id:'bug133-member-role-preview',version:'v3.2.0',date:'2026-11-26',type:'fix',typeLabel:'修复BUG',title:'分配成员角色时直接查看完整权限',summary:'打开「分配角色」即可查看这名成员当前角色的权限。切换备选角色可预览授权，点击「保存分配」后生效。',details:[]},
   {id:'req214-recruit',version:'v3.2.0',date:'2026-11-25',type:'feature',typeLabel:'新增功能',title:'同一职业可同时招募多个专精',summary:'一条需求可勾选多个职责和专精。勾选战士的坦克职责会自动选中防护，输出专精可按需勾选。',details:[]},
@@ -16137,6 +16138,8 @@ let anxState = {
   forbidden: false,   // 403 → 整块占位，不弹错不闪屏不反复请求
   range: '30d',       // today/7d/30d/90d/custom
   grain: 'day',       // hour/day/week/month
+  appliedGrain: 'day', // 当前结果的粒度，独立于尚未点击查询的选项
+  sourceName: '', sourceOpen: false, sourcePage: 0,
   page: 'all',        // all/index/decor/data
   start: '', end: '', // YYYY-MM-DD 展示值（非自定义自动回填置灰，自定义可编辑）
   data: null,
@@ -16152,10 +16155,6 @@ const ANX_TAB_LABEL = {
   home: '首页', 'team-guide': '团队引导', 'decor-plan': '方案单', community: '家宅分享', rankings: '排行榜'
 };
 
-function anxEsc(s) {
-  return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-}
-
 function anxPageLabel(p) {
   if (p === 'decor') return '家宅公示页';
   if (p === 'data') return '掉落公示页';
@@ -16163,26 +16162,22 @@ function anxPageLabel(p) {
   return p;
 }
 
-// 范围计算：预设按本地时区（今日=本地 0 点起至今；近 N 天=往前 N-1 个日历日 0 点起）；
-// 自定义按起日 00:00 ~ 止日 23:59:59.999。返回 { s: Date, e: Date } 或 null（自定义未填齐）。
+// 与数据库分桶使用同一个北京日历，查询区间左闭右开。
 function anxComputeRange() {
   if (anxState.range === 'custom') {
     if (!anxState.start || !anxState.end) return null;
-    const s = new Date(anxState.start + 'T00:00:00');
-    const e = new Date(anxState.end + 'T23:59:59.999');
+    const s = new Date(anxState.start + 'T00:00:00+08:00');
+    const e = new Date(Date.parse(anxState.end + 'T00:00:00+08:00') + 86400000);
     return { s, e };
   }
   const days = ANX_RANGE_DAYS[anxState.range];
   const e = new Date();
-  const s = new Date();
-  s.setHours(0, 0, 0, 0);
-  s.setDate(s.getDate() - days);
+  const s = new Date(Date.parse(anxFmtDate(e) + 'T00:00:00+08:00') - days * 86400000);
   return { s, e };
 }
 
 function anxFmtDate(d) {
-  const p2 = n => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())}`;
+  return new Date(d.getTime() + 8 * 3600000).toISOString().slice(0, 10);
 }
 
 // 控制条渲染（每次切 tab 重建 DOM，状态全部来自 anxState）
@@ -16208,7 +16203,7 @@ function mdRenderAnalytics(panel) {
         <span class="anx-date-sep">至</span>
         <input type="date" id="anxEnd" class="anx-date" value="${anxState.end}"${custom ? '' : ' disabled'} onchange="anxState.end=this.value">
       </span>
-      <select id="anxGrain" class="form-select anx-select" onchange="anxState.grain=this.value">${grainOpts}</select>
+      <select id="anxGrain" class="form-select anx-select" aria-label="统计时间粒度" onchange="anxState.grain=this.value">${grainOpts}</select>
       <select id="anxPage" class="form-select anx-select" onchange="anxState.page=this.value">${pageOpts}</select>
       <button id="anxQueryBtn" class="btn btn-primary anx-query-btn" onclick="anxQuery()">查询</button>
       <span id="anxInlineErr" class="anx-inline-err"></span>
@@ -16264,6 +16259,7 @@ async function anxQuery() {
   if (errEl) errEl.textContent = '';
 
   const btn = document.getElementById('anxQueryBtn');
+  const { grain, page } = anxState;
   anxState.loading = true;
   if (btn) { btn.disabled = true; btn.textContent = '查询中…'; }
   anxRenderBody();
@@ -16273,7 +16269,7 @@ async function anxQuery() {
     const resp = await fetch('/api/analytics/summary', {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ start: r.s.toISOString(), end: r.e.toISOString(), grain: anxState.grain, page: anxState.page })
+      body: JSON.stringify({ start: r.s.toISOString(), end: r.e.toISOString(), grain, page })
     });
     if (resp.status === 403) { // 整块占位，不弹错不闪屏不反复请求
       anxState.forbidden = true; anxState.data = null; anxState.error = '';
@@ -16286,6 +16282,8 @@ async function anxQuery() {
       return;
     }
     anxState.data = await resp.json();
+    anxState.appliedGrain = grain;
+    anxState.sourcePage = 0;
     anxState.error = '';
     anxState.inited = true;
   } catch (e) {
@@ -16316,7 +16314,7 @@ function anxRenderBody() {
   }
   const d = anxState.data;
   if (!d || !d.cards) { body.innerHTML = ''; return; }
-  if (!d.cards.pv) {
+  if (!d.cards.pv && !d.events?.length) {
     body.innerHTML = '<div class="anx-state">该时间范围内暂无数据</div>';
     return;
   }
@@ -16326,8 +16324,9 @@ function anxRenderBody() {
       <div class="card anx-card"><div class="anx-card-label">总 UV</div><div class="anx-card-num">${d.cards.uv}</div></div>
       <div class="card anx-card"><div class="anx-card-label">日均 DAU</div><div class="anx-card-num">${d.cards.dau_avg}</div></div>
     </div>`;
-  body.innerHTML = cards + anxChartHtml(d.series || [], anxState.grain) + anxPanelsHtml(d);
-  anxBindChart(d.series || [], anxState.grain);
+  body.innerHTML = cards + anxChartHtml(d.series || [], anxState.appliedGrain) + anxPanelsHtml(d);
+  anxBindChart(d.series || [], anxState.appliedGrain);
+  anxBindSourceHistory(d, anxState);
 }
 
 // ---------- 趋势图（零依赖手写 SVG；PV 金 / UV 青 双线） ----------
@@ -16427,30 +16426,9 @@ function anxBindChart(series, grain) {
 }
 
 // ---------- 面板区（导航 TAB 排行 / 分页面 / 来源域 TOP10 / 事件 TOP） ----------
-function anxBarsHtml(items, getLabel, getV1, getV2, v1Name, v2Name) {
-  if (!items.length) return '<div class="anx-panel-empty">暂无数据</div>';
-  const max = Math.max(1, ...items.map(getV1));
-  return items.map(it => {
-    const v1 = getV1(it), v2 = getV2(it);
-    return `<div class="anx-bar-row">
-      <span class="anx-bar-label" title="${anxEsc(getLabel(it))}">${anxEsc(getLabel(it))}</span>
-      <span class="anx-bar-track"><span class="anx-bar-fill" style="width:${((v1 / max) * 100).toFixed(1)}%"></span></span>
-      <span class="anx-bar-num">${v1} <em>${v1Name}</em> · ${v2} <em>${v2Name}</em></span>
-    </div>`;
-  }).join('');
-}
-
-function anxTableHtml(headers, rows) {
-  if (!rows.length) return '<div class="anx-panel-empty">暂无数据</div>';
-  return `<table class="anx-table"><thead><tr>${headers.map(h => `<th>${h}</th>`).join('')}</tr></thead>
-    <tbody>${rows.map(r => `<tr>${r.map(c => `<td>${c}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
-}
-
 function anxPanelsHtml(d) {
   const nav = (d.nav || []).map(it => ({ ...it, label: anxPageLabel(it.page) }));
   const pages = (d.pages || []).map(it => [anxEsc(anxPageLabel(it.page)), it.pv, it.uv]);
-  const refs = (d.refs || []).map(it => ({ ...it }));
-  const events = (d.events || []).map(it => [anxEsc(it.event), it.cnt]);
   return `
     <div class="anx-panels">
       <div class="card anx-panel">
@@ -16461,14 +16439,7 @@ function anxPanelsHtml(d) {
         <div class="anx-panel-title">分页面</div>
         ${anxTableHtml(['页面', 'PV', 'UV'], pages)}
       </div>
-      <div class="card anx-panel">
-        <div class="anx-panel-title">来源域 TOP10</div>
-        ${anxBarsHtml(refs, it => it.ref_dom || '直接访问', it => it.pv || 0, it => it.uv || 0, 'PV', 'UV')}
-      </div>
-      <div class="card anx-panel">
-        <div class="anx-panel-title">事件 TOP</div>
-        ${anxTableHtml(['事件', '次数'], events)}
-      </div>
+      ${anxBreakdownPanelsHtml(d, anxState)}
     </div>`;
 }
 

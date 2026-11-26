@@ -4693,11 +4693,20 @@ img.class-icon[src$=".png"] { border-radius: 3px; }
 .anx-panels {
   display: grid;
   grid-template-columns: 1fr 1fr;
+  align-items: start;
   gap: 16px;
 }
 .anx-panel { padding: 16px 20px; }
 .anx-panel-title { font-size: 14px; font-weight: 600; margin-bottom: 12px; }
 .anx-panel-empty { color: var(--text-muted); font-size: 12px; padding: 12px 0; text-align: center; }
+.anx-source-history { margin-top: 12px; border-top: 1px solid var(--border-color); }
+.anx-source-history summary { width: fit-content; padding: 10px 2px; cursor: pointer; color: var(--gold); font-size: 13px; }
+.anx-source-history summary:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+.anx-source-picker, .anx-source-pager { display: flex; align-items: center; gap: 8px; color: var(--text-secondary); font-size: 12px; }
+.anx-source-picker select { width: auto; max-width: 75%; }
+.anx-source-pager { justify-content: flex-end; margin-top: 8px; font-variant-numeric: tabular-nums; }
+.anx-source-pager[hidden] { display: none; }
+.anx-source-pager button { padding: 4px 10px; }
 .anx-bar-row {
   display: grid;
   grid-template-columns: 130px 1fr auto;
