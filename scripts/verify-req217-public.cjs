@@ -51,7 +51,7 @@ async function verify() {
     await page.waitForURL(origin + pages.rankings.path);
     assert.ok(await page.locator('#page-rankings.page.active').isVisible());
     await page.locator('.ia-tabs a[href="/font-manager/"]').click();
-    assert.ok(await page.locator('#pickFonts').isVisible());
+    await page.locator('#pickFonts').waitFor({state:'visible'});
     await page.waitForFunction(() => window.testVisits.length > 0);
     const fontVisits = await page.evaluate(async () => (await Promise.all(window.testVisits)).map(e => [e.page, e.event]));
     assert.deepEqual(fontVisits, [['index:font-manager', 'page_view']]);
@@ -61,6 +61,9 @@ async function verify() {
     assert.equal(await page.locator('#appVersion').textContent(), await cards.first().locator('.changelog-version').textContent());
     assert.equal(await page.locator('#latestChangeDate').getAttribute('datetime'), await cards.first().locator('.changelog-date').textContent());
     assert.ok(await cards.filter({hasText:'从顶部导航打开国服字体管理器'}).count());
+    await page.locator('.ia-tabs a[href="/font-manager/"]').click();
+    await page.getByRole('link',{name:'返回魔兽管家首页'}).click();
+    await page.locator('#page-home.page.active').waitFor();
     assert.deepEqual(errors, []);
   } finally {
     await browser.close();

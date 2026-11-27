@@ -174,16 +174,17 @@
     frame.append(ink);return frame;
   }
 
+  const editions={'_retail_':'正式服','_forever_':'无限服','_classic_':'怀旧服','_classic_era_':'经典旧世','_classic_titan_':'泰坦重铸「时光」','_ptr_':'测试服','_beta_':'测试版'};
   async function inspectGame(dir) {
-    const editions={'_retail_':'正式服','_classic_':'怀旧服','_classic_era_':'经典怀旧服','_classic_titan_':'时光泰坦服','_forever_':'无限服','_ptr_':'测试服','_beta_':'测试版'};
-    if(dir.name.toLowerCase()==='fonts') return [dir.name];
+    const name=dir.name.toLowerCase();
+    if(name==='fonts') return [];
+    if(Object.hasOwn(editions,name)) return [name];
     const versions=[];
-    for (const [key,label] of Object.entries(editions)) {
-      if(dir.name.toLowerCase()===key) return [label+' · '+dir.name];
-      try {await dir.getDirectoryHandle(key);versions.push(label+' · '+key);}
+    for (const key of Object.keys(editions)) {
+      try {await dir.getDirectoryHandle(key);versions.push(key);}
       catch(e){if(!['NotFoundError','TypeMismatchError'].includes(e.name))throw e;}
     }
     return versions;
   }
-  window.WBFontPreview={coverage,hasGlyph,loadLocal,language,scene,inspectGame};
+  window.WBFontPreview={coverage,hasGlyph,loadLocal,language,scene,inspectGame,editions};
 })();

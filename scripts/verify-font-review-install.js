@@ -16,10 +16,11 @@ async function run() {
   const expected = crypto.createHash('sha256').update(fs.readFileSync(sample)).digest('hex');
   const browser = await chromium.launch({channel:'chrome'});
   try {
-    const page = await browser.newPage();
+    const context = await browser.newContext();
+    const page = await context.newPage();
     const errors = [];
     page.on('pageerror', e => errors.push(e.message));
-    await page.route('http://127.0.0.1:57983/**', route => {
+    await context.route('http://127.0.0.1:57983/**', route => {
       const asset = path.join(folder, path.basename(new URL(route.request().url()).pathname));
       return fs.existsSync(asset) ? route.fulfill({path:asset}) : route.fulfill({status:404, body:''});
     });
@@ -34,6 +35,8 @@ async function run() {
     });
     await page.goto(url);
     await page.evaluate(async () => {
+      const root=await navigator.storage.getDirectory();
+      for(const name of ['_forever_','_classic_','_classic_era_','_classic_titan_'])await root.getDirectoryHandle(name,{create:true});
       await writeFixture('ARKai_T.TTF', 'original-file');
       await writeFixture('untouched.ttf', 'keep');
     });
@@ -64,6 +67,17 @@ async function run() {
     assert.equal(await current.getByText('待读取',{exact:true}).count(), 5);
     await importLocal();
     await apply.click(); await page.locator('#cancelInstall').click();
+    const editions=await page.locator('#editionInfo').innerText();
+    for(const label of ['当前目标：正式服','无限服','怀旧服','经典旧世','泰坦重铸'])assert.ok(editions.includes(label));
+    const refreshFill=await page.locator('#rescanGame').evaluate(b=>getComputedStyle(b).backgroundColor);
+    assert.notEqual(refreshFill,await page.locator('#pickGame').evaluate(b=>getComputedStyle(b).backgroundColor));
+    await page.locator('#rescanGame').click();
+    for (const version of ['_forever_','_classic_']) {
+      await page.evaluate(name=>{window.showDirectoryPicker=async()=>(await navigator.storage.getDirectory()).getDirectoryHandle(name);},version);
+      await page.locator('#pickGame').click();
+      await page.waitForFunction(name=>document.getElementById('dirStatus').textContent.includes(name),version);
+      assert.equal(await page.evaluate(async()=>(await currentFonts.storeTarget('get')).handle.name),'_retail_');
+    }
     assert.equal(await current.getByText('游戏默认',{exact:true}).count(),4);
     assert.match(await chat.innerText(),/无法识别/);
     assert.equal(await readText('ARKai_T.TTF'), 'original-file');
@@ -105,13 +119,45 @@ async function run() {
     assert.equal(await exists('ARKai_C.TTF'), false);
     await page.evaluate(() => { FileSystemHandle.prototype.requestPermission = async () => 'denied'; });
     await act(apply, '未获得写入权限'); assert.equal(await exists('ARKai_C.TTF'), false);
-    await page.addInitScript(()=>{FileSystemHandle.prototype.queryPermission=async()=>'prompt';});
-    await page.reload(); await page.locator('#resumeGame').waitFor();
-    assert.equal(await current.getByText('待授权读取',{exact:true}).count(),5);
-    await page.locator('#forgetGame').click();await page.waitForFunction(async()=>!(await currentFonts.storeTarget('get')));
-    await page.reload();assert.equal(await current.getByText('待读取',{exact:true}).count(),5);
+    await page.close();
+    // Same browser profile and stored directory. The permission prompt is controlled in this test.
+    await context.addInitScript(()=>{
+      window.readGrant='prompt';
+      window.allowRead=false;
+      window.pickerCalls=0;
+      window.showDirectoryPicker=()=>{++window.pickerCalls;throw new Error('Unexpected folder picker');};
+      FileSystemHandle.prototype.queryPermission=async()=>window.readGrant;
+      FileSystemHandle.prototype.requestPermission=async({mode})=>{
+        if(mode!=='read') throw new Error('Unexpected write permission request');
+        return window.readGrant=window.allowRead?'granted':'denied';
+      };
+    });
+    const reopened = await context.newPage();
+    reopened.on('pageerror',e=>errors.push(e.message));
+    await reopened.goto(url);
+    const resume = reopened.getByRole('button',{name:'继续使用此目录'});
+    await resume.waitFor();
+    assert.equal(await resume.evaluate(b=>getComputedStyle(b).backgroundColor),refreshFill);
+    await resume.click();
+    await reopened.getByText(/浏览器尚未允许读取/).waitFor();
+    assert.equal(await reopened.locator('#currentSlots').isVisible(),false);
+    await reopened.evaluate(()=>{window.allowRead=true;});
+    await resume.click();
+    await reopened.locator('#currentSlots [data-slot="ARIALN.TTF"]').getByText('游戏默认').waitFor();
+    assert.equal(await reopened.evaluate(()=>pickerCalls),0);
+    await reopened.reload();
+    await resume.waitFor();
+    await reopened.evaluate(()=>{window.allowRead=true;});
+    await reopened.locator('#applyFont').click();
+    await reopened.locator('#installConfirm[open]').waitFor();
+    assert.equal(await reopened.evaluate(()=>pickerCalls),0);
+    await reopened.locator('#cancelInstall').click();
+    await reopened.locator('#forgetGame').click();
+    await reopened.waitForFunction(async()=>!(await currentFonts.storeTarget('get')));
+    await reopened.reload();
+    await reopened.locator('#pickGame:enabled').waitFor();
+    assert.equal(await resume.isVisible(),false);
     assert.deepEqual(errors, []);
-    assert.ok(await status.isVisible());
     console.log('PASS: cancel, apply, readback, repeat, two slots, remove local list, reload, restore, external change, delete new file, wrong source, permission denied.');
   } finally {
     await browser.close();
