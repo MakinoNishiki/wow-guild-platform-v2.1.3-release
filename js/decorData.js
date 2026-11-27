@@ -1555,7 +1555,9 @@
 
     // ---- 事件绑定 ----
     const $p = id => planPageEl.querySelector('#' + id);
-    $p('dhPpBack').onclick = () => { location.hash = '#/house/decor'; };
+    const fromAssets = window.PersonalArchive?.fromAssets();
+    if (fromAssets) $p('dhPpBack').textContent = '← 返回我的资产';
+    $p('dhPpBack').onclick = () => { location.hash = fromAssets ? '#/personal/assets' : '#/house/decor'; };
     const goDecor = $p('dhPpGoDecor');
     if (goDecor) goDecor.onclick = () => { location.hash = '#/house/decor'; };
     if (logged) {

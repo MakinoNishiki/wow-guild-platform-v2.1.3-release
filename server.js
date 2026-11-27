@@ -1626,6 +1626,7 @@ const handleHousingSupplies = require('./lib/housingSupplyRoutes.cjs')({auth:ver
 const handleHousingCommunity = require('./lib/housingCommunityRoutes.cjs')({auth:verifyTokenCached,get:supabaseRestGet,write:supabaseRestWrite,body:readBody});
 const handleDecorEngagement = require('./lib/decorEngagementRoutes.cjs')({ auth: verifyTokenCached, get: supabaseRestGet, write: supabaseRestWrite, body: readBody, signingKey: getServiceRoleKey });
 const handleWclUser = require('./lib/wclUserRoutes.cjs')({
+  siteOrigin: origin => ALLOWED_CORS_ORIGINS.has(origin),
   auth: verifyTokenCached, role: getGuildRole, can:hasGuildPermission, get: supabaseRestGet,
   write: supabaseRestWrite, body: readBody,
   exchange: async (code, redirectUri) => {

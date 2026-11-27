@@ -6,23 +6,23 @@
 <title>魔兽管家 WoW Butler｜魔兽世界国服玩家工具</title>
 <meta name="description" content="魔兽管家为魔兽世界国服玩家提供家宅家具图鉴、国服大秘境与 PvP 排行榜、副本掉落查询，以及公会考勤和装备分配工具。">
 <link rel="canonical" href="https://wow.ddctl.com/">
-<!-- 静态资源版本号：20261128.181（任务书 #22 WP3-②：凡改动 js/css 的 commit 必须同步递增此处与所有 ?v= 查询串，见 docs/开发规范.md 第五章） -->
+<!-- 静态资源版本号：20261128.182（任务书 #22 WP3-②：凡改动 js/css 的 commit 必须同步递增此处与所有 ?v= 查询串，见 docs/开发规范.md 第五章） -->
 <link rel="icon" type="image/png" sizes="32x32" href="assets/brand/favicon-32.png">
 <link rel="icon" type="image/png" sizes="16x16" href="assets/brand/favicon-16.png">
-<link rel="stylesheet" href="css/main.css?v=20261128.181">
-<link rel="stylesheet" href="css/data-public.css?v=20261128.181"><!-- 任务书 #28 WP5：副本掉落 tab（选择器全 .dp- 前缀 + #page-lootdrop 作用域，零泄漏） -->
-<link rel="stylesheet" href="css/housing-community.css?v=20261128.181">
-<link rel="stylesheet" href="css/housing-furniture.css?v=20261128.181">
-<link rel="stylesheet" href="css/guild-battle-editor.css?v=20261128.181">
-<link rel="stylesheet" href="css/decor-public.css?v=20261128.181"><!-- 任务书 #51：家宅图鉴（选择器全 .dh- 前缀，零泄漏，双壳共用） -->
-<link rel="stylesheet" href="css/decor-model.css?v=20261128.181">
-<script src="assets/vendor/supabase-js-2.js?v=20261128.181"></script>
-<link rel="stylesheet" href="css/guild-battle-public.css?v=20261128.181">
-<link rel="stylesheet" href="css/workspaces.css?v=20261128.181">
-<link rel="stylesheet" href="css/guild-intro.css?v=20261128.181">
-<link rel="stylesheet" href="css/tab-indicators.css?v=20261128.181">
-<link rel="stylesheet" href="css/cn-leaderboards.css?v=20261128.181">
-<link rel="stylesheet" href="css/guild-roles.css?v=20261128.181">
+<link rel="stylesheet" href="css/main.css?v=20261128.182">
+<link rel="stylesheet" href="css/data-public.css?v=20261128.182"><!-- 任务书 #28 WP5：副本掉落 tab（选择器全 .dp- 前缀 + #page-lootdrop 作用域，零泄漏） -->
+<link rel="stylesheet" href="css/housing-community.css?v=20261128.182">
+<link rel="stylesheet" href="css/housing-furniture.css?v=20261128.182">
+<link rel="stylesheet" href="css/guild-battle-editor.css?v=20261128.182">
+<link rel="stylesheet" href="css/decor-public.css?v=20261128.182"><!-- 任务书 #51：家宅图鉴（选择器全 .dh- 前缀，零泄漏，双壳共用） -->
+<link rel="stylesheet" href="css/decor-model.css?v=20261128.182">
+<script src="assets/vendor/supabase-js-2.js?v=20261128.182"></script>
+<link rel="stylesheet" href="css/guild-battle-public.css?v=20261128.182">
+<link rel="stylesheet" href="css/workspaces.css?v=20261128.182">
+<link rel="stylesheet" href="css/guild-intro.css?v=20261128.182">
+<link rel="stylesheet" href="css/tab-indicators.css?v=20261128.182">
+<link rel="stylesheet" href="css/cn-leaderboards.css?v=20261128.182">
+<link rel="stylesheet" href="css/guild-roles.css?v=20261128.182">
 </head>
 <body>
 
@@ -277,8 +277,10 @@
         <img class="wb-nav-icon" width="20" height="20" src="assets/icons/nav/profile.svg" alt="">档案总览</button>
         <button type="button" class="ia-pill" data-ia-key="characters" onclick="iaGoKey('characters')">
          <img class="wb-nav-icon" width="20" height="20" src="assets/icons/nav/characters.svg" alt="">我的角色</button>
+         <button type="button" class="ia-pill" data-ia-key="privacy" onclick="iaGoKey('privacy')"><img class="wb-nav-icon" width="20" height="20" src="assets/icons/nav/profile.svg" alt="">展示与隐私</button>
+         <button type="button" class="ia-pill" data-ia-key="assets" onclick="iaGoKey('assets')"><img class="wb-nav-icon" width="20" height="20" src="assets/icons/nav/decor-plan.svg" alt="">我的资产</button>
          <button type="button" class="ia-pill" data-ia-key="claims" onclick="iaGoKey('claims')">
-          <img class="wb-nav-icon" width="20" height="20" src="assets/icons/nav/claims.svg" alt="">我的认领</button>
+          <img class="wb-nav-icon" width="20" height="20" src="assets/icons/nav/claims.svg" alt="">公会与认领</button>
          </nav>
     <!-- 顶部栏 -->
     <header class="topbar">
@@ -449,10 +451,10 @@
          <button class="btn" onclick="iaGoKey('characters')">查看我的角色</button>
         </section>
         <section class="card">
-         <h2>所属公会</h2>
-         <p id="wsPlayerGuild">
-         </p>
-         <button class="btn" onclick="iaSwitchTab('team')">进入公会</button>
+         <h2>我的档案</h2>
+         <a class="pa-entry" href="#/personal/privacy"><span>展示与隐私</span><strong id="paDisplaySummary"></strong></a>
+         <a class="pa-entry" href="#/personal/assets"><span>我的资产</span><strong id="paPlanSummary"></strong></a>
+         <a class="pa-entry" href="#/personal/claims"><span>公会与认领</span><strong id="wsPlayerGuild"></strong></a>
         </section>
        </div>
       </div>
@@ -470,17 +472,30 @@
        <div class="ws-panel-host card">
        </div>
       </div>
+      <div class="page" id="page-privacy">
+       <header class="ws-hero"><div><p class="ws-kicker">个人档案</p><h1>展示与隐私</h1><p>选择代表你的角色，查看不同身份能看到的资料。</p></div><span class="ws-crest"><img src="assets/icons/nav/characters.svg" width="40" height="40" alt=""></span></header>
+       <div class="pa-grid">
+        <section class="card"><h2>对外展示角色</h2><p>最多展示一个角色，可随时更换或撤下。</p><div id="paChoices"></div><button class="btn" id="paWithdraw" disabled>撤下展示</button><p role="status" id="paSaveStatus"></p></section>
+        <section class="card"><h2>可见内容预览</h2><div class="pa-views" aria-label="查看视角" role="group"><button class="btn" data-pa-view="self" aria-pressed="false">本人</button><button class="btn" data-pa-view="guild" aria-pressed="false">本会团员</button><button class="btn" data-pa-view="visitor" aria-pressed="true">访客</button></div><div id="paPreview" aria-live="polite"></div></section>
+       </div>
+       <a href="#/personal/claims" class="pa-entry">管理公会认领 <span aria-hidden="true">›</span></a>
+      </div>
+      <div class="page" id="page-assets">
+       <header class="ws-hero"><div><p class="ws-kicker">个人档案</p><h1>我的资产</h1><p>查看家宅方案，以及已认领角色的装备心愿与最终分配。</p></div><span class="ws-crest"><img src="assets/icons/nav/decor-plan.svg" width="40" height="40" alt=""></span></header>
+       <div class="pa-grid"><section class="card"><h2>我的家宅方案</h2><p>选一份方案，进入方案单调整家具用量。</p><div id="paPlans"></div></section><section class="card"><h2>我的团队记录</h2><div id="paRecords"></div><a class="pa-entry" href="#/personal/claims">查看公会与认领 <span aria-hidden="true">›</span></a></section></div>
+      </div>
       <div class="page" id="page-claims">
        <header class="ws-hero">
         <div>
          <p class="ws-kicker">个人档案</p>
-         <h1>我的认领</h1>
-         <p>仅本人可见</p>
+         <h1>公会与认领</h1>
+         <p>切换公会，管理你在当前公会名册里的角色。</p>
         </div>
         <span class="ws-crest">
          <img src="assets/icons/nav/claims.svg" width="40" height="40" alt="">
         </span>
        </header>
+       <div class="pa-grid"><section class="card"><h2>我加入的公会</h2><div id="paGuilds"></div><details class="pa-ledger"><summary>用邀请码加入公会</summary><form id="paJoin"><label for="paCode">公会邀请码</label><input class="form-input" id="paCode" required maxlength="32" autocomplete="off"><button class="btn btn-primary" type="submit">加入公会</button><p id="paJoinStatus" role="status"></p></form></details></section><section class="card"><h2>当前公会认领</h2><div id="paRoster"></div></section></div>
        <div class="ws-panel-host card">
        </div>
       </div>
@@ -2522,28 +2537,28 @@
   </div>
 </div>
 
-<script src="js/cloud.js?v=20261128.181"></script>
+<script src="js/cloud.js?v=20261128.182"></script>
 <!-- 任务书 #14：主数据层（快照兜底 + 加载层），须在 app.js 之前 -->
-<script src="js/masterDataSnapshot.js?v=20261128.181"></script>
-<script src="js/masterData.js?v=20261128.181"></script>
+<script src="js/masterDataSnapshot.js?v=20261128.182"></script>
+<script src="js/masterData.js?v=20261128.182"></script>
 <!-- 任务书 #22 WP2：职业/专精/职责图标集中映射（全站唯一取图处） -->
-<script src="js/iconMap.js?v=20261128.181"></script>
+<script src="js/iconMap.js?v=20261128.182"></script>
 <!-- 任务书 #31（REQ-097）：装备分类词表单一真源（公示页 chips / picker 过滤 / BUG-057 回填三处消费，须在 dataPublic.js 与 app.js 之前） -->
-<script src="js/itemQualityData.js?v=20261128.181"></script>
-<script src="js/lootTaxonomy.js?v=20261128.181"></script>
+<script src="js/itemQualityData.js?v=20261128.182"></script>
+<script src="js/lootTaxonomy.js?v=20261128.182"></script>
 <!-- 任务书 #28 WP5：副本掉落渲染层（双壳同源；无 data-public-body 不自动启动，由 app.js 懒挂载，须在 app.js 之前） -->
-<script src="js/dataPublic.js?v=20261128.181"></script>
+<script src="js/dataPublic.js?v=20261128.182"></script>
 <!-- 任务书 #51（REQ-137 一期）：家宅图鉴词表单一真源（价格/分类/尺寸/来源词表，须在 decorData.js 之前） -->
-<script src="js/decorDict.js?v=20261128.181"></script>
+<script src="js/decorDict.js?v=20261128.182"></script>
 <!-- 任务书 #51：家宅图鉴数据层+渲染层（双壳同源；无 data-decor-body 不自动启动，由 app.js 懒挂载，须在 app.js 之前） -->
-<script src="js/decorIntroducedPatches.js?v=20261128.181"></script>
-<script src="js/decorEffectIds.js?v=20261128.181"></script>
-<script src="js/decorUseFacts.js?v=20261128.181"></script>
-<script src="js/decorFacts.js?v=20261128.181"></script>
-<script src="js/decorEngagement.js?v=20261128.181"></script>
-<script src="js/decorModelManifest.js?v=20261128.181"></script>
-<script src="js/decorModelPreview.js?v=20261128.181"></script>
-<script src="js/decorData.js?v=20261128.181"></script>
+<script src="js/decorIntroducedPatches.js?v=20261128.182"></script>
+<script src="js/decorEffectIds.js?v=20261128.182"></script>
+<script src="js/decorUseFacts.js?v=20261128.182"></script>
+<script src="js/decorFacts.js?v=20261128.182"></script>
+<script src="js/decorEngagement.js?v=20261128.182"></script>
+<script src="js/decorModelManifest.js?v=20261128.182"></script>
+<script src="js/decorModelPreview.js?v=20261128.182"></script>
+<script src="js/decorData.js?v=20261128.182"></script>
 <div id="housingBuildEditor" class="modal-overlay">
   <section class="modal" role="dialog" aria-modal="true" aria-labelledby="hbEditorTitle">
     <div class="modal-header"><h2 class="modal-title" id="hbEditorTitle">创建作品</h2><button type="button" class="modal-close" aria-label="关闭" onclick="requestCloseModal('housingBuildEditor')">×</button></div>
@@ -2579,11 +2594,11 @@
     </div></form>
   </section>
 </div>
-<script src="js/housingCommunity.js?v=20261128.181"></script>
-<script src="js/housingBuildFurniture.js?v=20261128.181"></script>
-<script src="js/housingBuildTags.js?v=20261128.181"></script>
-<script src="js/housingBuilds.js?v=20261128.181"></script>
-<script src="js/lootEvidence.js?v=20261128.181"></script>
+<script src="js/housingCommunity.js?v=20261128.182"></script>
+<script src="js/housingBuildFurniture.js?v=20261128.182"></script>
+<script src="js/housingBuildTags.js?v=20261128.182"></script>
+<script src="js/housingBuilds.js?v=20261128.182"></script>
+<script src="js/lootEvidence.js?v=20261128.182"></script>
 <template id="tokenTrendTemplate">
   <div class="token-trend">
     <div class="token-trend-heading"><strong>近期走势</strong><div class="token-periods" role="group" aria-label="走势时段">
@@ -2601,21 +2616,22 @@
     <div class="token-coverage" data-value="coverage"></div></details>
   </div>
 </template>
-<script src="js/wowTokenTrend.js?v=20261128.181"></script>
-<script src="js/wowToken.js?v=20261128.181"></script>
-<script src="js/guildBattlePublic.js?v=20261128.181"></script>
-<script src="js/guildIntroEditor.js?v=20261128.181"></script>
-<script src="js/guildRecruitment.js?v=20261128.181"></script>
-<script src="js/workspaces.js?v=20261128.181"></script>
-<script src="js/cnLeaderboards.js?v=20261128.181"></script>
-<script src="js/guildRoles.js?v=20261128.181"></script>
-<script src="js/guildBattleEditor.js?v=20261128.181"></script>
-<script src="js/analyticsBreakdown.js?v=20261128.181"></script>
-<script src="js/publicSearchPages.js?v=20261128.181"></script>
-<script src="js/app.js?v=20261128.181"></script>
-<script src="js/lootWorkflow.js?v=20261128.181"></script>
-<script src="js/personAttendance.js?v=20261128.181"></script>
-<script src="js/lootDetails.js?v=20261128.181"></script>
-<script src="js/track.js?v=20261128.181"></script><!-- 任务书 #54 WP1：全站埋点采集层（REQ-141，零依赖静默兜底） -->
+<script src="js/wowTokenTrend.js?v=20261128.182"></script>
+<script src="js/wowToken.js?v=20261128.182"></script>
+<script src="js/guildBattlePublic.js?v=20261128.182"></script>
+<script src="js/guildIntroEditor.js?v=20261128.182"></script>
+<script src="js/guildRecruitment.js?v=20261128.182"></script>
+<script src="js/personalArchive.js?v=20261128.182"></script>
+<script src="js/workspaces.js?v=20261128.182"></script>
+<script src="js/cnLeaderboards.js?v=20261128.182"></script>
+<script src="js/guildRoles.js?v=20261128.182"></script>
+<script src="js/guildBattleEditor.js?v=20261128.182"></script>
+<script src="js/analyticsBreakdown.js?v=20261128.182"></script>
+<script src="js/publicSearchPages.js?v=20261128.182"></script>
+<script src="js/app.js?v=20261128.182"></script>
+<script src="js/lootWorkflow.js?v=20261128.182"></script>
+<script src="js/personAttendance.js?v=20261128.182"></script>
+<script src="js/lootDetails.js?v=20261128.182"></script>
+<script src="js/track.js?v=20261128.182"></script><!-- 任务书 #54 WP1：全站埋点采集层（REQ-141，零依赖静默兜底） -->
 </body>
 </html>

@@ -1,0 +1,74 @@
+.product-area{border-left:1px solid var(--line);padding-left:20px;color:var(--text)}
+.demo-label,.section-hint,.view-hint,#selectionState,#membership{color:var(--muted);font-size:14px}
+main.privacy-shell{width:min(1136px,100%);margin:0 auto;padding:28px 24px 36px;display:block}
+.privacy-shell .hero{min-height:147px;padding:20px 32px}
+.hero .kicker{color:var(--gold);font-size:13px;letter-spacing:.1em}
+.workspace{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:18px;margin:18px 0}
+.workspace .panel{margin:0;padding:22px 24px}
+.privacy-shell .panel h2{margin:0;color:#f2e6cc}
+.privacy-shell p.section-hint{margin:4px 0 12px}
+.choices{display:grid;gap:8px}
+.choice,.record{display:flex;align-items:center;gap:12px;min-width:0}
+.choice{width:100%;padding:11px 12px;text-align:left;border:1px solid var(--line);border-radius:4px;background:var(--ink);transition:border-color .16s ease,background-color .16s ease}
+.choice:hover{border-color:var(--edge)}.choice[aria-pressed=true]{border-color:var(--edge);background:#29281f}
+.choice img,.record img{width:39px;height:39px;border:1px solid #665b46;border-radius:4px}
+.name{display:block;font-size:17px;font-weight:600;overflow-wrap:anywhere}.subline{display:block;color:var(--muted);font-size:13px}
+.choice .choice-state{margin-left:auto;font-size:13px;color:var(--muted);white-space:nowrap}
+.choice[aria-pressed=true] .choice-state{color:var(--gold)}
+.class-druid{color:var(--class-druid)}.class-warrior{color:var(--class-warrior)}
+.selection-foot,.guild-line,.guild-actions,.guild-heading{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.selection-foot{border-top:1px solid var(--line);margin-top:14px;padding-top:12px}
+.privacy-shell button:disabled{opacity:.46;cursor:default}
+.views{display:flex;gap:16px;border-bottom:1px solid var(--line);margin:4px 0 14px}
+.views button{position:relative;padding:8px 2px;color:var(--muted);font-size:14px}
+.views button::after{content:"";position:absolute;inset:auto 0 -1px;height:2px;background:var(--gold);opacity:0;transition:opacity .16s}
+.views button:is(:hover,:focus-visible,[aria-pressed=true]){color:var(--gold)}
+.views button:is(:hover,:focus-visible,[aria-pressed=true])::after{opacity:1}
+.preview-blank{display:grid;justify-items:center;align-content:center;gap:6px;min-height:125px;background:var(--ink);border:1px dashed var(--line);border-radius:4px;text-align:center}
+.preview-blank img{width:32px;height:32px}
+.record{padding:10px 12px;background:var(--ink);border-left:2px solid var(--edge);border-radius:2px;margin-bottom:6px}
+.record .subline{margin-top:2px}.record.public{min-height:96px;background:linear-gradient(105deg,#26271f,var(--ink) 76%)}
+.record.public img{width:48px;height:48px}.record.public .name{font:600 23px var(--book)}
+.preview-caption{font-size:13px;font-weight:600;color:var(--muted);margin:8px 0 5px}
+.privacy-shell p.view-hint{margin:12px 0 0;font-size:13px}
+.guild-panel{padding:16px 24px}.guild-heading{justify-content:start;gap:8px;border-bottom:1px solid var(--line);padding-bottom:8px}.guild-heading img{width:20px;height:20px}
+.guild-line{margin-top:12px}.guild-line p{font-size:14px;margin:4px 0 0}.guild-actions{flex-wrap:wrap}
+#membership{margin-left:10px}.privacy-shell #message{min-height:1.6em;margin:8px 0;color:var(--gold);font-size:14px}
+dialog{width:min(420px,90vw);padding:23px;background:var(--side);border:1px solid var(--edge);border-radius:6px;color:var(--text)}
+dialog::backdrop{background:#080b10ba}dialog h2{margin:0;font:600 22px var(--book);color:var(--gold)}
+dialog p{margin:12px 0 20px;color:var(--muted)}.dialog-actions{justify-content:flex-end}
+.primary{padding:6px 12px;border:1px solid var(--gold);border-radius:4px;background:var(--gold);color:var(--ink);font-weight:600}
+@media(max-width:760px){.workspace{grid-template-columns:1fr}.product-area{display:none}.guild-line{flex-wrap:wrap}.privacy-shell .hero{padding:18px}.privacy-shell .panel{padding:16px}.mast{gap:12px}.demo-label{font-size:12px}.utilities{white-space:normal}main.privacy-shell{padding:16px 12px}}
+@media(prefers-reduced-motion:reduce){.choice,.views button::after{transition:none}}
+.profile-sections{display:flex;flex-wrap:wrap;align-items:center;gap:0 22px;padding:0 6px;border-bottom:1px solid var(--line)}
+.profile-sections a{display:flex;align-items:center;gap:7px;position:relative;min-height:48px;color:var(--muted)}
+.profile-sections a::after{position:absolute;content:"";inset:auto 0 -1px;height:2px;background:var(--gold);opacity:0;transition:opacity .16s ease-out}
+.profile-sections a:is(:hover,:focus-visible,[aria-current]){color:var(--gold)}
+.profile-sections a:is(:hover,:focus-visible,[aria-current])::after{opacity:1}
+.profile-sections img,.section-heading img{width:20px;height:20px}
+.dossier a,.asset-row,.membership-row,.section-heading,.form-inline{display:flex;align-items:center;gap:12px}
+.dossier a,.asset-row,.membership-row{min-height:58px;border-bottom:1px solid var(--line)}
+.dossier a strong,.asset-row strong,.asset-row input,.membership-row button{margin-left:auto}
+.dossier a{color:var(--muted)}.dossier a:hover,.dossier a strong{color:var(--gold)}
+.section-heading{border-bottom:1px solid var(--line);padding-bottom:12px;margin-bottom:12px}
+.scope{margin-left:auto;color:var(--muted);font-size:13px}
+.plan-label,.privacy-shell small{display:block;color:var(--muted);font-size:13px}
+.privacy-shell :is(select,input){background:var(--ink);border:1px solid var(--line);border-radius:4px;color:var(--text);font:inherit;padding:6px 10px}
+.privacy-shell :is(select,input):focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+.privacy-shell input:invalid:not(:placeholder-shown){border-color:#a98555}
+#planSelect{width:100%;margin:3px 0 8px}.asset-row img{width:38px;height:38px;background:var(--ink);border:1px solid var(--line);border-radius:4px}
+.asset-row input{width:5em}.asset-row strong,#planTotal{font-variant-numeric:tabular-nums}
+.workspace details{margin:8px 0;padding:0 12px;background:var(--ink);border:1px solid var(--line);border-radius:4px}
+.workspace summary{padding:10px 0;color:var(--text)}.ledger summary span{float:right;color:var(--muted);font-size:13px}
+.ledger div,#joinForm{border-top:1px solid var(--line);padding:10px 0}
+.inset-link{display:inline-block;padding:8px 0;color:var(--gold);font-size:14px}.inset-link:hover{text-decoration:underline}
+.membership-row{flex-wrap:wrap;gap:4px 10px}.membership-row small{color:var(--gold)}
+.form-inline{margin:6px 0}.form-inline input{min-width:0;width:12em;max-width:60%}
+.privacy-shell p.empty-note{margin:14px 0;padding:16px;color:var(--muted);border-left:2px solid var(--edge);background:var(--ink)}
+#inviteError:not(:empty){color:#ffc0a4}#activeClaim .record{margin:10px 0 14px}
+@media(max-width:600px){.profile-sections{gap:0 14px;padding:0}.profile-sections a{font-size:13px;gap:4px;min-height:42px}.profile-sections img{width:16px;height:16px}}
+@media(prefers-reduced-motion:reduce){.profile-sections a::after{transition:none}}
+.plan-entry{display:flex;align-items:center;gap:12px;padding:12px 8px;border-bottom:1px solid var(--line);color:var(--text)}
+.plan-entry img{width:46px;height:46px;background:var(--ink);border:1px solid var(--line);border-radius:4px}
+.plan-entry span:last-child{margin-left:auto;color:var(--gold)}.plan-entry:hover{background:var(--ink);color:var(--gold)}
+.original-plan{margin:18px 0;max-width:660px}.original-plan .inset-link{margin-bottom:10px}

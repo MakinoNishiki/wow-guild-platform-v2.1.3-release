@@ -2,7 +2,7 @@
 window.Workspaces = (() => {
   'use strict';
   const byId = id => document.getElementById(id);
-  const pages = new Set(['guild','guild-settings','guild-permissions','personal','characters','claims']);
+  const pages = new Set(['guild','guild-settings','guild-permissions','personal','characters','claims','privacy','assets']);
   const roleNames = { owner:'会长', editor:'编辑', viewer:'团员' };
   let epoch = 0;
   let inline = null;
@@ -10,19 +10,20 @@ window.Workspaces = (() => {
   function restorePanel() {
     if (!inline) return;
     inline.marker.replaceWith(inline.panel);
-    inline.panel.style.display = 'none';
+    inline.panel.style.display = inline.display;
     inline = null;
   }
 
   function personalDetail(key) {
     if (byId('userCenterModal').classList.contains('show')) return;
-    const panel = byId('tab-' + key);
+    const panel = byId(key === 'claims' ? 'wclGuildPanel' : 'tab-' + key);
+    const display = panel.style.display;
     const marker = document.createComment('个人资料面板原位置');
     panel.before(marker);
     byId('page-' + key).querySelector('.ws-panel-host').append(panel);
     panel.style.display = 'block';
-    inline = {panel, marker};
-    if (key === 'claims') loadMyClaims();
+    inline = {panel, marker, display};
+    if (key === 'claims') loadWclGuildPanel();
     else { loadWclAccount(); loadUserCharacters(); }
   }
 
@@ -34,12 +35,16 @@ window.Workspaces = (() => {
     byId('wsPlayerGuild').textContent = guild ? guildDisplayName(guild) : '尚未加入公会';
     const list = byId('wsCharacterPreview');
     list.replaceChildren();
+    byId('paDisplaySummary').textContent = '';
+    byId('paPlanSummary').textContent = '';
     if (!user) return;
+    PersonalArchive.planCount(byId('paPlanSummary'),current);
     list.textContent = '正在读取角色…';
     try {
       const data = await CloudSync.wclAccount('characters');
       if (!current()) return;
       list.replaceChildren();
+      byId('paDisplaySummary').textContent = data.characters.find(c => c.id === data.displayCharacterId)?.character_name || '仅自己可见';
       for (const character of data.characters) {
         const row = document.createElement('p');
         row.textContent = [character.character_name,character.server_name,character.class].filter(Boolean).join(' · ');
@@ -292,11 +297,13 @@ window.Workspaces = (() => {
     const generation = ++epoch;
     restorePanel();
     if (profile && (key !== 'guild-settings' || !sameProfile())) clearProfile();
+    PersonalArchive.reset(key);
     if (!pages.has(key)) return;
     const user = window.CloudSync?.getCachedUser(), guild = window.CloudSync?.getCurrentGuild();
     const current = () => generation === epoch && user?.id === CloudSync.getCachedUser()?.id && guild?.id === CloudSync.getCurrentGuild()?.id;
     if (key === 'personal') { overview(user,guild,current); return; }
     if (!user) return;
+    if (['privacy','assets','claims'].includes(key)) PersonalArchive.show(key,user,iaHasGuild() ? guild : null,current);
     if (key === 'characters' || key === 'claims') { personalDetail(key); return; }
     if (!guild) return;
     if (key === 'guild-permissions') { loadGuildMembers(); return; }

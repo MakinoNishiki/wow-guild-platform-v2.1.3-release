@@ -2,6 +2,48 @@
   --ws-book: "Songti SC","SimSun",serif;
 }
 
+.pa-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin-bottom: 16px;
+  align-items: start;
+}
+.pa-grid .card { margin: 0; min-width: 0; }
+.pa-grid h2 { margin: 0 0 12px; font: 600 21px/1.4 var(--ws-book); color: #efe2c9; }
+.pa-grid p, .pa-grid small, .pa-entry strong { color: var(--text-secondary); }
+.pa-entry, .pa-row, .pa-choice, .pa-ledger summary {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  min-width: 0; padding: 12px 3px; border-bottom: 1px solid var(--border-color);
+  overflow-wrap: anywhere;
+}
+.pa-entry { color: var(--gold); text-decoration: none; }
+.pa-entry strong, .pa-row small { font-size: 13px; font-weight: 400; }
+.pa-row strong, .pa-row small { display: block; }
+.pa-row small { margin-top: 3px; }
+.pa-choice {
+  width: 100%; cursor: pointer; margin: 6px 0; border: 1px solid var(--border-color);
+  border-radius: 5px; padding: 8px 14px; text-align: left;
+  background: var(--bg-dark,#141a21); color: var(--text-primary); font: inherit;
+}
+.pa-choice .pa-row { padding: 0; border: 0; flex: 1; }
+.pa-choice img { width: 23px; height: 23px; }
+.pa-choice:hover, .pa-entry:hover, .pa-choice[aria-pressed="true"], .pa-views .btn[aria-pressed="true"] {
+  border-color: var(--gold); color: var(--gold); background: #65522e28;
+}
+.pa-views { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px; }
+.pa-grid .btn { white-space: normal; }
+.pa-ledger { margin-top: 12px; }
+.pa-ledger summary { cursor: pointer; color: var(--gold); justify-content: flex-start; }
+.pa-ledger summary::before { content: '▸'; }
+.pa-ledger[open] summary::before { content: '▾'; }
+#paWithdraw, #paRoster select, #paJoin input { margin: 10px 0; }
+#paRoster select { width: 100%; }
+#paJoin { padding-top: 10px; }
+#paJoin label { display: block; }
+#paSaveStatus:empty, #paJoinStatus:empty { display: none; }
+@media (max-width: 820px) { .pa-grid { grid-template-columns: minmax(0,1fr); } }
+
 .ws-hero {
   position: relative;
   display: flex;

@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>展示与隐私 · 魔兽管家交互评审</title>
+  <link rel="icon" href="../../assets/brand/favicon-32.png">
+  <link rel="stylesheet" href="../guild-personal-navigation/style.css">
+  <link rel="stylesheet" href="style.css">
+  <script src="../../js/iconMap.js" defer></script>
+  <script src="preview.js" defer></script>
+  <script src="bundle.js" defer></script>
+</head>
+<body>
+  <header class="mast">
+    <div class="brand"><img src="../../assets/brand/wb-shield.svg" alt="">魔兽管家</div>
+    <span class="product-area">个人档案</span>
+    <div class="utilities"><span class="demo-label">交互评审 · 示例数据</span><button class="button" id="reset">重置示例</button></div>
+  </header>
+  <main class="privacy-shell">
+    <header class="hero">
+      <div><p class="kicker">微澜的个人档案</p><h1 id="pageHeading">展示与隐私</h1><p id="pageLead">选择代表你的角色，查看自己、团员和访客各自能看到的资料。</p></div>
+      <div class="crest" aria-hidden="true"><img id="pageEmblem" src="../../assets/icons/nav/characters.svg" alt=""></div>
+    </header>
+    <nav class="profile-sections" aria-label="个人档案">
+      <a href="#overview"><img src="../../assets/icons/nav/profile.svg" alt="">我的档案</a>
+      <a href="#privacy"><img src="../../assets/icons/nav/characters.svg" alt="">展示与隐私</a>
+      <a href="#assets"><img src="../../assets/icons/nav/decor-plan.svg" alt="">我的资产</a>
+      <a href="#guilds"><img src="../../assets/icons/nav/guild-banner.svg" alt="">公会与认领</a>
+    </nav>
+    <section id="overviewPage" hidden>
+      <div class="workspace">
+        <section class="panel"><h2>我的角色</h2><p class="section-hint">微澜 · 国服</p><div id="ownedRoster"></div></section>
+        <section class="panel dossier"><h2>档案概览</h2>
+          <a href="#privacy"><span>对外展示</span><strong id="overviewDisplay"></strong><span aria-hidden="true">›</span></a>
+          <a href="#assets"><span>个人方案</span><strong id="overviewPlan"></strong><span aria-hidden="true">›</span></a>
+          <a href="#guilds"><span>当前公会</span><strong id="overviewGuild"></strong><span aria-hidden="true">›</span></a>
+        </section>
+      </div>
+    </section>
+    <div id="privacyPage">
+    <div class="workspace">
+      <section class="panel" aria-labelledby="selection-title">
+        <h2 id="selection-title">对外展示角色</h2>
+        <p class="section-hint">最多展示一个角色，可随时更换或撤下。</p>
+        <div id="choices" class="choices" role="group" aria-label="选择对外展示的角色"></div>
+        <div class="selection-foot"><span id="selectionState"></span><button class="button" id="withdraw" disabled>撤下展示</button></div>
+      </section>
+      <section class="panel preview-panel" aria-labelledby="preview-title">
+        <h2 id="preview-title">可见内容预览</h2>
+        <div class="views" role="group" aria-label="查看视角">
+          <button data-view="self" aria-pressed="false">本人</button>
+          <button data-view="guild" aria-pressed="false">本会团员</button>
+          <button data-view="visitor" aria-pressed="true">访客</button>
+        </div>
+        <div id="previewBody"></div>
+        <p id="viewHint" class="view-hint"></p>
+      </section>
+    </div>
+    <section class="panel guild-panel" aria-labelledby="guild-title">
+      <div class="guild-heading"><img src="../../assets/icons/nav/guild-banner.svg" alt=""><h2 id="guild-title">公会认领</h2></div>
+      <div class="guild-line">
+        <div><strong id="privacyGuildName">暮星公会</strong><span id="membership"></span><p id="claimState"></p></div>
+        <div class="guild-actions"><a href="#guilds" class="inset-link">管理公会认领 →</a><button class="button" id="unclaim">模拟解除认领</button><button class="button" id="leave">模拟退出公会</button></div>
+      </div>
+    </section>
+    </div>
+    <section id="assetsPage" hidden>
+      <div class="workspace">
+        <section class="panel">
+          <header class="section-heading"><img src="../../assets/icons/nav/decor-plan.svg" alt=""><h2>我的家宅方案</h2><span class="scope">自己可见</span></header>
+          <p class="section-hint">选一份方案，进入家宅方案单调整用量。</p><div id="personalPlans"></div>
+        </section>
+        <section class="panel">
+          <header class="section-heading"><img src="../../assets/icons/nav/loot.svg" alt=""><h2>我的团队记录</h2></header>
+          <div id="assetRecords"></div>
+          <a class="inset-link" href="#guilds">查看公会与认领 →</a>
+        </section>
+      </div>
+    </section>
+    <section id="planPage" class="panel original-plan" hidden>
+      <a class="inset-link" href="#assets">← 返回我的资产</a>
+      <label class="plan-label" for="planSelect">选择方案</label>
+      <select id="planSelect"><option value="study">林间书房</option><option value="hearth">炉边会客厅</option></select>
+      <div id="planItems"></div>
+      <div class="selection-foot"><span id="planTotal"></span><div class="guild-actions"><button class="button" id="cancelPlan" hidden>取消</button><button class="button" id="editPlan">调整用量</button></div></div>
+    </section>
+    <section id="guildsPage" hidden>
+      <div class="workspace">
+        <section class="panel">
+          <header class="section-heading"><img src="../../assets/icons/nav/guild-banner.svg" alt=""><h2>我加入的公会</h2></header>
+          <div id="guildMemberships"></div>
+          <details id="joinBox">
+            <summary>用邀请码加入公会</summary>
+            <form id="joinForm"><label for="inviteCode">公会邀请码</label>
+              <div class="form-inline"><input id="inviteCode" maxlength="8" autocomplete="off" required><button class="button" type="submit">加入公会</button></div>
+              <small id="inviteHint"></small><p id="inviteError" role="alert"></p>
+            </form>
+          </details>
+        </section>
+        <section class="panel">
+          <header class="section-heading"><img src="../../assets/icons/nav/claims.svg" alt=""><h2>当前公会认领</h2></header>
+          <div id="activeClaim"></div>
+        </section>
+      </div>
+    </section>
+    <p id="message" role="status"></p>
+  </main>
+  <dialog id="confirmation" aria-labelledby="dialogTitle" aria-describedby="dialogText">
+    <form method="dialog"><h2 id="dialogTitle"></h2><p id="dialogText"></p>
+      <div class="dialog-actions"><button class="button" value="cancel" autofocus>取消</button><button class="primary" value="confirm" id="confirmAction"></button></div>
+    </form>
+  </dialog>
+</body>
+</html>

@@ -16,11 +16,12 @@ const assert = require('node:assert/strict');
 const root = path.resolve(__dirname, '..');
 const recruitment = process.argv.includes('--guild-recruitment') && require('./verify-req212-recruitment.cjs');
 const guildRoles = process.argv.includes('--guild-roles') && require('./verify-guild-roles-real.cjs');
-const output = process.env.WB_VERIFY_OUTPUT || path.join(root, 'docs/evidence', guildRoles ? 'req191-guild-roles-20261125' : recruitment ? 'req212-recruitment-20261125' : process.argv.includes('--guild-battles') ? 'req190-20261123' : 'req203-cover-20261119');
+const archive = process.argv.includes('--personal-archive') && require('./verify-personal-archive.cjs');
+const output = process.env.WB_VERIFY_OUTPUT || path.join(root, 'docs/evidence', archive ? 'personal-archive-20261128' : guildRoles ? 'req191-guild-roles-20261125' : recruitment ? 'req212-recruitment-20261125' : process.argv.includes('--guild-battles') ? 'req190-20261123' : 'req203-cover-20261119');
 const host = '127.0.0.1';
 const checkDecor = process.argv.includes('--decor-engagement');
 const lootReadback = process.argv.includes('--loot-readback') && require('./verify-loot-import-readback.cjs');
-const battleReports = (guildRoles || recruitment || process.argv.includes('--guild-battles')) && require('./verify-req190-battles.cjs');
+const battleReports = (guildRoles || recruitment || archive || process.argv.includes('--guild-battles')) && require('./verify-req190-battles.cjs');
 const suite = process.argv.find(arg => arg.startsWith('--suite='))?.slice(8);
 const withCatalog = checkDecor || !!suite;
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
@@ -88,6 +89,7 @@ async function main() {
       await db.query(migration);
       await db.query(migration);
     }
+    if (archive) await archive.setup(db,sessions);
     const migration = fs.readFileSync(path.join(root, 'sql/49_req203_housing_builds.sql'), 'utf8');
     await db.query(migration);
     await db.query(migration);
@@ -171,6 +173,7 @@ async function main() {
           !(battleReports && (battleReports.allows(req.url) || req.url === '/rest/v1/rpc/req212_read_card' || /^\/rest\/v1\/rpc\/req191_/.test(req.url))) &&
           !(guildRoles && /^\/rest\/v1\/raid_members\?/.test(req.url)) &&
           !(recruitment && recruitment.allows(req.url)) &&
+          !(archive && archive.allows(req.url)) &&
           !(lootReadback && /^\/rest\/v1\/(?:guild_members|guilds|loot_drops|rpc\/req19[19]_submit_loot)(?:\?|$)/.test(req.url)) &&
           !(withCatalog && /^\/rest\/v1\/(?:decor_item_|decor_plan|rpc\/(?:record_decor|set_decor|favorite_decor))/.test(req.url))) {
         res.setHeader('Content-Type', 'application/json'); return res.end('[]');
@@ -219,7 +222,9 @@ async function main() {
       const page = await context.newPage();
       page.on('pageerror', e => errors.push(e.message));
       page.setDefaultTimeout(9000);
-      if (recruitment || guildRoles) {
+      if (archive) {
+        await page.goto(base + '/#/personal');
+      } else if (recruitment || guildRoles) {
         await page.goto(base + '/#/team/guild-settings');
       } else {
         await page.goto(base + '/#/house/community');
@@ -228,9 +233,9 @@ async function main() {
       return page;
     }
     const author = await open(sessions[0], 1920);
-    if (recruitment || guildRoles) {
+    if (recruitment || guildRoles || archive) {
       const precedingChecks = checks.length;
-      await (guildRoles || recruitment).verify({author, guest:await open(null,1366), viewer:await open(sessions[1],1366), open, db, sessions, base, output, pass});
+      await (guildRoles || recruitment || archive).verify({author, guest:await open(null,1366), viewer:await open(sessions[1],1366), open, db, sessions, base, output, pass});
       assert.deepEqual(errors, []);
       fs.writeFileSync(path.join(output,'verification.json'), JSON.stringify({browser:browser.version(), database:'本地一次性 PostgreSQL / PostgREST', authentication:'模拟账号、认证服务与登录会话', checks:checks.slice(precedingChecks)},null,2)+'\n');
       verifiedRoles = !!guildRoles;

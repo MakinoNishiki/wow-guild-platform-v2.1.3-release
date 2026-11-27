@@ -3,7 +3,7 @@ const STORAGE_KEY = 'wow_raid_attendance_data';
 
 // 每次正式发版按发布标签新增一组，保留旧组供历史公告引用。
 const releaseNov27 = { version: 'v3.2.0', date: '2026-11-27' };
-const APP_VERSION = releaseNov27.version;
+const APP_VERSION = 'v3.3.0';
 
 let appData = {
   members: [],
@@ -1849,7 +1849,7 @@ async function handleCreateGuild() {
 
 // 加入公会（任务书 #59 WP2：接受可选 codeOverride——遮罩表单按钮照旧无参调读 #joinInviteCode；
 // 引导卡按钮传 iaGuideInviteCode 值。引导卡场景遮罩未开、showAuthError 不可见，提示口径 = showToast）
-async function handleJoinGuild(codeOverride) {
+async function handleJoinGuild(codeOverride, returnToClaims = false) {
   const fromGuide = typeof codeOverride === 'string';
   const code = (fromGuide ? codeOverride : document.getElementById('joinInviteCode').value).trim().toUpperCase();
   if (!code) {
@@ -1865,10 +1865,11 @@ async function handleJoinGuild(codeOverride) {
     showAppView();
     // 任务书 #59 WP1：入会成功从引导卡/公会表单落仪表盘
     iaSyncTopRight();
-    iaSetHash('#/team/dashboard');
+    iaSetHash(returnToClaims ? '#/personal/claims' : '#/team/dashboard');
     iaApplyRoute();
     // 任务书 #56：REQ-141 WP3 埋点（事件名见 docs/开发规范.md 埋点纪律章）
     if (window.WBTrack) WBTrack.event('guild_join');
+    return true;
   } catch (e) {
     if (fromGuide) showToast(e.message || '加入失败', 'error');
     else showAuthError(e.message || '加入失败');
@@ -1943,7 +1944,7 @@ async function handleLeaveGuild() {
       updateCloudUI();
       updatePermissionUI();
       iaSyncTopRight();
-      iaSetHash('#/home');
+      iaSetHash(location.hash === '#/personal/claims' ? '#/personal/claims' : '#/home');
       iaApplyRoute();
       showToast('已退出公会', 'success');
     }
@@ -2269,7 +2270,7 @@ window.showLoadFailureBanner = function (failedTables) {
 
 // ==================== 页面切换 ====================
 const pageTitles = {
-  guild: '公会战报', 'guild-settings': '公会资料', 'guild-permissions': '成员权限', personal: '个人档案', characters: '我的角色', claims: '我的认领',
+  guild: '公会战报', 'guild-settings': '公会资料', 'guild-permissions': '成员权限', personal: '个人档案', characters: '我的角色', claims: '公会与认领', privacy: '展示与隐私', assets: '我的资产',
   dashboard: '仪表盘',
   members: '成员管理',
   attendance: '考勤记录',
@@ -2598,7 +2599,7 @@ function iaSetHash(h) {
 
 function iaKeyToHash(key) {
   if (key === 'rankings' || key === 'personal') return '#/' + key;
-  if (key === 'characters' || key === 'claims') return '#/personal/' + key;
+  if (['characters','claims','privacy','assets'].includes(key)) return '#/personal/' + key;
   if (key === 'home' || key === 'changelog' || key === 'lootdrop') return '#/' + key;
   if (key === 'decor') return '#/house/decor';
   if (key === 'decor-plan') return '#/house/plan';
@@ -2608,7 +2609,7 @@ function iaKeyToHash(key) {
 }
 
 function iaTabOfPage(page) {
-  if (['personal','characters','claims'].includes(page)) return 'personal';
+  if (['personal','characters','claims','privacy','assets'].includes(page)) return 'personal';
   if (page === 'decor' || page === 'decor-plan' || page === 'community') return 'house';
   if (page === 'home') return null;
   if (page === 'changelog' || page === 'lootdrop' || page === 'rankings') return page;
@@ -2728,7 +2729,7 @@ function iaApplyRoute() {
   let page = null, tab = null, activeKey = null;
   if (h === '#/home') {
     page = 'home'; tab = null;
-  } else if (['#/personal','#/personal/characters','#/personal/claims'].includes(h)) {
+  } else if (['#/personal','#/personal/characters','#/personal/claims','#/personal/privacy','#/personal/assets'].includes(h)) {
     page = iaIsLoggedIn() ? h.split('/').at(-1) : 'personal'; tab = 'personal';
   } else if (h === '#/rankings' || /^#\/rankings\/pvp\/(2v2|3v3|battlegrounds|shuffle|blitz)$/.test(h)) {
     page = 'rankings'; tab = page;
@@ -2958,7 +2959,7 @@ function closeModal(id) {
   const si = modalStack.indexOf(id);
   if (si !== -1) modalStack.splice(si, 1);
   const page = document.querySelector('.page.active')?.id.slice(5);
-  if ((id === 'userCenterModal' && ['personal','characters','claims'].includes(page)) ||
+  if ((id === 'userCenterModal' && iaTabOfPage(page) === 'personal') ||
       (id === 'guildBattleModal' && page === 'guild')) Workspaces.show(page);
 }
 
@@ -4127,6 +4128,7 @@ async function confirmClaimMember() {
     showToast('认领失败: ' + (e.message || '未知错误'), 'error');
   } finally {
     if (btn) btn.disabled = false;
+    if (location.hash === '#/personal/claims') Workspaces.show('claims');
   }
 }
 
@@ -9088,7 +9090,11 @@ function lootFillAssignedTo(idOrName) {
 // ==================== 初始化 ====================
 // ==================== 更新日志 ====================
 const changelogData = [
-  {id:'req218-font-editions',version:APP_VERSION,date:'2026-11-28',type:'feature',typeLabel:'新增功能',title:'为不同游戏版本分别选字体',summary:'打开字体管理器即可看到游戏版本入口。只选过正式服目录时，也可以直接点无限服或怀旧服，选择游戏总目录后进入对应版本。应用和恢复只影响当前版本，下次打开会记住上次的选择。',details:[]},
+  {id:'personal-archive-visibility',version:APP_VERSION,date:'2026-11-28',type:'feature',typeLabel:'新增功能',title:'换个视角看自己的角色',summary:'在个人档案选择一位展示角色，切换本人、本会团员和访客，核对各自能看到什么。展示角色可随时撤下。',details:[]},
+  {id:'personal-archive-assets',version:APP_VERSION,date:'2026-11-28',type:'improve',typeLabel:'功能优化',title:'从我的资产接着改家宅方案',summary:'每份方案直接列出家具种数和件数。点进原方案单调整用量，保存后返回即可看到新数量。团队记录可按当前公会查看已认领角色的心愿和已获装备。',details:[]},
+  {id:'personal-archive-settings',version:APP_VERSION,date:'2026-11-28',type:'fix',typeLabel:'修复BUG',title:'手动登记的角色也可独立设置展示',summary:'站点已允许的来源可以直接保存展示选择，设置个人名片无需配置 WCL 回调。',details:[]},
+  {id:'personal-archive-guilds',version:APP_VERSION,date:'2026-11-28',type:'refactor',typeLabel:'模块调整',title:'入会、切会与角色认领集中在一个入口',summary:'在「公会与认领」用邀请码入会、切换公会或管理认领申请。退出最后一个公会后，个人角色和家宅方案继续保留。',details:[]},
+  {id:'req218-font-editions',version:releaseNov27.version,date:'2026-11-28',type:'feature',typeLabel:'新增功能',title:'为不同游戏版本分别选字体',summary:'打开字体管理器即可看到游戏版本入口。只选过正式服目录时，也可以直接点无限服或怀旧服，选择游戏总目录后进入对应版本。应用和恢复只影响当前版本，下次打开会记住上次的选择。',details:[]},
   {id:'bug134-font-directory',...releaseNov27,type:'fix',typeLabel:'修复BUG',title:'字体管理器可以接着用上次的游戏目录',summary:'授权和刷新按钮以亮金色标出。选择游戏总目录后可看到当前正式服目标及同时识别到的其他版本。直接应用字体会沿用已记住的目录，页首可返回魔兽管家首页。',details:[]},
   {id:'req215-fonts',...releaseNov27,type:'feature',typeLabel:'新增功能',title:'从顶部导航打开国服字体管理器',summary:'预览任务、姓名板、战斗数字和聊天字体，输入角色名检查缺字。在支持的浏览器里选择游戏目录后，可按用途应用字体或恢复原文件。',details:[]},
   {id:'req217-search',...releaseNov27,type:'improve',typeLabel:'功能优化',title:'家宅图鉴和国服排行榜有了独立网址',summary:'打开或收藏对应网址，即可直接进入图鉴或排行榜。以前分享的链接也可以继续使用。',details:[]},
@@ -16649,7 +16655,15 @@ async function wclAccountAction(action) {
       showToast(failed?'部分角色未完成，请查看原因并重试':'处理完成，请查看逐项结果',failed?'warning':'success');
     }
   }catch(e){if(CloudSync.getCachedUser()?.id===me && CloudSync.getCurrentGuild()?.id===guildId)showToast(e.message,'error');}
-  finally{wclAccountBusy=false;if(CloudSync.getCachedUser()?.id===me){loadWclAccount();loadUserCharacters();loadMyClaims();}}
+  finally {
+    wclAccountBusy=false;
+    if(CloudSync.getCachedUser()?.id===me) {
+      loadWclAccount();
+      loadUserCharacters();
+      if (action === 'claim' && location.hash === '#/personal/claims') Workspaces.show('claims');
+      else loadMyClaims();
+    }
+  }
 }
 // Claims checkboxes live inside the existing user-center modal.
 const wclOriginalUserDirty = modalDirtyChecks.userCenterModal;
