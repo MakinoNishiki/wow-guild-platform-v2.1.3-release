@@ -9088,6 +9088,7 @@ function lootFillAssignedTo(idOrName) {
 // ==================== 初始化 ====================
 // ==================== 更新日志 ====================
 const changelogData = [
+  {id:'req218-font-editions',version:APP_VERSION,date:'2026-11-28',type:'feature',typeLabel:'新增功能',title:'为不同游戏版本分别选字体',summary:'打开字体管理器即可看到游戏版本入口。只选过正式服目录时，也可以直接点无限服或怀旧服，选择游戏总目录后进入对应版本。应用和恢复只影响当前版本，下次打开会记住上次的选择。',details:[]},
   {id:'bug134-font-directory',...releaseNov27,type:'fix',typeLabel:'修复BUG',title:'字体管理器可以接着用上次的游戏目录',summary:'授权和刷新按钮以亮金色标出。选择游戏总目录后可看到当前正式服目标及同时识别到的其他版本。直接应用字体会沿用已记住的目录，页首可返回魔兽管家首页。',details:[]},
   {id:'req215-fonts',...releaseNov27,type:'feature',typeLabel:'新增功能',title:'从顶部导航打开国服字体管理器',summary:'预览任务、姓名板、战斗数字和聊天字体，输入角色名检查缺字。在支持的浏览器里选择游戏目录后，可按用途应用字体或恢复原文件。',details:[]},
   {id:'req217-search',...releaseNov27,type:'improve',typeLabel:'功能优化',title:'家宅图鉴和国服排行榜有了独立网址',summary:'打开或收藏对应网址，即可直接进入图鉴或排行榜。以前分享的链接也可以继续使用。',details:[]},

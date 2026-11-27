@@ -25,8 +25,13 @@ async function run() {
       return fs.existsSync(asset) ? route.fulfill({path:asset}) : route.fulfill({status:404, body:''});
     });
     await page.addInitScript(() => {
-      window.showDirectoryPicker = () => navigator.storage.getDirectory();
-      window.retailFixture = async () => (await navigator.storage.getDirectory()).getDirectoryHandle('_retail_', {create:true});
+      window.pickerCalls = 0;
+      window.showDirectoryPicker = async () => {
+        ++window.pickerCalls;
+        return (await navigator.storage.getDirectory()).getDirectoryHandle('World of Warcraft',{create:true});
+      };
+      window.gameRoot = async () => (await navigator.storage.getDirectory()).getDirectoryHandle('World of Warcraft',{create:true});
+      window.retailFixture = async () => (await gameRoot()).getDirectoryHandle('_retail_', {create:true});
       window.filesFixture = async () => (await window.retailFixture()).getDirectoryHandle('Fonts', {create:true});
       window.writeFixture = async (name, bytes) => {
         const handle = await (await window.filesFixture()).getFileHandle(name, {create:true});
@@ -35,7 +40,7 @@ async function run() {
     });
     await page.goto(url);
     await page.evaluate(async () => {
-      const root=await navigator.storage.getDirectory();
+      const root=await gameRoot();
       for(const name of ['_forever_','_classic_','_classic_era_','_classic_titan_'])await root.getDirectoryHandle(name,{create:true});
       await writeFixture('ARKai_T.TTF', 'original-file');
       await writeFixture('untouched.ttf', 'keep');
@@ -64,20 +69,52 @@ async function run() {
       await button.click(); await confirm.click(); await waitFor(done);
     }
     assert.equal(await remove.isDisabled(), true);
+    await page.locator('[data-edition="_forever_"]:enabled').waitFor();
+    assert.equal(await page.locator('#editionInfo [data-needs-root]').count(),5);
     assert.equal(await current.getByText('待读取',{exact:true}).count(), 5);
     await importLocal();
     await apply.click(); await page.locator('#cancelInstall').click();
     const editions=await page.locator('#editionInfo').innerText();
-    for(const label of ['当前目标：正式服','无限服','怀旧服','经典旧世','泰坦重铸'])assert.ok(editions.includes(label));
+    for(const label of ['正式服','无限服','怀旧服','经典旧世','泰坦重铸'])assert.ok(editions.includes(label));
+    const versionButton = version => page.locator('#editionInfo [data-edition="'+version+'"]');
+    async function selectVersion(version) {
+      await versionButton(version).click();
+      await page.locator('#editionInfo [data-edition="'+version+'"][aria-pressed=true]:enabled').waitFor();
+      assert.ok((await page.locator('#dirStatus').innerText()).includes(version));
+    }
     const refreshFill=await page.locator('#rescanGame').evaluate(b=>getComputedStyle(b).backgroundColor);
     assert.notEqual(refreshFill,await page.locator('#pickGame').evaluate(b=>getComputedStyle(b).backgroundColor));
     await page.locator('#rescanGame').click();
-    for (const version of ['_forever_','_classic_']) {
-      await page.evaluate(name=>{window.showDirectoryPicker=async()=>(await navigator.storage.getDirectory()).getDirectoryHandle(name);},version);
-      await page.locator('#pickGame').click();
-      await page.waitForFunction(name=>document.getElementById('dirStatus').textContent.includes(name),version);
-      assert.equal(await page.evaluate(async()=>(await currentFonts.storeTarget('get')).handle.name),'_retail_');
+    for (const version of ['_forever_','_classic_','_classic_era_','_classic_titan_']) {
+      await selectVersion(version);
+      assert.equal(await current.getByText('游戏默认',{exact:true}).count(),5);
+      await apply.click();
+      assert.ok((await page.locator('#actionTarget').innerText()).includes(version+'/Fonts/ARKai_T.TTF'));
+      await confirm.click(); await waitFor('已应用「试装」');
+      assert.equal(await page.evaluate(async key=>{
+        const dir=await (await (await gameRoot()).getDirectoryHandle(key)).getDirectoryHandle('Fonts');
+        const file=await (await dir.getFileHandle('ARKai_T.TTF')).getFile();
+        const bytes=await crypto.subtle.digest('SHA-256',await file.arrayBuffer());
+        return Array.from(new Uint8Array(bytes),b=>b.toString(16).padStart(2,'0')).join('');
+      },version),expected);
+      assert.equal(await readText('ARKai_T.TTF'),'original-file');
     }
+    assert.equal(await page.evaluate(()=>pickerCalls),1);
+    await page.reload();
+    await waitFor('管家上次应用');
+    assert.equal(await versionButton('_classic_titan_').getAttribute('aria-pressed'),'true');
+    for (const version of ['_classic_era_','_classic_','_forever_','_classic_titan_']) {
+      await selectVersion(version);
+      assert.equal(await remove.isEnabled(),true);
+      if (process.env.WB_FONT_EDITION_SCREENSHOT && version==='_forever_') {
+        await page.locator('.current-panel').screenshot({path:process.env.WB_FONT_EDITION_SCREENSHOT});
+      }
+      await act(remove,'已删除已应用字体');
+      assert.equal(await current.getByText('游戏默认',{exact:true}).count(),5);
+    }
+    assert.equal(await page.evaluate(()=>pickerCalls),0);
+    await selectVersion('_retail_');
+    await importLocal();
     assert.equal(await current.getByText('游戏默认',{exact:true}).count(),4);
     assert.match(await chat.innerText(),/无法识别/);
     assert.equal(await readText('ARKai_T.TTF'), 'original-file');
@@ -119,6 +156,60 @@ async function run() {
     assert.equal(await exists('ARKai_C.TTF'), false);
     await page.evaluate(() => { FileSystemHandle.prototype.requestPermission = async () => 'denied'; });
     await act(apply, '未获得写入权限'); assert.equal(await exists('ARKai_C.TTF'), false);
+    // Old records retained the child, even when the picker had listed its siblings.
+    await page.evaluate(async()=>{
+      await currentFonts.storeTarget('put',{handle:await retailFixture(),direct:false,
+        path:'World of Warcraft/_retail_/Fonts',editions:['_retail_','_classic_','_forever_']});
+    });
+    await page.reload(); await page.locator('#rescanGame:enabled').waitFor();
+    assert.equal(await page.locator('#editionInfo [data-needs-root]').count(),4);
+    assert.equal(await versionButton('_retail_').getAttribute('aria-pressed'),'true');
+    await page.evaluate(()=>{
+      window.openRootForTest=window.showDirectoryPicker;
+      window.showDirectoryPicker=()=>Promise.reject(new DOMException('取消','AbortError'));
+    });
+    await versionButton('_forever_').click();
+    await page.getByText(/已取消切换/).waitFor();
+    await page.evaluate(()=>{window.showDirectoryPicker=retailFixture;});
+    await versionButton('_forever_').click();
+    await page.getByText(/选中的是子目录/).waitFor();
+    assert.equal(await versionButton('_retail_').getAttribute('aria-pressed'),'true');
+    await page.evaluate(()=>{window.showDirectoryPicker=window.openRootForTest;});
+    await selectVersion('_forever_');
+    assert.equal(await page.locator('#editionInfo [data-needs-root]').count(),0);
+    assert.equal(await page.evaluate(()=>pickerCalls),1);
+    // An installation without retail, and an individually chosen child, both work.
+    await page.evaluate(async()=>{
+      const root=await (await navigator.storage.getDirectory()).getDirectoryHandle('怀旧专用',{create:true});
+      await root.getDirectoryHandle('_classic_',{create:true});
+      window.showDirectoryPicker=async()=>root;
+    });
+    await page.locator('#pickGame').click();
+    await page.waitForFunction(()=>document.querySelector('#dirStatus').textContent.includes('怀旧专用/_classic_/Fonts'));
+    assert.equal(await page.locator('#editionInfo button').count(),1);
+    await page.locator('#rescanGame:enabled').waitFor();
+    await page.evaluate(async()=>{
+      const root=(await currentFonts.storeTarget('get')).rootHandle;
+      await root.getDirectoryHandle('_ptr_',{create:true});
+      await root.removeEntry('_classic_');
+    });
+    await page.reload();
+    await page.getByText(/无法打开 .*怀旧专用/).waitFor();
+    assert.equal(await page.locator('#deleteFont').isEnabled(),false);
+    await page.evaluate(()=>{window.showDirectoryPicker=async()=>(await navigator.storage.getDirectory()).getDirectoryHandle('怀旧专用');});
+    await page.locator('#pickGame').click();
+    await page.waitForFunction(()=>document.getElementById('dirStatus').textContent.includes('仅检测到测试服'));
+    assert.equal(await page.locator('#editionInfo [data-needs-root]').count(),5);
+    await versionButton('_forever_').click();
+    await page.getByText(/所选目录中未找到无限服/).waitFor();
+    assert.equal(await page.locator('#editionInfo [aria-pressed=true]').count(),0);
+    await page.evaluate(()=>{window.showDirectoryPicker=async()=>(await gameRoot()).getDirectoryHandle('_forever_');});
+    await page.locator('#pickGame').click();
+    await page.locator('[data-edition="_forever_"][aria-pressed=true]:enabled').waitFor();
+    assert.equal(await page.locator('#editionInfo [data-needs-root]').count(),4);
+    await page.evaluate(()=>{window.showDirectoryPicker=gameRoot;});
+    await page.locator('#pickGame').click();
+    await selectVersion('_retail_');
     await page.close();
     // Same browser profile and stored directory. The permission prompt is controlled in this test.
     await context.addInitScript(()=>{
@@ -145,6 +236,9 @@ async function run() {
     await resume.click();
     await reopened.locator('#currentSlots [data-slot="ARIALN.TTF"]').getByText('游戏默认').waitFor();
     assert.equal(await reopened.evaluate(()=>pickerCalls),0);
+    await reopened.getByRole('button',{name:'怀旧服',exact:true}).click();
+    await reopened.waitForFunction(()=>document.querySelector('[data-edition="_classic_"][aria-pressed=true]:enabled'));
+    assert.equal(await reopened.evaluate(()=>pickerCalls),0);
     await reopened.reload();
     await resume.waitFor();
     await reopened.evaluate(()=>{window.allowRead=true;});
@@ -158,7 +252,7 @@ async function run() {
     await reopened.locator('#pickGame:enabled').waitFor();
     assert.equal(await resume.isVisible(),false);
     assert.deepEqual(errors, []);
-    console.log('PASS: cancel, apply, readback, repeat, two slots, remove local list, reload, restore, external change, delete new file, wrong source, permission denied.');
+    console.log('PASS: five editions, scoped files and restores, persisted switch without picker, legacy and non-retail directories, approval, two slots, source and file checks.');
   } finally {
     await browser.close();
     fs.unlinkSync(sample); fs.rmdirSync(fixture);

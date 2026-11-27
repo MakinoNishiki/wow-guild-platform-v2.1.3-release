@@ -14,7 +14,7 @@ const PublicSearchPages = {
   },
   fonts: {
     path: '/font-manager/', title: '魔兽世界国服字体管理器｜字体预览与替换｜魔兽管家',
-    description: '预览魔兽世界国服简中正式服的任务、聊天、姓名板和战斗数字字体，检查角色名缺字，授权游戏目录后可应用字体并恢复原文件。'
+    description: '切换魔兽世界国服正式服、无限服和怀旧服，预览任务、聊天、姓名板和战斗数字字体，检查角色名缺字，按游戏版本应用或恢复字体。'
   }
 };
 if (typeof module !== 'undefined' && module.exports) module.exports = PublicSearchPages;

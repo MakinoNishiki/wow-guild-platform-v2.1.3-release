@@ -61,6 +61,7 @@ async function verify() {
     assert.equal(await page.locator('#appVersion').textContent(), await cards.first().locator('.changelog-version').textContent());
     assert.equal(await page.locator('#latestChangeDate').getAttribute('datetime'), await cards.first().locator('.changelog-date').textContent());
     assert.ok(await cards.filter({hasText:'从顶部导航打开国服字体管理器'}).count());
+    assert.ok(await cards.filter({hasText:'为不同游戏版本分别选字体'}).count());
     await page.locator('.ia-tabs a[href="/font-manager/"]').click();
     await page.getByRole('link',{name:'返回魔兽管家首页'}).click();
     await page.locator('#page-home.page.active').waitFor();

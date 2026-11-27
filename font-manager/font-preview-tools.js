@@ -174,17 +174,19 @@
     frame.append(ink);return frame;
   }
 
-  const editions={'_retail_':'正式服','_forever_':'无限服','_classic_':'怀旧服','_classic_era_':'经典旧世','_classic_titan_':'泰坦重铸「时光」','_ptr_':'测试服','_beta_':'测试版'};
+  // 国服简中字体文件按客户端版本分别保存在各自的 Fonts 目录。
+  const editions={'_retail_':'正式服','_forever_':'无限服','_classic_':'怀旧服','_classic_era_':'经典旧世','_classic_titan_':'泰坦重铸「时光」'};
+  const previewEditions={'_ptr_':'测试服','_beta_':'测试版'};
   async function inspectGame(dir) {
     const name=dir.name.toLowerCase();
     if(name==='fonts') return [];
-    if(Object.hasOwn(editions,name)) return [name];
+    if(Object.hasOwn(editions,name) || Object.hasOwn(previewEditions,name)) return [name];
     const versions=[];
-    for (const key of Object.keys(editions)) {
+    for (const key of [...Object.keys(editions),...Object.keys(previewEditions)]) {
       try {await dir.getDirectoryHandle(key);versions.push(key);}
       catch(e){if(!['NotFoundError','TypeMismatchError'].includes(e.name))throw e;}
     }
     return versions;
   }
-  window.WBFontPreview={coverage,hasGlyph,loadLocal,language,scene,inspectGame,editions};
+  window.WBFontPreview={coverage,hasGlyph,loadLocal,language,scene,inspectGame,editions,previewEditions};
 })();
