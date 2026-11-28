@@ -2417,6 +2417,23 @@ async function setCalendarDensity(d) {
   }
 }
 
+function changeHeadingTag(element, tag) {
+  const heading = document.createElement(tag);
+  for (const {name, value} of element.attributes) heading.setAttribute(name, value);
+  heading.append(...element.childNodes);
+  element.replaceWith(heading);
+}
+
+function updatePageHeading(activePage, title) {
+  const topTitle = document.getElementById('pageTitle');
+  topTitle.textContent = title;
+  const heading = activePage.querySelector('[data-page-heading]') || topTitle;
+  const previous = document.querySelector('h1[data-page-heading], h1#pageTitle');
+  if (previous === heading) return;
+  if (previous) changeHeadingTag(previous, previous === topTitle ? 'div' : 'h2');
+  changeHeadingTag(heading, 'h1');
+}
+
 function switchPage(pageName, routeHash) {
   Workspaces.show(pageName);
   if (pageName !== 'decor') window.DecorCatalog?.hideDetail();
@@ -2430,10 +2447,11 @@ function switchPage(pageName, routeHash) {
   document.querySelectorAll('.page').forEach(page => {
     page.classList.remove('active');
   });
-  document.getElementById(`page-${pageName}`).classList.add('active');
+  const activePage = document.getElementById(`page-${pageName}`);
+  activePage.classList.add('active');
   
   // 更新标题
-  document.getElementById('pageTitle').textContent = pageTitles[pageName];
+  updatePageHeading(activePage, pageTitles[pageName]);
   
   // 渲染对应页面
   if (pageName === 'attendance') {
@@ -9090,6 +9108,7 @@ function lootFillAssignedTo(idOrName) {
 // ==================== 初始化 ====================
 // ==================== 更新日志 ====================
 const changelogData = [
+  {id:'bug136-page-headings',version:APP_VERSION,date:'2026-11-28',type:'fix',typeLabel:'修复BUG',title:'用读屏工具更容易定位当前栏目',summary:'打开首页、家宅图鉴或排行榜时，可以直接读到当前页面的主标题。首页入口的装饰图标由旁边的文字说明，反馈二维码保留扫码用途说明。',details:[]},
   {id:'personal-archive-visibility',version:APP_VERSION,date:'2026-11-28',type:'feature',typeLabel:'新增功能',title:'换个视角看自己的角色',summary:'在个人档案选择一位展示角色，切换本人、本会团员和访客，核对各自能看到什么。展示角色可随时撤下。',details:[]},
   {id:'personal-archive-assets',version:APP_VERSION,date:'2026-11-28',type:'improve',typeLabel:'功能优化',title:'从我的资产接着改家宅方案',summary:'每份方案直接列出家具种数和件数。点进原方案单调整用量，保存后返回即可看到新数量。团队记录可按当前公会查看已认领角色的心愿和已获装备。',details:[]},
   {id:'personal-archive-settings',version:APP_VERSION,date:'2026-11-28',type:'fix',typeLabel:'修复BUG',title:'手动登记的角色也可独立设置展示',summary:'站点已允许的来源可以直接保存展示选择，设置个人名片无需配置 WCL 回调。',details:[]},

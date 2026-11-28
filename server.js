@@ -1598,6 +1598,10 @@ function serveFile(res, filePath, req, searchKey) {
           .replace(/(<link rel="canonical" href=")[^"]*/, '$1' + searchOrigin + page.path)
           .replace('class="page active" id="page-home"', 'class="page" id="page-home"')
           .replace('class="page" id="page-' + searchKey + '"', 'class="page active" id="page-' + searchKey + '"')
+          .replace(/<h[12] data-page-heading="([^"]+)"([^>]*)>([\s\S]*?)<\/h[12]>/g, (_, key, attrs, body) => {
+            const tag = key === searchKey ? 'h1' : 'h2';
+            return `<${tag} data-page-heading="${key}"${attrs}>${body}</${tag}>`;
+          })
           .replace('id="pageTitle">首页', 'id="pageTitle">' + (searchKey === 'decor' ? '家宅图鉴' : '国服排行榜'));
       }
       res.writeHead(200, headers);

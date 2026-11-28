@@ -65,7 +65,7 @@
   border: 1px solid #9f885526;
 }
 
-.ws-hero h1 {
+.ws-hero :is(h1,h2) {
   margin: 6px 0 10px;
   color: #eee2ca;
   font: 600 clamp(29px,3vw,43px)/1.2 var(--ws-book);

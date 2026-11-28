@@ -39,7 +39,11 @@ async function verify() {
     await card.getByText('区间统计',{exact:true}).click();
     assert.equal(await card.locator('[data-value=change]').innerText(), '—');
     assert.match(await card.locator('[data-value=coverage]').innerText(), /已采 1 次/);
-    assert.equal(await card.locator('img').evaluate(img => img.complete && img.naturalWidth > 0 && img.clientWidth === 20 && img.clientHeight === 20), true);
+    const icon = card.locator('.wb-art-token');
+    assert.equal(await icon.getAttribute('aria-hidden'), 'true');
+    assert.deepEqual(await icon.evaluate(el => [el.clientWidth, el.clientHeight]), [20, 20]);
+    assert.equal(await icon.evaluate(el => getComputedStyle(el).backgroundImage), 'url("' + base + '/assets/icons/nav/wow-token.svg")');
+    assert.ok((await page.request.get(base + '/assets/icons/nav/wow-token.svg')).ok());
     assert.match(await card.locator('[role=status]').innerText(), /本站读取.+北京时间/);
     assert.equal(await card.getByRole('link').getAttribute('href'), 'https://wowdata.top/wowtoken_retail');
     await card.getByRole('link').focus();
@@ -61,7 +65,7 @@ async function verify() {
     }
     await page.locator('#pageTitle').click();
     assert.equal(await card.isVisible(), false);
-    assert.equal(new URL(page.url()).hash, '#/house/decor');
+    assert.equal(page.url(), base + '/housing-decor');
     let gold = 101234;
     let failing = false;
     let requests = 0;

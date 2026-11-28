@@ -4759,7 +4759,7 @@ img.class-icon[src$=".png"] { border-radius: 3px; }
   border-bottom: 1px solid var(--border-color);
 }
 .ia-brand { display: flex; align-items: center; gap: 8px; }
-.ia-brand-logo { width: 28px; height: 28px; display: block; }
+.ia-brand-logo { width: 28px; height: 28px; display: block; background: url("../assets/brand/wb-shield.svg") center / contain no-repeat; }
 .ia-brand-name { font-size: 15px; font-weight: 700; color: var(--gold); }
 .ia-brand-sub { font-size: 10px; color: var(--text-muted); }
 .ia-tabs { display: flex; align-items: stretch; height: 100%; }
@@ -4815,6 +4815,10 @@ img.class-icon[src$=".png"] { border-radius: 3px; }
 :is(#iaSubnavTeam, #iaSubnavHouse) .ia-pill { gap: 8px; padding-block: 5px; }
 #userCenterModal .uc-tabs > .uc-tab { display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
 .wb-nav-icon { display: block; width: 20px; height: 20px; flex: 0 0 20px; }
+.wb-art-decor { background: url("../assets/icons/nav/decor.svg") center / contain no-repeat; }
+.wb-art-lootdrop { background: url("../assets/icons/nav/lootdrop.svg") center / contain no-repeat; }
+.wb-art-community { background: url("../assets/icons/nav/community.svg") center / contain no-repeat; }
+.wb-art-token { background: url("../assets/icons/nav/wow-token.svg") center / contain no-repeat; }
 :is(#iaSubnavTeam, #iaSubnavHouse, #userCenterModal) button:is(:hover, :focus-visible) > .wb-nav-icon { filter: brightness(1.12); }
 :is(#iaSubnavTeam, #iaSubnavHouse, #userCenterModal) button.active > .wb-nav-icon { filter: brightness(1.16); }
 @media (max-width: 768px) {
@@ -4865,7 +4869,7 @@ img.class-icon[src$=".png"] { border-radius: 3px; }
 .home-hero { text-align: center; padding: 56px 20px 32px; }
 .home-hero-title { margin: 0; font-size: 28px; font-weight: 700; color: var(--text-primary); }
 .search-decor-intro { margin-bottom: 16px; color: var(--text-secondary); }
-.search-decor-intro h1 { margin: 0 0 6px; font-size: 20px; color: var(--text-primary); }
+.search-decor-intro [data-page-heading] { margin: 0 0 6px; font-size: 20px; color: var(--text-primary); }
 .search-decor-intro p { margin: 0; }
 .search-decor-intro a { color: var(--gold); }
 .home-hero-gold { color: var(--gold); }
